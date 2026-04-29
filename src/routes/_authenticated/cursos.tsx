@@ -124,7 +124,7 @@ function CursosPage() {
       setCursos(formattedData);
       setCategorias(catsRes.data || []);
     } catch (error: any) {
-      toast.error("Erro ao carregar dados");
+      toast.error("Erro ao carregar cursos");
     } finally {
       setLoading(false);
     }
@@ -250,7 +250,7 @@ function CursosPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cursos</h1>
-          <p className="text-muted-foreground text-sm">Repositório pessoal de cursos e áreas de membros</p>
+          <p className="text-muted-foreground text-sm">Repositório pessoal de cursos por temas</p>
         </div>
         <Button onClick={handleAddCourse} className="gap-2">
           <Plus size={18} />
@@ -364,8 +364,8 @@ function CursosPage() {
               <h3 className="text-lg font-medium">Nenhum curso cadastrado ainda</h3>
               <p className="text-muted-foreground max-w-xs">
                 {currentTema === "todos" 
-                  ? "Comece adicionando seu primeiro curso ou área de membros."
-                  : `Nenhum curso na categoria "${allTabs.find(t => t.id === currentTema)?.label}" cadastrado.`}
+                  ? "Comece adicionando seu primeiro curso."
+                  : `Nenhum curso no tema "${allTabs.find(t => t.id === currentTema)?.label}" cadastrado.`}
               </p>
             </div>
             <Button onClick={handleAddCourse}>Criar primeiro curso</Button>

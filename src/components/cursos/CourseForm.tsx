@@ -119,13 +119,13 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
       if (error) throw error;
 
-      toast.success("Categoria criada!");
+      toast.success("Tema criado!");
       setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
       form.setValue("categoria_id", data.id);
       setSearchQuery("");
       return data.id;
     } catch (error: any) {
-      toast.error("Erro ao criar categoria");
+      toast.error("Erro ao criar tema");
       return null;
     }
   };
@@ -227,7 +227,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 name="categoria_id"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Categoria</FormLabel>
+                    <FormLabel>Tema</FormLabel>
                     <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -242,7 +242,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                           >
                             {field.value
                               ? categorias.find((cat) => cat.id === field.value)?.nome
-                              : "Selecione a categoria..."}
+                              : "Selecione o tema..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -257,7 +257,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                           <CommandList>
                             <CommandEmpty>
                               <div className="p-2 space-y-2">
-                                <p className="text-xs text-muted-foreground">Nenhuma categoria encontrada.</p>
+                                <p className="text-xs text-muted-foreground">Nenhum tema encontrado.</p>
                                 {searchQuery && (
                                   <Button 
                                     type="button"
@@ -323,33 +323,6 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="tema"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tema (Legado)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um tema" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="ia">IA</SelectItem>
-                      <SelectItem value="trafego_pago">Tráfego Pago</SelectItem>
-                      <SelectItem value="trackeamento">Trackeamento</SelectItem>
-                      <SelectItem value="copywriting">Copywriting</SelectItem>
-                      <SelectItem value="gestao">Gestão</SelectItem>
-                      <SelectItem value="vendas">Vendas</SelectItem>
-                      <SelectItem value="multiplos_temas">Múltiplos Temas</SelectItem>
-                      <SelectItem value="outros">Outros</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}
