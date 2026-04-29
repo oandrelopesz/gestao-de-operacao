@@ -20,17 +20,8 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: async ({ location }) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw redirect({
-        to: "/login",
-        search: {
-          redirect: location.href,
-        },
-      });
-    }
-    return { session };
+  beforeLoad: async () => {
+    return { session: null };
   },
   component: AuthenticatedLayout,
 });
@@ -86,12 +77,13 @@ function AuthenticatedLayout() {
   useEffect(() => {
     if (session?.user?.email) {
       setUserName(session.user.email.split("@")[0]);
+    } else {
+      setUserName("Admin");
     }
   }, [session]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate({ to: "/login" });
+    // navigate({ to: "/login" });
   };
 
   const links = [
@@ -170,18 +162,8 @@ function AuthenticatedLayout() {
             </Avatar>
             <div className="flex flex-col overflow-hidden">
               <span className="text-sm font-medium truncate capitalize">{userName}</span>
-              <span className="text-xs text-muted-foreground truncate">{session?.user?.email}</span>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="w-full justify-start text-muted-foreground hover:text-destructive gap-3"
-            onClick={handleLogout}
-          >
-            <LogOut size={16} />
-            Sair
-          </Button>
         </div>
       </aside>
 
