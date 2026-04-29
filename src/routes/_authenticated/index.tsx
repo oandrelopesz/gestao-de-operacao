@@ -181,7 +181,7 @@ function DemandasPage() {
         
         const { error } = await supabase.from("demandas").insert([{
           ...values,
-          user_id: user.id,
+          user_id: userId,
           ordem: maxOrder + 1
         }]);
         if (error) throw error;
@@ -230,7 +230,7 @@ function DemandasPage() {
       const { error } = await supabase.from("demandas").insert([{
         ...rest,
         titulo: `${rest.titulo} (Cópia)`,
-        user_id: user.id,
+        user_id: userId,
       }]);
 
       if (error) throw error;
@@ -260,7 +260,7 @@ function DemandasPage() {
       const { data, error } = await supabase.from("demandas").insert([{
         titulo,
         status: status as any,
-        user_id: user.id,
+        user_id: userId,
         cliente_id: null,
         prioridade: "media" as const,
         ordem: maxOrder + 1,

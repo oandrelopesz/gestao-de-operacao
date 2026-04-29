@@ -27,7 +27,8 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
-  const { session } = Route.useRouteContext();
+  const context = Route.useRouteContext() as any;
+  const session = context?.session;
   const navigate = useNavigate();
   const [userName, setUserName] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
