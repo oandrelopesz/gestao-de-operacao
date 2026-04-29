@@ -108,7 +108,11 @@ function ClientesPage() {
       
       const enrichedData = (data as any[] || []).map(cli => {
         const cliSaldos = (saldos || []).filter(s => s.cliente_id === cli.id);
-        const summary = cliSaldos.map(s => `${s.plataforma.charAt(0).toUpperCase() + s.plataforma.slice(1)} ${formatBRL(s.verba_diaria_calc * 30)}`).join(" / ");
+        const summary = cliSaldos.map(s => {
+          const platName = s.plataforma ? s.plataforma.charAt(0).toUpperCase() + s.plataforma.slice(1) : "Outras";
+          const verba = (s.verba_diaria_calc || 0) * 30;
+          return `${platName} ${formatBRL(verba)}`;
+        }).join(" / ");
         return { ...cli, saldo_ads_summary: summary };
       });
       
