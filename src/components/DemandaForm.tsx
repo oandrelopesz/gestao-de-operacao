@@ -24,9 +24,12 @@ const demandaSchema = z.object({
   titulo: z.string().min(2, "Título é obrigatório"),
   descricao: z.string().optional(),
   cliente_id: z.string().min(1, "Selecione um cliente"),
-  status: z.enum(["fazer_hoje", "fazer_amanha", "fazer_depois_amanha", "standby", "feito"]),
+  status: z.enum(["recorrentes", "fazer_hoje", "fazer_amanha", "fazer_depois_amanha", "standby", "feito"]),
   prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
   prazo: z.string().optional(),
+  recorrente: z.boolean().default(false),
+  frequencia: z.enum(["diaria", "semanal", "quinzenal", "mensal", "customizada"]).optional().nullable(),
+  dia_referencia: z.string().optional().nullable(),
 });
 
 export type DemandaFormValues = z.infer<typeof demandaSchema>;
@@ -47,6 +50,9 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
       status: initialValues?.status || "fazer_hoje",
       prioridade: initialValues?.prioridade || "media",
       prazo: initialValues?.prazo || "",
+      recorrente: initialValues?.recorrente || false,
+      frequencia: initialValues?.frequencia || "semanal",
+      dia_referencia: initialValues?.dia_referencia || "",
     },
   });
 
@@ -109,6 +115,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
+                    <SelectItem value="recorrentes">Recorrentes</SelectItem>
                     <SelectItem value="fazer_hoje">Fazer hoje</SelectItem>
                     <SelectItem value="fazer_amanha">Fazer amanhã</SelectItem>
                     <SelectItem value="fazer_depois_amanha">Fazer depois de amanhã</SelectItem>
@@ -143,6 +150,78 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
               </FormItem>
             )}
           />
+        </div>
+
+        <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+          <FormField
+            control={form.control}
+            name="recorrente"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between">
+                <div>
+                  <FormLabel className="text-base">Tarefa Recorrente</FormLabel>
+                  <p className="text-xs text-muted-foreground">Repetir esta tarefa periodicamente</p>
+                </div>
+                <FormControl>
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    checked={field.value}
+                    onChange={(e) => {
+                      field.onChange(e.target.checked);
+                      if (e.target.checked) {
+                        form.setValue("status", "recorrentes");
+                      } else if (form.getValues("status") === "recorrentes") {
+                        form.setValue("status", "fazer_hoje");
+                      }
+                    }}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          {form.watch("recorrente") && (
+            <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <FormField
+                control={form.control}
+                name="frequencia"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Frequência</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || "semanal"}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Frequência" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="diaria">Diária</SelectItem>
+                        <SelectItem value="semanal">Semanal</SelectItem>
+                        <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                        <SelectItem value="mensal">Mensal</SelectItem>
+                        <SelectItem value="customizada">Customizada</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="dia_referencia"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dia de Referência</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Toda segunda" {...field} value={field.value || ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
         </div>
 
         <FormField
