@@ -226,66 +226,78 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 name="categoria_id"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="flex items-center justify-between">
-                      Categoria
-                      {!isAddingCategory && (
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 px-2 text-[10px] gap-1"
-                          onClick={() => setIsAddingCategory(true)}
-                        >
-                          <Plus size={10} /> Nova
-                        </Button>
-                      )}
-                    </FormLabel>
-                    {isAddingCategory ? (
-                      <div className="flex gap-2">
-                        <Input 
-                          placeholder="Nome da categoria" 
-                          value={newCategoryName}
-                          onChange={(e) => setNewCategoryName(e.target.value)}
-                          className="h-9"
-                          autoFocus
-                        />
-                        <Button 
-                          type="button" 
-                          size="sm" 
-                          onClick={handleAddCategory}
-                          className="h-9 px-3"
-                        >
-                          OK
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => setIsAddingCategory(false)}
-                          className="h-9 px-3"
-                        >
-                          X
-                        </Button>
-                      </div>
-                    ) : (
-                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <FormLabel>Categoria</FormLabel>
+                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                      <PopoverTrigger asChild>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione uma categoria" />
-                          </SelectTrigger>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openCombobox}
+                            className={cn(
+                              "w-full justify-between font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value
+                              ? categorias.find((cat) => cat.id === field.value)?.nome
+                              : "Selecione a categoria..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
                         </FormControl>
-                        <SelectContent>
-                          {categorias.map(cat => (
-                            <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
-                          ))}
-                          {categorias.length === 0 && (
-                            <div className="p-2 text-xs text-center text-muted-foreground">
-                              Nenhuma categoria criada
-                            </div>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    )}
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Buscar ou criar..." 
+                            value={searchQuery}
+                            onValueChange={setSearchQuery}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              <div className="p-2 space-y-2">
+                                <p className="text-xs text-muted-foreground">Nenhuma categoria encontrada.</p>
+                                {searchQuery && (
+                                  <Button 
+                                    type="button"
+                                    size="sm" 
+                                    className="w-full h-8 text-xs gap-1"
+                                    onClick={() => {
+                                      setNewCategoryName(searchQuery);
+                                      handleAddCategory();
+                                      setOpenCombobox(false);
+                                      setSearchQuery("");
+                                    }}
+                                  >
+                                    <Plus size={12} /> Criar "{searchQuery}"
+                                  </Button>
+                                )}
+                              </div>
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {categorias.map((cat) => (
+                                <CommandItem
+                                  key={cat.id}
+                                  value={cat.nome}
+                                  onSelect={() => {
+                                    form.setValue("categoria_id", cat.id);
+                                    setOpenCombobox(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      field.value === cat.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {cat.nome}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
