@@ -186,6 +186,22 @@ function SaldoPage() {
     } catch (e: any) {
       toast.error(e.message || "Erro ao salvar");
     } finally {
+  const handleUpdateClient = async (values: ClientFormValues) => {
+    if (!editingClient) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("clientes")
+        .update(values)
+        .eq("id", editingClient.id);
+      if (error) throw error;
+      toast.success("Dados do cliente atualizados");
+      setClientModalOpen(false);
+      setEditingClient(null);
+      fetchSaldo();
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao atualizar cliente");
+    } finally {
       setSaving(false);
     }
   };
@@ -226,14 +242,22 @@ function SaldoPage() {
     }
   };
 
-  const fetchHistory = async (record: any) => {
+  const fetchHistory = async (record: any, consolidated: boolean = false) => {
     setSelectedForHistory(record);
+    setHistoryIsConsolidated(consolidated);
     setHistoryOpen(true);
-    const { data, error } = await supabase
+    
+    let query = supabase
       .from("recargas")
-      .select("*")
-      .eq("saldo_ads_id", record.id)
-      .order("data_recarga", { ascending: false });
+      .select("*, saldo_ads!inner(plataformas)");
+      
+    if (consolidated) {
+      query = query.eq("saldo_ads.cliente_id", record.cliente_id);
+    } else {
+      query = query.eq("saldo_ads_id", record.id);
+    }
+    
+    const { data, error } = await query.order("data_recarga", { ascending: false });
     
     if (error) {
       toast.error("Erro ao carregar histórico");
