@@ -13,7 +13,8 @@ import {
   DollarSign,
   Target,
   BookOpen,
-  Book
+  Book,
+  ClipboardList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -92,6 +93,7 @@ function AuthenticatedLayout() {
 
   const links = [
     { label: "Demandas", icon: <LayoutDashboard size={18} />, to: "/" },
+    { label: "Pendências", icon: <ClipboardList size={18} />, to: "/pendencias" },
     { label: "Saldo", icon: <Wallet size={18} />, to: "/saldo" },
     { label: "NPS de Clientes", icon: <MessageSquare size={18} />, to: "/nps" },
     { label: "Clientes Ativos", icon: <Users size={18} />, to: "/clientes" },
