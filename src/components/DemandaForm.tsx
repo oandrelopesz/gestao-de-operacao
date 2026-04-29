@@ -28,8 +28,9 @@ const demandaSchema = z.object({
   prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
   prazo: z.string().nullable().optional(),
   recorrente: z.boolean(),
-  frequencia: z.enum(["diaria", "semanal", "quinzenal", "mensal", "customizada"]).nullable().optional(),
-  dia_referencia: z.string().nullable().optional(),
+  frequencia_tipo: z.enum(["diaria", "semanal", "quinzenal", "mensal", "customizada"]).nullable().optional(),
+  frequencia_dia_mes: z.number().nullable().optional(),
+  frequencia_intervalo_dias: z.number().nullable().optional(),
 });
 
 export type DemandaFormValues = z.infer<typeof demandaSchema>;
