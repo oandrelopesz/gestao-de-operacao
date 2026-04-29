@@ -196,11 +196,12 @@ function DemandasPage() {
   const filteredDemandas = useMemo(() => {
     return demandas.filter(d => {
       const matchesCliente = filterCliente === "all" || d.cliente_id === filterCliente;
+      const matchesAgencia = filterAgencia === "all" || d.clientes?.agencia === filterAgencia;
       const matchesSearch = d.titulo.toLowerCase().includes(searchQuery.toLowerCase()) || 
                            (d.clientes?.nome && d.clientes.nome.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesCliente && matchesSearch;
+      return matchesCliente && matchesAgencia && matchesSearch;
     });
-  }, [demandas, filterCliente, searchQuery]);
+  }, [demandas, filterCliente, filterAgencia, searchQuery]);
 
   // Drag and Drop Logic
   const onDragStart = (event: DragStartEvent) => {
