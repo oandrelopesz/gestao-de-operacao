@@ -82,7 +82,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
                 <SelectContent>
                   {clientes.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.nome}
+                      {c.nome} {c.agencia && `— ${c.agencia.charAt(0).toUpperCase() + c.agencia.slice(1)}`}
                     </SelectItem>
                   ))}
                   {clientes.length === 0 && (
