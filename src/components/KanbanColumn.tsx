@@ -57,7 +57,10 @@ export function KanbanColumn({
   };
 
   return (
-    <div className="flex flex-col w-[280px] shrink-0 bg-muted/30 rounded-lg p-2 max-h-full">
+    <div className={cn(
+      "flex flex-col w-[280px] shrink-0 rounded-lg p-2 max-h-full",
+      id === "recorrentes" ? "bg-primary/5 border-l-2 border-primary" : "bg-muted/30"
+    )}>
       <div className="flex items-center justify-between px-2 mb-4">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-sm">{title}</h3>

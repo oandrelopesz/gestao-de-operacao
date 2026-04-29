@@ -22,14 +22,14 @@ import { Textarea } from "@/components/ui/textarea";
 
 const demandaSchema = z.object({
   titulo: z.string().min(2, "Título é obrigatório"),
-  descricao: z.string().optional().nullable(),
+  descricao: z.string().default("").optional(),
   cliente_id: z.string().min(1, "Selecione um cliente"),
   status: z.enum(["recorrentes", "fazer_hoje", "fazer_amanha", "fazer_depois_amanha", "standby", "feito"]),
   prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
-  prazo: z.string().optional().nullable(),
+  prazo: z.string().default("").optional(),
   recorrente: z.boolean(),
   frequencia: z.enum(["diaria", "semanal", "quinzenal", "mensal", "customizada"]).optional().nullable(),
-  dia_referencia: z.string().optional().nullable(),
+  dia_referencia: z.string().default("").optional().nullable(),
 });
 
 export type DemandaFormValues = z.infer<typeof demandaSchema>;
@@ -231,7 +231,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
             <FormItem>
               <FormLabel>Prazo (Opcional)</FormLabel>
               <FormControl>
-                <Input type="date" {...field} />
+                <Input type="date" {...field} value={field.value || ""} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -245,7 +245,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
             <FormItem>
               <FormLabel>Descrição</FormLabel>
               <FormControl>
-                <Textarea placeholder="Mais detalhes sobre a tarefa..." {...field} />
+                <Textarea placeholder="Mais detalhes sobre a tarefa..." {...field} value={field.value || ""} />
               </FormControl>
               <FormMessage />
             </FormItem>
