@@ -459,6 +459,11 @@ function ClienteCard({
                   Onboarding
                 </Badge>
               )}
+              {Number(cliente.verba_ads || 0) === 0 && (
+                <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
+                  Sem verba
+                </Badge>
+              )}
             </div>
             {cliente.nicho && <p className="text-xs text-muted-foreground mt-0.5 truncate">{cliente.nicho}</p>}
           </div>
