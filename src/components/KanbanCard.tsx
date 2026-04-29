@@ -75,16 +75,18 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
       {...attributes}
       {...listeners}
       className={cn(
-        "group relative outline-none rounded-md mb-2 cursor-grab active:cursor-grabbing",
+        "group relative outline-none rounded-md mb-2",
+        !isRecorrenteMae && "cursor-grab active:cursor-grabbing",
         isDragging && "opacity-50 z-50",
-        isRecorrenteMae && !isDueToday && "opacity-70"
+        isRecorrenteMae && !isDueToday && !isDoneForNow && "opacity-70"
       )}
     >
       <Card
         className={cn(
           "hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden",
           isDone && "opacity-60",
-          isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20"
+          isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20",
+          isDoneForNow && "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50"
         )}
         onClick={(e) => {
           e.stopPropagation();
