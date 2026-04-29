@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MoreVertical, Pencil, Copy, Trash2 } from "lucide-react";
+import { Calendar, MoreVertical, Pencil, Copy, Trash2, Repeat, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -21,6 +21,10 @@ interface Demanda {
   prioridade: "baixa" | "media" | "alta" | "urgente";
   prazo?: string;
   cliente_id: string;
+  recorrente?: boolean;
+  frequencia?: string;
+  dia_referencia?: string;
+  ultima_execucao?: string;
   clientes?: { nome: string; agencia?: string };
 }
 
@@ -28,6 +32,7 @@ interface KanbanCardProps {
   demanda: Demanda;
   onEdit: (demanda: Demanda) => void;
   onDelete: (id: string, name: string) => void;
+  onComplete?: (id: string) => void;
 }
 
 const priorityColors = {
@@ -37,7 +42,7 @@ const priorityColors = {
   urgente: "bg-red-50 text-red-700 border-red-200",
 };
 
-export function KanbanCard({ demanda, onEdit, onDelete }: KanbanCardProps) {
+export function KanbanCard({ demanda, onEdit, onDelete, onComplete }: KanbanCardProps) {
   const {
     attributes,
     listeners,
@@ -59,6 +64,17 @@ export function KanbanCard({ demanda, onEdit, onDelete }: KanbanCardProps) {
     if (e.key === "Delete" || e.key === "Backspace") {
       onDelete(demanda.id, demanda.titulo);
     }
+  };
+
+  const timeSinceLastExecution = (dateString?: string) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return "Hoje";
+    if (diffDays === 1) return "Ontem";
+    return `há ${diffDays} dias`;
   };
 
   return (
@@ -83,12 +99,29 @@ export function KanbanCard({ demanda, onEdit, onDelete }: KanbanCardProps) {
         />
         <CardContent className="p-3 space-y-3">
           <div className="flex items-start justify-between gap-2">
-            <h4 className={cn(
-              "text-sm font-medium leading-tight",
-              isDone && "line-through text-muted-foreground"
-            )}>
-              {demanda.titulo}
-            </h4>
+            <div className="flex flex-col gap-1 w-full">
+              <div className="flex items-center gap-1.5">
+                {demanda.recorrente && <Repeat size={12} className="text-primary shrink-0" />}
+                <h4 className={cn(
+                  "text-sm font-medium leading-tight",
+                  isDone && "line-through text-muted-foreground"
+                )}>
+                  {demanda.titulo}
+                </h4>
+              </div>
+              {demanda.recorrente && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-[9px] py-0 px-1 font-normal bg-primary/10 text-primary border-none">
+                    {demanda.frequencia} {demanda.dia_referencia && `• ${demanda.dia_referencia}`}
+                  </Badge>
+                  {demanda.ultima_execucao && (
+                    <span className="text-[9px] text-muted-foreground">
+                      Última: {timeSinceLastExecution(demanda.ultima_execucao)}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
             <div onClick={(e) => e.stopPropagation()}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -115,6 +148,21 @@ export function KanbanCard({ demanda, onEdit, onDelete }: KanbanCardProps) {
           </div>
 
           <div className="flex flex-wrap gap-1.5 items-center">
+            {demanda.recorrente && onComplete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[10px] gap-1 hover:bg-emerald-50 hover:text-emerald-600 text-muted-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onComplete(demanda.id);
+                }}
+              >
+                <CheckCircle2 size={12} />
+                Concluir execução
+              </Button>
+            )}
+
             {demanda.clientes?.nome && (
               <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal border-muted-foreground/20">
                 {demanda.clientes.nome} {demanda.clientes.agencia && `— ${demanda.clientes.agencia.charAt(0).toUpperCase() + demanda.clientes.agencia.slice(1)}`}

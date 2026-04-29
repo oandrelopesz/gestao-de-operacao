@@ -16,6 +16,10 @@ interface Demanda {
   prazo?: string;
   cliente_id: string;
   clientes?: { nome: string };
+  recorrente?: boolean;
+  frequencia?: string;
+  dia_referencia?: string;
+  ultima_execucao?: string;
 }
 
 interface KanbanColumnProps {
@@ -26,6 +30,7 @@ interface KanbanColumnProps {
   onFullAdd: (status: string) => void;
   onEdit: (demanda: Demanda) => void;
   onDelete: (id: string, name: string) => void;
+  onComplete?: (id: string) => void;
 }
 
 export function KanbanColumn({
@@ -36,6 +41,7 @@ export function KanbanColumn({
   onFullAdd,
   onEdit,
   onDelete,
+  onComplete,
 }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({ id });
   const [isAdding, setIsAdding] = useState(false);
@@ -57,7 +63,10 @@ export function KanbanColumn({
   };
 
   return (
-    <div className="flex flex-col w-[280px] shrink-0 bg-muted/30 rounded-lg p-2 max-h-full">
+    <div className={cn(
+      "flex flex-col w-[280px] shrink-0 rounded-lg p-2 max-h-full",
+      id === "recorrentes" ? "bg-primary/5 border-l-2 border-primary" : "bg-muted/30"
+    )}>
       <div className="flex items-center justify-between px-2 mb-4">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-sm">{title}</h3>
@@ -81,6 +90,7 @@ export function KanbanColumn({
               demanda={demanda}
               onEdit={onEdit}
               onDelete={onDelete}
+              onComplete={onComplete}
             />
           ))}
           {demandas.length === 0 && !isAdding && (

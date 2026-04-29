@@ -57,6 +57,7 @@ import { KanbanCard } from "@/components/KanbanCard";
 import { cn } from "@/lib/utils";
 
 const COLUMNS = [
+  { id: "recorrentes", title: "Recorrentes" },
   { id: "fazer_hoje", title: "Fazer hoje" },
   { id: "fazer_amanha", title: "Fazer amanhã" },
   { id: "fazer_depois_amanha", title: "Fazer depois de amanhã" },
@@ -173,9 +174,6 @@ function DemandasPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      // We need at least one client for the quick add because of the form schema, 
-      // but in a real app we might make client_id optional or have a default.
-      // For now, let's use the first client if available.
       if (clientes.length === 0) {
         toast.error("Cadastre um cliente primeiro para usar o adicionar rápido.");
         return;
@@ -184,13 +182,17 @@ function DemandasPage() {
       const columnDemandas = demandas.filter(d => d.status === status);
       const maxOrder = columnDemandas.length > 0 ? Math.max(...columnDemandas.map(d => d.ordem || 0)) : -1;
 
+      const isRecorrente = status === "recorrentes";
+
       const { error } = await supabase.from("demandas").insert([{
         titulo,
         status: status as any,
         user_id: user.id,
         cliente_id: clientes[0].id,
         prioridade: "media" as const,
-        ordem: maxOrder + 1
+        ordem: maxOrder + 1,
+        recorrente: isRecorrente,
+        frequencia: isRecorrente ? "semanal" : null
       }]);
 
       if (error) throw error;
@@ -211,6 +213,20 @@ function DemandasPage() {
       toast.error(error.message || "Erro ao deletar");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleCompleteExecution = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("demandas")
+        .update({ ultima_execucao: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success("Execução registrada!");
+      fetchDemandas();
+    } catch (error: any) {
+      toast.error("Erro ao registrar execução");
     }
   };
 
@@ -245,7 +261,6 @@ function DemandasPage() {
 
     if (!isActiveTask) return;
 
-    // Implemented logic to handle dropping over a column or another task
     const activeTask = demandas.find(d => d.id === activeId);
     if (!activeTask) return;
 
@@ -263,7 +278,11 @@ function DemandasPage() {
           : prev.length;
 
         const updated = [...prev];
-        updated[activeIndex] = { ...updated[activeIndex], status: overStatus };
+        updated[activeIndex] = { 
+          ...updated[activeIndex], 
+          status: overStatus,
+          recorrente: overStatus === "recorrentes" ? true : updated[activeIndex].recorrente
+        };
         
         return arrayMove(updated, activeIndex, overIndex);
       });
@@ -279,14 +298,6 @@ function DemandasPage() {
     const activeId = active.id;
     const overId = over.id;
 
-    if (activeId === overId) {
-      // Potentially no change, but we should sync order if moved within same column
-      // fetchDemandas() will fix it if something went wrong
-    }
-
-    // Sync with database
-    // Simplified sync: update status and order for all relevant items
-    // In a production app, we would only update changed items
     const activeTask = demandas.find(d => d.id === activeId);
     if (!activeTask) return;
 
@@ -294,28 +305,27 @@ function DemandasPage() {
     const overTask = demandas.find(d => d.id === overId);
     if (overTask) overStatus = overTask.status;
     else if (!COLUMNS.some(c => c.id === overId)) {
-        // If not a column ID and not a task, something is wrong
         return;
     }
 
+    if (activeTask.recorrente && overStatus !== "recorrentes") {
+      const confirm = window.confirm("Deseja desativar a recorrência desta tarefa?");
+      if (!confirm) {
+        fetchDemandas();
+        return;
+      }
+    }
+
     try {
-      // Re-order locally first for responsiveness
-      const oldIndex = demandas.findIndex(d => d.id === activeId);
-      const newIndex = demandas.findIndex(d => d.id === overId);
-      
-      const newDemandas = arrayMove([...demandas], oldIndex, newIndex === -1 ? oldIndex : newIndex);
-      
-      // Update the moved task
       const { error } = await supabase
         .from("demandas")
         .update({ 
           status: overStatus as any,
+          recorrente: overStatus === "recorrentes" ? true : (activeTask.recorrente && overStatus !== "recorrentes" ? false : activeTask.recorrente)
         })
         .eq("id", String(activeId));
       
       if (error) throw error;
-      
-      // Better way: Update status and then refresh to get correct orders from DB
       fetchDemandas();
     } catch (error: any) {
       toast.error("Erro ao sincronizar movimento");
@@ -422,6 +432,7 @@ function DemandasPage() {
                       setDeletingId(id);
                       setDeletingName(name);
                     }}
+                    onComplete={handleCompleteExecution}
                   />
                 ))}
               </div>
