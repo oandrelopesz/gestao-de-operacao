@@ -40,7 +40,7 @@ interface SaldoAdsFormProps {
 }
 
 export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormProps) {
-  const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: string; verba_ads: number }[]>([]);
+  const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: string; verba_ads: number; tipo_verba: string; verba_total_contratada: number; data_inicio: string; data_limite_verba: string }[]>([]);
 
   const form = useForm<SaldoAdsFormValues>({
     resolver: zodResolver(saldoAdsSchema),
@@ -59,7 +59,7 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
 
   useEffect(() => {
     const fetchClientes = async () => {
-      const { data } = await supabase.from("clientes").select("id, nome, agencia, verba_ads").order("nome");
+      const { data } = await supabase.from("clientes").select("id, nome, agencia, verba_ads, tipo_verba, verba_total_contratada, data_inicio, data_limite_verba").order("nome");
       if (data) setClientes(data as any);
     };
     fetchClientes();
@@ -71,7 +71,15 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
     if (!initialValues?.cliente_id && selectedClienteId) {
       const cliente = clientes.find(c => c.id === selectedClienteId);
       if (cliente && !form.getValues("verba_diaria")) {
-        const calculated = (cliente.verba_ads || 0) / 30;
+        let calculated = 0;
+        if (cliente.tipo_verba === "total_periodo" && cliente.data_limite_verba && cliente.data_inicio) {
+          const inicio = new Date(cliente.data_inicio);
+          const fim = new Date(cliente.data_limite_verba);
+          const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+          calculated = (cliente.verba_total_contratada || 0) / dias;
+        } else {
+          calculated = (cliente.verba_ads || 0) / 30;
+        }
         form.setValue("verba_diaria", calculated);
         setVerbaDiariaDisplay(maskBRLInput(String(Math.round(calculated * 100))));
       }
