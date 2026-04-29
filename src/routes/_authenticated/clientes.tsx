@@ -787,8 +787,8 @@ function ClientesPage() {
         </div>
       )}
 
-      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) setEditing(null); }}>
-        <DialogContent className="sm:max-w-[520px]">
+      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) { setEditing(null); setEditingSaldo(null); } }}>
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar cliente" : "Novo cliente"}</DialogTitle>
             <DialogDescription>Preencha os dados do cliente. O status é calculado a partir do NPS.</DialogDescription>
@@ -808,7 +808,9 @@ function ClientesPage() {
               tipo_verba: editing.tipo_verba || "mensal",
               verba_total_contratada: editing.verba_total_contratada ?? null,
               data_limite_verba: editing.data_limite_verba || "",
-            } : { agencia: agencia === "todos" ? "effect" : agencia } as any}
+              metodo_pagamento: editingSaldo?.metodo_pagamento || "pix",
+              plataformas: editingSaldo?.plataformas || [],
+            } : { agencia: agencia === "todos" ? "effect" : agencia, metodo_pagamento: "pix", plataformas: [] } as any}
           />
         </DialogContent>
       </Dialog>
