@@ -133,14 +133,7 @@ function DemandasPage() {
     else setClientes((data as any) || []);
   };
 
-  const catchUpRecorrentes = async () => {
-    try {
-      await supabase.functions.invoke('materializar-recorrentes');
-      fetchDemandas();
-    } catch (err) {
-      console.error("Erro no catch-up de recorrentes:", err);
-    }
-  };
+  // Removido catchUpRecorrentes para evitar materialização automática em Fazer Hoje
 
   const fetchDemandas = async () => {
     const { data, error } = await supabase
