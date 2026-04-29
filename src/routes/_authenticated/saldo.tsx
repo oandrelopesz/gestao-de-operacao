@@ -110,6 +110,7 @@ function SaldoPage() {
   const [showPausados, setShowPausados] = useState(false);
   const [showCartao, setShowCartao] = useState(true);
   const [sortBy, setSortBy] = useState<string>("dias_restantes");
+  const { cliente_id: searchClientId, highlight: searchHighlight } = Route.useSearch() as any;
   
   const [modalOpen, setModalOpen] = useState(false);
   const [clientModalOpen, setClientModalOpen] = useState(false);
@@ -123,6 +124,29 @@ function SaldoPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [historyData, setHistoryData] = useState<any[]>([]);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searchClientId) {
+      setSearchQuery("");
+      setFilterAgencia("all");
+      setFilterPlataforma("all");
+      setFilterStatus("all");
+      setShowPausados(true);
+    }
+    if (searchHighlight) {
+      setHighlightedId(searchHighlight);
+      setTimeout(() => {
+        const el = document.getElementById(`card-${searchHighlight}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 500);
+      
+      const timer = setTimeout(() => setHighlightedId(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchClientId, searchHighlight]);
 
   useEffect(() => {
     fetchSaldo();
@@ -615,10 +639,12 @@ function SaldoPage() {
             return (
               <Card 
                 key={group.cliente_id} 
+                id={`card-${group.cliente_id}`}
                 className={cn(
                   "group relative border-l-4 transition-all hover:shadow-md flex flex-col",
                   getStatusColor(group.pior_status_alerta),
-                  isPausado && "opacity-75"
+                  isPausado && "opacity-75",
+                  highlightedId === group.cliente_id && "ring-2 ring-primary animate-pulse shadow-lg"
                 )}
               >
                 <CardHeader className="pb-3">

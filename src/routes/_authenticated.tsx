@@ -7,14 +7,15 @@ import {
   Wallet, 
   MessageSquare, 
   LogOut,
-   ChevronRight,
-   User as UserIcon,
-   Bell
- } from "lucide-react";
- import { Button } from "@/components/ui/button";
- import { Separator } from "@/components/ui/separator";
- import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
- import { NotificationBell } from "@/components/NotificationBell";
+  ChevronRight,
+  User as UserIcon,
+  Bell
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { NotificationBell } from "@/components/NotificationBell";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -37,6 +38,48 @@ function AuthenticatedLayout() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [topAlert, setTopAlert] = useState<{ status: string, id: string, cliente_id: string } | null>(null);
+
+  useEffect(() => {
+    const fetchTopAlert = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("saldo_ads_view" as any)
+          .select("id, status_alerta, cliente_id")
+          .filter("status_alerta", "in", '("alerta", "critico", "zerado")');
+
+        if (error) throw error;
+        
+        if (data && (data as any[]).length > 0) {
+          const sorted = [...(data as any[])].sort((a: any, b: any) => {
+            const order: any = { zerado: 0, critico: 1, alerta: 2 };
+            return (order[a.status_alerta] ?? 99) - (order[b.status_alerta] ?? 99);
+          });
+          setTopAlert({
+            status: sorted[0].status_alerta,
+            id: sorted[0].id,
+            cliente_id: sorted[0].cliente_id
+          });
+        } else {
+          setTopAlert(null);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar top alerta:", err);
+      }
+    };
+
+    fetchTopAlert();
+    
+    const channel = supabase
+      .channel('top-alerta-global')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'saldo_ads' }, () => fetchTopAlert())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recargas' }, () => fetchTopAlert())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -56,8 +99,29 @@ function AuthenticatedLayout() {
     { label: "Clientes Ativos", icon: <Users size={18} />, to: "/clientes" },
   ];
 
+  const getAlertColor = (status: string) => {
+    if (status === 'zerado') return 'bg-red-700';
+    if (status === 'critico') return 'bg-red-500';
+    return 'bg-amber-500';
+  };
+
   return (
     <div className="flex min-h-screen bg-background text-foreground">
+      {/* Top indicator bar */}
+      {topAlert && (
+        <div 
+          className={cn(
+            "fixed top-0 left-0 right-0 h-[3px] z-[100] cursor-pointer animate-pulse",
+            getAlertColor(topAlert.status)
+          )}
+          onClick={() => navigate({ 
+            to: "/saldo", 
+            search: (prev: any) => ({ ...prev, cliente_id: topAlert.cliente_id, highlight: topAlert.id }) 
+          })}
+          title="Clique para ver alertas de saldo"
+        />
+      )}
+
       {/* Sidebar Mobile Overlay */}
       {isSidebarOpen && (
         <div 
@@ -140,4 +204,3 @@ function AuthenticatedLayout() {
     </div>
   );
 }
-

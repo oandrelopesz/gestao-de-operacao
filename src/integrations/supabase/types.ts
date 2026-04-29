@@ -533,7 +533,11 @@ export type Database = {
           cliente_agencia: Database["public"]["Enums"]["agencia_enum"] | null
           cliente_id: string | null
           cliente_nome: string | null
+          cliente_status_operacional:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
           created_at: string | null
+          data_ultima_recarga: string | null
           dias_restantes: number | null
           id: string | null
           metodo_pagamento:
@@ -541,6 +545,7 @@ export type Database = {
             | null
           observacoes: string | null
           plataformas: string[] | null
+          qtd_recargas: number | null
           saldo_atual_estimado: number | null
           saldo_total_acumulado: number | null
           status_alerta: string | null
@@ -548,7 +553,6 @@ export type Database = {
           user_id: string | null
           verba_diaria: number | null
           verba_diaria_calc: number | null
-          verba_mensal_estimada: number | null
         }
         Relationships: [
           {
