@@ -242,7 +242,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                           >
                             {field.value
                               ? categorias.find((cat) => cat.id === field.value)?.nome
-                              : "Selecione a categoria..."}
+                              : "Selecione o tema..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
