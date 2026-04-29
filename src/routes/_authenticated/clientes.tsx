@@ -64,6 +64,7 @@ interface ClienteView {
   verba_ads: number;
   observacoes: string | null;
   arquivado: boolean;
+  em_onboarding: boolean;
   ultima_nps_score: number | null;
   ultima_nps_data: string | null;
   nps_status: "ancora" | "saudavel" | "em_risco" | "critico" | "sem_avaliacao";
@@ -359,6 +360,7 @@ function ClientesPage() {
               data_inicio: editing.data_inicio,
               verba_ads: Number(editing.verba_ads || 0),
               observacoes: editing.observacoes || "",
+              em_onboarding: editing.em_onboarding || false,
             } : { agencia }}
           />
         </DialogContent>
@@ -449,7 +451,14 @@ function ClienteCard({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 pr-6">
-            <CardTitle className="text-base font-semibold truncate">{cliente.nome}</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-semibold truncate">{cliente.nome}</CardTitle>
+              {cliente.em_onboarding && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
+                  Onboarding
+                </Badge>
+              )}
+            </div>
             {cliente.nicho && <p className="text-xs text-muted-foreground mt-0.5 truncate">{cliente.nicho}</p>}
           </div>
           <Badge variant="outline" className={cn("font-normal text-[10px] shrink-0", nps.classes)}>

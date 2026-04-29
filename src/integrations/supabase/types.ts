@@ -20,6 +20,7 @@ export type Database = {
           arquivado: boolean
           created_at: string
           data_inicio: string
+          em_onboarding: boolean | null
           id: string
           nicho: string | null
           nome: string
@@ -33,6 +34,7 @@ export type Database = {
           arquivado?: boolean
           created_at?: string
           data_inicio?: string
+          em_onboarding?: boolean | null
           id?: string
           nicho?: string | null
           nome: string
@@ -46,6 +48,7 @@ export type Database = {
           arquivado?: boolean
           created_at?: string
           data_inicio?: string
+          em_onboarding?: boolean | null
           id?: string
           nicho?: string | null
           nome?: string

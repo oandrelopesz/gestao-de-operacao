@@ -1,0 +1,1 @@
+ALTER TABLE public.clientes ADD COLUMN em_onboarding BOOLEAN DEFAULT false;

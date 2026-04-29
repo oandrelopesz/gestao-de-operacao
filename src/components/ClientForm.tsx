@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AGENCIAS, maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
 
 const clientSchema = z.object({
@@ -29,6 +30,7 @@ const clientSchema = z.object({
   data_inicio: z.string().min(1, "Informe a data de início"),
   verba_ads: z.number().min(0),
   observacoes: z.string().optional(),
+  em_onboarding: z.boolean(),
 });
 
 export type ClientFormValues = z.infer<typeof clientSchema>;
@@ -49,6 +51,7 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       data_inicio: initialValues?.data_inicio || new Date().toISOString().slice(0, 10),
       verba_ads: initialValues?.verba_ads ?? 0,
       observacoes: initialValues?.observacoes || "",
+      em_onboarding: initialValues?.em_onboarding ?? false,
     },
   });
 
@@ -160,6 +163,29 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
                 <Textarea rows={3} placeholder="Notas, contexto, links..." {...field} />
               </FormControl>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="em_onboarding"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>
+                  Em Onboarding
+                </FormLabel>
+                <p className="text-sm text-muted-foreground">
+                  Marque para exibir um destaque de onboarding no card do cliente.
+                </p>
+              </div>
             </FormItem>
           )}
         />
