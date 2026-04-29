@@ -81,12 +81,26 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       tipo_verba: initialValues?.tipo_verba || "mensal",
       verba_total_contratada: initialValues?.verba_total_contratada ?? null,
       data_limite_verba: initialValues?.data_limite_verba || "",
+      metodo_pagamento: initialValues?.metodo_pagamento || "pix",
+      plataformas: initialValues?.plataformas || [],
     },
   });
 
   const [verbaDisplay, setVerbaDisplay] = useState(
     initialValues?.verba_ads ? maskBRLInput(String(Math.round((initialValues.verba_ads || 0) * 100))) : ""
   );
+
+  const removePlataforma = (plat: string) => {
+    const current = form.getValues("plataformas");
+    form.setValue("plataformas", current.filter((p) => p !== plat), { shouldValidate: true });
+  };
+
+  const addPlataforma = (plat: string) => {
+    const current = form.getValues("plataformas");
+    if (!current.includes(plat)) {
+      form.setValue("plataformas", [...current, plat], { shouldValidate: true });
+    }
+  };
 
   return (
     <Form {...form}>
