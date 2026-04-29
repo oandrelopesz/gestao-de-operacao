@@ -116,7 +116,12 @@ export function ProspeccaoDrawer({
         .eq("prospeccao_id", lead.id)
         .order("data_interacao", { ascending: false });
       if (error) throw error;
-      setInteractions(data || []);
+      setInteractions((data as any[] || []).map(i => ({
+        id: i.id,
+        tipo: i.tipo,
+        descricao: i.descricao,
+        data_interacao: i.data_interacao || ''
+      })));
     } catch (error) {
       console.error("Erro interações:", error);
     } finally {
