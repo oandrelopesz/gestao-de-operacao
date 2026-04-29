@@ -557,7 +557,7 @@ function SaldoPage() {
               Histórico de Recargas
             </SheetTitle>
             <SheetDescription>
-              {selectedForHistory?.cliente_nome} — <span className="capitalize">{selectedForHistory?.plataforma}</span>
+              {selectedForHistory?.cliente_nome} — {selectedForHistory?.plataformas?.join(", ")}
             </SheetDescription>
           </SheetHeader>
           
