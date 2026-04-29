@@ -37,6 +37,16 @@ function AuthenticatedLayout() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("sidebar-collapsed") === "1";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("sidebar-collapsed", isDesktopCollapsed ? "1" : "0");
+    }
+  }, [isDesktopCollapsed]);
   const [topAlert, setTopAlert] = useState<{ status: string, id: string, cliente_id: string } | null>(null);
 
   useEffect(() => {
