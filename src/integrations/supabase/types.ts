@@ -77,6 +77,51 @@ export type Database = {
         }
         Relationships: []
       }
+      cursos: {
+        Row: {
+          created_at: string | null
+          em_andamento: boolean | null
+          id: string
+          link_area_membros: string | null
+          login: string | null
+          nome: string
+          observacoes: string | null
+          ordem: number | null
+          senha: string | null
+          tema: Database["public"]["Enums"]["curso_tema"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          em_andamento?: boolean | null
+          id?: string
+          link_area_membros?: string | null
+          login?: string | null
+          nome: string
+          observacoes?: string | null
+          ordem?: number | null
+          senha?: string | null
+          tema?: Database["public"]["Enums"]["curso_tema"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string | null
+          em_andamento?: boolean | null
+          id?: string
+          link_area_membros?: string | null
+          login?: string | null
+          nome?: string
+          observacoes?: string | null
+          ordem?: number | null
+          senha?: string | null
+          tema?: Database["public"]["Enums"]["curso_tema"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       demanda_execucoes: {
         Row: {
           concluida: boolean | null
@@ -835,6 +880,15 @@ export type Database = {
         | "em_risco"
         | "critico"
         | "sem_avaliacao"
+      curso_tema:
+        | "ia"
+        | "trafego_pago"
+        | "trackeamento"
+        | "copywriting"
+        | "gestao"
+        | "vendas"
+        | "multiplos_temas"
+        | "outros"
       demanda_frequencia:
         | "diaria"
         | "semanal"
@@ -1013,6 +1067,16 @@ export const Constants = {
         "em_risco",
         "critico",
         "sem_avaliacao",
+      ],
+      curso_tema: [
+        "ia",
+        "trafego_pago",
+        "trackeamento",
+        "copywriting",
+        "gestao",
+        "vendas",
+        "multiplos_temas",
+        "outros",
       ],
       demanda_frequencia: [
         "diaria",
