@@ -227,7 +227,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 name="categoria_id"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Categoria</FormLabel>
+                    <FormLabel>Tema</FormLabel>
                     <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
                       <PopoverTrigger asChild>
                         <FormControl>
