@@ -207,13 +207,22 @@ function ClientesPage() {
       // Sanitiza campos opcionais para evitar erros no banco
       const payload: any = { ...values };
       
+      // Converte verba_total_contratada para number se for string
+      if (typeof payload.verba_total_contratada === "string") {
+        if (payload.verba_total_contratada === "") {
+          payload.verba_total_contratada = null;
+        } else {
+          payload.verba_total_contratada = Number(payload.verba_total_contratada);
+        }
+      }
+
       // Garante que campos opcionais sejam nulos se vazios ou não aplicáveis
       if (payload.tipo_verba === "mensal") {
         payload.verba_total_contratada = null;
         payload.data_limite_verba = null;
       } else {
         if (!payload.data_limite_verba) payload.data_limite_verba = null;
-        if (payload.verba_total_contratada === undefined || payload.verba_total_contratada === "") {
+        if (payload.verba_total_contratada === undefined) {
           payload.verba_total_contratada = null;
         }
       }
