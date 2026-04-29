@@ -348,6 +348,51 @@ export type Database = {
           },
         ]
       }
+      livros: {
+        Row: {
+          autor: string
+          created_at: string | null
+          data_conclusao: string | null
+          data_inicio: string | null
+          em_andamento: boolean | null
+          id: string
+          lido: boolean | null
+          nome: string
+          observacoes: string | null
+          ordem: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          autor: string
+          created_at?: string | null
+          data_conclusao?: string | null
+          data_inicio?: string | null
+          em_andamento?: boolean | null
+          id?: string
+          lido?: boolean | null
+          nome: string
+          observacoes?: string | null
+          ordem?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          autor?: string
+          created_at?: string | null
+          data_conclusao?: string | null
+          data_inicio?: string | null
+          em_andamento?: boolean | null
+          id?: string
+          lido?: boolean | null
+          nome?: string
+          observacoes?: string | null
+          ordem?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notificacoes_config: {
         Row: {
           alerta_dias_antes: number
