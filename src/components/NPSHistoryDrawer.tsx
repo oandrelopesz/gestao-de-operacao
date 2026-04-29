@@ -141,8 +141,8 @@ export function NPSHistoryDrawer({ cliente, onClose }: NPSHistoryDrawerProps) {
                     <div className="grid grid-cols-5 gap-2">
                       {NPS_METRICS.map(m => (
                         <div key={m.id} className="text-center">
-                          <div className={cn("h-1.5 w-full rounded-full mb-1", getMetricColor(h[m.id]))} />
-                          <p className="text-[9px] font-bold opacity-60">{h[m.id]}</p>
+                          <div className={cn("h-1.5 w-full rounded-full mb-1", getMetricColor((h as any)[m.id]))} />
+                          <p className="text-[9px] font-bold opacity-60">{(h as any)[m.id]}</p>
                         </div>
                       ))}
                     </div>
