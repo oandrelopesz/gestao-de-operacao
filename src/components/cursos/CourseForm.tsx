@@ -28,13 +28,14 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const courseSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
-  tema: z.enum(["ia", "trafego_pago", "trackeamento", "copywriting", "gestao", "vendas", "multiplos_temas", "outros"]),
+  tema: z.string().optional(),
+  categoria_id: z.string().optional().nullable(),
   link_area_membros: z.string().optional().or(z.literal("")),
   login: z.string().optional().or(z.literal("")),
   senha: z.string().optional().or(z.literal("")),
