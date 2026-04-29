@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Sheet, 
   SheetContent, 
@@ -24,7 +24,10 @@ import {
   Users,
   Building2,
   MoreVertical,
-  Briefcase
+  Briefcase,
+  XCircle,
+  FileText,
+  AlertOctagon
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,7 +51,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { debounce } from "lodash";
 
 const ETAPAS = [
   { id: "lead", label: "Lead", color: "slate-500", hex: "#64748b" },
