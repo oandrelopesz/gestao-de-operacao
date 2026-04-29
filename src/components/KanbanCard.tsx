@@ -66,7 +66,15 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
 
   const today = new Date().toISOString().split('T')[0];
   const isDueToday = demanda.proxima_execucao === today;
+  const isOverdue = isRecorrenteMae && demanda.proxima_execucao && demanda.proxima_execucao < today;
   const isDoneForNow = isRecorrenteMae && demanda.proxima_execucao && demanda.proxima_execucao > today;
+  const canCompleteRecorrente = isRecorrenteMae && (isDueToday || isOverdue);
+
+  const formatProxima = (iso?: string) => {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}`;
+  };
 
   return (
     <div 
