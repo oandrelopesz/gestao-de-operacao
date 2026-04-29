@@ -250,7 +250,7 @@ function CursosPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cursos</h1>
-          <p className="text-muted-foreground text-sm">Repositório pessoal de cursos e áreas de membros</p>
+          <p className="text-muted-foreground text-sm">Repositório pessoal de cursos por temas</p>
         </div>
         <Button onClick={handleAddCourse} className="gap-2">
           <Plus size={18} />
