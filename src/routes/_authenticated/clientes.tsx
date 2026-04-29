@@ -270,7 +270,7 @@ function ClientesPage() {
               borderClass={agenciaMeta.border}
               onEdit={() => { setEditing(c); setModalOpen(true); }}
               onArchive={() => handleArchive(c.id)}
-              onDelete={() => handleDelete(c.id)}
+              onDelete={() => { setDeletingId(c.id); setDeletingName(c.nome); }}
             />
           ))}
         </div>
@@ -286,7 +286,7 @@ function ClientesPage() {
                 <TableHead>NPS</TableHead>
                 <TableHead>Demandas</TableHead>
                 <TableHead>Pagamento</TableHead>
-                <TableHead></TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -303,7 +303,27 @@ function ClientesPage() {
                     <TableCell>{c.demandas_ativas}</TableCell>
                     <TableCell>{pag ? <Badge variant="outline" className={cn("font-normal", pag.classes)}>{pag.label}</Badge> : <span className="text-muted-foreground text-xs">—</span>}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => { setEditing(c); setModalOpen(true); }}><Pencil size={14} /></Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical size={16} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-[140px]">
+                          <DropdownMenuItem onClick={() => { setEditing(c); setModalOpen(true); }}>
+                            <Pencil size={14} className="mr-2" /> Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleArchive(c.id)}>
+                            <Archive size={14} className="mr-2" /> Arquivar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-destructive focus:text-destructive" 
+                            onClick={() => { setDeletingId(c.id); setDeletingName(c.nome); }}
+                          >
+                            <Trash2 size={14} className="mr-2" /> Remover
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 );
