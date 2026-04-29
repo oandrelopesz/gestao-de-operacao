@@ -104,13 +104,29 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
         <div className="p-2.5 space-y-1.5 relative">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-2 flex-1 min-w-0">
-              {!isDone && !isDoneForNow && onMoveToDone && (
+              {!isDone && !isDoneForNow && (onMoveToDone || onComplete) && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onMoveToDone(demanda.id);
+                    if (isRecorrenteMae) {
+                      if (!canCompleteRecorrente) return;
+                      onComplete?.(demanda.id);
+                    } else {
+                      onMoveToDone?.(demanda.id);
+                    }
                   }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity mt-1 h-4 w-4 rounded-sm border border-zinc-300 dark:border-zinc-700 flex items-center justify-center hover:bg-emerald-500 hover:border-emerald-500 hover:text-white shrink-0"
+                  disabled={isRecorrenteMae && !canCompleteRecorrente}
+                  title={
+                    isRecorrenteMae && !canCompleteRecorrente
+                      ? `Liberada em ${formatProxima(demanda.proxima_execucao)}`
+                      : "Concluir"
+                  }
+                  className={cn(
+                    "transition-opacity mt-1 h-4 w-4 rounded-sm border flex items-center justify-center shrink-0",
+                    isRecorrenteMae && !canCompleteRecorrente
+                      ? "opacity-40 cursor-not-allowed border-zinc-300 dark:border-zinc-700"
+                      : "opacity-0 group-hover:opacity-100 border-zinc-300 dark:border-zinc-700 hover:bg-emerald-500 hover:border-emerald-500 hover:text-white cursor-pointer"
+                  )}
                 >
                   <Check size={10} />
                 </button>
