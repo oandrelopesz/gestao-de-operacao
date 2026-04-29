@@ -1,0 +1,1 @@
+DELETE FROM public.curso_categorias WHERE id = '31f09fc7-a4c2-461e-8a33-765ce4400b3c';
