@@ -358,6 +358,7 @@ export type Database = {
           arquivado: boolean | null
           created_at: string | null
           data_inicio: string | null
+          data_limite_verba: string | null
           demandas_ativas: number | null
           em_onboarding: boolean | null
           id: string | null
@@ -368,17 +369,20 @@ export type Database = {
           status_operacional:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
+          tipo_verba: Database["public"]["Enums"]["tipo_verba_enum"] | null
           ultima_nps_data: string | null
           ultima_nps_score: number | null
           updated_at: string | null
           user_id: string | null
           verba_ads: number | null
+          verba_total_contratada: number | null
         }
         Insert: {
           agencia?: Database["public"]["Enums"]["agencia_enum"] | null
           arquivado?: boolean | null
           created_at?: string | null
           data_inicio?: string | null
+          data_limite_verba?: string | null
           demandas_ativas?: never
           em_onboarding?: boolean | null
           id?: string | null
@@ -389,17 +393,20 @@ export type Database = {
           status_operacional?:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
+          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"] | null
           ultima_nps_data?: never
           ultima_nps_score?: never
           updated_at?: string | null
           user_id?: string | null
           verba_ads?: number | null
+          verba_total_contratada?: number | null
         }
         Update: {
           agencia?: Database["public"]["Enums"]["agencia_enum"] | null
           arquivado?: boolean | null
           created_at?: string | null
           data_inicio?: string | null
+          data_limite_verba?: string | null
           demandas_ativas?: never
           em_onboarding?: boolean | null
           id?: string | null
@@ -410,11 +417,13 @@ export type Database = {
           status_operacional?:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
+          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"] | null
           ultima_nps_data?: never
           ultima_nps_score?: never
           updated_at?: string | null
           user_id?: string | null
           verba_ads?: number | null
+          verba_total_contratada?: number | null
         }
         Relationships: []
       }
