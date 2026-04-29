@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import {
   Plus, Search, Users as UsersIcon, DollarSign, TrendingUp, Smile,
-  Pencil, Archive, Trash2, LayoutGrid, Table as TableIcon, Calendar,
+  MoreVertical, Pencil, Archive, Trash2, LayoutGrid, Table as TableIcon, Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,22 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
