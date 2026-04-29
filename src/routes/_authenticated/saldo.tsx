@@ -121,7 +121,7 @@ function SaldoPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("saldo_ads_view")
-      .select("*, clientes!inner(status_operacional)")
+      .select("*, clientes!inner(status_operacional, verba_ads)")
       .order("dias_restantes", { ascending: true });
 
     if (error) {
