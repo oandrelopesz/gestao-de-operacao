@@ -113,6 +113,7 @@ function DemandasPage() {
   useEffect(() => {
     fetchClientes();
     fetchDemandas();
+    catchUpRecorrentes();
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "n" && !isModalOpen && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
