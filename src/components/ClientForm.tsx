@@ -269,6 +269,8 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
             </div>
           )}
         </div>
+        </div>
+
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-md border p-4 bg-muted/20">
           <FormField
