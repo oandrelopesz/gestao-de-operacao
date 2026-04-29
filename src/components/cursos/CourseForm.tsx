@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -77,6 +77,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   ]);
   const [openCombobox, setOpenCombobox] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const creatingCategoryRef = useRef(false);
 
   const form = useForm<CourseFormValues>({
     resolver: zodResolver(courseSchema),
@@ -116,6 +117,8 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   const handleAddCategory = async (nameOverride?: string) => {
     const nameToUse = nameOverride || searchQuery;
     if (!nameToUse.trim()) return;
+    if (creatingCategoryRef.current) return null;
+    creatingCategoryRef.current = true;
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -157,6 +160,8 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
     } catch (error: any) {
       toast.error("Erro ao criar tema");
       return null;
+    } finally {
+      creatingCategoryRef.current = false;
     }
   };
 
