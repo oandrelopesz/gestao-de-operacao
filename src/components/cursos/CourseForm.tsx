@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -28,7 +29,16 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Eye, EyeOff, Plus } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { 
+  Command, 
+  CommandEmpty, 
+  CommandGroup, 
+  CommandInput, 
+  CommandItem, 
+  CommandList 
+} from "@/components/ui/command";
+import { Eye, EyeOff, Plus, Check, ChevronsUpDown, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -56,8 +66,8 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [categorias, setCategorias] = useState<{ id: string; nome: string }[]>([]);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [openCombobox, setOpenCombobox] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const form = useForm<CourseFormValues>({
     resolver: zodResolver(courseSchema),
@@ -93,8 +103,9 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
     }
   };
 
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
+  const handleAddCategory = async (nameOverride?: string) => {
+    const nameToUse = nameOverride || searchQuery;
+    if (!nameToUse.trim()) return;
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -102,7 +113,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
       const { data, error } = await supabase
         .from("curso_categorias")
-        .insert([{ nome: newCategoryName.trim(), user_id: userId }])
+        .insert([{ nome: nameToUse.trim(), user_id: userId }])
         .select()
         .single();
 
@@ -111,10 +122,11 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       toast.success("Categoria criada!");
       setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
       form.setValue("categoria_id", data.id);
-      setNewCategoryName("");
-      setIsAddingCategory(false);
+      setSearchQuery("");
+      return data.id;
     } catch (error: any) {
       toast.error("Erro ao criar categoria");
+      return null;
     }
   };
 
@@ -215,66 +227,77 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 name="categoria_id"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="flex items-center justify-between">
-                      Categoria
-                      {!isAddingCategory && (
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 px-2 text-[10px] gap-1"
-                          onClick={() => setIsAddingCategory(true)}
-                        >
-                          <Plus size={10} /> Nova
-                        </Button>
-                      )}
-                    </FormLabel>
-                    {isAddingCategory ? (
-                      <div className="flex gap-2">
-                        <Input 
-                          placeholder="Nome da categoria" 
-                          value={newCategoryName}
-                          onChange={(e) => setNewCategoryName(e.target.value)}
-                          className="h-9"
-                          autoFocus
-                        />
-                        <Button 
-                          type="button" 
-                          size="sm" 
-                          onClick={handleAddCategory}
-                          className="h-9 px-3"
-                        >
-                          OK
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => setIsAddingCategory(false)}
-                          className="h-9 px-3"
-                        >
-                          X
-                        </Button>
-                      </div>
-                    ) : (
-                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <FormLabel>Categoria</FormLabel>
+                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                      <PopoverTrigger asChild>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione uma categoria" />
-                          </SelectTrigger>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openCombobox}
+                            className={cn(
+                              "w-full justify-between font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value
+                              ? categorias.find((cat) => cat.id === field.value)?.nome
+                              : "Selecione a categoria..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
                         </FormControl>
-                        <SelectContent>
-                          {categorias.map(cat => (
-                            <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
-                          ))}
-                          {categorias.length === 0 && (
-                            <div className="p-2 text-xs text-center text-muted-foreground">
-                              Nenhuma categoria criada
-                            </div>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    )}
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Buscar ou criar..." 
+                            value={searchQuery}
+                            onValueChange={setSearchQuery}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              <div className="p-2 space-y-2">
+                                <p className="text-xs text-muted-foreground">Nenhuma categoria encontrada.</p>
+                                {searchQuery && (
+                                  <Button 
+                                    type="button"
+                                    size="sm" 
+                                    className="w-full h-8 text-xs gap-1"
+                                    onClick={() => {
+                                      handleAddCategory(searchQuery);
+                                      setOpenCombobox(false);
+                                      setSearchQuery("");
+                                    }}
+                                  >
+                                    <Plus size={12} /> Criar "{searchQuery}"
+                                  </Button>
+                                )}
+                              </div>
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {categorias.map((cat) => (
+                                <CommandItem
+                                  key={cat.id}
+                                  value={cat.nome}
+                                  onSelect={() => {
+                                    form.setValue("categoria_id", cat.id);
+                                    setOpenCombobox(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      field.value === cat.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {cat.nome}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
