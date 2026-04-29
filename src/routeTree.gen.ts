@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 
 const LoginRoute = LoginRouteImport.update({
@@ -28,6 +29,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSaldoRoute = AuthenticatedSaldoRouteImport.update({
+  id: '/saldo',
+  path: '/saldo',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
   id: '/clientes',
   path: '/clientes',
@@ -38,10 +44,12 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
   '/clientes': typeof AuthenticatedClientesRoute
+  '/saldo': typeof AuthenticatedSaldoRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/clientes': typeof AuthenticatedClientesRoute
+  '/saldo': typeof AuthenticatedSaldoRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
@@ -49,18 +57,20 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
+  '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/clientes'
+  fullPaths: '/' | '/login' | '/clientes' | '/saldo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/clientes' | '/'
+  to: '/login' | '/clientes' | '/saldo' | '/'
   id:
     | '__root__'
     | '/_authenticated'
     | '/login'
     | '/_authenticated/clientes'
+    | '/_authenticated/saldo'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/saldo': {
+      id: '/_authenticated/saldo'
+      path: '/saldo'
+      fullPath: '/saldo'
+      preLoaderRoute: typeof AuthenticatedSaldoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/clientes': {
       id: '/_authenticated/clientes'
       path: '/clientes'
@@ -104,11 +121,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
+  AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
+  AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 
