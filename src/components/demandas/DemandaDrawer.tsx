@@ -278,6 +278,35 @@ export function DemandaDrawer({
 
           <Separator className="my-6 opacity-50" />
 
+          {/* Recurrence Section */}
+          {demanda.recorrente && (
+            <div className="space-y-4 border rounded-lg p-4 bg-zinc-50/50 dark:bg-zinc-900/50">
+              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                <Repeat size={16} className="text-primary" />
+                <span>Configuração de Recorrência</span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <span className="text-zinc-400">Tipo</span>
+                  <div className="capitalize font-medium">{demanda.frequencia_tipo || "Não definida"}</div>
+                </div>
+                {demanda.proxima_execucao && (
+                  <div className="space-y-1">
+                    <span className="text-zinc-400">Próxima Execução</span>
+                    <div className="font-medium">{new Date(demanda.proxima_execucao).toLocaleDateString('pt-BR')}</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1.5" onClick={() => onUpdate(demanda.id, { recorrente: false })}>
+                  Desativar Recorrência
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Description area */}
           <div className="space-y-2">
             <textarea
