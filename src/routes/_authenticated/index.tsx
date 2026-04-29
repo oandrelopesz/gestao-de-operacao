@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DemandaForm, DemandaFormValues } from "@/components/DemandaForm";
 import { KanbanColumn } from "@/components/KanbanColumn";
+import { DemandaDrawer } from "@/components/demandas/DemandaDrawer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AGENCIAS, AgenciaId } from "@/lib/clientes";
@@ -82,6 +83,8 @@ function DemandasPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingName, setDeletingName] = useState<string>("");
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedDemanda, setSelectedDemanda] = useState<any | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -168,6 +171,53 @@ function DemandasPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpdateDemanda = async (id: string, values: Partial<any>) => {
+    try {
+      const { error } = await supabase
+        .from("demandas")
+        .update(values)
+        .eq("id", id);
+      if (error) throw error;
+      
+      // Update local state for immediate feedback
+      setDemandas(prev => prev.map(d => d.id === id ? { ...d, ...values } : d));
+      if (selectedDemanda?.id === id) {
+        setSelectedDemanda(prev => ({ ...prev, ...values }));
+      }
+      
+      // Silently sync
+      fetchDemandas();
+    } catch (error: any) {
+      toast.error("Erro ao salvar alterações");
+    }
+  };
+
+  const handleDuplicateDemanda = async (demanda: any) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { id, created_at, updated_at, clientes, ...rest } = demanda;
+      
+      const { error } = await supabase.from("demandas").insert([{
+        ...rest,
+        titulo: `${rest.titulo} (Cópia)`,
+        user_id: user.id,
+      }]);
+
+      if (error) throw error;
+      toast.success("Demanda duplicada!");
+      fetchDemandas();
+    } catch (error: any) {
+      toast.error("Erro ao duplicar demanda");
+    }
+  };
+
+  const handleOpenDrawer = (demanda: any) => {
+    setSelectedDemanda(demanda);
+    setIsDrawerOpen(true);
   };
 
   const handleQuickAdd = async (status: string, titulo: string) => {
