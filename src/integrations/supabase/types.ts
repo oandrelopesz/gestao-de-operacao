@@ -534,7 +534,9 @@ export type Database = {
         Row: {
           cliente_id: string
           created_at: string
+          descricao: string | null
           id: string
+          resolvida: boolean | null
           status: Database["public"]["Enums"]["status_pendencia"]
           updated_at: string
           user_id: string
@@ -542,7 +544,9 @@ export type Database = {
         Insert: {
           cliente_id: string
           created_at?: string
+          descricao?: string | null
           id?: string
+          resolvida?: boolean | null
           status?: Database["public"]["Enums"]["status_pendencia"]
           updated_at?: string
           user_id: string
@@ -550,7 +554,9 @@ export type Database = {
         Update: {
           cliente_id?: string
           created_at?: string
+          descricao?: string | null
           id?: string
+          resolvida?: boolean | null
           status?: Database["public"]["Enums"]["status_pendencia"]
           updated_at?: string
           user_id?: string
