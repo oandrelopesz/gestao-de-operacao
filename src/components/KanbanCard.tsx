@@ -52,26 +52,29 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
 
   const isDone = demanda.status === "feito";
 
+  // Get preview of description (first 2 lines)
+  const descriptionPreview = demanda.descricao ? demanda.descricao.split('\n').slice(0, 2).join('\n') : "";
+
   return (
     <div 
       ref={setNodeRef} 
       style={style} 
       className={cn(
-        "group relative outline-none focus-within:ring-1 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-600 rounded-md mb-2",
+        "group relative outline-none rounded-md mb-2",
         isDragging && "opacity-50 z-50"
       )}
     >
       <Card
         className={cn(
-          "cursor-grab active:cursor-grabbing hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden",
+          "cursor-default hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden",
           isDone && "opacity-60"
         )}
         onClick={() => onEdit(demanda)}
       >
-        <div className="p-2.5 space-y-1 relative">
+        <div className="p-2.5 space-y-1.5 relative">
           {/* Grab handle area */}
           <div 
-            className="absolute inset-y-0 left-0 w-1" 
+            className="absolute inset-y-0 left-0 w-1 cursor-grab active:cursor-grabbing" 
             {...attributes} 
             {...listeners} 
           />
@@ -92,7 +95,7 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
               )}
               
               <h4 className={cn(
-                "text-[14px] font-medium leading-snug break-words",
+                "text-[14px] font-medium leading-tight break-words",
                 isDone && "line-through text-zinc-500"
               )}>
                 {demanda.titulo}
@@ -102,13 +105,13 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
             <div onClick={(e) => e.stopPropagation()} className="shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity -mr-1">
                     <MoreVertical size={14} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[140px] text-xs">
                   <DropdownMenuItem onClick={() => onEdit(demanda)} className="gap-2 py-1.5">
-                    <Pencil size={12} /> Editar
+                    <Pencil size={12} /> Detalhes
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => {}} className="gap-2 py-1.5">
                     <Copy size={12} /> Duplicar
@@ -124,18 +127,31 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
             </div>
           </div>
 
+          {/* Description Preview */}
+          {descriptionPreview && (
+            <div className="text-[12px] text-zinc-400 leading-snug line-clamp-2 break-words">
+              {descriptionPreview}
+            </div>
+          )}
+
           {/* Footer of the card */}
           {(demanda.descricao || demanda.clientes?.nome || demanda.prazo) && (
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-0.5">
               {demanda.descricao && (
-                <FileText size={12} className="text-zinc-400" />
+                <div title="Tem descrição">
+                  <FileText size={12} className="text-zinc-400" />
+                </div>
               )}
               
-              {/* Optional: if client exists, show tiny indicator or keep minimal as requested */}
-              {/* Keeping minimal: labels only if edited manually later */}
               {demanda.clientes?.nome && (
-                <span className="text-[10px] text-zinc-400 truncate">
+                <span className="text-[10px] text-zinc-400 truncate font-medium">
                   {demanda.clientes.nome}
+                </span>
+              )}
+
+              {demanda.prazo && (
+                <span className="text-[10px] text-zinc-400 ml-auto shrink-0">
+                  {new Date(demanda.prazo).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                 </span>
               )}
             </div>
