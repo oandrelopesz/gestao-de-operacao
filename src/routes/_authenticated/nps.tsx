@@ -73,7 +73,7 @@ function NPSPage() {
   const stats = useMemo(() => {
     if (!filteredData.length) return { avgScore: 0, criticalCount: 0, total: 0 };
     const total = filteredData.length;
-    const avgScore = Math.round(filteredData.reduce((acc, curr) => acc + curr.score_total, 0) / total);
+    const avgScore = Math.round(filteredData.reduce((acc, curr) => acc + (curr.score_total || 0), 0) / total);
     const criticalCount = filteredData.filter(i => i.categoria === "critico" || i.categoria === "em_risco").length;
     
     const distribution = NPS_SCORE_CATEGORIES.map(cat => ({
