@@ -104,14 +104,14 @@ function ClientesPage() {
     if (error) { toast.error("Erro ao carregar clientes"); console.error(error); }
     else {
       // Fetch platform summary for each client
-      const { data: saldos } = await supabase.from("saldo_ads_view").select("cliente_id, plataforma, verba_diaria_calc");
+      const { data: saldos } = await supabase.from("saldo_ads_view").select("cliente_id, plataformas, verba_diaria_calc");
       
       const enrichedData = (data as any[] || []).map(cli => {
         const cliSaldos = (saldos || []).filter(s => s.cliente_id === cli.id);
         const summary = cliSaldos.map(s => {
-          const platName = s.plataforma ? s.plataforma.charAt(0).toUpperCase() + s.plataforma.slice(1) : "Outras";
+          const platNames = s.plataformas && s.plataformas.length > 0 ? s.plataformas.join(", ") : "Outras";
           const verba = (s.verba_diaria_calc || 0) * 30;
-          return `${platName} ${formatBRL(verba)}`;
+          return `${platNames} ${formatBRL(verba)}`;
         }).join(" / ");
         return { ...cli, saldo_ads_summary: summary };
       });
