@@ -132,7 +132,7 @@ export function NotificationBell() {
                         {alerta.dias_restantes <= 0 
                           ? 'Saldo zerado' 
                           : `${Math.floor(alerta.dias_restantes)} ${Math.floor(alerta.dias_restantes) === 1 ? 'dia restante' : 'dias restantes'}`
-                        }
+                        } (em {alerta.cliente_agencia})
                       </span>
                     </div>
                   </div>
