@@ -40,6 +40,8 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone }: KanbanCardProps) {
+  const isRecorrenteMae = demanda.status === "recorrentes";
+  
   const {
     attributes,
     listeners,
@@ -47,7 +49,10 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: demanda.id });
+  } = useSortable({ 
+    id: demanda.id,
+    disabled: isRecorrenteMae 
+  });
 
   const style = {
     transform: CSS.Translate.toString(transform),
