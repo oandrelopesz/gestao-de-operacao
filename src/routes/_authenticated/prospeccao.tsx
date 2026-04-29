@@ -212,7 +212,7 @@ function ProspeccaoPage() {
       setLeadForPerda({ id: activeLeadItem.id, name: activeLeadItem.nome });
       setIsPerdaModalOpen(true);
     } else {
-      await syncMovement(activeLeadItem.id, overStatus);
+      await syncMovement(activeLeadItem.id, overStatus as any);
     }
   };
 
