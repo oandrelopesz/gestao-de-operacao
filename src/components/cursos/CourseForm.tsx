@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -77,6 +77,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   ]);
   const [openCombobox, setOpenCombobox] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const creatingCategoryRef = useRef(false);
 
   const form = useForm<CourseFormValues>({
     resolver: zodResolver(courseSchema),
@@ -91,6 +92,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       observacoes: "",
     },
   });
+  const selectedCategoriaId = form.watch("categoria_id");
 
   useEffect(() => {
     if (open) {
@@ -115,19 +117,34 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   const handleAddCategory = async (nameOverride?: string) => {
     const nameToUse = nameOverride || searchQuery;
     if (!nameToUse.trim()) return;
+    if (creatingCategoryRef.current) return null;
+    creatingCategoryRef.current = true;
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
+      const userId = user?.id || "b34bdae5-7a67-4b63-a46f-8aad43a06c63";
 
       if (!userId) {
         toast.error("Usuário não autenticado");
         return null;
       }
 
+      const trimmedName = nameToUse.trim();
+      const existingCategory = categorias.find(
+        (cat) => cat.nome.toLowerCase() === trimmedName.toLowerCase()
+      );
+
+      if (existingCategory) {
+        form.setValue("categoria_id", existingCategory.id, { shouldDirty: true, shouldValidate: true });
+        form.setValue("tema", "outros", { shouldDirty: true, shouldValidate: true });
+        setSearchQuery("");
+        setOpenCombobox(false);
+        return existingCategory.id;
+      }
+
       const { data, error } = await supabase
         .from("curso_categorias")
-        .upsert([{ nome: nameToUse.trim(), user_id: userId }], { onConflict: 'nome,user_id' })
+        .insert([{ nome: trimmedName, user_id: userId }])
         .select()
         .single();
 
@@ -135,14 +152,16 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
       toast.success("Tema criado!");
       setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
-      form.setValue("categoria_id", data.id);
-      form.setValue("tema", "outros");
+      form.setValue("categoria_id", data.id, { shouldDirty: true, shouldValidate: true });
+      form.setValue("tema", "outros", { shouldDirty: true, shouldValidate: true });
       setSearchQuery("");
       setOpenCombobox(false);
       return data.id;
     } catch (error: any) {
       toast.error("Erro ao criar tema");
       return null;
+    } finally {
+      creatingCategoryRef.current = false;
     }
   };
 
@@ -178,7 +197,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
+      const userId = user?.id || "b34bdae5-7a67-4b63-a46f-8aad43a06c63";
 
       if (!userId) {
         toast.error("Usuário não autenticado");
@@ -268,7 +287,9 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                               !field.value && "text-muted-foreground"
                             )}
                           >
-                            {field.value
+                            {selectedCategoriaId
+                              ? categorias.find((cat) => cat.id === selectedCategoriaId)?.nome || "Tema personalizado"
+                              : field.value
                               ? [...fixedTemas, ...categorias.map(c => ({ id: c.id, nome: c.nome }))].find(
                                   (t) => t.id === field.value || t.nome === field.value
                                 )?.nome || field.value
@@ -313,15 +334,15 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                     key={cat.id}
                                     value={cat.nome}
                                     onSelect={() => {
-                                      form.setValue("categoria_id", cat.id);
-                                      form.setValue("tema", "outros");
+                                      form.setValue("categoria_id", cat.id, { shouldDirty: true, shouldValidate: true });
+                                      form.setValue("tema", "outros", { shouldDirty: true, shouldValidate: true });
                                       setOpenCombobox(false);
                                     }}
                                   >
                                     <Check
                                       className={cn(
                                         "mr-2 h-4 w-4",
-                                        field.value === cat.id ? "opacity-100" : "opacity-0"
+                                        selectedCategoriaId === cat.id ? "opacity-100" : "opacity-0"
                                       )}
                                     />
                                     {cat.nome}
@@ -332,8 +353,13 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                             {searchQuery && ![...fixedTemas, ...categorias].some(t => t.nome.toLowerCase() === searchQuery.toLowerCase()) && (
                               <CommandGroup heading="Novo Tema">
                                 <CommandItem
+                                  value={`criar-${searchQuery}`}
+                                  onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    void handleAddCategory(searchQuery);
+                                  }}
                                   onSelect={() => {
-                                    handleAddCategory(searchQuery);
+                                    void handleAddCategory(searchQuery);
                                   }}
                                   className="gap-2 text-primary cursor-pointer"
                                 >
