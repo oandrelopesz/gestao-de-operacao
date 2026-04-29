@@ -171,7 +171,7 @@ function ClientesPage() {
       </div>
 
       {/* Sub-tabs por agência */}
-      <Tabs value={agencia} onValueChange={(v) => navigate({ search: (p) => ({ ...p, agencia: v as AgenciaId }) })}>
+      <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v as AgenciaId } })}>
         <TabsList>
           {AGENCIAS.map((a) => (
             <TabsTrigger key={a.id} value={a.id} className="gap-2">
