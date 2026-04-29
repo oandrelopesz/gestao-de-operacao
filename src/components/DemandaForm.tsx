@@ -101,18 +101,19 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
             name="status"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Status</FormLabel>
+                <FormLabel>Coluna</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Status" />
+                      <SelectValue placeholder="Coluna" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="a fazer">A fazer</SelectItem>
-                    <SelectItem value="em andamento">Em andamento</SelectItem>
-                    <SelectItem value="em revisão">Em revisão</SelectItem>
-                    <SelectItem value="concluída">Concluída</SelectItem>
+                    <SelectItem value="fazer_hoje">Fazer hoje</SelectItem>
+                    <SelectItem value="fazer_amanha">Fazer amanhã</SelectItem>
+                    <SelectItem value="fazer_depois_amanha">Fazer depois de amanhã</SelectItem>
+                    <SelectItem value="standby">Standby</SelectItem>
+                    <SelectItem value="feito">Feito</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
