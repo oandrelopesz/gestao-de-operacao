@@ -87,7 +87,7 @@ function CursosPage() {
   const [deletingCourse, setDeletingCourse] = useState<Curso | null>(null);
 
   useEffect(() => {
-    fetchCursos();
+    fetchData();
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "n" && !isModalOpen && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
@@ -99,26 +99,38 @@ function CursosPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const fetchCursos = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("cursos")
-        .select("*")
-        .order("nome", { ascending: true });
+      const [cursosRes, catsRes] = await Promise.all([
+        supabase
+          .from("cursos")
+          .select("*, curso_categorias(id, nome)")
+          .order("nome", { ascending: true }),
+        supabase
+          .from("curso_categorias")
+          .select("id, nome")
+          .order("nome")
+      ]);
 
-      if (error) throw error;
-      const formattedData = (data || []).map(c => ({
+      if (cursosRes.error) throw cursosRes.error;
+      if (catsRes.error) throw catsRes.error;
+
+      const formattedData = (cursosRes.data || []).map(c => ({
         ...c,
         em_andamento: !!c.em_andamento
       })) as Curso[];
+      
       setCursos(formattedData);
+      setCategorias(catsRes.data || []);
     } catch (error: any) {
-      toast.error("Erro ao carregar cursos");
+      toast.error("Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchCursos = fetchData; // Keep the name for backward compatibility if needed
 
   const handleAddCourse = () => {
     setEditingCourse(null);
