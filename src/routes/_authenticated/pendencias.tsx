@@ -152,7 +152,7 @@ function PendenciasPage() {
     }
   };
 
-  const handleToggleResolvida = async (id: string, currentStatus: boolean) => {
+  const handleToggleResolvida = async (id: string, currentStatus: boolean | null) => {
     try {
       const { error } = await supabase
         .from("pendencias_clientes")
