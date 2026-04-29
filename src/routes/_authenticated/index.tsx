@@ -155,7 +155,7 @@ function DemandasPage() {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '00000000-0000-0000-0000-000000000000'; // Default ID for bypass
+      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63'; // ID consolidado para acesso sem login
 
 
       if (editingDemanda?.id) {
@@ -215,7 +215,7 @@ function DemandasPage() {
   const handleDuplicateDemanda = async (demanda: any) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
 
 
       const { id, created_at, updated_at, clientes, ...rest } = demanda;
@@ -242,7 +242,7 @@ function DemandasPage() {
   const handleQuickAdd = async (status: string, titulo: string, event?: React.MouseEvent | React.TouchEvent) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
 
 
       const columnDemandas = demandas.filter(d => d.status === status);

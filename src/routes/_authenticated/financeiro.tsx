@@ -162,7 +162,8 @@ function FinanceiroPage() {
   const toggleRecebido = async (item: FinanceiroView) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
+      // if (!user) return; // Removido para permitir acesso sem login
 
       const mesReferencia = new Date();
       mesReferencia.setDate(1);
@@ -184,7 +185,7 @@ function FinanceiroPage() {
         const { error } = await supabase
           .from("financeiro_recebimentos")
           .insert({
-            user_id: user.id,
+            user_id: userId,
             fonte_id: item.fonte_id,
             mes_referencia: mesRefStr,
             recebido: true,
@@ -216,7 +217,8 @@ function FinanceiroPage() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
+      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
+      // if (!user) throw new Error("Usuário não autenticado");
 
       if (editingFonte) {
         const { error } = await supabase
@@ -228,7 +230,7 @@ function FinanceiroPage() {
       } else {
         const { error } = await supabase
           .from("financeiro_fontes")
-          .insert([{ ...values, user_id: user.id }]);
+          .insert([{ ...values, user_id: userId }]);
         if (error) throw error;
         toast.success("Fonte criada com sucesso");
       }
