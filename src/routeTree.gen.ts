@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
 import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
+import { Route as AuthenticatedPendenciasRouteImport } from './routes/_authenticated/pendencias'
 import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
 import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated/livros'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
@@ -42,6 +43,11 @@ const AuthenticatedSaldoRoute = AuthenticatedSaldoRouteImport.update({
 const AuthenticatedProspeccaoRoute = AuthenticatedProspeccaoRouteImport.update({
   id: '/prospeccao',
   path: '/prospeccao',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPendenciasRoute = AuthenticatedPendenciasRouteImport.update({
+  id: '/pendencias',
+  path: '/pendencias',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedNpsRoute = AuthenticatedNpsRouteImport.update({
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/livros': typeof AuthenticatedLivrosRoute
   '/nps': typeof AuthenticatedNpsRoute
+  '/pendencias': typeof AuthenticatedPendenciasRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/saldo': typeof AuthenticatedSaldoRoute
 }
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/livros': typeof AuthenticatedLivrosRoute
   '/nps': typeof AuthenticatedNpsRoute
+  '/pendencias': typeof AuthenticatedPendenciasRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/saldo': typeof AuthenticatedSaldoRoute
   '/': typeof AuthenticatedIndexRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/livros': typeof AuthenticatedLivrosRoute
   '/_authenticated/nps': typeof AuthenticatedNpsRoute
+  '/_authenticated/pendencias': typeof AuthenticatedPendenciasRoute
   '/_authenticated/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/livros'
     | '/nps'
+    | '/pendencias'
     | '/prospeccao'
     | '/saldo'
   fileRoutesByTo: FileRoutesByTo
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/livros'
     | '/nps'
+    | '/pendencias'
     | '/prospeccao'
     | '/saldo'
     | '/'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/_authenticated/financeiro'
     | '/_authenticated/livros'
     | '/_authenticated/nps'
+    | '/_authenticated/pendencias'
     | '/_authenticated/prospeccao'
     | '/_authenticated/saldo'
     | '/_authenticated/'
@@ -184,6 +196,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProspeccaoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/pendencias': {
+      id: '/_authenticated/pendencias'
+      path: '/pendencias'
+      fullPath: '/pendencias'
+      preLoaderRoute: typeof AuthenticatedPendenciasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/nps': {
       id: '/_authenticated/nps'
       path: '/nps'
@@ -228,6 +247,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedLivrosRoute: typeof AuthenticatedLivrosRoute
   AuthenticatedNpsRoute: typeof AuthenticatedNpsRoute
+  AuthenticatedPendenciasRoute: typeof AuthenticatedPendenciasRoute
   AuthenticatedProspeccaoRoute: typeof AuthenticatedProspeccaoRoute
   AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -239,6 +259,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedLivrosRoute: AuthenticatedLivrosRoute,
   AuthenticatedNpsRoute: AuthenticatedNpsRoute,
+  AuthenticatedPendenciasRoute: AuthenticatedPendenciasRoute,
   AuthenticatedProspeccaoRoute: AuthenticatedProspeccaoRoute,
   AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
