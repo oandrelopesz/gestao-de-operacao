@@ -800,9 +800,7 @@ function DemandasPage() {
                   fetchDemandas();
                   toast.success("Recorrência configurada!");
                   
-                  if (proxima === today) {
-                    // Removido catchUpRecorrentes para evitar materialização automática em Fazer Hoje
-                  }
+                  // Removido catchUpRecorrentes para evitar materialização automática em Fazer Hoje
                 }}
               >
                 <div className="flex flex-col">
