@@ -690,7 +690,7 @@ function ClientesPage() {
               cliente={c}
               borderClass={agencia === "todos" ? (AGENCIAS.find(a => a.id === c.agencia)?.border || "border-l-primary") : agenciaMeta.border}
               showAgenciaBadge={agencia === "todos"}
-              onEdit={() => { setEditing(c); setModalOpen(true); }}
+              onEdit={() => openEdit(c)}
               onArchive={() => handleArchive(c.id)}
               onDelete={() => { setDeletingId(c.id); setDeletingName(c.nome); }}
             />
