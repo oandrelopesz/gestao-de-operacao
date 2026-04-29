@@ -146,7 +146,16 @@ function SaldoPage() {
           .update({ ...values })
           .eq("id", editing.id);
         if (error) throw error;
-        toast.success("Registro atualizado");
+        
+        if (editing.metodo_pagamento !== values.metodo_pagamento) {
+          if (values.metodo_pagamento === 'cartao') {
+            toast.success("Migrado para Cartão: Monitoramento desativado");
+          } else {
+            toast.success(`Alterado para ${values.metodo_pagamento.toUpperCase()}: Monitoramento ativado`);
+          }
+        } else {
+          toast.success("Registro atualizado");
+        }
       } else {
         const { data: newRecord, error } = await supabase
           .from("saldo_ads")
@@ -155,9 +164,11 @@ function SaldoPage() {
           .single();
         if (error) throw error;
         toast.success("Registro criado");
-        // Automatically open first reload modal
-        setSelectedForRecarga(newRecord);
-        setRecargaModalOpen(true);
+        // Automatically open first reload modal if not cartao
+        if (values.metodo_pagamento !== 'cartao') {
+          setSelectedForRecarga(newRecord);
+          setRecargaModalOpen(true);
+        }
       }
       setModalOpen(false);
       setEditing(null);
