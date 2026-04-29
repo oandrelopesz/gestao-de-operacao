@@ -633,7 +633,16 @@ function ClientesPage() {
                     <TableCell className="font-medium">{c.nome}</TableCell>
                     <TableCell className="text-muted-foreground">{c.nicho || "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{tempoDeCasa(c.data_inicio)}</TableCell>
-                    <TableCell>{formatBRL(c.verba_ads)}</TableCell>
+                    <TableCell>
+                      {c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba
+                        ? (() => {
+                            const inicio = new Date(c.data_inicio);
+                            const fim = new Date(c.data_limite_verba);
+                            const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                            return formatBRL((Number(c.verba_total_contratada) / dias) * 30);
+                          })()
+                        : formatBRL(c.verba_ads)}
+                    </TableCell>
                     <TableCell><Badge variant="outline" className={cn("font-normal", nps.classes)}>{nps.label}</Badge></TableCell>
                     <TableCell>{c.demandas_ativas}</TableCell>
                     <TableCell>{pag ? <Badge variant="outline" className={cn("font-normal", pag.classes)}>{pag.label}</Badge> : <span className="text-muted-foreground text-xs">—</span>}</TableCell>
