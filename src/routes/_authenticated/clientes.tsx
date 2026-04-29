@@ -605,6 +605,7 @@ function ClientesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Cliente</TableHead>
+                {agencia === "todos" && <TableHead>Agência</TableHead>}
                 <TableHead>Nicho</TableHead>
                 <TableHead>Início</TableHead>
                 <TableHead>Verba/mês</TableHead>
@@ -631,6 +632,18 @@ function ClientesPage() {
                     }}
                   >
                     <TableCell className="font-medium">{c.nome}</TableCell>
+                    {agencia === "todos" && (
+                      <TableCell>
+                        <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5 font-bold uppercase", 
+                          c.agencia === 'effect' && "border-blue-500 text-blue-500 bg-blue-500/5",
+                          c.agencia === 'spike' && "border-violet-500 text-violet-500 bg-violet-500/5",
+                          c.agencia === 'alt' && "border-amber-500 text-amber-500 bg-amber-500/5",
+                          c.agencia === 'pessoais' && "border-emerald-500 text-emerald-500 bg-emerald-500/5",
+                        )}>
+                          {AGENCIAS.find(a => a.id === c.agencia)?.label}
+                        </Badge>
+                      </TableCell>
+                    )}
                     <TableCell className="text-muted-foreground">{c.nicho || "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{tempoDeCasa(c.data_inicio)}</TableCell>
                     <TableCell>
