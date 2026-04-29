@@ -290,7 +290,21 @@ export function DemandaDrawer({
               <div className="grid grid-cols-2 gap-4 text-xs">
                 <div className="space-y-1">
                   <span className="text-zinc-400">Tipo</span>
-                  <div className="capitalize font-medium">{demanda.frequencia_tipo || "Não definida"}</div>
+                  <Select 
+                    value={demanda.frequencia_tipo || "semanal"} 
+                    onValueChange={(val) => saveUpdate({ frequencia_tipo: val })}
+                  >
+                    <SelectTrigger className="h-7 text-xs border-none bg-transparent p-0 focus:ring-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="diaria" className="text-xs">Diária</SelectItem>
+                      <SelectItem value="semanal" className="text-xs">Semanal</SelectItem>
+                      <SelectItem value="quinzenal" className="text-xs">Quinzenal</SelectItem>
+                      <SelectItem value="mensal" className="text-xs">Mensal</SelectItem>
+                      <SelectItem value="customizada" className="text-xs">Customizada</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 {demanda.proxima_execucao && (
                   <div className="space-y-1">
