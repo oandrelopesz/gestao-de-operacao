@@ -801,7 +801,7 @@ function DemandasPage() {
                   toast.success("Recorrência configurada!");
                   
                   if (proxima === today) {
-                    catchUpRecorrentes();
+                    // Removido catchUpRecorrentes para evitar materialização automática em Fazer Hoje
                   }
                 }}
               >
