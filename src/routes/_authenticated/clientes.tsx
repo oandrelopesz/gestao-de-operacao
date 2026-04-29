@@ -450,7 +450,14 @@ function ClienteCard({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 pr-6">
-            <CardTitle className="text-base font-semibold truncate">{cliente.nome}</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-semibold truncate">{cliente.nome}</CardTitle>
+              {cliente.em_onboarding && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
+                  Onboarding
+                </Badge>
+              )}
+            </div>
             {cliente.nicho && <p className="text-xs text-muted-foreground mt-0.5 truncate">{cliente.nicho}</p>}
           </div>
           <Badge variant="outline" className={cn("font-normal text-[10px] shrink-0", nps.classes)}>
