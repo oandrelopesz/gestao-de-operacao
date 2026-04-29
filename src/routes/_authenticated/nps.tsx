@@ -42,38 +42,25 @@ function NPSPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingName, setDeletingName] = useState<string>("");
 
+  const isFriday = isFridayToday();
+  const nextFriday = getProximaSextaFormatada();
+  const daysUntilFriday = getDiasAteProximaSexta();
+
   const { data: avaliacoes, isLoading, error: queryError } = useQuery({
     queryKey: ["nps-avaliacoes"],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from("nps_avaliacoes_view")
-          .select("*")
-          .order("data_avaliacao", { ascending: false });
+      console.log("Fetching NPS avaliacoes...");
+      const { data, error } = await supabase
+        .from("nps_avaliacoes_view")
+        .select("*")
+        .order("data_avaliacao", { ascending: false });
 
-        if (error) {
-          console.error("Erro detalhado NPS query:", error);
-          toast.error(`Erro ao carregar feedbacks NPS: ${error.message}`);
-          throw error;
-        }
-
-        // Mapear para estrutura compatível com o resto do componente
-        const mapped = (data || []).map((item: any) => ({
-          ...item,
-          clientes: {
-            nome: item.cliente_nome,
-            agencia: item.cliente_agencia,
-            status_operacional: item.cliente_status_operacional,
-            em_onboarding: item.cliente_em_onboarding,
-            nicho: item.cliente_nicho,
-          }
-        }));
-
-        return mapped;
-      } catch (err: any) {
-        console.error("Erro inesperado na query NPS:", err);
-        throw err;
+      if (error) {
+        console.error("NPS error:", error);
+        throw error;
       }
+
+      return data || [];
     },
   });
 
@@ -86,8 +73,8 @@ function NPSPage() {
       queryClient.invalidateQueries({ queryKey: ["nps-avaliacoes"] });
       toast.success("Avaliação removida");
     },
-    onError: (err) => {
-      toast.error("Erro ao remover avaliação");
+    onError: (err: any) => {
+      toast.error(`Erro ao remover avaliação: ${err.message}`);
       console.error(err);
     },
   });
@@ -95,15 +82,15 @@ function NPSPage() {
   const filteredData = useMemo(() => {
     if (!avaliacoes) return [];
     return avaliacoes.filter(item => {
-      const matchesAgencia = filterAgencia === "all" || item.clientes?.agencia === filterAgencia;
+      const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
       const matchesCategory = filterCategory === "all" || item.categoria === filterCategory;
-      const matchesSearch = item.clientes?.nome?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesAgencia && matchesSearch && matchesCategory;
     });
   }, [avaliacoes, filterAgencia, filterCategory, searchQuery]);
 
   const stats = useMemo(() => {
-    if (!filteredData.length) return { avgScore: 0, criticalCount: 0, total: 0 };
+    if (!filteredData.length) return { avgScore: 0, criticalCount: 0, total: 0, distribution: [] };
     const total = filteredData.length;
     const avgScore = Math.round(filteredData.reduce((acc, curr) => acc + (curr.score_total || 0), 0) / total);
     const criticalCount = filteredData.filter(i => i.categoria === "critico" || i.categoria === "em_risco").length;
@@ -118,15 +105,74 @@ function NPSPage() {
 
   return (
     <div className="space-y-6">
+      {isFriday ? (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-lg flex items-center gap-3 text-emerald-700 dark:text-emerald-400 text-sm font-medium animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+            <Calendar size={18} />
+          </div>
+          <p>✓ Janela de avaliação aberta. Preencha o NPS dos clientes hoje.</p>
+        </div>
+      ) : (
+        <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg flex items-center gap-3 text-amber-700 dark:text-amber-400 text-sm font-medium">
+          <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+            <AlertTriangle size={18} />
+          </div>
+          <p>⚠️ Modo somente visualização. Próxima janela de avaliação: sexta-feira {nextFriday} (em {daysUntilFriday} {daysUntilFriday === 1 ? 'dia' : 'dias'}).</p>
+        </div>
+      )}
+
+      {queryError && (
+        <Card className="border-red-500 bg-red-50 dark:bg-red-950">
+          <CardHeader>
+            <CardTitle className="text-red-700 flex items-center gap-2">
+              <AlertCircle size={20} />
+              Erro ao carregar NPS
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <pre className="text-xs bg-white dark:bg-black/30 p-3 rounded overflow-auto max-h-40">
+              {JSON.stringify(queryError, null, 2)}
+            </pre>
+            <Button variant="destructive" onClick={() => queryClient.invalidateQueries({ queryKey: ["nps-avaliacoes"] })}>
+              Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">NPS Multidimensional</h1>
           <p className="text-muted-foreground">Gestão estratégica de saúde e satisfação da carteira.</p>
         </div>
-        <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
-          <Plus size={16} />
-          Nova avaliação
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="inline-block">
+                <Button 
+                  className={cn("gap-2 relative", !isFriday && "opacity-60 cursor-not-allowed")} 
+                  onClick={() => isFriday && setIsFormOpen(true)}
+                  disabled={!isFriday}
+                >
+                  <Plus size={16} />
+                  Nova avaliação
+                  {isFriday && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </TooltipTrigger>
+            {!isFriday && (
+              <TooltipContent>
+                <p>Avaliações NPS só podem ser registradas às sextas-feiras.</p>
+                <p className="text-xs opacity-70">Próxima janela: {nextFriday} (em {daysUntilFriday} dias).</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
