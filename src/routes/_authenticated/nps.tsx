@@ -41,7 +41,7 @@ function NPSPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingName, setDeletingName] = useState<string>("");
 
-  const { data: avaliacoes, isLoading } = useQuery({
+  const { data: avaliacoes, isLoading, error: queryError } = useQuery({
     queryKey: ["nps-avaliacoes"],
     queryFn: async () => {
       try {
