@@ -405,9 +405,7 @@ export function DemandaDrawer({
               size="sm" 
               className="text-zinc-500 hover:text-destructive h-8 gap-1.5 text-xs"
               onClick={() => {
-                if (window.confirm("Tem certeza que deseja excluir esta tarefa?")) {
-                  onDelete(demanda.id);
-                }
+                onDelete(demanda.id);
               }}
             >
               <Trash2 size={14} /> Remover
