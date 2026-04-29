@@ -425,12 +425,13 @@ function DemandasPage() {
     const overColumnDemandas = demandas.filter(d => d.status === overStatus);
     const newOrder = overColumnDemandas.length;
 
-    if (activeTask.recorrente && overStatus !== "recorrentes") {
-      const confirm = window.confirm("Deseja desativar a recorrência desta tarefa?");
-      if (!confirm) {
-        fetchDemandas();
-        return;
-      }
+    if (activeTask.status === "recorrentes" && overStatus !== "recorrentes") {
+      toast.error("Tarefas recorrentes vivem na coluna Recorrentes. Mova a instância gerada hoje em Fazer hoje.");
+      return;
+    }
+
+    if (activeTask.recorrente && overStatus !== "recorrentes" && activeTask.status === "recorrentes") {
+      return;
     }
 
     try {
