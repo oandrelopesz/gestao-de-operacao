@@ -520,7 +520,7 @@ function SaldoPage() {
             onSubmit={handleSave}
             initialValues={editing ? {
               cliente_id: editing.cliente_id,
-              plataforma: editing.plataforma,
+              plataformas: editing.plataformas || [],
               metodo_pagamento: editing.metodo_pagamento,
               verba_diaria: editing.verba_diaria,
               observacoes: editing.observacoes,
