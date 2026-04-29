@@ -57,12 +57,12 @@ import { KanbanCard } from "@/components/KanbanCard";
 import { cn } from "@/lib/utils";
 
 const COLUMNS = [
-  { id: "recorrentes", title: "Recorrentes" },
-  { id: "fazer_hoje", title: "Fazer hoje" },
-  { id: "fazer_amanha", title: "Fazer amanhã" },
-  { id: "fazer_depois_amanha", title: "Fazer depois de amanhã" },
-  { id: "standby", title: "Standby" },
-  { id: "feito", title: "Feito" },
+  { id: "recorrentes", title: "Recorrentes", color: "slate-500", hex: "#64748b" },
+  { id: "fazer_hoje", title: "Fazer hoje", color: "red-500", hex: "#ef4444" },
+  { id: "fazer_amanha", title: "Fazer amanhã", color: "yellow-500", hex: "#eab308" },
+  { id: "fazer_depois_amanha", title: "Fazer depois de amanhã", color: "orange-500", hex: "#f97316" },
+  { id: "standby", title: "Standby", color: "blue-500", hex: "#3b82f6" },
+  { id: "feito", title: "Feito", color: "green-500", hex: "#22c55e" },
 ];
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -174,28 +174,27 @@ function DemandasPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      if (clientes.length === 0) {
-        toast.error("Cadastre um cliente primeiro para usar o adicionar rápido.");
-        return;
-      }
-
       const columnDemandas = demandas.filter(d => d.status === status);
       const maxOrder = columnDemandas.length > 0 ? Math.max(...columnDemandas.map(d => d.ordem || 0)) : -1;
 
       const isRecorrente = status === "recorrentes";
 
-      const { error } = await supabase.from("demandas").insert([{
+      const { data, error } = await supabase.from("demandas").insert([{
         titulo,
         status: status as any,
         user_id: user.id,
-        cliente_id: clientes[0].id,
+        cliente_id: null,
         prioridade: "media" as const,
         ordem: maxOrder + 1,
         recorrente: isRecorrente,
         frequencia: isRecorrente ? "semanal" : null
-      }]);
+      }]).select().single();
 
       if (error) throw error;
+      
+      // Optimistic update
+      setDemandas(prev => [...prev, data]);
+      // Silently fetch to sync relationships
       fetchDemandas();
     } catch (error: any) {
       toast.error(error.message || "Erro ao criar demanda");
@@ -418,6 +417,8 @@ function DemandasPage() {
                     key={col.id}
                     id={col.id}
                     title={col.title}
+                    color={col.color}
+                    hex={col.hex}
                     demandas={filteredDemandas.filter((d) => d.status === col.id)}
                     onQuickAdd={handleQuickAdd}
                     onFullAdd={(status) => {
@@ -433,6 +434,18 @@ function DemandasPage() {
                       setDeletingName(name);
                     }}
                     onComplete={handleCompleteExecution}
+                    onMoveToDone={async (id) => {
+                      try {
+                        const { error } = await supabase
+                          .from("demandas")
+                          .update({ status: "feito" as any })
+                          .eq("id", id);
+                        if (error) throw error;
+                        fetchDemandas();
+                      } catch (err) {
+                        toast.error("Erro ao mover para concluído");
+                      }
+                    }}
                   />
                 ))}
               </div>
