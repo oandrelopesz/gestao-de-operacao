@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Plus, Search, Users as UsersIcon, DollarSign, TrendingUp, Smile,
   MoreVertical, Pencil, Archive, Trash2, LayoutGrid, Table as TableIcon, Calendar,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,12 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -253,11 +260,11 @@ function ClientesPage() {
                 <div className="flex items-baseline gap-2">
                   <h2 className="text-4xl font-extrabold tracking-tight text-primary">
                     {formatBRL(clientes.filter(c => c.status_operacional === "ativo").reduce((acc, c) => {
-                      if (c.tipo_verba === "total_periodo" && c.verba_total_contratada && c.data_inicio && c.data_limite_verba) {
+                      if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
                         const inicio = new Date(c.data_inicio);
                         const fim = new Date(c.data_limite_verba);
                         const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
-                        return acc + ((c.verba_total_contratada / dias) * 30);
+                        return acc + ((Number(c.verba_total_contratada) / dias) * 30);
                       }
                       return acc + Number(c.verba_ads || 0);
                     }, 0))}
@@ -272,11 +279,11 @@ function ClientesPage() {
                 {AGENCIAS.map(a => {
                   const agAtivos = clientes.filter(c => c.agencia === a.id && c.status_operacional === "ativo");
                   const agVerba = agAtivos.reduce((acc, c) => {
-                    if (c.tipo_verba === "total_periodo" && c.verba_total_contratada && c.data_inicio && c.data_limite_verba) {
+                    if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
                       const inicio = new Date(c.data_inicio);
                       const fim = new Date(c.data_limite_verba);
                       const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
-                      return acc + ((c.verba_total_contratada / dias) * 30);
+                      return acc + ((Number(c.verba_total_contratada) / dias) * 30);
                     }
                     return acc + Number(c.verba_ads || 0);
                   }, 0);
@@ -300,11 +307,11 @@ function ClientesPage() {
                     const ativosComVerba = clientes.filter(c => c.status_operacional === "ativo" && (c.verba_ads > 0 || c.verba_total_contratada > 0));
                     if (ativosComVerba.length === 0) return "R$ 0,00";
                     const totalVerba = ativosComVerba.reduce((acc, c) => {
-                      if (c.tipo_verba === "total_periodo" && c.verba_total_contratada && c.data_inicio && c.data_limite_verba) {
+                      if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
                         const inicio = new Date(c.data_inicio);
                         const fim = new Date(c.data_limite_verba);
                         const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
-                        return acc + ((c.verba_total_contratada / dias) * 30);
+                        return acc + ((Number(c.verba_total_contratada) / dias) * 30);
                       }
                       return acc + Number(c.verba_ads || 0);
                     }, 0);
@@ -314,13 +321,13 @@ function ClientesPage() {
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Mediana: {(() => {
                     const values = clientes
-                      .filter(c => c.status_operacional === "ativo" && (c.verba_ads > 0 || c.verba_total_contratada > 0))
+                      .filter(c => c.status_operacional === "ativo" && (Number(c.verba_ads || 0) > 0 || Number(c.verba_total_contratada || 0) > 0))
                       .map(c => {
-                        if (c.tipo_verba === "total_periodo" && c.verba_total_contratada && c.data_inicio && c.data_limite_verba) {
+                        if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
                           const inicio = new Date(c.data_inicio);
                           const fim = new Date(c.data_limite_verba);
                           const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
-                          return (c.verba_total_contratada / dias) * 30;
+                          return (Number(c.verba_total_contratada) / dias) * 30;
                         }
                         return Number(c.verba_ads || 0);
                       })
