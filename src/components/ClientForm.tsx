@@ -15,7 +15,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  Trigger,
+  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,7 +27,7 @@ const clientSchema = z.object({
   whatsapp: z.string().optional(),
   nicho: z.string().optional(),
   status: z.enum(["ativo", "pausado", "churn"]),
-  valor_mensal: z.string().transform((val) => Number(val.replace(/[^\d]/g, "")) / 100),
+  valor_mensal: z.string(),
   observacoes: z.string().optional(),
 });
 
@@ -49,7 +49,7 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       whatsapp: initialValues?.whatsapp || "",
       nicho: initialValues?.nicho || "",
       status: initialValues?.status || "ativo",
-      valor_mensal: initialValues?.valor_mensal ? initialValues.valor_mensal.toString() : "0",
+      valor_mensal: initialValues?.valor_mensal || "0",
       observacoes: initialValues?.observacoes || "",
     },
   });
@@ -137,7 +137,9 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
                 <FormLabel>Status</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectValue placeholder="Selecione um status" />
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um status" />
+                    </SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="ativo">Ativo</SelectItem>
