@@ -356,7 +356,7 @@ function ClientesPage() {
               <TabsTrigger value="tabela" className="gap-1.5"><TableIcon size={14} />Tabela</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
+          <Button className="gap-2" onClick={() => { setEditing(null); setEditingSaldo(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
           </Button>
         </div>
