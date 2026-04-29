@@ -124,6 +124,7 @@ export type Database = {
           ordem: number
           prazo: string | null
           prioridade: Database["public"]["Enums"]["demanda_prioridade"]
+          prospeccao_id: string | null
           proxima_execucao: string | null
           recorrente: boolean
           recorrente_pai_id: string | null
@@ -147,6 +148,7 @@ export type Database = {
           ordem?: number
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          prospeccao_id?: string | null
           proxima_execucao?: string | null
           recorrente?: boolean
           recorrente_pai_id?: string | null
@@ -170,6 +172,7 @@ export type Database = {
           ordem?: number
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          prospeccao_id?: string | null
           proxima_execucao?: string | null
           recorrente?: boolean
           recorrente_pai_id?: string | null
@@ -192,6 +195,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demandas_prospeccao_id_fkey"
+            columns: ["prospeccao_id"]
+            isOneToOne: false
+            referencedRelation: "prospeccao"
             referencedColumns: ["id"]
           },
           {
@@ -391,6 +401,128 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospeccao: {
+        Row: {
+          agencia_destino: string | null
+          cliente_id: string | null
+          created_at: string | null
+          data_fechamento: string | null
+          data_lead: string | null
+          data_perda: string | null
+          data_proximo_contato: string | null
+          etapa: Database["public"]["Enums"]["prospeccao_etapa"]
+          id: string
+          motivo_perda: string | null
+          nicho: string | null
+          nome: string
+          observacoes: string | null
+          ordem: number | null
+          origem: Database["public"]["Enums"]["prospeccao_origem"] | null
+          origem_detalhe: string | null
+          probabilidade: number | null
+          updated_at: string | null
+          user_id: string
+          valor_estimado: number | null
+        }
+        Insert: {
+          agencia_destino?: string | null
+          cliente_id?: string | null
+          created_at?: string | null
+          data_fechamento?: string | null
+          data_lead?: string | null
+          data_perda?: string | null
+          data_proximo_contato?: string | null
+          etapa?: Database["public"]["Enums"]["prospeccao_etapa"]
+          id?: string
+          motivo_perda?: string | null
+          nicho?: string | null
+          nome: string
+          observacoes?: string | null
+          ordem?: number | null
+          origem?: Database["public"]["Enums"]["prospeccao_origem"] | null
+          origem_detalhe?: string | null
+          probabilidade?: number | null
+          updated_at?: string | null
+          user_id: string
+          valor_estimado?: number | null
+        }
+        Update: {
+          agencia_destino?: string | null
+          cliente_id?: string | null
+          created_at?: string | null
+          data_fechamento?: string | null
+          data_lead?: string | null
+          data_perda?: string | null
+          data_proximo_contato?: string | null
+          etapa?: Database["public"]["Enums"]["prospeccao_etapa"]
+          id?: string
+          motivo_perda?: string | null
+          nicho?: string | null
+          nome?: string
+          observacoes?: string | null
+          ordem?: number | null
+          origem?: Database["public"]["Enums"]["prospeccao_origem"] | null
+          origem_detalhe?: string | null
+          probabilidade?: number | null
+          updated_at?: string | null
+          user_id?: string
+          valor_estimado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospeccao_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospeccao_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospeccao_interacoes: {
+        Row: {
+          created_at: string | null
+          data_interacao: string | null
+          descricao: string
+          id: string
+          prospeccao_id: string
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          data_interacao?: string | null
+          descricao: string
+          id?: string
+          prospeccao_id: string
+          tipo: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          data_interacao?: string | null
+          descricao?: string
+          id?: string
+          prospeccao_id?: string
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospeccao_interacoes_prospeccao_id_fkey"
+            columns: ["prospeccao_id"]
+            isOneToOne: false
+            referencedRelation: "prospeccao"
             referencedColumns: ["id"]
           },
         ]
@@ -728,6 +860,23 @@ export type Database = {
       nps_score_categoria: "ancora" | "saudavel" | "em_risco" | "critico"
       pagamento_status: "em_dia" | "pendente" | "atrasado"
       plataforma_enum: "meta" | "google" | "tiktok" | "outras"
+      prospeccao_etapa:
+        | "lead"
+        | "contato_feito"
+        | "reuniao_agendada"
+        | "proposta_enviada"
+        | "negociacao"
+        | "fechado"
+        | "perdido"
+      prospeccao_origem:
+        | "indicacao"
+        | "instagram"
+        | "anuncio"
+        | "evento"
+        | "inbound"
+        | "outbound"
+        | "parceiro"
+        | "outros"
       status_operacional_type: "ativo" | "pausado" | "churn"
       tipo_verba_enum: "mensal" | "total_periodo"
     }
@@ -893,6 +1042,25 @@ export const Constants = {
       nps_score_categoria: ["ancora", "saudavel", "em_risco", "critico"],
       pagamento_status: ["em_dia", "pendente", "atrasado"],
       plataforma_enum: ["meta", "google", "tiktok", "outras"],
+      prospeccao_etapa: [
+        "lead",
+        "contato_feito",
+        "reuniao_agendada",
+        "proposta_enviada",
+        "negociacao",
+        "fechado",
+        "perdido",
+      ],
+      prospeccao_origem: [
+        "indicacao",
+        "instagram",
+        "anuncio",
+        "evento",
+        "inbound",
+        "outbound",
+        "parceiro",
+        "outros",
+      ],
       status_operacional_type: ["ativo", "pausado", "churn"],
       tipo_verba_enum: ["mensal", "total_periodo"],
     },

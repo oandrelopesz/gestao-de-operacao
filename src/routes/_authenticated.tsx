@@ -10,7 +10,8 @@ import {
   ChevronRight,
   User as UserIcon,
   Bell,
-  DollarSign
+  DollarSign,
+  Target
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -98,6 +99,7 @@ function AuthenticatedLayout() {
     { label: "Saldo", icon: <Wallet size={18} />, to: "/saldo" },
     { label: "NPS de Clientes", icon: <MessageSquare size={18} />, to: "/nps" },
     { label: "Clientes Ativos", icon: <Users size={18} />, to: "/clientes" },
+    { label: "Prospecção", icon: <Target size={18} />, to: "/prospeccao" },
     { label: "Financeiro", icon: <DollarSign size={18} />, to: "/financeiro" },
   ];
 
