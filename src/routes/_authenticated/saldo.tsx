@@ -478,111 +478,145 @@ function SaldoPage() {
             </Button>
           </div>
         ) : (
-          filteredData.map((item) => (
-            <Card 
-              key={item.id} 
-              className={cn(
-                "group relative border-l-4 transition-all hover:shadow-md cursor-pointer",
-                getStatusColor(item.status_alerta),
-                item.clientes?.status_operacional === "pausado" && "opacity-70"
-              )}
-              onClick={() => fetchHistory(item)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-base line-clamp-1">{item.cliente_nome}</CardTitle>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      <Badge variant="outline" className={cn(
-                        "text-[10px] font-normal uppercase py-0",
-                        item.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : "",
-                        item.cliente_agencia === "spike" ? "text-purple-600 border-purple-200 bg-purple-50" : ""
-                      )}>
-                        {AGENCIAS.find(a => a.id === item.cliente_agencia)?.label || item.cliente_agencia}
-                      </Badge>
-                      {item.clientes?.status_operacional === "pausado" && (
-                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0">
-                          Pausado
+          filteredData.map((item) => {
+            const isCartao = item.metodo_pagamento === "cartao";
+            const isPausado = item.clientes?.status_operacional === "pausado";
+
+            return (
+              <Card 
+                key={item.id} 
+                className={cn(
+                  "group relative border-l-4 transition-all hover:shadow-md cursor-pointer",
+                  isCartao ? "border-blue-300 opacity-90 shadow-sm" : getStatusColor(item.status_alerta),
+                  isPausado && "opacity-70"
+                )}
+                onClick={() => fetchHistory(item)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-base line-clamp-1">{item.cliente_nome}</CardTitle>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <Badge variant="outline" className={cn(
+                          "text-[10px] font-normal uppercase py-0",
+                          item.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : "",
+                          item.cliente_agencia === "spike" ? "text-purple-600 border-purple-200 bg-purple-50" : ""
+                        )}>
+                          {AGENCIAS.find(a => a.id === item.cliente_agencia)?.label || item.cliente_agencia}
                         </Badge>
+                        {isCartao && (
+                          <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 text-[10px] uppercase py-0">
+                            Cartão
+                          </Badge>
+                        )}
+                        {isPausado && (
+                          <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0">
+                            Pausado
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
+                          <MoreVertical size={16} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-[140px]">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(item); setModalOpen(true); }}>
+                          <Pencil size={14} className="mr-2" /> Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-destructive focus:text-destructive" 
+                          onClick={(e) => { e.stopPropagation(); setDeletingId(item.id); }}
+                        >
+                          <Trash2 size={14} className="mr-2" /> Remover
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-wrap gap-1">
+                      {item.plataformas?.map((plat: string) => (
+                        <Badge key={plat} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find(p => p.id === plat)?.color)}>
+                          {plat}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="text-right">
+                      {isCartao ? (
+                        <div className="text-sm font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                          Cartão
+                        </div>
+                      ) : (
+                        <div className="text-2xl font-bold tracking-tight text-primary">
+                          {formatBRL(item.saldo_atual)}
+                        </div>
                       )}
                     </div>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
-                        <MoreVertical size={16} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-[140px]">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(item); setModalOpen(true); }}>
-                        <Pencil size={14} className="mr-2" /> Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        className="text-destructive focus:text-destructive" 
-                        onClick={(e) => { e.stopPropagation(); setDeletingId(item.id); }}
-                      >
-                        <Trash2 size={14} className="mr-2" /> Remover
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex flex-wrap gap-1">
-                    {item.plataformas?.map((plat: string) => (
-                      <Badge key={plat} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find(p => p.id === plat)?.color)}>
-                        {plat}
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold tracking-tight text-primary">
-                      {formatBRL(item.saldo_atual)}
+
+                  {!isCartao ? (
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-medium">
+                        <span>{item.dias_restantes ? Math.floor(item.dias_restantes) : 0} dias restantes</span>
+                        <span className="text-muted-foreground">
+                          Fim: {item.data_prevista_fim ? new Date(item.data_prevista_fim).toLocaleDateString("pt-BR") : "—"}
+                        </span>
+                      </div>
+                      <Progress 
+                        value={Math.min(100, (item.dias_restantes || 0) * 10)} 
+                        className="h-2"
+                        indicatorClassName={getProgressColor(item.status_alerta)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-10 flex items-center justify-center bg-muted/30 rounded-md border border-dashed">
+                      <p className="text-[11px] text-muted-foreground italic">Pagamento direto no cartão</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t">
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground">Verba Diária</p>
+                      <p className="font-semibold">{formatBRL(item.verba_diaria_calc)}</p>
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <p className="text-muted-foreground">{isCartao ? "Verba Mensal" : "Total Investido"}</p>
+                      <p className="font-semibold">
+                        {isCartao 
+                          ? formatBRL(item.clientes?.verba_ads || (item.verba_diaria_calc * 30)) 
+                          : formatBRL(item.total_recarregado)}
+                      </p>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span>{item.dias_restantes ? Math.floor(item.dias_restantes) : 0} dias restantes</span>
-                    <span className="text-muted-foreground">
-                      Fim: {item.data_prevista_fim ? new Date(item.data_prevista_fim).toLocaleDateString("pt-BR") : "—"}
-                    </span>
-                  </div>
-                  <Progress 
-                    value={Math.min(100, (item.dias_restantes || 0) * 10)} 
-                    className="h-2"
-                    indicatorClassName={getProgressColor(item.status_alerta)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t">
-                  <div className="space-y-1">
-                    <p className="text-muted-foreground">Verba Diária</p>
-                    <p className="font-semibold">{formatBRL(item.verba_diaria_calc)}</p>
-                  </div>
-                  <div className="space-y-1 text-right">
-                    <p className="text-muted-foreground">Total Investido</p>
-                    <p className="font-semibold">{formatBRL(item.total_recarregado)}</p>
-                  </div>
-                </div>
-
-                <Button 
-                  className="w-full h-8 text-xs gap-2" 
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedForRecarga(item);
-                    setRecargaModalOpen(true);
-                  }}
-                >
-                  <ArrowUpCircle size={14} />
-                  Adicionar recarga
-                </Button>
-              </CardContent>
-            </Card>
-          ))
+                  {!isCartao ? (
+                    <Button 
+                      className="w-full h-8 text-xs gap-2" 
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedForRecarga(item);
+                        setRecargaModalOpen(true);
+                      }}
+                    >
+                      <ArrowUpCircle size={14} />
+                      Adicionar recarga
+                    </Button>
+                  ) : (
+                    <div className="h-8 flex items-center justify-center">
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Check size={10} className="text-emerald-500" /> Pagamento no cartão
+                      </span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
 
