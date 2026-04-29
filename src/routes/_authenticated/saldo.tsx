@@ -413,10 +413,6 @@ function SaldoPage() {
           <Button variant="outline" size="icon" onClick={fetchSaldo} disabled={loading}>
             <RefreshCw size={16} className={cn(loading && "animate-spin")} />
           </Button>
-          <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
-            <Plus size={16} />
-            Novo registro de saldo
-          </Button>
         </div>
       </div>
 
