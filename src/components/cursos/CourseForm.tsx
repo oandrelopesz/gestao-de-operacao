@@ -105,8 +105,9 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
     }
   };
 
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
+  const handleAddCategory = async (nameOverride?: string) => {
+    const nameToUse = nameOverride || newCategoryName;
+    if (!nameToUse.trim()) return;
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -114,7 +115,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
       const { data, error } = await supabase
         .from("curso_categorias")
-        .insert([{ nome: newCategoryName.trim(), user_id: userId }])
+        .insert([{ nome: nameToUse.trim(), user_id: userId }])
         .select()
         .single();
 
@@ -125,8 +126,10 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       form.setValue("categoria_id", data.id);
       setNewCategoryName("");
       setIsAddingCategory(false);
+      return data.id;
     } catch (error: any) {
       toast.error("Erro ao criar categoria");
+      return null;
     }
   };
 
