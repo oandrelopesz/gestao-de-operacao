@@ -55,11 +55,12 @@ function DemandasPage() {
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [clientes, setClientes] = useState<{ id: string; nome: string }[]>([]);
+  const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: AgenciaId }[]>([]);
   const [demandas, setDemandas] = useState<any[]>([]);
   const [activeDemanda, setActiveDemanda] = useState<any | null>(null);
   const [editingDemanda, setEditingDemanda] = useState<any | null>(null);
   const [filterCliente, setFilterCliente] = useState<string>("all");
+  const [filterAgencia, setFilterAgencia] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const sensors = useSensors(
