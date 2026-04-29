@@ -33,8 +33,8 @@ const clientSchema = z.object({
   em_onboarding: z.boolean(),
   status_operacional: z.enum(["ativo", "pausado", "churn"]),
   tipo_verba: z.enum(["mensal", "total_periodo"]),
-  verba_total_contratada: z.number().optional().nullable(),
-  data_limite_verba: z.string().optional().nullable(),
+  verba_total_contratada: z.union([z.number(), z.string().length(0)]).optional().nullable(),
+  data_limite_verba: z.string().optional().nullable().or(z.literal("")),
 });
 
 export type ClientFormValues = z.infer<typeof clientSchema>;
