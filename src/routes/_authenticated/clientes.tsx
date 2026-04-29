@@ -76,6 +76,7 @@ interface ClienteView {
   verba_total_contratada: number | null;
   data_limite_verba: string | null;
   saldo_ads_summary?: string;
+  plataformas_ativas?: string[];
 }
 
 function ClientesPage() {
