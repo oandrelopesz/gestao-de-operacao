@@ -188,6 +188,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "demandas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "demandas_recorrente_pai_id_fkey"
             columns: ["recorrente_pai_id"]
             isOneToOne: false
@@ -287,6 +294,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nps_avaliacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
             referencedColumns: ["id"]
           },
         ]
@@ -393,10 +407,86 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "saldo_ads_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
+      clientes_view: {
+        Row: {
+          agencia: Database["public"]["Enums"]["agencia_enum"] | null
+          arquivado: boolean | null
+          data_inicio: string | null
+          data_limite_verba: string | null
+          demandas_ativas: number | null
+          em_onboarding: boolean | null
+          id: string | null
+          nicho: string | null
+          nome: string | null
+          nps_status: string | null
+          observacoes: string | null
+          status_operacional:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
+          status_pagamento_mes: string | null
+          tipo_verba: Database["public"]["Enums"]["tipo_verba_enum"] | null
+          ultima_nps_data: string | null
+          ultima_nps_score: number | null
+          verba_ads: number | null
+          verba_total_contratada: number | null
+        }
+        Insert: {
+          agencia?: Database["public"]["Enums"]["agencia_enum"] | null
+          arquivado?: boolean | null
+          data_inicio?: string | null
+          data_limite_verba?: string | null
+          demandas_ativas?: never
+          em_onboarding?: boolean | null
+          id?: string | null
+          nicho?: string | null
+          nome?: string | null
+          nps_status?: never
+          observacoes?: string | null
+          status_operacional?:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
+          status_pagamento_mes?: never
+          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"] | null
+          ultima_nps_data?: never
+          ultima_nps_score?: never
+          verba_ads?: number | null
+          verba_total_contratada?: number | null
+        }
+        Update: {
+          agencia?: Database["public"]["Enums"]["agencia_enum"] | null
+          arquivado?: boolean | null
+          data_inicio?: string | null
+          data_limite_verba?: string | null
+          demandas_ativas?: never
+          em_onboarding?: boolean | null
+          id?: string | null
+          nicho?: string | null
+          nome?: string | null
+          nps_status?: never
+          observacoes?: string | null
+          status_operacional?:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
+          status_pagamento_mes?: never
+          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"] | null
+          ultima_nps_data?: never
+          ultima_nps_score?: never
+          verba_ads?: number | null
+          verba_total_contratada?: number | null
+        }
+        Relationships: []
+      }
       nps_avaliacoes_view: {
         Row: {
           categoria: string | null
@@ -428,6 +518,13 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "nps_avaliacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       saldo_ads_view: {
@@ -455,6 +552,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_ads_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
             referencedColumns: ["id"]
           },
         ]
