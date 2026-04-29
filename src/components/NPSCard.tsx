@@ -27,8 +27,15 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
 
   return (
     <Card 
-      className="group hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-muted-foreground/10"
+      className="group hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-muted-foreground/10 outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
       onClick={() => onClick(avaliacao)}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Delete" || e.key === "Backspace") {
+          e.stopPropagation();
+          onDelete(avaliacao.id);
+        }
+      }}
     >
       <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0 relative">
         <div className="space-y-1">
