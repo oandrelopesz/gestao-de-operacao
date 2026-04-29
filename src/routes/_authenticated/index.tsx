@@ -757,6 +757,61 @@ function DemandasPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {popoverConfig && (
+        <div 
+          className="fixed z-[100] w-64 bg-white dark:bg-zinc-950 border rounded-lg shadow-xl p-4 animate-in zoom-in duration-200"
+          style={{ left: popoverConfig.x, top: popoverConfig.y }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider">Quando repetir?</h4>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPopoverConfig(null)}><X size={14} /></Button>
+          </div>
+          <div className="grid gap-2">
+            {[
+              { label: 'Diária', value: 'diaria', desc: 'Todos os dias' },
+              { label: 'Semanal', value: 'semanal', desc: 'Uma vez por semana' },
+              { label: 'Quinzenal', value: 'quinzenal', desc: 'A cada 15 dias' },
+              { label: 'Mensal', value: 'mensal', desc: 'Mesmo dia todo mês' },
+              { label: 'Customizada', value: 'customizada', desc: 'Intervalo de dias' }
+            ].map((opt) => (
+              <Button 
+                key={opt.value} 
+                variant="outline" 
+                className="justify-start h-auto py-2 px-3 text-left"
+                onClick={async () => {
+                  const today = new Date().toISOString().split('T')[0];
+                  
+                  // Calcular primeira proxima_execucao baseada no tipo (simplificado para o popover inicial)
+                  let proxima = today; 
+                  if (opt.value === 'diaria') {
+                    const d = new Date(); d.setDate(d.getDate() + 1);
+                    proxima = d.toISOString().split('T')[0];
+                  }
+
+                  await supabase.from("demandas").update({
+                    frequencia_tipo: opt.value,
+                    proxima_execucao: proxima
+                  }).eq("id", popoverConfig.id);
+                  
+                  setPopoverConfig(null);
+                  fetchDemandas();
+                  toast.success("Recorrência configurada!");
+                  
+                  if (proxima === today) {
+                    catchUpRecorrentes();
+                  }
+                }}
+              >
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold">{opt.label}</span>
+                  <span className="text-[10px] text-zinc-400">{opt.desc}</span>
+                </div>
+              </Button>
+            ))}
+            <Button variant="ghost" className="text-xs h-8" onClick={() => setPopoverConfig(null)}>Configurar depois</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
