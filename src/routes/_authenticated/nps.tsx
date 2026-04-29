@@ -1,9 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { MessageSquare, Star, TrendingUp, Plus } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { MessageSquare, Star, TrendingUp, Plus, Search, Building2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { AGENCIAS, formatBRL } from "@/lib/clientes";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/nps")({
   component: NPSPage,
