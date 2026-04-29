@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AGENCIAS, maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
 
 const clientSchema = z.object({
