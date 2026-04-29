@@ -204,16 +204,26 @@ function ClientesPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");
 
+      // Sanitiza campos opcionais para evitar erros no banco
+      const payload: any = { ...values };
+      if (payload.tipo_verba === "mensal") {
+        payload.verba_total_contratada = null;
+        payload.data_limite_verba = null;
+      } else {
+        if (!payload.data_limite_verba) payload.data_limite_verba = null;
+        if (payload.verba_total_contratada === undefined) payload.verba_total_contratada = null;
+      }
+
       if (editing) {
         const { error } = await supabase.from("clientes")
-          .update({ ...values } as any).eq("id", editing.id);
+          .update(payload).eq("id", editing.id);
         if (error) throw error;
         toast.success("Cliente atualizado");
       } else {
         const { error } = await supabase.from("clientes").insert([{
-          ...values,
+          ...payload,
           user_id: user.id,
-        }] as any);
+        }]);
         if (error) throw error;
         toast.success("Cliente criado");
       }
