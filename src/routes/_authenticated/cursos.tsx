@@ -101,7 +101,11 @@ function CursosPage() {
         .order("nome", { ascending: true });
 
       if (error) throw error;
-      setCursos(data || []);
+      const formattedData = (data || []).map(c => ({
+        ...c,
+        em_andamento: !!c.em_andamento
+      })) as Curso[];
+      setCursos(formattedData);
     } catch (error: any) {
       toast.error("Erro ao carregar cursos");
     } finally {
