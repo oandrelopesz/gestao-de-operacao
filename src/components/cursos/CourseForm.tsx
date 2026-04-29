@@ -127,7 +127,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
       const { data, error } = await supabase
         .from("curso_categorias")
-        .insert([{ nome: nameToUse.trim(), user_id: userId }])
+        .upsert([{ nome: nameToUse.trim(), user_id: userId }], { onConflict: 'nome' })
         .select()
         .single();
 
