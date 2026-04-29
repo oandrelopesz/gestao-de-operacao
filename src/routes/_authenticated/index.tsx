@@ -285,10 +285,9 @@ function DemandasPage() {
       const { error } = await supabase
         .from("demandas")
         .update({ 
-          status: overStatus,
-          // We would ideally update all orders here, but for now just the status
+          status: overStatus as any,
         })
-        .eq("id", activeId);
+        .eq("id", String(activeId));
       
       if (error) throw error;
       
