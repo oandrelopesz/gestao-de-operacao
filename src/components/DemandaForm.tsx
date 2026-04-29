@@ -25,7 +25,7 @@ const demandaSchema = z.object({
   descricao: z.string().optional(),
   cliente_id: z.string().min(1, "Selecione um cliente"),
   status: z.enum(["fazer_hoje", "fazer_amanha", "fazer_depois_amanha", "standby", "feito"]),
-  prioridade: z.enum(["baixa", "média", "alta", "urgente"]),
+  prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
   prazo: z.string().optional(),
 });
 
