@@ -135,18 +135,13 @@ export function ProspeccaoDrawer({
     }
   }, [isOpen, lead?.id]);
 
-  const handleUpdate = (field: keyof Lead, value: any) => {
-    if (!lead?.id) return;
-    onUpdate(lead.id, { [field]: value });
-  };
-
-  // Debounced auto-save for observations
-  const debouncedUpdateObs = useCallback(
-    debounce((val: string) => {
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const handleUpdateObs = (val: string) => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
       if (lead?.id) onUpdate(lead.id, { observacoes: val });
-    }, 500),
-    [lead?.id, onUpdate]
-  );
+    }, 500);
+  };
 
   const addInteraction = async () => {
     if (!lead?.id || !newInteraction.descricao) return;
