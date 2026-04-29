@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Filter, List, Kanban as KanbanIcon, Search, Building2, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Plus, Filter, List, Kanban as KanbanIcon, Search, Building2, MoreVertical, Pencil, Trash2, Repeat, Calendar as CalendarIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
