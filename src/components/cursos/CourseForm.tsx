@@ -91,6 +91,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       observacoes: "",
     },
   });
+  const selectedCategoriaId = form.watch("categoria_id");
 
   useEffect(() => {
     if (open) {
@@ -125,9 +126,22 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
         return null;
       }
 
+      const trimmedName = nameToUse.trim();
+      const existingCategory = categorias.find(
+        (cat) => cat.nome.toLowerCase() === trimmedName.toLowerCase()
+      );
+
+      if (existingCategory) {
+        form.setValue("categoria_id", existingCategory.id, { shouldDirty: true, shouldValidate: true });
+        form.setValue("tema", "outros", { shouldDirty: true, shouldValidate: true });
+        setSearchQuery("");
+        setOpenCombobox(false);
+        return existingCategory.id;
+      }
+
       const { data, error } = await supabase
         .from("curso_categorias")
-        .upsert([{ nome: nameToUse.trim(), user_id: userId }], { onConflict: 'nome,user_id' })
+        .insert([{ nome: trimmedName, user_id: userId }])
         .select()
         .single();
 
@@ -135,8 +149,8 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
       toast.success("Tema criado!");
       setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
-      form.setValue("categoria_id", data.id);
-      form.setValue("tema", "outros");
+      form.setValue("categoria_id", data.id, { shouldDirty: true, shouldValidate: true });
+      form.setValue("tema", "outros", { shouldDirty: true, shouldValidate: true });
       setSearchQuery("");
       setOpenCombobox(false);
       return data.id;
