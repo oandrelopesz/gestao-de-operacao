@@ -368,7 +368,7 @@ function NPSPage() {
                   </div>
 
                   <div className="text-right hidden md:block text-xs text-muted-foreground shrink-0">
-                    {new Date(item.data_avaliacao).toLocaleDateString("pt-BR")}
+                    {item.data_avaliacao ? new Date(item.data_avaliacao).toLocaleDateString("pt-BR") : "—"}
                   </div>
 
                   <DropdownMenu>
