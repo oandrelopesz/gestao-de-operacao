@@ -28,8 +28,8 @@ export function NPSHistoryDrawer({ cliente, onClose }: NPSHistoryDrawerProps) {
     enabled: !!cliente?.id,
   });
 
-  const latest = historico?.[historico.length - 1];
-  const previous = historico?.[historico.length - 2];
+  const latest = historico?.[historico.length - 1] as any;
+  const previous = historico?.[historico.length - 2] as any;
 
   const radarData = latest ? [
     { subject: "Engajamento", A: latest.engajamento, fullMark: 10 },
@@ -46,7 +46,7 @@ export function NPSHistoryDrawer({ cliente, onClose }: NPSHistoryDrawerProps) {
 
   const getDelta = (metric: string) => {
     if (!latest || !previous) return null;
-    const diff = latest[metric] - previous[metric];
+    const diff = (latest[metric] || 0) - (previous[metric] || 0);
     if (diff > 0) return { val: `+${diff}`, icon: <TrendingUp size={12} className="text-emerald-500" /> };
     if (diff < 0) return { val: diff, icon: <TrendingDown size={12} className="text-red-500" /> };
     return { val: "0", icon: <Minus size={12} className="text-slate-400" /> };
