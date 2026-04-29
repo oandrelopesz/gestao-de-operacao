@@ -94,6 +94,7 @@ function SaldoPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showPausados, setShowPausados] = useState(false);
+  const [showCartao, setShowCartao] = useState(true);
   const [sortBy, setSortBy] = useState<string>("dias_restantes");
   
   const [modalOpen, setModalOpen] = useState(false);
