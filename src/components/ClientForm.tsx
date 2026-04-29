@@ -21,7 +21,26 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { X, Plus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AGENCIAS, maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
+
+const PLATAFORMAS_DISPONIVEIS = [
+  "Meta",
+  "Google",
+  "Pinterest",
+  "X Ads",
+  "LinkedIn",
+  "TikTok",
+  "Taboola",
+  "Outbrain",
+];
 
 const clientSchema = z.object({
   nome: z.string().min(2, "Nome é obrigatório"),
@@ -35,6 +54,8 @@ const clientSchema = z.object({
   tipo_verba: z.enum(["mensal", "total_periodo"]),
   verba_total_contratada: z.union([z.number(), z.string().length(0)]).optional().nullable(),
   data_limite_verba: z.string().optional().nullable().or(z.literal("")),
+  metodo_pagamento: z.enum(["cartao", "pix", "boleto"]),
+  plataformas: z.array(z.string()).min(1, "Selecione pelo menos uma plataforma"),
 });
 
 export type ClientFormValues = z.infer<typeof clientSchema>;
