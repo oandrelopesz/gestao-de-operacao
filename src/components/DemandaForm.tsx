@@ -22,14 +22,14 @@ import { Textarea } from "@/components/ui/textarea";
 
 const demandaSchema = z.object({
   titulo: z.string().min(2, "Título é obrigatório"),
-  descricao: z.string().optional().nullable().default(""),
+  descricao: z.string().nullable().optional(),
   cliente_id: z.string().min(1, "Selecione um cliente"),
   status: z.enum(["recorrentes", "fazer_hoje", "fazer_amanha", "fazer_depois_amanha", "standby", "feito"]),
   prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
-  prazo: z.string().optional().nullable().default(""),
+  prazo: z.string().nullable().optional(),
   recorrente: z.boolean(),
-  frequencia: z.enum(["diaria", "semanal", "quinzenal", "mensal", "customizada"]).optional().nullable(),
-  dia_referencia: z.string().optional().nullable().default(""),
+  frequencia: z.enum(["diaria", "semanal", "quinzenal", "mensal", "customizada"]).nullable().optional(),
+  dia_referencia: z.string().nullable().optional(),
 });
 
 export type DemandaFormValues = z.infer<typeof demandaSchema>;
@@ -66,7 +66,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
             <FormItem>
               <FormLabel>Título</FormLabel>
               <FormControl>
-                <Input placeholder="O que precisa ser feito?" {...field} />
+                <Input placeholder="O que precisa ser feito?" {...field} value={field.value || ""} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -159,17 +159,18 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
             render={({ field }) => (
               <FormItem className="flex items-center justify-between">
                 <div>
-                  <FormLabel className="text-base">Tarefa Recorrente</FormLabel>
+                  <FormLabel className="text-base font-medium">Tarefa Recorrente</FormLabel>
                   <p className="text-xs text-muted-foreground">Repetir esta tarefa periodicamente</p>
                 </div>
                 <FormControl>
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
                     checked={field.value}
                     onChange={(e) => {
-                      field.onChange(e.target.checked);
-                      if (e.target.checked) {
+                      const isChecked = e.target.checked;
+                      field.onChange(isChecked);
+                      if (isChecked) {
                         form.setValue("status", "recorrentes");
                       } else if (form.getValues("status") === "recorrentes") {
                         form.setValue("status", "fazer_hoje");
