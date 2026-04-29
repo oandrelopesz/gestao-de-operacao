@@ -639,10 +639,12 @@ function SaldoPage() {
             return (
               <Card 
                 key={group.cliente_id} 
+                id={`card-${group.cliente_id}`}
                 className={cn(
                   "group relative border-l-4 transition-all hover:shadow-md flex flex-col",
                   getStatusColor(group.pior_status_alerta),
-                  isPausado && "opacity-75"
+                  isPausado && "opacity-75",
+                  highlightedId === group.cliente_id && "ring-2 ring-primary animate-pulse shadow-lg"
                 )}
               >
                 <CardHeader className="pb-3">
