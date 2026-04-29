@@ -90,15 +90,15 @@ function DemandasPage() {
   }, []);
 
   const fetchClientes = async () => {
-    const { data, error } = await supabase.from("clientes").select("id, nome").order("nome");
+    const { data, error } = await supabase.from("clientes").select("id, nome, agencia").order("nome");
     if (error) console.error("Erro ao buscar clientes:", error);
-    else setClientes(data || []);
+    else setClientes((data as any) || []);
   };
 
   const fetchDemandas = async () => {
     const { data, error } = await supabase
       .from("demandas")
-      .select("*, clientes(nome)")
+      .select("*, clientes(nome, agencia)")
       .order("ordem", { ascending: true });
     
     if (error) console.error("Erro ao buscar demandas:", error);
