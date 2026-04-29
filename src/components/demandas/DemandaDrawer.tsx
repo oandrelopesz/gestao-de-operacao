@@ -249,7 +249,7 @@ export function DemandaDrawer({
 
             <div className="grid grid-cols-[120px,1fr] items-center gap-2">
               <div className="flex items-center gap-2 text-zinc-400">
-                <Calendar size={14} />
+                <CalendarIcon size={14} />
                 <span>Criado</span>
               </div>
               <div className="text-zinc-500">
