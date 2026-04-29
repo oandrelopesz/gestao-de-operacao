@@ -405,10 +405,34 @@ function ClienteCard({
     : cliente.observacoes;
 
   return (
-    <Card className={cn("border-l-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default flex flex-col", borderClass)}>
+    <Card className={cn("border-l-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default flex flex-col group relative", borderClass)}>
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreVertical size={16} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[140px]">
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil size={14} className="mr-2" /> Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onArchive}>
+              <Archive size={14} className="mr-2" /> Arquivar
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              className="text-destructive focus:text-destructive" 
+              onClick={onDelete}
+            >
+              <Trash2 size={14} className="mr-2" /> Remover
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+          <div className="min-w-0 pr-6">
             <CardTitle className="text-base font-semibold truncate">{cliente.nome}</CardTitle>
             {cliente.nicho && <p className="text-xs text-muted-foreground mt-0.5 truncate">{cliente.nicho}</p>}
           </div>
@@ -457,11 +481,6 @@ function ClienteCard({
           <div className="text-xs text-muted-foreground border-t pt-2 leading-relaxed">{obsTrim}</div>
         )}
       </CardContent>
-      <div className="flex items-center justify-end gap-1 px-4 py-2 border-t bg-muted/20">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} title="Editar"><Pencil size={13} /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onArchive} title="Arquivar"><Archive size={13} /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Deletar"><Trash2 size={13} /></Button>
-      </div>
     </Card>
   );
 }
