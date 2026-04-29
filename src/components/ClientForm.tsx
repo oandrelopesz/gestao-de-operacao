@@ -32,6 +32,9 @@ const clientSchema = z.object({
   observacoes: z.string().optional(),
   em_onboarding: z.boolean(),
   status_operacional: z.enum(["ativo", "pausado", "churn"]),
+  tipo_verba: z.enum(["mensal", "total_periodo"]),
+  verba_total_contratada: z.number().optional().nullable(),
+  data_limite_verba: z.string().optional().nullable(),
 });
 
 export type ClientFormValues = z.infer<typeof clientSchema>;
@@ -54,6 +57,9 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       observacoes: initialValues?.observacoes || "",
       em_onboarding: initialValues?.em_onboarding ?? false,
       status_operacional: initialValues?.status_operacional || "ativo",
+      tipo_verba: initialValues?.tipo_verba || "mensal",
+      verba_total_contratada: initialValues?.verba_total_contratada ?? 0,
+      data_limite_verba: initialValues?.data_limite_verba || "",
     },
   });
 
@@ -130,29 +136,104 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
               </FormItem>
             )}
           />
+        <div className="space-y-4 rounded-md border p-4 bg-muted/20">
           <FormField
             control={form.control}
-            name="verba_ads"
+            name="tipo_verba"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Verba de ads / mês</FormLabel>
-                <FormControl>
-                  <Input
-                    inputMode="numeric"
-                    placeholder="R$ 0,00"
-                    value={verbaDisplay}
-                    onChange={(e) => {
-                      const masked = maskBRLInput(e.target.value);
-                      setVerbaDisplay(masked);
-                      field.onChange(parseBRLInput(e.target.value));
-                    }}
-                  />
-                </FormControl>
-                <p className="text-xs text-muted-foreground">{formatBRL(field.value)}</p>
+              <FormItem className="space-y-3">
+                <FormLabel>Tipo de Verba</FormLabel>
+                <div className="flex gap-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="mensal"
+                      value="mensal"
+                      checked={field.value === "mensal"}
+                      onChange={() => field.onChange("mensal")}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor="mensal" className="text-sm">Mensal</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="total_periodo"
+                      value="total_periodo"
+                      checked={field.value === "total_periodo"}
+                      onChange={() => field.onChange("total_periodo")}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor="total_periodo" className="text-sm">Total período</label>
+                  </div>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
+
+          {form.watch("tipo_verba") === "mensal" ? (
+            <FormField
+              control={form.control}
+              name="verba_ads"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Verba de ads / mês</FormLabel>
+                  <FormControl>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="R$ 0,00"
+                      value={verbaDisplay}
+                      onChange={(e) => {
+                        const masked = maskBRLInput(e.target.value);
+                        setVerbaDisplay(masked);
+                        field.onChange(parseBRLInput(e.target.value));
+                      }}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">{formatBRL(field.value)}</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="verba_total_contratada"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Verba Total Contratada</FormLabel>
+                    <FormControl>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="R$ 0,00"
+                        value={field.value ? formatBRL(field.value) : ""}
+                        onChange={(e) => {
+                          field.onChange(parseBRLInput(e.target.value));
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="data_limite_verba"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data Limite</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} value={field.value || ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
+        </div>
         </div>
 
         <FormField

@@ -72,6 +72,10 @@ interface ClienteView {
   nps_status: "ancora" | "saudavel" | "em_risco" | "critico" | "sem_avaliacao";
   demandas_ativas: number;
   status_pagamento_mes: "em_dia" | "pendente" | "atrasado" | null;
+  tipo_verba: "mensal" | "total_periodo";
+  verba_total_contratada: number | null;
+  data_limite_verba: string | null;
+  saldo_ads_summary?: string;
 }
 
 function ClientesPage() {
@@ -98,7 +102,22 @@ function ClientesPage() {
       .eq("arquivado", false)
       .order("nome");
     if (error) { toast.error("Erro ao carregar clientes"); console.error(error); }
-    else setClientes((data as any) || []);
+    else {
+      // Fetch platform summary for each client
+      const { data: saldos } = await supabase.from("saldo_ads_view").select("cliente_id, plataforma, verba_diaria_calc");
+      
+      const enrichedData = (data as any[] || []).map(cli => {
+        const cliSaldos = (saldos || []).filter(s => s.cliente_id === cli.id);
+        const summary = cliSaldos.map(s => {
+          const platName = s.plataforma ? s.plataforma.charAt(0).toUpperCase() + s.plataforma.slice(1) : "Outras";
+          const verba = (s.verba_diaria_calc || 0) * 30;
+          return `${platName} ${formatBRL(verba)}`;
+        }).join(" / ");
+        return { ...cli, saldo_ads_summary: summary };
+      });
+      
+      setClientes(enrichedData);
+    }
     setLoading(false);
   };
 
@@ -395,6 +414,9 @@ function ClientesPage() {
               observacoes: editing.observacoes || "",
               em_onboarding: editing.em_onboarding || false,
               status_operacional: editing.status_operacional || "ativo",
+              tipo_verba: editing.tipo_verba || "mensal",
+              verba_total_contratada: editing.verba_total_contratada || 0,
+              data_limite_verba: editing.data_limite_verba || "",
             } : { agencia }}
           />
         </DialogContent>
@@ -485,16 +507,21 @@ function ClienteCard({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 pr-6">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="text-base font-semibold truncate">{cliente.nome}</CardTitle>
               {cliente.em_onboarding && (
                 <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
                   Onboarding
                 </Badge>
               )}
-              {Number(cliente.verba_ads || 0) === 0 && (
+              {Number(cliente.verba_ads || 0) === 0 && cliente.tipo_verba === "mensal" && (
                 <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
                   Sem verba
+                </Badge>
+              )}
+              {(!cliente.data_inicio || (cliente.tipo_verba === "mensal" && !cliente.verba_ads)) && (
+                <Badge variant="secondary" className="bg-red-100 text-red-700 hover:bg-red-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
+                  Dados incompletos
                 </Badge>
               )}
             </div>
@@ -513,8 +540,19 @@ function ClienteCard({
         </div>
 
         <div className="rounded-md bg-muted/40 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Verba de ads / mês</p>
-          <p className="text-lg font-bold">{formatBRL(cliente.verba_ads)}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {cliente.tipo_verba === "total_periodo" ? "Verba Total Contratada" : "Verba de ads / mês"}
+          </p>
+          <p className="text-lg font-bold">
+            {cliente.tipo_verba === "total_periodo" 
+              ? formatBRL(cliente.verba_total_contratada || 0) 
+              : formatBRL(cliente.verba_ads)}
+          </p>
+          {cliente.saldo_ads_summary && (
+            <p className="text-[10px] text-muted-foreground mt-1 font-medium border-t pt-1 italic">
+              {cliente.saldo_ads_summary}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-xs">
