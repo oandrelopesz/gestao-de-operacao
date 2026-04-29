@@ -21,7 +21,7 @@ interface Demanda {
   prioridade: "baixa" | "media" | "alta" | "urgente";
   prazo?: string;
   cliente_id: string;
-  clientes?: { nome: string };
+  clientes?: { nome: string; agencia?: string };
 }
 
 interface KanbanCardProps {
