@@ -412,7 +412,10 @@ function SaldoPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="text-base line-clamp-1">{item.cliente_nome}</CardTitle>
-                    <Badge variant="outline" className="text-[10px] font-normal uppercase py-0 mt-1">
+                    <Badge variant="outline" className={cn(
+                      "text-[10px] font-normal uppercase py-0 mt-1",
+                      item.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : ""
+                    )}>
                       {AGENCIAS.find(a => a.id === item.cliente_agencia)?.label || item.cliente_agencia}
                     </Badge>
                     {item.clientes?.status_operacional === "pausado" && (
