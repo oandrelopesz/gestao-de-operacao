@@ -834,7 +834,7 @@ function SaldoPage() {
       <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) setEditing(null); }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{editing ? "Editar Registro" : "Novo Registro de Saldo"}</DialogTitle>
+            <DialogTitle>{editing?.id ? "Editar Registro" : "Novo Registro de Saldo"}</DialogTitle>
             <DialogDescription>
               Configure o monitoramento de verba para uma plataforma de anúncios.
             </DialogDescription>
@@ -849,6 +849,22 @@ function SaldoPage() {
               verba_diaria: editing.verba_diaria,
               observacoes: editing.observacoes,
             } : {}}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={clientModalOpen} onOpenChange={(o) => { setClientModalOpen(o); if (!o) setEditingClient(null); }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Cliente</DialogTitle>
+            <DialogDescription>
+              Atualize as informações cadastrais do cliente.
+            </DialogDescription>
+          </DialogHeader>
+          <ClientForm
+            loading={saving}
+            onSubmit={handleUpdateClient}
+            initialValues={editingClient}
           />
         </DialogContent>
       </Dialog>
@@ -874,39 +890,41 @@ function SaldoPage() {
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
-              Histórico de Recargas
+              {historyIsConsolidated ? "Histórico Consolidado" : "Histórico de Recargas"}
             </SheetTitle>
             <SheetDescription>
-              {selectedForHistory?.cliente_nome} — {selectedForHistory?.plataformas?.join(", ")}
+              {selectedForHistory?.cliente_nome} {historyIsConsolidated ? "— Todas plataformas" : `— ${selectedForHistory?.plataformas?.join(", ")}`}
             </SheetDescription>
           </SheetHeader>
           
           <div className="mt-8 space-y-6">
-            <div className="p-4 rounded-xl bg-muted/50 border space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status Atual</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[10px] text-muted-foreground">
-                    {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Método' : 'Saldo'}
-                  </p>
-                  <p className="text-lg font-bold">
-                    {selectedForHistory?.metodo_pagamento === 'cartao' 
-                      ? 'Cartão' 
-                      : formatBRL(selectedForHistory?.saldo_atual)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground">
-                    {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Monitoramento' : 'Previsão'}
-                  </p>
-                  <p className="text-lg font-bold">
-                    {selectedForHistory?.metodo_pagamento === 'cartao' 
-                      ? 'Desativado' 
-                      : `${selectedForHistory?.dias_restantes ? Math.floor(selectedForHistory.dias_restantes) : 0} dias`}
-                  </p>
+            {!historyIsConsolidated && (
+              <div className="p-4 rounded-xl bg-muted/50 border space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status Atual</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Método' : 'Saldo'}
+                    </p>
+                    <p className="text-lg font-bold">
+                      {selectedForHistory?.metodo_pagamento === 'cartao' 
+                        ? 'Cartão' 
+                        : formatBRL(selectedForHistory?.saldo_atual)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Monitoramento' : 'Previsão'}
+                    </p>
+                    <p className="text-lg font-bold">
+                      {selectedForHistory?.metodo_pagamento === 'cartao' 
+                        ? 'Desativado' 
+                        : `${selectedForHistory?.dias_restantes ? Math.floor(selectedForHistory.dias_restantes) : 0} dias`}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {selectedForHistory?.metodo_pagamento === 'cartao' && historyData.length > 0 && (
               <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-700">
@@ -927,7 +945,12 @@ function SaldoPage() {
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-bold">{formatBRL(recarga.valor)}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold">{formatBRL(recarga.valor)}</p>
+                            {historyIsConsolidated && recarga.saldo_ads?.plataformas?.map((p: string) => (
+                              <Badge key={p} variant="outline" className="text-[9px] h-4 py-0">{p}</Badge>
+                            ))}
+                          </div>
                           <span className="text-[10px] text-muted-foreground font-mono">
                             {new Date(recarga.data_recarga).toLocaleDateString("pt-BR")}
                           </span>
