@@ -535,7 +535,7 @@ function DemandasPage() {
               ) : (
                 <div className="divide-y">
                     {filteredDemandas.map(d => (
-                        <div key={d.id} className="p-4 flex items-center justify-between hover:bg-muted/50">
+                        <div key={d.id} className="p-4 flex items-center justify-between hover:bg-muted/50 cursor-pointer" onClick={() => handleOpenDrawer(d)}>
                             <div className="flex items-center gap-3">
                                 <div className={`w-2 h-2 rounded-full ${d.status === 'feito' ? 'bg-emerald-500' : 'bg-primary'}`} />
                                 <div>
@@ -548,9 +548,9 @@ function DemandasPage() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => {
-                                    setEditingDemanda(d);
-                                    setIsModalOpen(true);
+                                <Button variant="ghost" size="icon" onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenDrawer(d);
                                 }}>
                                     <Plus className="rotate-45" size={16} />
                                 </Button>
