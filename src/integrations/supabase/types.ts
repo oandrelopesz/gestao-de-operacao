@@ -495,6 +495,48 @@ export type Database = {
           },
         ]
       }
+      pendencias_clientes: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["status_pendencia"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["status_pendencia"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["status_pendencia"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pendencias_clientes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pendencias_clientes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prospeccao: {
         Row: {
           agencia_destino: string | null
@@ -977,6 +1019,7 @@ export type Database = {
         | "parceiro"
         | "outros"
       status_operacional_type: "ativo" | "pausado" | "churn"
+      status_pendencia: "onboarding" | "ongoing" | "offboard"
       tipo_verba_enum: "mensal" | "total_periodo"
     }
     CompositeTypes: {
@@ -1171,6 +1214,7 @@ export const Constants = {
         "outros",
       ],
       status_operacional_type: ["ativo", "pausado", "churn"],
+      status_pendencia: ["onboarding", "ongoing", "offboard"],
       tipo_verba_enum: ["mensal", "total_periodo"],
     },
   },
