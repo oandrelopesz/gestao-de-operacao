@@ -228,6 +228,115 @@ function ClientesPage() {
         </div>
       </div>
 
+      {/* Card global de investimento */}
+      <div className="space-y-4">
+        <Card className="bg-gradient-to-br from-primary/5 via-primary/10 to-transparent border-primary/20 shadow-sm overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-3 text-primary/10 group-hover:text-primary/20 transition-colors">
+            <DollarSign size={80} strokeWidth={1} />
+          </div>
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Investimento total gerenciado/mês</p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-muted-foreground/60 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs text-[11px]">Considera clientes ativos com verba definida. Clientes com verba contratada por período são convertidos para equivalente mensal (verba_diaria × 30).</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-4xl font-extrabold tracking-tight text-primary">
+                    {formatBRL(clientes.filter(c => c.status_operacional === "ativo").reduce((acc, c) => {
+                      if (c.tipo_verba === "total_periodo" && c.verba_total_contratada && c.data_inicio && c.data_limite_verba) {
+                        const inicio = new Date(c.data_inicio);
+                        const fim = new Date(c.data_limite_verba);
+                        const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                        return acc + ((c.verba_total_contratada / dias) * 30);
+                      }
+                      return acc + Number(c.verba_ads || 0);
+                    }, 0))}
+                  </h2>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {clientes.filter(c => c.status_operacional === "ativo" && (c.verba_ads > 0 || c.verba_total_contratada > 0)).length} clientes ativos em {new Set(clientes.filter(c => c.status_operacional === "ativo").map(c => c.agencia)).size} agências
+                </p>
+              </div>
+
+              <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {AGENCIAS.map(a => {
+                  const agAtivos = clientes.filter(c => c.agencia === a.id && c.status_operacional === "ativo");
+                  const agVerba = agAtivos.reduce((acc, c) => {
+                    if (c.tipo_verba === "total_periodo" && c.verba_total_contratada && c.data_inicio && c.data_limite_verba) {
+                      const inicio = new Date(c.data_inicio);
+                      const fim = new Date(c.data_limite_verba);
+                      const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                      return acc + ((c.verba_total_contratada / dias) * 30);
+                    }
+                    return acc + Number(c.verba_ads || 0);
+                  }, 0);
+                  return (
+                    <button 
+                      key={a.id} 
+                      onClick={() => navigate({ search: { view, agencia: a.id } })}
+                      className="text-left p-2 rounded-lg bg-background/50 border border-border/50 hover:bg-background/80 hover:border-primary/30 transition-all group/mini"
+                    >
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase group-hover/mini:text-primary transition-colors">{a.label}</p>
+                      <p className="text-sm font-bold">{formatBRL(agVerba)}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="border-l pl-6 hidden lg:block min-w-[180px]">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Verba média / cliente</p>
+                <p className="text-xl font-bold">
+                  {(() => {
+                    const ativosComVerba = clientes.filter(c => c.status_operacional === "ativo" && (c.verba_ads > 0 || c.verba_total_contratada > 0));
+                    if (ativosComVerba.length === 0) return "R$ 0,00";
+                    const totalVerba = ativosComVerba.reduce((acc, c) => {
+                      if (c.tipo_verba === "total_periodo" && c.verba_total_contratada && c.data_inicio && c.data_limite_verba) {
+                        const inicio = new Date(c.data_inicio);
+                        const fim = new Date(c.data_limite_verba);
+                        const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                        return acc + ((c.verba_total_contratada / dias) * 30);
+                      }
+                      return acc + Number(c.verba_ads || 0);
+                    }, 0);
+                    return formatBRL(totalVerba / ativosComVerba.length);
+                  })()}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Mediana: {(() => {
+                    const values = clientes
+                      .filter(c => c.status_operacional === "ativo" && (c.verba_ads > 0 || c.verba_total_contratada > 0))
+                      .map(c => {
+                        if (c.tipo_verba === "total_periodo" && c.verba_total_contratada && c.data_inicio && c.data_limite_verba) {
+                          const inicio = new Date(c.data_inicio);
+                          const fim = new Date(c.data_limite_verba);
+                          const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                          return (c.verba_total_contratada / dias) * 30;
+                        }
+                        return Number(c.verba_ads || 0);
+                      })
+                      .sort((a, b) => a - b);
+                    if (values.length === 0) return "R$ 0,00";
+                    const mid = Math.floor(values.length / 2);
+                    const median = values.length % 2 !== 0 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+                    return formatBRL(median);
+                  })()}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Sub-tabs por agência */}
       <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v as AgenciaId } })}>
         <TabsList>
