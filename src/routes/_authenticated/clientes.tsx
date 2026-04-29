@@ -440,11 +440,26 @@ function ClientesPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[1, 2, 3, 4].map((i) => <div key={i} className="h-56 rounded-lg bg-muted/40 animate-pulse" />)}
         </div>
+      ) : clientes.length === 0 ? (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardHeader className="flex flex-row items-center gap-2">
+            <AlertCircle className="text-destructive" size={20} />
+            <CardTitle className="text-destructive">Erro ao carregar dados</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-destructive/80">
+              Não foi possível conectar ao banco de dados ou a view está indisponível. Verifique sua conexão e tente novamente.
+            </p>
+            <Button variant="outline" size="sm" onClick={fetchClientes} className="border-destructive/30 text-destructive hover:bg-destructive/10">
+              Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/20">
           <UsersIcon size={36} className="text-muted-foreground mb-3 opacity-50" />
           <h3 className="text-lg font-semibold">Nenhum cliente em {agenciaMeta.label}</h3>
-          <p className="text-muted-foreground mb-4 text-sm">Cadastre o primeiro cliente desta agência.</p>
+          <p className="text-muted-foreground mb-4 text-sm">Cadastre o primeiro cliente desta agência ou ajuste os filtros.</p>
           <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
           </Button>
