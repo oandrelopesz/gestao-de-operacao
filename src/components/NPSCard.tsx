@@ -27,7 +27,10 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
 
   return (
     <Card 
-      className="group hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-muted-foreground/10 outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
+      className={cn(
+        "group hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-muted-foreground/10 outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2",
+        avaliacao.clientes?.status_operacional === "pausado" && "opacity-75"
+      )}
       onClick={() => onClick(avaliacao)}
       tabIndex={0}
       onKeyDown={(e) => {
