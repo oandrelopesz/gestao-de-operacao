@@ -8,6 +8,8 @@ import {
   MessageSquare, 
   LogOut,
   ChevronRight,
+  ChevronLeft,
+  PanelLeft,
   User as UserIcon,
   Bell,
   DollarSign,
