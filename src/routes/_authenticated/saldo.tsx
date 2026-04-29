@@ -1,9 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DollarSign, Receipt, Clock, AlertCircle, Plus } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { DollarSign, Receipt, Clock, AlertCircle, Plus, Search, Building2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { AGENCIAS, AgenciaId, formatBRL } from "@/lib/clientes";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/saldo")({
   component: SaldoPage,
