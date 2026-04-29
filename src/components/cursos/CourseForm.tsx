@@ -267,8 +267,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                     size="sm" 
                                     className="w-full h-8 text-xs gap-1"
                                     onClick={() => {
-                                      setNewCategoryName(searchQuery);
-                                      handleAddCategory();
+                                      handleAddCategory(searchQuery);
                                       setOpenCombobox(false);
                                       setSearchQuery("");
                                     }}
