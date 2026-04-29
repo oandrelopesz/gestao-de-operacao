@@ -40,6 +40,8 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone }: KanbanCardProps) {
+  const isRecorrenteMae = demanda.status === "recorrentes";
+  
   const {
     attributes,
     listeners,
@@ -47,7 +49,10 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: demanda.id });
+  } = useSortable({ 
+    id: demanda.id,
+    disabled: isRecorrenteMae 
+  });
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -59,9 +64,9 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
   // Get preview of description (first 2 lines)
   const descriptionPreview = demanda.descricao ? demanda.descricao.split('\n').slice(0, 2).join('\n') : "";
 
-  const isRecorrenteMae = demanda.status === "recorrentes";
   const today = new Date().toISOString().split('T')[0];
   const isDueToday = demanda.proxima_execucao === today;
+  const isDoneForNow = isRecorrenteMae && demanda.proxima_execucao && demanda.proxima_execucao > today;
 
   return (
     <div 
@@ -70,16 +75,18 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
       {...attributes}
       {...listeners}
       className={cn(
-        "group relative outline-none rounded-md mb-2 cursor-grab active:cursor-grabbing",
+        "group relative outline-none rounded-md mb-2",
+        !isRecorrenteMae && "cursor-grab active:cursor-grabbing",
         isDragging && "opacity-50 z-50",
-        isRecorrenteMae && !isDueToday && "opacity-70"
+        isRecorrenteMae && !isDueToday && !isDoneForNow && "opacity-70"
       )}
     >
       <Card
         className={cn(
           "hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden",
           isDone && "opacity-60",
-          isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20"
+          isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20",
+          isDoneForNow && "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50"
         )}
         onClick={(e) => {
           e.stopPropagation();
@@ -89,7 +96,7 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
         <div className="p-2.5 space-y-1.5 relative">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-2 flex-1 min-w-0">
-              {!isDone && onMoveToDone && (
+              {!isDone && !isDoneForNow && onMoveToDone && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -147,9 +154,9 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
                 <div className="flex items-center gap-1 ml-auto shrink-0">
                   <span className={cn(
                     "text-[9px] px-1 py-0.5 rounded-full font-bold uppercase tracking-tighter",
-                    isDueToday ? "bg-primary text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                    isDueToday ? "bg-primary text-white" : (isDoneForNow ? "bg-emerald-500 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500")
                   )}>
-                    {isDueToday ? "HOJE" : (demanda.frequencia_tipo || "Repetir")}
+                    {isDueToday ? "HOJE" : (isDoneForNow ? "OK" : (demanda.frequencia_tipo || "Repetir"))}
                   </span>
                 </div>
               )}
