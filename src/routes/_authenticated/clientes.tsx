@@ -160,12 +160,16 @@ function ClientesPage() {
     else { toast.success("Cliente arquivado"); fetchClientes(); }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Deletar este cliente? Esta ação não pode ser desfeita.")) return;
-    const { error } = await supabase.from("clientes").delete().eq("id", id);
+  const handleDelete = async () => {
+    if (!deletingId) return;
+    const { error } = await supabase.from("clientes").delete().eq("id", deletingId);
     if (error) toast.error("Erro ao deletar");
     else { toast.success("Cliente deletado"); fetchClientes(); }
+    setDeletingId(null);
   };
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingName, setDeletingName] = useState<string>("");
 
   return (
     <div className="space-y-6">
