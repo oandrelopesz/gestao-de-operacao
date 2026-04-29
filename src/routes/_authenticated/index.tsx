@@ -182,9 +182,9 @@ function DemandasPage() {
       if (error) throw error;
       
       // Update local state for immediate feedback
-      setDemandas(prev => prev.map(d => d.id === id ? { ...d, ...values } : d));
+      setDemandas((prev: any[]) => prev.map(d => d.id === id ? { ...d, ...values } : d));
       if (selectedDemanda?.id === id) {
-        setSelectedDemanda(prev => ({ ...prev, ...values }));
+        setSelectedDemanda((prev: any) => ({ ...prev, ...values }));
       }
       
       // Silently sync
@@ -483,10 +483,7 @@ function DemandasPage() {
                       setEditingDemanda({ status });
                       setIsModalOpen(true);
                     }}
-                    onEdit={(demanda) => {
-                      setEditingDemanda(demanda);
-                      setIsModalOpen(true);
-                    }}
+                    onEdit={handleOpenDrawer}
                     onDelete={(id, name) => {
                       setDeletingId(id);
                       setDeletingName(name);
