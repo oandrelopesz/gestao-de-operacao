@@ -12,7 +12,7 @@ interface Demanda {
   titulo: string;
   descricao?: string;
   status: string;
-  prioridade: "baixa" | "média" | "alta" | "urgente";
+  prioridade: "baixa" | "media" | "alta" | "urgente";
   prazo?: string;
   cliente_id: string;
   clientes?: { nome: string };
