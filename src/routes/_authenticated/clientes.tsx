@@ -158,7 +158,7 @@ function ClientesPage() {
           <p className="text-muted-foreground">Visão por agência, com NPS e financeiro consolidados.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Tabs value={view} onValueChange={(v) => navigate({ search: (p) => ({ ...p, view: v as any }) })}>
+          <Tabs value={view} onValueChange={(v) => navigate({ search: { agencia, view: v as any } })}>
             <TabsList>
               <TabsTrigger value="cards" className="gap-1.5"><LayoutGrid size={14} />Cards</TabsTrigger>
               <TabsTrigger value="tabela" className="gap-1.5"><TableIcon size={14} />Tabela</TabsTrigger>
