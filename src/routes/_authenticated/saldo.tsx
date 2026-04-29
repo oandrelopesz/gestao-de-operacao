@@ -17,13 +17,20 @@ import {
   ArrowUpCircle,
   Filter,
   RefreshCw,
-  History
+  History,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { AGENCIAS, formatBRL } from "@/lib/clientes";
 import { toast } from "sonner";
@@ -83,6 +90,7 @@ const STATUS_ALERTA = [
   { id: "alerta", label: "Alerta", color: "bg-amber-500" },
   { id: "critico", label: "Crítico", color: "bg-red-500" },
   { id: "zerado", label: "Zerado", color: "bg-gray-500" },
+  { id: "cartao", label: "Cartão (sem monitoramento)", color: "bg-blue-400" },
 ];
 
 function SaldoPage() {
@@ -93,6 +101,7 @@ function SaldoPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showPausados, setShowPausados] = useState(false);
+  const [showCartao, setShowCartao] = useState(true);
   const [sortBy, setSortBy] = useState<string>("dias_restantes");
   
   const [modalOpen, setModalOpen] = useState(false);
@@ -113,7 +122,7 @@ function SaldoPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("saldo_ads_view")
-      .select("*, clientes!inner(status_operacional)")
+      .select("*, clientes!inner(status_operacional, verba_ads)")
       .order("dias_restantes", { ascending: true });
 
     if (error) {
@@ -137,7 +146,16 @@ function SaldoPage() {
           .update({ ...values })
           .eq("id", editing.id);
         if (error) throw error;
-        toast.success("Registro atualizado");
+        
+        if (editing.metodo_pagamento !== values.metodo_pagamento) {
+          if (values.metodo_pagamento === 'cartao') {
+            toast.success("Migrado para Cartão: Monitoramento desativado");
+          } else {
+            toast.success(`Alterado para ${values.metodo_pagamento.toUpperCase()}: Monitoramento ativado`);
+          }
+        } else {
+          toast.success("Registro atualizado");
+        }
       } else {
         const { data: newRecord, error } = await supabase
           .from("saldo_ads")
@@ -146,9 +164,11 @@ function SaldoPage() {
           .single();
         if (error) throw error;
         toast.success("Registro criado");
-        // Automatically open first reload modal
-        setSelectedForRecarga(newRecord);
-        setRecargaModalOpen(true);
+        // Automatically open first reload modal if not cartao
+        if (values.metodo_pagamento !== 'cartao') {
+          setSelectedForRecarga(newRecord);
+          setRecargaModalOpen(true);
+        }
       }
       setModalOpen(false);
       setEditing(null);
@@ -214,31 +234,51 @@ function SaldoPage() {
 
   const filteredData = useMemo(() => {
     let result = data.filter(item => {
+      const isCartao = item.metodo_pagamento === "cartao";
       const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
       const matchesPlataforma = filterPlataforma === "all" || item.plataformas?.includes(filterPlataforma);
-      const matchesStatus = filterStatus === "all" || item.status_alerta === filterStatus;
+      
+      let matchesStatus = filterStatus === "all" || item.status_alerta === filterStatus;
+      if (filterStatus === "cartao") {
+        matchesStatus = isCartao;
+      } else if (filterStatus !== "all" && isCartao) {
+        // If filtering by status but it's a card (which has its own status), exclude unless it's specifically cartao filter
+        matchesStatus = false;
+      }
+
       const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
       const isPausado = item.clientes?.status_operacional === "pausado";
       const matchesPausados = showPausados || !isPausado;
-      return matchesAgencia && matchesPlataforma && matchesStatus && matchesSearch && matchesPausados;
+      const matchesCartao = showCartao || !isCartao;
+
+      return matchesAgencia && matchesPlataforma && matchesStatus && matchesSearch && matchesPausados && matchesCartao;
     });
 
     result.sort((a, b) => {
-      if (sortBy === "dias_restantes") return (a.dias_restantes || 0) - (b.dias_restantes || 0);
+      // Put card items at the end when sorting by days remaining
+      if (sortBy === "dias_restantes") {
+        if (a.metodo_pagamento === "cartao" && b.metodo_pagamento !== "cartao") return 1;
+        if (a.metodo_pagamento !== "cartao" && b.metodo_pagamento === "cartao") return -1;
+        return (a.dias_restantes || 0) - (b.dias_restantes || 0);
+      }
       if (sortBy === "nome") return (a.cliente_nome || "").localeCompare(b.cliente_nome || "");
       if (sortBy === "valor") return (b.saldo_atual || 0) - (a.saldo_atual || 0);
       return 0;
     });
 
     return result;
-  }, [data, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy]);
+  }, [data, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy, showPausados, showCartao]);
 
   const metrics = useMemo(() => {
+    const monitored = data.filter(i => i.metodo_pagamento !== "cartao");
+    const onCartao = data.filter(i => i.metodo_pagamento === "cartao");
+
     return {
-      totalContas: data.length,
-      saldoTotal: data.reduce((acc, curr) => acc + (curr.saldo_atual || 0), 0),
-      emAlerta: data.filter(i => i.status_alerta === "alerta").length,
-      criticos: data.filter(i => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
+      totalContas: monitored.length,
+      saldoTotal: monitored.reduce((acc, curr) => acc + (curr.saldo_atual || 0), 0),
+      emAlerta: monitored.filter(i => i.status_alerta === "alerta").length,
+      criticos: monitored.filter(i => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
+      totalCartao: onCartao.length
     };
   }, [data]);
 
@@ -280,48 +320,92 @@ function SaldoPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Contas Monitoradas</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalContas}</div>
-            <p className="text-xs text-muted-foreground">Total de registros ativos</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
-            <Wallet className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(metrics.saldoTotal)}</div>
-            <p className="text-xs text-muted-foreground">Soma de todas as plataformas</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Em Alerta</CardTitle>
-            <Clock className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.emAlerta}</div>
-            <p className="text-xs text-muted-foreground">Saldo dura entre 2 e 4 dias</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Críticos / Zerados</CardTitle>
-            <AlertCircle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.criticos}</div>
-            <p className="text-xs text-muted-foreground">Saldo dura menos de 1 dia</p>
-          </CardContent>
-        </Card>
-      </div>
+      <TooltipProvider>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Contas Monitoradas</CardTitle>
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{metrics.totalContas}</div>
+                  <p className="text-xs text-muted-foreground">Total de registros ativos</p>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Clientes no cartão não entram no monitoramento de saldo</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
+                  <Wallet className="h-4 w-4 text-emerald-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatBRL(metrics.saldoTotal)}</div>
+                  <p className="text-xs text-muted-foreground">Soma de todas as plataformas</p>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Soma apenas dos registros Pix/Boleto</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Em Alerta</CardTitle>
+                  <Clock className="h-4 w-4 text-amber-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{metrics.emAlerta}</div>
+                  <p className="text-xs text-muted-foreground">Saldo dura entre 2 e 4 dias</p>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Ignora clientes no cartão</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Críticos / Zerados</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{metrics.criticos}</div>
+                  <p className="text-xs text-muted-foreground">Saldo dura menos de 1 dia</p>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Ignora clientes no cartão</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
+          <Card className="bg-blue-50/50 border-blue-100 py-2">
+            <CardContent className="py-0 flex items-center gap-3">
+              <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                {metrics.totalCartao}
+              </Badge>
+              <span className="text-xs font-medium text-blue-700">clientes no cartão (pagamento direto)</span>
+            </CardContent>
+          </Card>
+        </div>
+      </TooltipProvider>
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full max-w-xs">
@@ -370,8 +454,12 @@ function SaldoPage() {
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs h-10">
-          <span className="font-medium">Mostrar pausados</span>
+          <span className="font-medium text-muted-foreground">Pausados</span>
           <Checkbox checked={showPausados} onCheckedChange={(v) => setShowPausados(!!v)} />
+        </div>
+        <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs h-10">
+          <span className="font-medium text-muted-foreground">Cartão</span>
+          <Checkbox checked={showCartao} onCheckedChange={(v) => setShowCartao(!!v)} />
         </div>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Ordenar por:</span>
@@ -402,111 +490,145 @@ function SaldoPage() {
             </Button>
           </div>
         ) : (
-          filteredData.map((item) => (
-            <Card 
-              key={item.id} 
-              className={cn(
-                "group relative border-l-4 transition-all hover:shadow-md cursor-pointer",
-                getStatusColor(item.status_alerta),
-                item.clientes?.status_operacional === "pausado" && "opacity-70"
-              )}
-              onClick={() => fetchHistory(item)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-base line-clamp-1">{item.cliente_nome}</CardTitle>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      <Badge variant="outline" className={cn(
-                        "text-[10px] font-normal uppercase py-0",
-                        item.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : "",
-                        item.cliente_agencia === "spike" ? "text-purple-600 border-purple-200 bg-purple-50" : ""
-                      )}>
-                        {AGENCIAS.find(a => a.id === item.cliente_agencia)?.label || item.cliente_agencia}
-                      </Badge>
-                      {item.clientes?.status_operacional === "pausado" && (
-                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0">
-                          Pausado
+          filteredData.map((item) => {
+            const isCartao = item.metodo_pagamento === "cartao";
+            const isPausado = item.clientes?.status_operacional === "pausado";
+
+            return (
+              <Card 
+                key={item.id} 
+                className={cn(
+                  "group relative border-l-4 transition-all hover:shadow-md cursor-pointer",
+                  isCartao ? "border-blue-300 opacity-90 shadow-sm" : getStatusColor(item.status_alerta),
+                  isPausado && "opacity-70"
+                )}
+                onClick={() => fetchHistory(item)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-base line-clamp-1">{item.cliente_nome}</CardTitle>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <Badge variant="outline" className={cn(
+                          "text-[10px] font-normal uppercase py-0",
+                          item.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : "",
+                          item.cliente_agencia === "spike" ? "text-purple-600 border-purple-200 bg-purple-50" : ""
+                        )}>
+                          {AGENCIAS.find(a => a.id === item.cliente_agencia)?.label || item.cliente_agencia}
                         </Badge>
+                        {isCartao && (
+                          <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 text-[10px] uppercase py-0">
+                            Cartão
+                          </Badge>
+                        )}
+                        {isPausado && (
+                          <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0">
+                            Pausado
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
+                          <MoreVertical size={16} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-[140px]">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(item); setModalOpen(true); }}>
+                          <Pencil size={14} className="mr-2" /> Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-destructive focus:text-destructive" 
+                          onClick={(e) => { e.stopPropagation(); setDeletingId(item.id); }}
+                        >
+                          <Trash2 size={14} className="mr-2" /> Remover
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-wrap gap-1">
+                      {item.plataformas?.map((plat: string) => (
+                        <Badge key={plat} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find(p => p.id === plat)?.color)}>
+                          {plat}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="text-right">
+                      {isCartao ? (
+                        <div className="text-sm font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                          Cartão
+                        </div>
+                      ) : (
+                        <div className="text-2xl font-bold tracking-tight text-primary">
+                          {formatBRL(item.saldo_atual)}
+                        </div>
                       )}
                     </div>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
-                        <MoreVertical size={16} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-[140px]">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(item); setModalOpen(true); }}>
-                        <Pencil size={14} className="mr-2" /> Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        className="text-destructive focus:text-destructive" 
-                        onClick={(e) => { e.stopPropagation(); setDeletingId(item.id); }}
-                      >
-                        <Trash2 size={14} className="mr-2" /> Remover
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex flex-wrap gap-1">
-                    {item.plataformas?.map((plat: string) => (
-                      <Badge key={plat} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find(p => p.id === plat)?.color)}>
-                        {plat}
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold tracking-tight text-primary">
-                      {formatBRL(item.saldo_atual)}
+
+                  {!isCartao ? (
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-medium">
+                        <span>{item.dias_restantes ? Math.floor(item.dias_restantes) : 0} dias restantes</span>
+                        <span className="text-muted-foreground">
+                          Fim: {item.data_prevista_fim ? new Date(item.data_prevista_fim).toLocaleDateString("pt-BR") : "—"}
+                        </span>
+                      </div>
+                      <Progress 
+                        value={Math.min(100, (item.dias_restantes || 0) * 10)} 
+                        className="h-2"
+                        indicatorClassName={getProgressColor(item.status_alerta)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-10 flex items-center justify-center bg-muted/30 rounded-md border border-dashed">
+                      <p className="text-[11px] text-muted-foreground italic">Pagamento direto no cartão</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t">
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground">Verba Diária</p>
+                      <p className="font-semibold">{formatBRL(item.verba_diaria_calc)}</p>
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <p className="text-muted-foreground">{isCartao ? "Verba Mensal" : "Total Investido"}</p>
+                      <p className="font-semibold">
+                        {isCartao 
+                          ? formatBRL(item.clientes?.verba_ads || (item.verba_diaria_calc * 30)) 
+                          : formatBRL(item.total_recarregado)}
+                      </p>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span>{item.dias_restantes ? Math.floor(item.dias_restantes) : 0} dias restantes</span>
-                    <span className="text-muted-foreground">
-                      Fim: {item.data_prevista_fim ? new Date(item.data_prevista_fim).toLocaleDateString("pt-BR") : "—"}
-                    </span>
-                  </div>
-                  <Progress 
-                    value={Math.min(100, (item.dias_restantes || 0) * 10)} 
-                    className="h-2"
-                    indicatorClassName={getProgressColor(item.status_alerta)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t">
-                  <div className="space-y-1">
-                    <p className="text-muted-foreground">Verba Diária</p>
-                    <p className="font-semibold">{formatBRL(item.verba_diaria_calc)}</p>
-                  </div>
-                  <div className="space-y-1 text-right">
-                    <p className="text-muted-foreground">Total Investido</p>
-                    <p className="font-semibold">{formatBRL(item.total_recarregado)}</p>
-                  </div>
-                </div>
-
-                <Button 
-                  className="w-full h-8 text-xs gap-2" 
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedForRecarga(item);
-                    setRecargaModalOpen(true);
-                  }}
-                >
-                  <ArrowUpCircle size={14} />
-                  Adicionar recarga
-                </Button>
-              </CardContent>
-            </Card>
-          ))
+                  {!isCartao ? (
+                    <Button 
+                      className="w-full h-8 text-xs gap-2" 
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedForRecarga(item);
+                        setRecargaModalOpen(true);
+                      }}
+                    >
+                      <ArrowUpCircle size={14} />
+                      Adicionar recarga
+                    </Button>
+                  ) : (
+                    <div className="h-8 flex items-center justify-center">
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Check size={10} className="text-emerald-500" /> Pagamento no cartão
+                      </span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
 
@@ -566,17 +688,33 @@ function SaldoPage() {
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status Atual</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Saldo</p>
-                  <p className="text-lg font-bold">{formatBRL(selectedForHistory?.saldo_atual)}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Método' : 'Saldo'}
+                  </p>
+                  <p className="text-lg font-bold">
+                    {selectedForHistory?.metodo_pagamento === 'cartao' 
+                      ? 'Cartão' 
+                      : formatBRL(selectedForHistory?.saldo_atual)}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Previsão</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Monitoramento' : 'Previsão'}
+                  </p>
                   <p className="text-lg font-bold">
-                    {selectedForHistory?.dias_restantes ? Math.floor(selectedForHistory.dias_restantes) : 0} dias
+                    {selectedForHistory?.metodo_pagamento === 'cartao' 
+                      ? 'Desativado' 
+                      : `${selectedForHistory?.dias_restantes ? Math.floor(selectedForHistory.dias_restantes) : 0} dias`}
                   </p>
                 </div>
               </div>
             </div>
+
+            {selectedForHistory?.metodo_pagamento === 'cartao' && historyData.length > 0 && (
+              <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-700">
+                Cliente migrou para cartão. Histórico de recargas anteriores arquivado apenas para referência.
+              </div>
+            )}
 
             <div className="space-y-4">
               <h4 className="text-sm font-semibold">Todas as Recargas</h4>

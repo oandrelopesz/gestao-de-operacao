@@ -22,6 +22,7 @@ serve(async (req) => {
       .from('saldo_ads_view')
       .select('*')
       .neq('status_alerta', 'ok')
+      .neq('metodo_pagamento', 'cartao')
 
     if (alertError) throw alertError
 
