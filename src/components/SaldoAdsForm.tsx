@@ -23,10 +23,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
 
+const PLATAFORMAS_DISPONIVEIS = [
+  "Meta",
+  "Google",
+  "Pinterest",
+  "X Ads",
+  "LinkedIn",
+  "TikTok",
+  "Taboola",
+  "Outbrain"
+];
+
+const METODOS_PAGAMENTO = [
+  { value: "cartao", label: "Cartão" },
+  { value: "pix", label: "Pix" },
+  { value: "boleto", label: "Boleto" }
+];
+
 const saldoAdsSchema = z.object({
   cliente_id: z.string().min(1, "Selecione um cliente"),
-  plataforma: z.enum(["meta", "google", "tiktok", "outras"]),
-  metodo_pagamento: z.enum(["dinheiro", "cartao_credito", "cartao_debito", "pix", "boleto", "outros"]),
+  plataformas: z.array(z.string()).min(1, "Selecione pelo menos uma plataforma"),
+  metodo_pagamento: z.enum(["cartao", "pix", "boleto"]),
   verba_diaria: z.number().min(0, "Valor inválido").optional().nullable(),
   observacoes: z.string().optional(),
 });
