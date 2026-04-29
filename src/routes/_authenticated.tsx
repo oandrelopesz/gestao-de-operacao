@@ -147,14 +147,24 @@ function AuthenticatedLayout() {
       )}
 
       {/* Sidebar */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 border-r bg-card flex flex-col transition-transform duration-300
-        lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card flex flex-col transition-transform duration-300",
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full",
+        isDesktopCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"
+      )}>
         <div className="p-6 flex items-center justify-between">
           <h1 className="text-xl font-bold tracking-tight">Gestor Pro</h1>
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(false)}>
             <ChevronRight className="rotate-180" size={18} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden lg:inline-flex"
+            onClick={() => setIsDesktopCollapsed(true)}
+            title="Recolher menu"
+          >
+            <ChevronLeft size={18} />
           </Button>
         </div>
         
@@ -188,12 +198,26 @@ function AuthenticatedLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 lg:pl-64 flex flex-col min-w-0">
+      <main className={cn(
+        "flex-1 flex flex-col min-w-0 transition-[padding] duration-300",
+        isDesktopCollapsed ? "lg:pl-0" : "lg:pl-64"
+      )}>
         <header className="h-16 border-b flex items-center justify-between px-4 lg:px-8 sticky top-0 bg-background/80 backdrop-blur-sm z-30">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(true)}>
               <ChevronRight size={18} />
             </Button>
+            {isDesktopCollapsed && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden lg:inline-flex"
+                onClick={() => setIsDesktopCollapsed(false)}
+                title="Mostrar menu"
+              >
+                <PanelLeft size={18} />
+              </Button>
+            )}
             <h2 className="text-sm font-medium text-muted-foreground">
               Dashboard
             </h2>
