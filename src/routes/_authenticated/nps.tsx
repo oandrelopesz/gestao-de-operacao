@@ -330,9 +330,9 @@ function NPSPage() {
                 }}
                 onDelete={(id) => {
                   setDeletingId(id);
-                  setDeletingName(item.clientes?.nome || "esta avaliação");
+                  setDeletingName(item.cliente_nome || "esta avaliação");
                 }}
-                onClick={(a) => setSelectedCliente({ id: a.cliente_id, nome: a.clientes?.nome, agencia: a.clientes?.agencia })}
+                onClick={(a) => setSelectedCliente({ id: a.cliente_id, nome: a.cliente_nome, agencia: a.cliente_agencia })}
               />
             ))}
           </div>
