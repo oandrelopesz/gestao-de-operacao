@@ -438,12 +438,12 @@ function SaldoPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[140px]">
-                      <DropdownMenuItem onClick={() => { setEditing(item); setModalOpen(true); }}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(item); setModalOpen(true); }}>
                         <Pencil size={14} className="mr-2" /> Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         className="text-destructive focus:text-destructive" 
-                        onClick={() => setDeletingId(item.id)}
+                        onClick={(e) => { e.stopPropagation(); setDeletingId(item.id); }}
                       >
                         <Trash2 size={14} className="mr-2" /> Remover
                       </DropdownMenuItem>
