@@ -119,7 +119,7 @@ function FinanceiroPage() {
         .order("nome");
 
       if (error) throw error;
-      setData(viewData || []);
+      setData((viewData as any[]) || []);
     } catch (error: any) {
       toast.error("Erro ao carregar financeiro: " + error.message);
     } finally {
