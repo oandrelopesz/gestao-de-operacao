@@ -82,7 +82,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
           render={({ field }) => (
             <FormItem>
               <FormLabel>Cliente</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um cliente" />
