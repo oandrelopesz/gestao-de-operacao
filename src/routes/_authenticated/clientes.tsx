@@ -441,9 +441,89 @@ function ClientesPage() {
         );
       })()}
 
+      {/* Breakdown por agência (mini-cards) */}
+      {agencia === "todos" && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {AGENCIAS.map(a => {
+            const agAtivos = clientes.filter(c => c.agencia === a.id && c.status_operacional === "ativo");
+            const agVerba = agAtivos.reduce((acc, c) => {
+              if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
+                const inicio = new Date(c.data_inicio);
+                const fim = new Date(c.data_limite_verba);
+                const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                return acc + ((Number(c.verba_total_contratada) / dias) * 30);
+              }
+              return acc + Number(c.verba_ads || 0);
+            }, 0);
+            const totalVerbaGlobal = clientes.filter(c => c.status_operacional === "ativo").reduce((acc, c) => {
+              if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
+                const inicio = new Date(c.data_inicio);
+                const fim = new Date(c.data_limite_verba);
+                const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                return acc + ((Number(c.verba_total_contratada) / dias) * 30);
+              }
+              return acc + Number(c.verba_ads || 0);
+            }, 0);
+            const percent = totalVerbaGlobal > 0 ? (agVerba / totalVerbaGlobal) * 100 : 0;
+            
+            return (
+              <button 
+                key={a.id} 
+                onClick={() => navigate({ search: { view, agencia: a.id } })}
+                className="text-left p-3 rounded-lg bg-card border border-border hover:border-primary/50 transition-all group/breakdown"
+              >
+                <div className="flex justify-between items-start mb-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider group-hover/breakdown:text-primary">{a.label}</p>
+                  <Badge variant="secondary" className="h-4 px-1 text-[9px]">{counts[a.id] || 0}</Badge>
+                </div>
+                <p className="text-sm font-bold">{formatBRL(agVerba)}</p>
+                <p className="text-[9px] text-muted-foreground">{percent.toFixed(1)}% do total gerenciado</p>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Métricas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-...
+        <MetricCard 
+          icon={<UsersIcon size={16} />} 
+          label="Clientes" 
+          value={String(metrics.total)} 
+          hint={`${metrics.ativos} ativos / ${metrics.pausados} pausados / ${metrics.churn} churn`} 
+        />
+        <MetricCard 
+          icon={<DollarSign size={16} />} 
+          label="Verba total / mês" 
+          value={formatBRL(metrics.verbaTotal)} 
+          hint="Considera apenas clientes ativos" 
+        />
+        <MetricCard 
+          icon={<TrendingUp size={16} />} 
+          label="Verba média / cliente" 
+          value={formatBRL(metrics.verbaMedia)} 
+          hint="Considera apenas clientes ativos" 
+        />
+        <Card>
+          <CardHeader className="flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Distribuição NPS</CardTitle>
+            <Smile size={16} className="text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2 text-sm">
+              <span className="text-emerald-900 font-bold text-lg" title="Âncora">{metrics.ancora}</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-emerald-500 font-bold text-lg" title="Saudável">{metrics.saudavel}</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-amber-500 font-bold text-lg" title="Em risco">{metrics.em_risco}</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-red-500 font-bold text-lg" title="Crítico">{metrics.critico}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 text-center">Âncora / Saudável / Risco / Crítico</p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -460,8 +540,15 @@ function ClientesPage() {
           </Select>
         )}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-...
-          </Select>
+          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status NPS</SelectItem>
+            <SelectItem value="ancora">Âncoras</SelectItem>
+            <SelectItem value="saudavel">Saudáveis</SelectItem>
+            <SelectItem value="em_risco">Em risco</SelectItem>
+            <SelectItem value="critico">Críticos</SelectItem>
+            <SelectItem value="sem_avaliacao">Sem avaliação</SelectItem>
+          </SelectContent>
         </Select>
         <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs">
           <span className="font-medium">Mostrar pausados</span>
