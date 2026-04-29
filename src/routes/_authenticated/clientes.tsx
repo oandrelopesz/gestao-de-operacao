@@ -738,7 +738,7 @@ function ClientesPage() {
               em_onboarding: editing.em_onboarding || false,
               status_operacional: editing.status_operacional || "ativo",
               tipo_verba: editing.tipo_verba || "mensal",
-              verba_total_contratada: editing.verba_total_contratada || 0,
+              verba_total_contratada: editing.verba_total_contratada ?? null,
               data_limite_verba: editing.data_limite_verba || "",
             } : { agencia: agencia === "todos" ? "effect" : agencia } as any}
           />
