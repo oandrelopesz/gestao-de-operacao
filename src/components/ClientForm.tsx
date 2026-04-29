@@ -269,6 +269,72 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
             </div>
           )}
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-md border p-4 bg-muted/20">
+          <FormField
+            control={form.control}
+            name="metodo_pagamento"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Forma de pagamento</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="pix">Pix</SelectItem>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="cartao">Cartão (sem monitoramento)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Define como o saldo de mídia será monitorado.
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="plataformas"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel>Plataformas de mídia</FormLabel>
+                <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md items-center bg-background">
+                  {field.value.map((plat) => (
+                    <Badge key={plat} variant="secondary" className="gap-1 pr-1">
+                      {plat}
+                      <button
+                        type="button"
+                        onClick={() => removePlataforma(plat)}
+                        className="hover:text-destructive"
+                      >
+                        <X size={12} />
+                      </button>
+                    </Badge>
+                  ))}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" type="button">
+                        <Plus size={14} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {PLATAFORMAS_DISPONIVEIS.filter((p) => !field.value.includes(p)).map((plat) => (
+                        <DropdownMenuItem key={plat} onClick={() => addPlataforma(plat)}>
+                          {plat}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
         <FormField
