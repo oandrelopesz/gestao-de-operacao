@@ -266,53 +266,106 @@ function SaldoPage() {
     }
   };
 
-  const filteredData = useMemo(() => {
-    let result = data.filter(item => {
-      const isCartao = item.metodo_pagamento === "cartao";
-      const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
-      const matchesPlataforma = filterPlataforma === "all" || item.plataformas?.includes(filterPlataforma);
-      
-      let matchesStatus = filterStatus === "all" || item.status_alerta === filterStatus;
-      if (filterStatus === "cartao") {
-        matchesStatus = isCartao;
-      } else if (filterStatus !== "all" && isCartao) {
-        // If filtering by status but it's a card (which has its own status), exclude unless it's specifically cartao filter
-        matchesStatus = false;
+  const groupedData = useMemo(() => {
+    const groups: Record<string, any> = {};
+    
+    data.forEach(item => {
+      const clientId = item.cliente_id;
+      if (!groups[clientId]) {
+        groups[clientId] = {
+          cliente_id: clientId,
+          cliente_nome: item.cliente_nome,
+          cliente_agencia: item.cliente_agencia,
+          status_operacional: item.clientes?.status_operacional,
+          metodo_pagamento_principal: item.metodo_pagamento,
+          plataformas: [],
+          saldo_total_consolidado: 0,
+          verba_diaria_total: 0,
+          pior_status_alerta: "ok",
+          data_prevista_fim_proxima: null,
+          plataforma_mais_proxima: "",
+        };
       }
+      
+      const group = groups[clientId];
+      group.plataformas.push(item);
+      
+      if (item.metodo_pagamento !== group.metodo_pagamento_principal) {
+        group.metodo_pagamento_principal = "misto";
+      }
+      
+      if (item.metodo_pagamento !== "cartao") {
+        group.saldo_total_consolidado += (item.saldo_atual || 0);
+        group.verba_diaria_total += (item.verba_diaria_calc || 0);
+        
+        // Update worst status alert
+        const currentWeight = STATUS_ALERTA.find(s => s.id === item.status_alerta)?.weight || 0;
+        const worstWeight = STATUS_ALERTA.find(s => s.id === group.pior_status_alerta)?.weight || 0;
+        if (currentWeight > worstWeight) {
+          group.pior_status_alerta = item.status_alerta;
+        }
+        
+        // Update next end date
+        if (item.data_prevista_fim) {
+          const currentEnd = new Date(item.data_prevista_fim);
+          if (!group.data_prevista_fim_proxima || currentEnd < new Date(group.data_prevista_fim_proxima)) {
+            group.data_prevista_fim_proxima = item.data_prevista_fim;
+            group.plataforma_mais_proxima = item.plataformas?.[0] || "";
+          }
+        }
+      } else if (group.pior_status_alerta === "ok") {
+        group.pior_status_alerta = "cartao";
+      }
+    });
+    
+    return Object.values(groups);
+  }, [data]);
 
-      const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
-      const isPausado = item.clientes?.status_operacional === "pausado";
+  const filteredData = useMemo(() => {
+    let result = groupedData.filter(group => {
+      const matchesAgencia = filterAgencia === "all" || group.cliente_agencia === filterAgencia;
+      const matchesSearch = group.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
+      const isPausado = group.status_operacional === "pausado";
       const matchesPausados = showPausados || !isPausado;
-      const matchesCartao = showCartao || !isCartao;
+      
+      const hasPlataforma = filterPlataforma === "all" || group.plataformas.some((p: any) => p.plataformas?.includes(filterPlataforma));
+      const hasStatus = filterStatus === "all" || group.plataformas.some((p: any) => p.status_alerta === filterStatus);
+      const hasCartao = showCartao || group.plataformas.some((p: any) => p.metodo_pagamento !== "cartao");
 
-      return matchesAgencia && matchesPlataforma && matchesStatus && matchesSearch && matchesPausados && matchesCartao;
+      return matchesAgencia && matchesSearch && matchesPausados && hasPlataforma && hasStatus && hasCartao;
     });
 
     result.sort((a, b) => {
-      // Put card items at the end when sorting by days remaining
       if (sortBy === "dias_restantes") {
-        if (a.metodo_pagamento === "cartao" && b.metodo_pagamento !== "cartao") return 1;
-        if (a.metodo_pagamento !== "cartao" && b.metodo_pagamento === "cartao") return -1;
-        return (a.dias_restantes || 0) - (b.dias_restantes || 0);
+        if (!a.data_prevista_fim_proxima) return 1;
+        if (!b.data_prevista_fim_proxima) return -1;
+        return new Date(a.data_prevista_fim_proxima).getTime() - new Date(b.data_prevista_fim_proxima).getTime();
       }
       if (sortBy === "nome") return (a.cliente_nome || "").localeCompare(b.cliente_nome || "");
-      if (sortBy === "valor") return (b.saldo_atual || 0) - (a.saldo_atual || 0);
+      if (sortBy === "valor") return (b.saldo_total_consolidado || 0) - (a.saldo_total_consolidado || 0);
       return 0;
     });
 
     return result;
-  }, [data, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy, showPausados, showCartao]);
+  }, [groupedData, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy, showPausados, showCartao]);
 
   const metrics = useMemo(() => {
     const monitored = data.filter(i => i.metodo_pagamento !== "cartao");
     const onCartao = data.filter(i => i.metodo_pagamento === "cartao");
+    const uniqueClients = new Set(data.map(i => i.cliente_id)).size;
+    
+    const criticalClient = [...data]
+      .filter(i => i.metodo_pagamento !== "cartao" && i.data_prevista_fim)
+      .sort((a, b) => new Date(a.data_prevista_fim).getTime() - new Date(b.data_prevista_fim).getTime())[0];
 
     return {
-      totalContas: monitored.length,
+      totalContas: data.length,
+      uniqueClients,
       saldoTotal: monitored.reduce((acc, curr) => acc + (curr.saldo_atual || 0), 0),
       emAlerta: monitored.filter(i => i.status_alerta === "alerta").length,
       criticos: monitored.filter(i => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
-      totalCartao: onCartao.length
+      totalCartao: onCartao.length,
+      criticalClientName: criticalClient?.cliente_nome
     };
   }, [data]);
 
@@ -322,6 +375,7 @@ function SaldoPage() {
       case "alerta": return "border-amber-500";
       case "critico": return "border-red-500";
       case "zerado": return "border-gray-400";
+      case "cartao": return "border-blue-300";
       default: return "border-border";
     }
   };
