@@ -194,9 +194,17 @@ function SaldoPage() {
     if (!editingClient) return;
     setSaving(true);
     try {
+      const payload: any = { ...values };
+      if (typeof payload.verba_total_contratada === "string") {
+        payload.verba_total_contratada = payload.verba_total_contratada === "" ? null : Number(payload.verba_total_contratada);
+      }
+      if (payload.data_limite_verba === "") {
+        payload.data_limite_verba = null;
+      }
+
       const { error } = await supabase
         .from("clientes")
-        .update(values)
+        .update(payload)
         .eq("id", editingClient.id);
       if (error) throw error;
       toast.success("Dados do cliente atualizados");
