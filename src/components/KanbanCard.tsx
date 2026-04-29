@@ -96,7 +96,7 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
         <div className="p-2.5 space-y-1.5 relative">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-2 flex-1 min-w-0">
-              {!isDone && onMoveToDone && (
+              {!isDone && !isDoneForNow && onMoveToDone && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
