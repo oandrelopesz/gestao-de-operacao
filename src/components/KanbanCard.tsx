@@ -64,9 +64,9 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
   // Get preview of description (first 2 lines)
   const descriptionPreview = demanda.descricao ? demanda.descricao.split('\n').slice(0, 2).join('\n') : "";
 
-  const isRecorrenteMae = demanda.status === "recorrentes";
   const today = new Date().toISOString().split('T')[0];
   const isDueToday = demanda.proxima_execucao === today;
+  const isDoneForNow = isRecorrenteMae && demanda.proxima_execucao && demanda.proxima_execucao > today;
 
   return (
     <div 
