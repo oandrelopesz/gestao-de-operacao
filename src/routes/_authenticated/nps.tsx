@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { Plus, Search, Building2, Filter, AlertTriangle, TrendingUp, Users, Target, AlertCircle, Calendar } from "lucide-react";
+import { Plus, Search, Building2, Filter, AlertTriangle, TrendingUp, Users, Target, AlertCircle, Calendar, MoreVertical, Edit2, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { getScoreCategory } from "@/lib/nps";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -81,11 +84,19 @@ function NPSPage() {
 
   const filteredData = useMemo(() => {
     if (!avaliacoes) return [];
-    return avaliacoes.filter(item => {
+    const filtered = avaliacoes.filter(item => {
       const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
       const matchesCategory = filterCategory === "all" || item.categoria === filterCategory;
       const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesAgencia && matchesSearch && matchesCategory;
+    });
+    // Ordena por categoria: crítico → em risco → saudável → âncora; secundariamente por score crescente
+    const categoriaOrdem: Record<string, number> = { critico: 0, em_risco: 1, saudavel: 2, ancora: 3 };
+    return [...filtered].sort((a, b) => {
+      const ca = categoriaOrdem[a.categoria as string] ?? 99;
+      const cb = categoriaOrdem[b.categoria as string] ?? 99;
+      if (ca !== cb) return ca - cb;
+      return (a.score_total || 0) - (b.score_total || 0);
     });
   }, [avaliacoes, filterAgencia, filterCategory, searchQuery]);
 
@@ -319,22 +330,72 @@ function NPSPage() {
             <p className="text-muted-foreground">Tente ajustar seus critérios de busca ou agência.</p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredData.map((item) => (
-              <NPSCard 
-                key={item.id} 
-                avaliacao={item} 
-                onEdit={(a) => {
-                  setEditingAvaliacao(a);
-                  setIsFormOpen(true);
-                }}
-                onDelete={(id) => {
-                  setDeletingId(id);
-                  setDeletingName(item.cliente_nome || "esta avaliação");
-                }}
-                onClick={(a) => setSelectedCliente({ id: a.cliente_id, nome: a.cliente_nome, agencia: a.cliente_agencia })}
-              />
-            ))}
+          <div className="rounded-lg border bg-card divide-y">
+            {filteredData.map((item) => {
+              const cat = getScoreCategory(item.score_total ?? 0);
+              const isPausado = item.cliente_status_operacional === "pausado";
+              return (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "flex items-center gap-4 p-3 hover:bg-muted/40 transition-colors cursor-pointer",
+                    isPausado && "opacity-70"
+                  )}
+                  onClick={() => setSelectedCliente({ id: item.cliente_id, nome: item.cliente_nome, agencia: item.cliente_agencia })}
+                >
+                  <div className={cn(
+                    "flex flex-col items-center justify-center w-14 h-14 rounded-md font-black text-lg shrink-0",
+                    cat.color
+                  )}>
+                    {item.score_total}
+                    <span className="text-[9px] font-bold opacity-80">/50</span>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold truncate">{item.cliente_nome}</h3>
+                      <Badge variant="outline" className="text-[10px] uppercase">{item.cliente_agencia}</Badge>
+                      {isPausado && <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50">Pausado</Badge>}
+                      {item.cliente_em_onboarding && <Badge className="bg-emerald-500 text-[10px]">Onboarding</Badge>}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                        cat.color
+                      )}>{cat.label}</span>
+                      <span className="truncate">{cat.action}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-right hidden md:block text-xs text-muted-foreground shrink-0">
+                    {item.data_avaliacao ? new Date(item.data_avaliacao).toLocaleDateString("pt-BR") : "—"}
+                  </div>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                        <MoreVertical size={16} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[140px]">
+                      <DropdownMenuItem
+                        disabled={!isFriday}
+                        onClick={(e) => { e.stopPropagation(); if (isFriday) { setEditingAvaliacao(item); setIsFormOpen(true); } }}
+                      >
+                        <Edit2 size={14} className="mr-2" /> Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={!isFriday}
+                        className="text-destructive focus:text-destructive"
+                        onClick={(e) => { e.stopPropagation(); if (isFriday) { setDeletingId(item.id); setDeletingName(item.cliente_nome || "esta avaliação"); } }}
+                      >
+                        <Trash2 size={14} className="mr-2" /> Remover
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

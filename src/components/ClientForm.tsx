@@ -21,7 +21,26 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { X, Plus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AGENCIAS, maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
+
+const PLATAFORMAS_DISPONIVEIS = [
+  "Meta",
+  "Google",
+  "Pinterest",
+  "X Ads",
+  "LinkedIn",
+  "TikTok",
+  "Taboola",
+  "Outbrain",
+];
 
 const clientSchema = z.object({
   nome: z.string().min(2, "Nome é obrigatório"),
@@ -35,6 +54,8 @@ const clientSchema = z.object({
   tipo_verba: z.enum(["mensal", "total_periodo"]),
   verba_total_contratada: z.union([z.number(), z.string().length(0)]).optional().nullable(),
   data_limite_verba: z.string().optional().nullable().or(z.literal("")),
+  metodo_pagamento: z.enum(["cartao", "pix", "boleto"]),
+  plataformas: z.array(z.string()).min(1, "Selecione pelo menos uma plataforma"),
 });
 
 export type ClientFormValues = z.infer<typeof clientSchema>;
@@ -60,12 +81,26 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       tipo_verba: initialValues?.tipo_verba || "mensal",
       verba_total_contratada: initialValues?.verba_total_contratada ?? null,
       data_limite_verba: initialValues?.data_limite_verba || "",
+      metodo_pagamento: initialValues?.metodo_pagamento || "pix",
+      plataformas: initialValues?.plataformas || [],
     },
   });
 
   const [verbaDisplay, setVerbaDisplay] = useState(
     initialValues?.verba_ads ? maskBRLInput(String(Math.round((initialValues.verba_ads || 0) * 100))) : ""
   );
+
+  const removePlataforma = (plat: string) => {
+    const current = form.getValues("plataformas");
+    form.setValue("plataformas", current.filter((p) => p !== plat), { shouldValidate: true });
+  };
+
+  const addPlataforma = (plat: string) => {
+    const current = form.getValues("plataformas");
+    if (!current.includes(plat)) {
+      form.setValue("plataformas", [...current, plat], { shouldValidate: true });
+    }
+  };
 
   return (
     <Form {...form}>
@@ -234,6 +269,74 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
             </div>
           )}
         </div>
+        </div>
+
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-md border p-4 bg-muted/20">
+          <FormField
+            control={form.control}
+            name="metodo_pagamento"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Forma de pagamento</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="pix">Pix</SelectItem>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="cartao">Cartão (sem monitoramento)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Define como o saldo de mídia será monitorado.
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="plataformas"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel>Plataformas de mídia</FormLabel>
+                <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md items-center bg-background">
+                  {field.value.map((plat) => (
+                    <Badge key={plat} variant="secondary" className="gap-1 pr-1">
+                      {plat}
+                      <button
+                        type="button"
+                        onClick={() => removePlataforma(plat)}
+                        className="hover:text-destructive"
+                      >
+                        <X size={12} />
+                      </button>
+                    </Badge>
+                  ))}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" type="button">
+                        <Plus size={14} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {PLATAFORMAS_DISPONIVEIS.filter((p) => !field.value.includes(p)).map((plat) => (
+                        <DropdownMenuItem key={plat} onClick={() => addPlataforma(plat)}>
+                          {plat}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
         <FormField

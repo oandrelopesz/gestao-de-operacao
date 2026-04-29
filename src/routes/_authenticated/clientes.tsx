@@ -99,7 +99,27 @@ function ClientesPage() {
   const [showPausados, setShowPausados] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ClienteView | null>(null);
+  const [editingSaldo, setEditingSaldo] = useState<{ plataformas: string[]; metodo_pagamento: "cartao" | "pix" | "boleto" } | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const openEdit = async (cliente: ClienteView) => {
+    setEditing(cliente);
+    // Busca saldo_ads existente para preencher plataformas/forma de pagamento
+    const { data } = await supabase
+      .from("saldo_ads")
+      .select("plataformas, metodo_pagamento")
+      .eq("cliente_id", cliente.id)
+      .maybeSingle();
+    if (data) {
+      setEditingSaldo({
+        plataformas: data.plataformas || [],
+        metodo_pagamento: (data.metodo_pagamento || "pix") as any,
+      });
+    } else {
+      setEditingSaldo(null);
+    }
+    setModalOpen(true);
+  };
 
   useEffect(() => { fetchClientes(); }, []);
 
@@ -227,24 +247,72 @@ function ClientesPage() {
         }
       }
 
+      // Separa campos do cliente dos campos do saldo_ads
+      const { metodo_pagamento, plataformas, ...clientePayload } = payload;
+
+      // Calcula a verba diária estimada para sincronizar saldo_ads
+      const computeVerbaDiaria = (cli: any) => {
+        if (cli.tipo_verba === "total_periodo" && cli.verba_total_contratada && cli.data_inicio && cli.data_limite_verba) {
+          const inicio = new Date(cli.data_inicio);
+          const fim = new Date(cli.data_limite_verba);
+          const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+          return Number(cli.verba_total_contratada) / dias;
+        }
+        return Number(cli.verba_ads || 0) / 30;
+      };
+
+      let clienteId: string;
       if (editing) {
         const { error } = await supabase.from("clientes")
-          .update(payload).eq("id", editing.id);
+          .update(clientePayload).eq("id", editing.id);
         if (error) {
           console.error("Erro ao atualizar cliente:", error);
           throw error;
         }
+        clienteId = editing.id;
         toast.success("Cliente atualizado");
       } else {
-        const { error } = await supabase.from("clientes").insert([{
-          ...payload,
+        const { data: novoCliente, error } = await supabase.from("clientes").insert([{
+          ...clientePayload,
           user_id: user.id,
-        }]);
+        }]).select().single();
         if (error) {
           console.error("Erro ao inserir cliente:", error);
           throw error;
         }
+        clienteId = novoCliente.id;
         toast.success("Cliente criado");
+      }
+
+      // Sincroniza saldo_ads (forma de pagamento + plataformas)
+      if (plataformas && plataformas.length > 0 && metodo_pagamento) {
+        const verbaDiaria = computeVerbaDiaria(payload);
+
+        // Verifica se já existe registro saldo_ads para esse cliente
+        const { data: existente } = await supabase
+          .from("saldo_ads")
+          .select("id")
+          .eq("cliente_id", clienteId)
+          .maybeSingle();
+
+        if (existente) {
+          await supabase.from("saldo_ads")
+            .update({
+              plataformas,
+              metodo_pagamento,
+              verba_diaria: verbaDiaria,
+            })
+            .eq("id", existente.id);
+        } else {
+          await supabase.from("saldo_ads").insert([{
+            cliente_id: clienteId,
+            user_id: user.id,
+            plataformas,
+            metodo_pagamento,
+            verba_diaria: verbaDiaria,
+            ativo: true,
+          }]);
+        }
       }
       setModalOpen(false);
       setEditing(null);
@@ -288,7 +356,7 @@ function ClientesPage() {
               <TabsTrigger value="tabela" className="gap-1.5"><TableIcon size={14} />Tabela</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
+          <Button className="gap-2" onClick={() => { setEditing(null); setEditingSaldo(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
           </Button>
         </div>
@@ -610,7 +678,7 @@ function ClientesPage() {
           <UsersIcon size={36} className="text-muted-foreground mb-3 opacity-50" />
           <h3 className="text-lg font-semibold">Nenhum cliente em {agencia === "todos" ? "Todos os Clientes" : agenciaMeta.label}</h3>
           <p className="text-muted-foreground mb-4 text-sm">Cadastre o primeiro cliente desta agência ou ajuste os filtros.</p>
-          <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
+          <Button className="gap-2" onClick={() => { setEditing(null); setEditingSaldo(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
           </Button>
         </div>
@@ -622,7 +690,7 @@ function ClientesPage() {
               cliente={c}
               borderClass={agencia === "todos" ? (AGENCIAS.find(a => a.id === c.agencia)?.border || "border-l-primary") : agenciaMeta.border}
               showAgenciaBadge={agencia === "todos"}
-              onEdit={() => { setEditing(c); setModalOpen(true); }}
+              onEdit={() => openEdit(c)}
               onArchive={() => handleArchive(c.id)}
               onDelete={() => { setDeletingId(c.id); setDeletingName(c.nome); }}
             />
@@ -696,7 +764,7 @@ function ClientesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-[140px]">
-                          <DropdownMenuItem onClick={() => { setEditing(c); setModalOpen(true); }}>
+                          <DropdownMenuItem onClick={() => openEdit(c)}>
                             <Pencil size={14} className="mr-2" /> Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleArchive(c.id)}>
@@ -719,8 +787,8 @@ function ClientesPage() {
         </div>
       )}
 
-      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) setEditing(null); }}>
-        <DialogContent className="sm:max-w-[520px]">
+      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) { setEditing(null); setEditingSaldo(null); } }}>
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar cliente" : "Novo cliente"}</DialogTitle>
             <DialogDescription>Preencha os dados do cliente. O status é calculado a partir do NPS.</DialogDescription>
@@ -740,7 +808,9 @@ function ClientesPage() {
               tipo_verba: editing.tipo_verba || "mensal",
               verba_total_contratada: editing.verba_total_contratada ?? null,
               data_limite_verba: editing.data_limite_verba || "",
-            } : { agencia: agencia === "todos" ? "effect" : agencia } as any}
+              metodo_pagamento: editingSaldo?.metodo_pagamento || "pix",
+              plataformas: editingSaldo?.plataformas || [],
+            } : { agencia: agencia === "todos" ? "effect" : agencia, metodo_pagamento: "pix", plataformas: [] } as any}
           />
         </DialogContent>
       </Dialog>
