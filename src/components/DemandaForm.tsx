@@ -32,7 +32,7 @@ const demandaSchema = z.object({
 export type DemandaFormValues = z.infer<typeof demandaSchema>;
 
 interface DemandaFormProps {
-  clientes: { id: string; nome: string }[];
+  clientes: { id: string; nome: string; agencia?: string }[];
   onSubmit: (values: DemandaFormValues) => void;
   loading?: boolean;
 }
