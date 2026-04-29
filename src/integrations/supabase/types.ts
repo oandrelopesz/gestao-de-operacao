@@ -203,6 +203,96 @@ export type Database = {
           },
         ]
       }
+      financeiro_fontes: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          dia_recebimento: number
+          id: string
+          nome: string
+          observacoes: string | null
+          tipo: string
+          updated_at: string | null
+          user_id: string
+          valor_mensal: number
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          dia_recebimento: number
+          id?: string
+          nome: string
+          observacoes?: string | null
+          tipo: string
+          updated_at?: string | null
+          user_id: string
+          valor_mensal?: number
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          dia_recebimento?: number
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          tipo?: string
+          updated_at?: string | null
+          user_id?: string
+          valor_mensal?: number
+        }
+        Relationships: []
+      }
+      financeiro_recebimentos: {
+        Row: {
+          created_at: string | null
+          data_confirmacao: string | null
+          fonte_id: string
+          id: string
+          mes_referencia: string
+          observacoes: string | null
+          recebido: boolean | null
+          user_id: string
+          valor_recebido: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_confirmacao?: string | null
+          fonte_id: string
+          id?: string
+          mes_referencia: string
+          observacoes?: string | null
+          recebido?: boolean | null
+          user_id: string
+          valor_recebido?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          data_confirmacao?: string | null
+          fonte_id?: string
+          id?: string
+          mes_referencia?: string
+          observacoes?: string | null
+          recebido?: boolean | null
+          user_id?: string
+          valor_recebido?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_recebimentos_fonte_id_fkey"
+            columns: ["fonte_id"]
+            isOneToOne: false
+            referencedRelation: "financeiro_fontes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_recebimentos_fonte_id_fkey"
+            columns: ["fonte_id"]
+            isOneToOne: false
+            referencedRelation: "financeiro_view"
+            referencedColumns: ["fonte_id"]
+          },
+        ]
+      }
       notificacoes_config: {
         Row: {
           alerta_dias_antes: number
@@ -484,6 +574,25 @@ export type Database = {
           ultima_nps_score?: never
           verba_ads?: number | null
           verba_total_contratada?: number | null
+        }
+        Relationships: []
+      }
+      financeiro_view: {
+        Row: {
+          ativo: boolean | null
+          data_confirmacao: string | null
+          dia_recebimento: number | null
+          fonte_id: string | null
+          mes_atual: string | null
+          nome: string | null
+          observacoes: string | null
+          recebido_mes_atual: boolean | null
+          recebimento_id: string | null
+          status_mes: string | null
+          tipo: string | null
+          user_id: string | null
+          valor_mensal: number | null
+          valor_recebido: number | null
         }
         Relationships: []
       }
