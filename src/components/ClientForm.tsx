@@ -58,7 +58,7 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       em_onboarding: initialValues?.em_onboarding ?? false,
       status_operacional: initialValues?.status_operacional || "ativo",
       tipo_verba: initialValues?.tipo_verba || "mensal",
-      verba_total_contratada: initialValues?.verba_total_contratada ?? 0,
+      verba_total_contratada: initialValues?.verba_total_contratada ?? null,
       data_limite_verba: initialValues?.data_limite_verba || "",
     },
   });
