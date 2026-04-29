@@ -50,8 +50,8 @@ interface Pendencia {
   id: string;
   cliente_id: string;
   status: PendenciaStatus;
-  descricao?: string;
-  resolvida: boolean;
+  descricao?: string | null;
+  resolvida: boolean | null;
   clientes: {
     nome: string;
     agencia: string;
