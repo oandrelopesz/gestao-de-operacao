@@ -360,6 +360,7 @@ function ClientesPage() {
               data_inicio: editing.data_inicio,
               verba_ads: Number(editing.verba_ads || 0),
               observacoes: editing.observacoes || "",
+              em_onboarding: editing.em_onboarding || false,
             } : { agencia }}
           />
         </DialogContent>
