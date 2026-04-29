@@ -318,7 +318,21 @@ export function DemandaDrawer({
                   <span className="text-zinc-400">Tipo</span>
                   <Select 
                     value={demanda.frequencia_tipo || "semanal"} 
-                    onValueChange={(val) => saveUpdate({ frequencia_tipo: val })}
+                    onValueChange={(val) => {
+                      const updates: Partial<Demanda> = { frequencia_tipo: val };
+                      
+                      // Ajustar parâmetros baseados na data atual se existir
+                      if (demanda.proxima_execucao) {
+                        const date = new Date(demanda.proxima_execucao + "T12:00:00");
+                        if (val === 'mensal') {
+                          updates.frequencia_dia_mes = date.getDate();
+                        } else if (val === 'semanal') {
+                          updates.frequencia_dias_semana = [date.getDay().toString()];
+                        }
+                      }
+                      
+                      saveUpdate(updates);
+                    }}
                   >
                     <SelectTrigger className="h-7 text-xs border-none bg-transparent p-0 focus:ring-0">
                       <SelectValue />
