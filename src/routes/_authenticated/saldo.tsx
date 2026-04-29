@@ -252,11 +252,15 @@ function SaldoPage() {
   }, [data, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy, showPausados, showCartao]);
 
   const metrics = useMemo(() => {
+    const monitored = data.filter(i => i.metodo_pagamento !== "cartao");
+    const onCartao = data.filter(i => i.metodo_pagamento === "cartao");
+
     return {
-      totalContas: data.length,
-      saldoTotal: data.reduce((acc, curr) => acc + (curr.saldo_atual || 0), 0),
-      emAlerta: data.filter(i => i.status_alerta === "alerta").length,
-      criticos: data.filter(i => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
+      totalContas: monitored.length,
+      saldoTotal: monitored.reduce((acc, curr) => acc + (curr.saldo_atual || 0), 0),
+      emAlerta: monitored.filter(i => i.status_alerta === "alerta").length,
+      criticos: monitored.filter(i => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
+      totalCartao: onCartao.length
     };
   }, [data]);
 
