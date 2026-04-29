@@ -292,7 +292,7 @@ function ClientesPage() {
             <TableBody>
               {filtered.map((c) => {
                 const nps = NPS_STATUS_META[c.nps_status];
-                const pag = cliente.status_pagamento_mes ? PAGAMENTO_META[cliente.status_pagamento_mes] : null;
+                const pag = c.status_pagamento_mes ? PAGAMENTO_META[c.status_pagamento_mes] : null;
                 return (
                   <TableRow 
                     key={c.id}
