@@ -803,7 +803,7 @@ function SaldoPage() {
                                 <p className="font-semibold">
                                   {isCartao 
                                     ? formatBRL(plat.clientes?.verba_ads || (plat.verba_diaria_calc * 30)) 
-                                    : formatBRL(plat.total_recarregado)}
+                                    : formatBRL(plat.saldo_total_acumulado)}
                                 </p>
                               </div>
                             </div>
