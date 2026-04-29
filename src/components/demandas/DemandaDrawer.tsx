@@ -10,7 +10,9 @@ import {
   ArrowRight,
   Plus,
   Check,
-  ChevronDown
+  ChevronDown,
+  Repeat,
+  History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -19,6 +21,13 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -34,6 +43,14 @@ interface Demanda {
   prazo?: string;
   cliente_id: string | null;
   created_at?: string;
+  recorrente?: boolean;
+  frequencia_tipo?: string;
+  frequencia_dias_semana?: string[];
+  frequencia_dia_mes?: number;
+  frequencia_intervalo_dias?: number;
+  ultima_execucao?: string;
+  proxima_execucao?: string;
+  recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
 }
 
@@ -250,7 +267,7 @@ export function DemandaDrawer({
             )}
             
             {/* Add field placeholder button */}
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap gap-2">
                <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-7 text-[11px] text-zinc-400 gap-1.5 px-1.5 hover:text-zinc-600">
@@ -258,6 +275,7 @@ export function DemandaDrawer({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
+                  <DropdownMenuItem className="text-xs" onClick={() => saveUpdate({ recorrente: true, frequencia_tipo: 'semanal' })}>Recorrência</DropdownMenuItem>
                   <DropdownMenuItem className="text-xs">Prioridade</DropdownMenuItem>
                   <DropdownMenuItem className="text-xs">Prazo</DropdownMenuItem>
                   <DropdownMenuItem className="text-xs">Tags</DropdownMenuItem>
@@ -267,6 +285,49 @@ export function DemandaDrawer({
           </div>
 
           <Separator className="my-6 opacity-50" />
+
+          {/* Recurrence Section */}
+          {demanda.recorrente && (
+            <div className="space-y-4 border rounded-lg p-4 bg-zinc-50/50 dark:bg-zinc-900/50">
+              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                <Repeat size={16} className="text-primary" />
+                <span>Configuração de Recorrência</span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <span className="text-zinc-400">Tipo</span>
+                  <Select 
+                    value={demanda.frequencia_tipo || "semanal"} 
+                    onValueChange={(val) => saveUpdate({ frequencia_tipo: val })}
+                  >
+                    <SelectTrigger className="h-7 text-xs border-none bg-transparent p-0 focus:ring-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="diaria" className="text-xs">Diária</SelectItem>
+                      <SelectItem value="semanal" className="text-xs">Semanal</SelectItem>
+                      <SelectItem value="quinzenal" className="text-xs">Quinzenal</SelectItem>
+                      <SelectItem value="mensal" className="text-xs">Mensal</SelectItem>
+                      <SelectItem value="customizada" className="text-xs">Customizada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {demanda.proxima_execucao && (
+                  <div className="space-y-1">
+                    <span className="text-zinc-400">Próxima Execução</span>
+                    <div className="font-medium">{new Date(demanda.proxima_execucao).toLocaleDateString('pt-BR')}</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1.5" onClick={() => onUpdate(demanda.id, { recorrente: false })}>
+                  Desativar Recorrência
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Description area */}
           <div className="space-y-2">

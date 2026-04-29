@@ -12,14 +12,18 @@ interface Demanda {
   titulo: string;
   descricao?: string;
   status: string;
-  prioridade: "baixa" | "media" | "alta" | "urgente";
+  prioridade: string;
   prazo?: string;
   cliente_id: string | null;
-  clientes?: { nome: string };
   recorrente?: boolean;
-  frequencia?: string;
-  dia_referencia?: string;
+  frequencia_tipo?: string;
+  frequencia_dias_semana?: string[];
+  frequencia_dia_mes?: number;
+  frequencia_intervalo_dias?: number;
   ultima_execucao?: string;
+  proxima_execucao?: string;
+  recorrente_pai_id?: string;
+  clientes?: { nome: string; agencia?: string };
 }
 
 interface KanbanColumnProps {
@@ -28,7 +32,7 @@ interface KanbanColumnProps {
   color: string;
   hex: string;
   demandas: Demanda[];
-  onQuickAdd: (status: string, title: string) => Promise<void>;
+  onQuickAdd: (status: string, title: string, event?: any) => Promise<void>;
   onFullAdd: (status: string) => void;
   onEdit: (demanda: Demanda) => void;
   onDelete: (id: string, name: string) => void;
@@ -143,7 +147,13 @@ export function KanbanColumn({
 
         {isAdding && (
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md p-2 mb-2 shadow-sm animate-in fade-in zoom-in duration-200">
-            <form onSubmit={handleQuickAdd}>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const event = (e as any).nativeEvent;
+              onQuickAdd(id, quickTitle, event);
+              setQuickTitle("");
+              if (inputRef.current) inputRef.current.focus();
+            }}>
               <Input
                 ref={inputRef}
                 placeholder="Nova tarefa..."

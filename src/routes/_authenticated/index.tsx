@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Filter, List, Kanban as KanbanIcon, Search, Building2, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Plus, Filter, List, Kanban as KanbanIcon, Search, Building2, MoreVertical, Pencil, Trash2, Repeat, Calendar as CalendarIcon, ChevronDown, ChevronUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -85,6 +85,19 @@ function DemandasPage() {
   const [deletingName, setDeletingName] = useState<string>("");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedDemanda, setSelectedDemanda] = useState<any | null>(null);
+  const [showCalendar, setShowCalendar] = useState(() => {
+    const saved = localStorage.getItem("demandas_calendar_visible");
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [calendarMode, setCalendarMode] = useState<"7days" | "30days">("7days");
+  const [popoverConfig, setPopoverConfig] = useState<{ id: string; x: number; y: number } | null>(null);
+
+  const toggleCalendar = () => {
+    setShowCalendar((prev: boolean) => {
+      localStorage.setItem("demandas_calendar_visible", JSON.stringify(!prev));
+      return !prev;
+    });
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -100,6 +113,7 @@ function DemandasPage() {
   useEffect(() => {
     fetchClientes();
     fetchDemandas();
+    catchUpRecorrentes();
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "n" && !isModalOpen && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
@@ -116,6 +130,15 @@ function DemandasPage() {
     const { data, error } = await supabase.from("clientes").select("id, nome, agencia").order("nome");
     if (error) console.error("Erro ao buscar clientes:", error);
     else setClientes((data as any) || []);
+  };
+
+  const catchUpRecorrentes = async () => {
+    try {
+      await supabase.functions.invoke('materializar-recorrentes');
+      fetchDemandas();
+    } catch (err) {
+      console.error("Erro no catch-up de recorrentes:", err);
+    }
   };
 
   const fetchDemandas = async () => {
@@ -220,7 +243,7 @@ function DemandasPage() {
     setIsDrawerOpen(true);
   };
 
-  const handleQuickAdd = async (status: string, titulo: string) => {
+  const handleQuickAdd = async (status: string, titulo: string, event?: React.MouseEvent | React.TouchEvent) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
@@ -237,14 +260,22 @@ function DemandasPage() {
         cliente_id: null,
         prioridade: "media" as const,
         ordem: maxOrder + 1,
-        recorrente: isRecorrente,
-        frequencia: isRecorrente ? "semanal" : null
+        recorrente: isRecorrente
       }]).select().single();
 
       if (error) throw error;
       
       // Optimistic update
       setDemandas(prev => [...prev, data]);
+      
+      if (isRecorrente && event) {
+        setPopoverConfig({
+          id: data.id,
+          x: (event as any).clientX || 200,
+          y: (event as any).clientY || 200
+        });
+      }
+
       // Silently fetch to sync relationships
       fetchDemandas();
     } catch (error: any) {
@@ -268,11 +299,44 @@ function DemandasPage() {
 
   const handleCompleteExecution = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from("demandas")
-        .update({ ultima_execucao: new Date().toISOString() })
-        .eq("id", id);
-      if (error) throw error;
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Registrar no histórico
+      const { error: execError } = await supabase
+        .from("demanda_execucoes")
+        .insert([{ demanda_id: id, data_execucao: today }]);
+      
+      if (execError) throw execError;
+
+      const demanda = demandas.find(d => d.id === id);
+      if (demanda?.recorrente) {
+        // Recalcular próxima execução
+        const { data: proximaData } = await supabase.rpc('calcular_proxima_execucao', {
+            p_tipo: demanda.frequencia_tipo,
+            p_dias_semana: demanda.frequencia_dias_semana,
+            p_dia_mes: demanda.frequencia_dia_mes,
+            p_intervalo_dias: demanda.frequencia_intervalo_dias,
+            p_ultima_execucao: today,
+            p_data_referencia: today
+        });
+
+        const { error: updateError } = await supabase
+            .from("demandas")
+            .update({ 
+                ultima_execucao: today,
+                proxima_execucao: proximaData
+            })
+            .eq("id", id);
+        
+        if (updateError) throw updateError;
+      } else {
+        const { error } = await supabase
+            .from("demandas")
+            .update({ ultima_execucao: today })
+            .eq("id", id);
+        if (error) throw error;
+      }
+
       toast.success("Execução registrada!");
       fetchDemandas();
     } catch (error: any) {
@@ -361,12 +425,13 @@ function DemandasPage() {
     const overColumnDemandas = demandas.filter(d => d.status === overStatus);
     const newOrder = overColumnDemandas.length;
 
-    if (activeTask.recorrente && overStatus !== "recorrentes") {
-      const confirm = window.confirm("Deseja desativar a recorrência desta tarefa?");
-      if (!confirm) {
-        fetchDemandas();
-        return;
-      }
+    if (activeTask.status === "recorrentes" && overStatus !== "recorrentes") {
+      toast.error("Tarefas recorrentes vivem na coluna Recorrentes. Mova a instância gerada hoje em Fazer hoje.");
+      return;
+    }
+
+    if (activeTask.recorrente && overStatus !== "recorrentes" && activeTask.status === "recorrentes") {
+      return;
     }
 
     try {
@@ -390,8 +455,18 @@ function DemandasPage() {
   return (
     <div className="space-y-4 flex flex-col h-[calc(100vh-8rem)]">
       <div className="flex items-center justify-between shrink-0">
-        <div>
+        <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold tracking-tight">Demandas</h1>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 text-xs text-zinc-500 gap-1.5" 
+            onClick={toggleCalendar}
+          >
+            <CalendarIcon size={14} />
+            {showCalendar ? "Ocultar Calendário" : "Mostrar Calendário"}
+            {showCalendar ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </Button>
         </div>
         
         <div className="flex items-center gap-2">
@@ -413,6 +488,65 @@ function DemandasPage() {
             </Button>
         </div>
       </div>
+
+      {showCalendar && (
+        <div className="bg-zinc-50/50 dark:bg-zinc-900/50 rounded-lg p-3 border animate-in slide-in-from-top duration-300">
+           {/* Calendário será implementado em componente separado ou inline */}
+           <div className="flex items-center justify-between mb-3">
+             <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Previsão de Recorrências</div>
+             <div className="flex items-center gap-1 bg-zinc-200/50 dark:bg-zinc-800/50 p-0.5 rounded-md">
+                <Button 
+                  variant={calendarMode === "7days" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-6 text-[10px] px-2"
+                  onClick={() => setCalendarMode("7days")}
+                >7 dias</Button>
+                <Button 
+                  variant={calendarMode === "30days" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-6 text-[10px] px-2"
+                  onClick={() => setCalendarMode("30days")}
+                >30 dias</Button>
+             </div>
+           </div>
+           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {Array.from({ length: calendarMode === "7days" ? 7 : 30 }).map((_, i) => {
+                const date = new Date();
+                date.setDate(date.getDate() + i);
+                const isToday = i === 0;
+                const dayName = date.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase().replace('.', '');
+                const dayNum = date.getDate();
+                
+                return (
+                  <div 
+                    key={i} 
+                    className={cn(
+                      "flex-1 min-w-[100px] max-w-[150px] p-2 rounded-md border border-dashed flex flex-col gap-1.5",
+                      isToday ? "bg-primary/5 border-primary/20" : "bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800"
+                    )}
+                  >
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-[10px] font-bold text-zinc-400">{dayName}</span>
+                      <span className={cn("text-xs font-bold", isToday ? "text-primary" : "text-zinc-600 dark:text-zinc-400")}>{dayNum}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      {demandas.filter(d => d.recorrente && d.proxima_execucao === date.toISOString().split('T')[0]).slice(0, 3).map(d => (
+                        <div key={d.id} className="text-[9px] bg-white dark:bg-zinc-900 border rounded px-1 py-0.5 truncate cursor-pointer hover:border-primary transition-colors" onClick={() => handleOpenDrawer(d)}>
+                          {d.titulo}
+                        </div>
+                      ))}
+                      {demandas.filter(d => d.recorrente && d.proxima_execucao === date.toISOString().split('T')[0]).length > 3 && (
+                        <div className="text-[8px] text-zinc-400 text-center">
+                          + {demandas.filter(d => d.recorrente && d.proxima_execucao === date.toISOString().split('T')[0]).length - 3} mais
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+           </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 shrink-0">
         <div className="relative w-full max-w-[200px]">
@@ -623,6 +757,61 @@ function DemandasPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {popoverConfig && (
+        <div 
+          className="fixed z-[100] w-64 bg-white dark:bg-zinc-950 border rounded-lg shadow-xl p-4 animate-in zoom-in duration-200"
+          style={{ left: popoverConfig.x, top: popoverConfig.y }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider">Quando repetir?</h4>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPopoverConfig(null)}><X size={14} /></Button>
+          </div>
+          <div className="grid gap-2">
+            {[
+              { label: 'Diária', value: 'diaria', desc: 'Todos os dias' },
+              { label: 'Semanal', value: 'semanal', desc: 'Uma vez por semana' },
+              { label: 'Quinzenal', value: 'quinzenal', desc: 'A cada 15 dias' },
+              { label: 'Mensal', value: 'mensal', desc: 'Mesmo dia todo mês' },
+              { label: 'Customizada', value: 'customizada', desc: 'Intervalo de dias' }
+            ].map((opt) => (
+              <Button 
+                key={opt.value} 
+                variant="outline" 
+                className="justify-start h-auto py-2 px-3 text-left"
+                onClick={async () => {
+                  const today = new Date().toISOString().split('T')[0];
+                  
+                  // Calcular primeira proxima_execucao baseada no tipo (simplificado para o popover inicial)
+                  let proxima = today; 
+                  if (opt.value === 'diaria') {
+                    const d = new Date(); d.setDate(d.getDate() + 1);
+                    proxima = d.toISOString().split('T')[0];
+                  }
+
+                  await supabase.from("demandas").update({
+                    frequencia_tipo: opt.value,
+                    proxima_execucao: proxima
+                  }).eq("id", popoverConfig.id);
+                  
+                  setPopoverConfig(null);
+                  fetchDemandas();
+                  toast.success("Recorrência configurada!");
+                  
+                  if (proxima === today) {
+                    catchUpRecorrentes();
+                  }
+                }}
+              >
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold">{opt.label}</span>
+                  <span className="text-[10px] text-zinc-400">{opt.desc}</span>
+                </div>
+              </Button>
+            ))}
+            <Button variant="ghost" className="text-xs h-8" onClick={() => setPopoverConfig(null)}>Configurar depois</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

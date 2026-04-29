@@ -1,0 +1,1 @@
+ALTER FUNCTION public.calcular_proxima_execucao(text, text[], integer, integer, date, date) SET search_path = public;

@@ -2,7 +2,7 @@ import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
-import { MoreVertical, Pencil, Copy, Trash2, Check, FileText } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,13 +17,17 @@ interface Demanda {
   titulo: string;
   descricao?: string;
   status: string;
-  prioridade: "baixa" | "media" | "alta" | "urgente";
+  prioridade: string;
   prazo?: string;
   cliente_id: string | null;
   recorrente?: boolean;
-  frequencia?: string;
-  dia_referencia?: string;
+  frequencia_tipo?: string;
+  frequencia_dias_semana?: string[];
+  frequencia_dia_mes?: number;
+  frequencia_intervalo_dias?: number;
   ultima_execucao?: string;
+  proxima_execucao?: string;
+  recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
 }
 
@@ -55,19 +59,25 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
   // Get preview of description (first 2 lines)
   const descriptionPreview = demanda.descricao ? demanda.descricao.split('\n').slice(0, 2).join('\n') : "";
 
+  const isRecorrenteMae = demanda.status === "recorrentes";
+  const today = new Date().toISOString().split('T')[0];
+  const isDueToday = demanda.proxima_execucao === today;
+
   return (
     <div 
       ref={setNodeRef} 
       style={style} 
       className={cn(
         "group relative outline-none rounded-md mb-2",
-        isDragging && "opacity-50 z-50"
+        isDragging && "opacity-50 z-50",
+        isRecorrenteMae && !isDueToday && "opacity-70"
       )}
     >
       <Card
         className={cn(
           "cursor-default hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden",
-          isDone && "opacity-60"
+          isDone && "opacity-60",
+          isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20"
         )}
         onClick={() => onEdit(demanda)}
       >
@@ -99,6 +109,7 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
                 isDone && "line-through text-zinc-500"
               )}>
                 {demanda.titulo}
+                {(isRecorrenteMae || demanda.recorrente_pai_id) && <Repeat size={12} className="inline-block ml-1 text-primary animate-pulse-slow" />}
               </h4>
             </div>
 
@@ -135,8 +146,8 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
           )}
 
           {/* Footer of the card */}
-          {(demanda.descricao || demanda.clientes?.nome || demanda.prazo) && (
-            <div className="flex items-center gap-2 pt-0.5">
+          {(demanda.descricao || demanda.clientes?.nome || demanda.prazo || isRecorrenteMae) && (
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
               {demanda.descricao && (
                 <div title="Tem descrição">
                   <FileText size={12} className="text-zinc-400" />
@@ -149,7 +160,18 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
                 </span>
               )}
 
-              {demanda.prazo && (
+              {isRecorrenteMae && (
+                <div className="flex items-center gap-1 ml-auto shrink-0">
+                  <span className={cn(
+                    "text-[9px] px-1 py-0.5 rounded-full font-bold uppercase tracking-tighter",
+                    isDueToday ? "bg-primary text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                  )}>
+                    {isDueToday ? "HOJE" : (demanda.frequencia_tipo || "Repetir")}
+                  </span>
+                </div>
+              )}
+
+              {!isRecorrenteMae && demanda.prazo && (
                 <span className="text-[10px] text-zinc-400 ml-auto shrink-0">
                   {new Date(demanda.prazo).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                 </span>

@@ -28,8 +28,9 @@ const demandaSchema = z.object({
   prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
   prazo: z.string().nullable().optional(),
   recorrente: z.boolean(),
-  frequencia: z.enum(["diaria", "semanal", "quinzenal", "mensal", "customizada"]).nullable().optional(),
-  dia_referencia: z.string().nullable().optional(),
+  frequencia_tipo: z.enum(["diaria", "semanal", "quinzenal", "mensal", "customizada"]).nullable().optional(),
+  frequencia_dia_mes: z.number().nullable().optional(),
+  frequencia_intervalo_dias: z.number().nullable().optional(),
 });
 
 export type DemandaFormValues = z.infer<typeof demandaSchema>;
@@ -48,11 +49,12 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
       descricao: initialValues?.descricao || "",
       cliente_id: initialValues?.cliente_id || "",
       status: initialValues?.status || "fazer_hoje",
-      prioridade: initialValues?.prioridade || "media",
+      prioridade: (initialValues?.prioridade as any) || "media",
       prazo: initialValues?.prazo || "",
       recorrente: initialValues?.recorrente || false,
-      frequencia: initialValues?.frequencia || "semanal",
-      dia_referencia: initialValues?.dia_referencia || "",
+      frequencia_tipo: (initialValues as any)?.frequencia_tipo || "semanal",
+      frequencia_dia_mes: (initialValues as any)?.frequencia_dia_mes || null,
+      frequencia_intervalo_dias: (initialValues as any)?.frequencia_intervalo_dias || null,
     },
   });
 
@@ -186,7 +188,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
             <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
               <FormField
                 control={form.control}
-                name="frequencia"
+                name="frequencia_tipo"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Frequência</FormLabel>
@@ -210,12 +212,12 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
               />
               <FormField
                 control={form.control}
-                name="dia_referencia"
+                name="frequencia_intervalo_dias"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Dia de Referência</FormLabel>
+                    <FormLabel>Intervalo (dias)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: Toda segunda" {...field} value={field.value || ""} />
+                      <Input type="number" placeholder="Ex: 3" {...field} value={field.value || ""} onChange={e => field.onChange(parseInt(e.target.value))} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
