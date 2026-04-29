@@ -16,6 +16,7 @@ import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
 import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
+import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 
 const LoginRoute = LoginRouteImport.update({
@@ -52,6 +53,11 @@ const AuthenticatedFinanceiroRoute = AuthenticatedFinanceiroRouteImport.update({
   path: '/financeiro',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCursosRoute = AuthenticatedCursosRouteImport.update({
+  id: '/cursos',
+  path: '/cursos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
   id: '/clientes',
   path: '/clientes',
@@ -62,6 +68,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
   '/clientes': typeof AuthenticatedClientesRoute
+  '/cursos': typeof AuthenticatedCursosRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/nps': typeof AuthenticatedNpsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/clientes': typeof AuthenticatedClientesRoute
+  '/cursos': typeof AuthenticatedCursosRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/nps': typeof AuthenticatedNpsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
@@ -81,6 +89,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
+  '/_authenticated/cursos': typeof AuthenticatedCursosRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/nps': typeof AuthenticatedNpsRoute
   '/_authenticated/prospeccao': typeof AuthenticatedProspeccaoRoute
@@ -93,6 +102,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/clientes'
+    | '/cursos'
     | '/financeiro'
     | '/nps'
     | '/prospeccao'
@@ -101,6 +111,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/clientes'
+    | '/cursos'
     | '/financeiro'
     | '/nps'
     | '/prospeccao'
@@ -111,6 +122,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/clientes'
+    | '/_authenticated/cursos'
     | '/_authenticated/financeiro'
     | '/_authenticated/nps'
     | '/_authenticated/prospeccao'
@@ -174,6 +186,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFinanceiroRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/cursos': {
+      id: '/_authenticated/cursos'
+      path: '/cursos'
+      fullPath: '/cursos'
+      preLoaderRoute: typeof AuthenticatedCursosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/clientes': {
       id: '/_authenticated/clientes'
       path: '/clientes'
@@ -186,6 +205,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
+  AuthenticatedCursosRoute: typeof AuthenticatedCursosRoute
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedNpsRoute: typeof AuthenticatedNpsRoute
   AuthenticatedProspeccaoRoute: typeof AuthenticatedProspeccaoRoute
@@ -195,6 +215,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
+  AuthenticatedCursosRoute: AuthenticatedCursosRoute,
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedNpsRoute: AuthenticatedNpsRoute,
   AuthenticatedProspeccaoRoute: AuthenticatedProspeccaoRoute,

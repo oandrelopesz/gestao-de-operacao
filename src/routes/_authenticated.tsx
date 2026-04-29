@@ -11,7 +11,8 @@ import {
   User as UserIcon,
   Bell,
   DollarSign,
-  Target
+  Target,
+  BookOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -95,6 +96,7 @@ function AuthenticatedLayout() {
     { label: "Clientes Ativos", icon: <Users size={18} />, to: "/clientes" },
     { label: "Prospecção", icon: <Target size={18} />, to: "/prospeccao" },
     { label: "Financeiro", icon: <DollarSign size={18} />, to: "/financeiro" },
+    { label: "Cursos", icon: <BookOpen size={18} />, to: "/cursos" },
   ];
 
   const getAlertColor = (status: string) => {
