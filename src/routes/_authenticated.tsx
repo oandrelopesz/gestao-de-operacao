@@ -9,7 +9,8 @@ import {
   LogOut,
   ChevronRight,
   User as UserIcon,
-  Bell
+  Bell,
+  DollarSign
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
