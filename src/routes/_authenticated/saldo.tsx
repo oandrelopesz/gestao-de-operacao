@@ -409,22 +409,40 @@ function SaldoPage() {
       </div>
 
       <TooltipProvider>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Tooltip>
             <TooltipTrigger asChild>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Contas Monitoradas</CardTitle>
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <LayoutGrid className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{metrics.totalContas}</div>
-                  <p className="text-xs text-muted-foreground">Total de registros ativos</p>
+                  <p className="text-xs text-muted-foreground">Registros saldo_ads</p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Clientes no cartão não entram no monitoramento de saldo</p>
+              <p>Total de registros individuais por plataforma</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Clientes Únicos</CardTitle>
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{metrics.uniqueClients}</div>
+                  <p className="text-xs text-muted-foreground">Clientes monitorados</p>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Contagem distinta de clientes na aba Saldo</p>
             </TooltipContent>
           </Tooltip>
 
@@ -450,12 +468,12 @@ function SaldoPage() {
             <TooltipTrigger asChild>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Em Alerta</CardTitle>
-                  <Clock className="h-4 w-4 text-amber-500" />
+                  <CardTitle className="text-sm font-medium">Em Alerta / Críticos</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-destructive" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{metrics.emAlerta}</div>
-                  <p className="text-xs text-muted-foreground">Saldo dura entre 2 e 4 dias</p>
+                  <div className="text-2xl font-bold">{metrics.criticos + metrics.emAlerta}</div>
+                  <p className="text-xs text-muted-foreground">{metrics.criticos} críticos, {metrics.emAlerta} em alerta</p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
@@ -466,19 +484,21 @@ function SaldoPage() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card>
+              <Card className="bg-red-50/50 border-red-100">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Críticos / Zerados</CardTitle>
-                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  <CardTitle className="text-sm font-medium text-red-800">Mais Crítico</CardTitle>
+                  <ArrowRight className="h-4 w-4 text-red-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{metrics.criticos}</div>
-                  <p className="text-xs text-muted-foreground">Saldo dura menos de 1 dia</p>
+                  <div className="text-base font-bold text-red-700 line-clamp-1">
+                    {metrics.criticalClientName || "Nenhum"}
+                  </div>
+                  <p className="text-xs text-red-600/80">Zera em breve</p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Ignora clientes no cartão</p>
+              <p>Cliente com plataforma que vai zerar primeiro</p>
             </TooltipContent>
           </Tooltip>
         </div>
