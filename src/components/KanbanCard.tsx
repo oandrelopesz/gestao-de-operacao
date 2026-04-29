@@ -59,19 +59,25 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
   // Get preview of description (first 2 lines)
   const descriptionPreview = demanda.descricao ? demanda.descricao.split('\n').slice(0, 2).join('\n') : "";
 
+  const isRecorrenteMae = demanda.status === "recorrentes";
+  const today = new Date().toISOString().split('T')[0];
+  const isDueToday = demanda.proxima_execucao === today;
+
   return (
     <div 
       ref={setNodeRef} 
       style={style} 
       className={cn(
         "group relative outline-none rounded-md mb-2",
-        isDragging && "opacity-50 z-50"
+        isDragging && "opacity-50 z-50",
+        isRecorrenteMae && !isDueToday && "opacity-70"
       )}
     >
       <Card
         className={cn(
           "cursor-default hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden",
-          isDone && "opacity-60"
+          isDone && "opacity-60",
+          isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20"
         )}
         onClick={() => onEdit(demanda)}
       >
