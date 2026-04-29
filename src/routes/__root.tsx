@@ -49,14 +49,18 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "GestorPro" },
+      { name: "description", content: "Kind Connect is a personal task and client management web app." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "GestorPro" },
+      { property: "og:description", content: "Kind Connect is a personal task and client management web app." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "GestorPro" },
+      { name: "twitter:description", content: "Kind Connect is a personal task and client management web app." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e173b8b9-0ec8-4a62-805d-1bc23b037e87/id-preview-f83993f3--b894ed2e-2f0d-4ef8-9bd0-7cb1ffbcdf51.lovable.app-1777432642889.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e173b8b9-0ec8-4a62-805d-1bc23b037e87/id-preview-f83993f3--b894ed2e-2f0d-4ef8-9bd0-7cb1ffbcdf51.lovable.app-1777432642889.png" },
     ],
     links: [
       {
