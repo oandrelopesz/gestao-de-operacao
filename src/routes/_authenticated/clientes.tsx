@@ -99,10 +99,11 @@ function ClientesPage() {
     const total = list.length;
     const verbaTotal = list.reduce((s, c) => s + Number(c.verba_ads || 0), 0);
     const verbaMedia = total > 0 ? verbaTotal / total : 0;
-    const promotores = list.filter((c) => c.nps_status === "promotor").length;
-    const neutros = list.filter((c) => c.nps_status === "neutro").length;
-    const detratores = list.filter((c) => c.nps_status === "detrator").length;
-    return { total, verbaTotal, verbaMedia, promotores, neutros, detratores };
+    const ancora = list.filter((c) => c.nps_status === "ancora").length;
+    const saudavel = list.filter((c) => c.nps_status === "saudavel").length;
+    const em_risco = list.filter((c) => c.nps_status === "em_risco").length;
+    const critico = list.filter((c) => c.nps_status === "critico").length;
+    return { total, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
   }, [clientes, agencia]);
 
   const agenciaMeta = AGENCIAS.find((a) => a.id === agencia)!;
