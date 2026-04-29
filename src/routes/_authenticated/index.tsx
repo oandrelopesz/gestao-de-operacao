@@ -57,6 +57,7 @@ import { KanbanCard } from "@/components/KanbanCard";
 import { cn } from "@/lib/utils";
 
 const COLUMNS = [
+  { id: "recorrentes", title: "Recorrentes" },
   { id: "fazer_hoje", title: "Fazer hoje" },
   { id: "fazer_amanha", title: "Fazer amanhã" },
   { id: "fazer_depois_amanha", title: "Fazer depois de amanhã" },
@@ -173,9 +174,6 @@ function DemandasPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      // We need at least one client for the quick add because of the form schema, 
-      // but in a real app we might make client_id optional or have a default.
-      // For now, let's use the first client if available.
       if (clientes.length === 0) {
         toast.error("Cadastre um cliente primeiro para usar o adicionar rápido.");
         return;
@@ -184,13 +182,17 @@ function DemandasPage() {
       const columnDemandas = demandas.filter(d => d.status === status);
       const maxOrder = columnDemandas.length > 0 ? Math.max(...columnDemandas.map(d => d.ordem || 0)) : -1;
 
+      const isRecorrente = status === "recorrentes";
+
       const { error } = await supabase.from("demandas").insert([{
         titulo,
         status: status as any,
         user_id: user.id,
         cliente_id: clientes[0].id,
         prioridade: "media" as const,
-        ordem: maxOrder + 1
+        ordem: maxOrder + 1,
+        recorrente: isRecorrente,
+        frequencia: isRecorrente ? "semanal" : null
       }]);
 
       if (error) throw error;
