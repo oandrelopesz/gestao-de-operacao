@@ -109,6 +109,7 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
                 isDone && "line-through text-zinc-500"
               )}>
                 {demanda.titulo}
+                {(isRecorrenteMae || demanda.recorrente_pai_id) && <Repeat size={12} className="inline-block ml-1 text-primary animate-pulse-slow" />}
               </h4>
             </div>
 
