@@ -57,7 +57,7 @@ interface ClienteView {
 
 function ClientesPage() {
   const { agencia, view } = Route.useSearch();
-  const navigate = useNavigate({ from: "/clientes" });
+  const navigate = useNavigate();
 
   const [clientes, setClientes] = useState<ClienteView[]>([]);
   const [loading, setLoading] = useState(true);
