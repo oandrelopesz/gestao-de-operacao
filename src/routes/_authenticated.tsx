@@ -37,6 +37,46 @@ function AuthenticatedLayout() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [topAlert, setTopAlert] = useState<{ status: string, id: string, cliente_id: string } | null>(null);
+
+  useEffect(() => {
+    const fetchTopAlert = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("saldo_ads_view" as any)
+          .select("id, status_alerta, cliente_id")
+          .in("status_alerta", ["alerta", "critico", "zerado"])
+          .limit(1);
+
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Pegar o mais grave (zerado > critico > alerta)
+          const sorted = [...data].sort((a: any, b: any) => {
+            const order: any = { zerado: 0, critico: 1, alerta: 2 };
+            return order[a.status_alerta] - order[b.status_alerta];
+          });
+          setTopAlert(sorted[0]);
+        } else {
+          setTopAlert(null);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar top alerta:", err);
+      }
+    };
+
+    fetchTopAlert();
+    
+    const channel = supabase
+      .channel('top-alerta-global')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'saldo_ads' }, () => fetchTopAlert())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recargas' }, () => fetchTopAlert())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     if (session?.user?.email) {
