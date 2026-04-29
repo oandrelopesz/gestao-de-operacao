@@ -1,16 +1,55 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Plus, Users as UsersIcon, Search, MoreHorizontal, TrendingUp, TrendingDown } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog";
+import { ClientForm, ClientFormValues } from "@/components/ClientForm";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/clientes")({
   component: ClientesPage,
 });
 
 function ClientesPage() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleCreateClient = async (values: ClientFormValues) => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { error } = await supabase.from("clientes").insert([{
+        ...values,
+        user_id: user.id,
+        valor_mensal: Number(values.valor_mensal.replace(/[^\d]/g, "")) / 100
+      }]);
+
+      if (error) throw error;
+
+      toast.success("Cliente criado com sucesso!");
+      setIsModalOpen(false);
+      // Here you would typically invalidate the query to refresh the list
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao criar cliente");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -18,10 +57,24 @@ function ClientesPage() {
           <h1 className="text-2xl font-bold tracking-tight">Clientes Ativos</h1>
           <p className="text-muted-foreground">Base central de clientes e CRM básico.</p>
         </div>
-        <Button className="gap-2">
-          <Plus size={16} />
-          Novo cliente
-        </Button>
+        
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus size={16} />
+              Novo cliente
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Novo Cliente</DialogTitle>
+              <DialogDescription>
+                Adicione um novo cliente à sua base para gerenciar demandas e pagamentos.
+              </DialogDescription>
+            </DialogHeader>
+            <ClientForm onSubmit={handleCreateClient} loading={loading} />
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -99,3 +152,4 @@ function ClientesPage() {
     </div>
   );
 }
+
