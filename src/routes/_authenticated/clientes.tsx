@@ -764,7 +764,7 @@ function ClientesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-[140px]">
-                          <DropdownMenuItem onClick={() => { setEditing(c); setModalOpen(true); }}>
+                          <DropdownMenuItem onClick={() => openEdit(c)}>
                             <Pencil size={14} className="mr-2" /> Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleArchive(c.id)}>
