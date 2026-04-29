@@ -323,8 +323,23 @@ function ProspeccaoPage() {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
 
+      // Sanitize values
+      const sanitizedValues: any = { ...values };
+      if (sanitizedValues.cliente_id === "" || sanitizedValues.cliente_id === "none") {
+        sanitizedValues.cliente_id = null;
+      }
+      if (sanitizedValues.prazo === "") {
+        sanitizedValues.prazo = null;
+      }
+      if (sanitizedValues.frequencia_dia_mes === "") {
+        sanitizedValues.frequencia_dia_mes = null;
+      }
+      if (sanitizedValues.frequencia_intervalo_dias === "" || isNaN(sanitizedValues.frequencia_intervalo_dias)) {
+        sanitizedValues.frequencia_intervalo_dias = null;
+      }
+
       const { error } = await supabase.from("demandas").insert([{
-        ...values,
+        ...sanitizedValues,
         user_id: userId,
         prospeccao_id: leadForDemanda?.id
       }]);
