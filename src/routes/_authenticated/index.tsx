@@ -132,6 +132,17 @@ function DemandasPage() {
     else setClientes((data as any) || []);
   };
 
+  const catchUpRecorrentes = async () => {
+    try {
+      await supabase.functions.invoke('materializar-recorrentes', {
+        queryString: { modo: 'catch_up' }
+      });
+      fetchDemandas();
+    } catch (err) {
+      console.error("Erro no catch-up de recorrentes:", err);
+    }
+  };
+
   const fetchDemandas = async () => {
     const { data, error } = await supabase
       .from("demandas")
