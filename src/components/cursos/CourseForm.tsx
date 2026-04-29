@@ -189,9 +189,9 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
         finalLink = `https://${finalLink}`;
       }
 
-      const payload = {
+      const payload: any = {
         nome: values.nome,
-        tema: values.tema,
+        tema: values.tema || "outros",
         categoria_id: values.categoria_id,
         link_area_membros: finalLink,
         login: values.login,
