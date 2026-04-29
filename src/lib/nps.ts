@@ -134,3 +134,32 @@ export function getMetricLabel(nota: number): string {
   if (nota >= 4) return "Alerta";
   return "Risco";
 }
+
+export function isFridayToday(): boolean {
+  // Garantir que a verificação use o fuso horário de Brasília (UTC-3)
+  const options: Intl.DateTimeFormatOptions = { timeZone: "America/Sao_Paulo", weekday: "numeric" };
+  const day = parseInt(new Intl.DateTimeFormat("en-US", options).format(new Date()));
+  // No formatter 'numeric' com 'weekday', dom=0, seg=1... sexta=5
+  // Na verdade, Intl.DateTimeFormat com weekday: 'numeric' retorna o dia da semana conforme o locale.
+  // Vamos usar getDay() em uma data ajustada ou usar a string.
+  
+  const brt = new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
+  return new Date(brt).getDay() === 5;
+}
+
+export function getDiasAteProximaSexta(): number {
+  const brt = new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
+  const today = new Date(brt);
+  const dayOfWeek = today.getDay();
+  if (dayOfWeek === 5) return 0;
+  if (dayOfWeek === 6) return 6; // sábado → 6 dias
+  return 5 - dayOfWeek; // dom=5, seg=4, ter=3, qua=2, qui=1
+}
+
+export function getProximaSextaFormatada(): string {
+  const dias = getDiasAteProximaSexta();
+  const brt = new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
+  const proxima = new Date(brt);
+  proxima.setDate(proxima.getDate() + dias);
+  return proxima.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
