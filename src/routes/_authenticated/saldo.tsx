@@ -83,6 +83,7 @@ const STATUS_ALERTA = [
   { id: "alerta", label: "Alerta", color: "bg-amber-500" },
   { id: "critico", label: "Crítico", color: "bg-red-500" },
   { id: "zerado", label: "Zerado", color: "bg-gray-500" },
+  { id: "cartao", label: "Cartão (sem monitoramento)", color: "bg-blue-400" },
 ];
 
 function SaldoPage() {
