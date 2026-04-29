@@ -44,16 +44,22 @@ function NPSPage() {
   const { data: avaliacoes, isLoading } = useQuery({
     queryKey: ["nps-avaliacoes"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("nps_avaliacoes_view")
-        .select("*, clientes(nome, agencia, status_operacional, em_onboarding)")
-        .order("data_avaliacao", { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from("nps_avaliacoes_view")
+          .select("*, clientes(nome, agencia, status_operacional, em_onboarding)")
+          .order("data_avaliacao", { ascending: false });
 
-      if (error) {
-        toast.error("Erro ao carregar feedbacks NPS");
-        throw error;
+        if (error) {
+          console.error("Erro detalhado NPS query:", error);
+          toast.error(`Erro ao carregar feedbacks NPS: ${error.message}`);
+          throw error;
+        }
+        return data || [];
+      } catch (err: any) {
+        console.error("Erro inesperado na query NPS:", err);
+        throw err;
       }
-      return data || [];
     },
   });
 
