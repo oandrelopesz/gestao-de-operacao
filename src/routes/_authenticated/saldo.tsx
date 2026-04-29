@@ -299,7 +299,7 @@ function SaldoPage() {
       }
       
       if (item.metodo_pagamento !== "cartao") {
-        group.saldo_total_consolidado += (item.saldo_atual || 0);
+        group.saldo_total_consolidado += (item.saldo_atual_estimado || 0);
         group.verba_diaria_total += (item.verba_diaria_calc || 0);
         
         // Update worst status alert
