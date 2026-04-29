@@ -677,17 +677,33 @@ function SaldoPage() {
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status Atual</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Saldo</p>
-                  <p className="text-lg font-bold">{formatBRL(selectedForHistory?.saldo_atual)}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Método' : 'Saldo'}
+                  </p>
+                  <p className="text-lg font-bold">
+                    {selectedForHistory?.metodo_pagamento === 'cartao' 
+                      ? 'Cartão' 
+                      : formatBRL(selectedForHistory?.saldo_atual)}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Previsão</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Monitoramento' : 'Previsão'}
+                  </p>
                   <p className="text-lg font-bold">
-                    {selectedForHistory?.dias_restantes ? Math.floor(selectedForHistory.dias_restantes) : 0} dias
+                    {selectedForHistory?.metodo_pagamento === 'cartao' 
+                      ? 'Desativado' 
+                      : `${selectedForHistory?.dias_restantes ? Math.floor(selectedForHistory.dias_restantes) : 0} dias`}
                   </p>
                 </div>
               </div>
             </div>
+
+            {selectedForHistory?.metodo_pagamento === 'cartao' && historyData.length > 0 && (
+              <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-700">
+                Cliente migrou para cartão. Histórico de recargas anteriores arquivado apenas para referência.
+              </div>
+            )}
 
             <div className="space-y-4">
               <h4 className="text-sm font-semibold">Todas as Recargas</h4>
