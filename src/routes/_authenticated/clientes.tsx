@@ -405,7 +405,13 @@ function ClienteCard({
     : cliente.observacoes;
 
   return (
-    <Card className={cn("border-l-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default flex flex-col group relative", borderClass)}>
+    <Card 
+      className={cn("border-l-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default flex flex-col group relative outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2", borderClass)}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Delete" || e.key === "Backspace") onDelete();
+      }}
+    >
       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
