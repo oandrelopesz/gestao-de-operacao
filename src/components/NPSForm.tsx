@@ -54,6 +54,12 @@ export function NPSForm({ onSuccess, onClose, initialData }: NPSFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isFridayToday()) {
+      toast.error("Hoje não é sexta-feira. A gravação de NPS está bloqueada.");
+      return;
+    }
+
     if (!clienteId) {
       toast.error("Selecione um cliente");
       return;
