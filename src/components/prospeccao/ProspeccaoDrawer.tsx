@@ -135,6 +135,11 @@ export function ProspeccaoDrawer({
     }
   }, [isOpen, lead?.id]);
 
+  const handleUpdate = (field: keyof Lead, value: any) => {
+    if (!lead?.id) return;
+    onUpdate(lead.id, { [field]: value });
+  };
+
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const handleUpdateObs = (val: string) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
