@@ -440,7 +440,7 @@ function DemandasPage() {
                                         {d.titulo}
                                     </h4>
                                     <p className="text-xs text-muted-foreground">
-                                        {d.clientes?.nome} • {COLUMNS.find(c => c.id === d.status)?.title}
+                                        {d.clientes?.nome} — {AGENCIAS.find(a => a.id === d.clientes?.agencia)?.label} • {COLUMNS.find(c => c.id === d.status)?.title}
                                     </p>
                                 </div>
                             </div>
