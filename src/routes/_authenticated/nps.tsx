@@ -41,13 +41,13 @@ function NPSPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingName, setDeletingName] = useState<string>("");
 
-  const { data: avaliacoes, isLoading } = useQuery({
+  const { data: avaliacoes, isLoading, error: queryError } = useQuery({
     queryKey: ["nps-avaliacoes"],
     queryFn: async () => {
       try {
         const { data, error } = await supabase
           .from("nps_avaliacoes_view")
-          .select("*, clientes(nome, agencia, status_operacional, em_onboarding)")
+          .select("*")
           .order("data_avaliacao", { ascending: false });
 
         if (error) {
@@ -55,7 +55,20 @@ function NPSPage() {
           toast.error(`Erro ao carregar feedbacks NPS: ${error.message}`);
           throw error;
         }
-        return data || [];
+
+        // Mapear para estrutura compatível com o resto do componente
+        const mapped = (data || []).map((item: any) => ({
+          ...item,
+          clientes: {
+            nome: item.cliente_nome,
+            agencia: item.cliente_agencia,
+            status_operacional: item.cliente_status_operacional,
+            em_onboarding: item.cliente_em_onboarding,
+            nicho: item.cliente_nicho,
+          }
+        }));
+
+        return mapped;
       } catch (err: any) {
         console.error("Erro inesperado na query NPS:", err);
         throw err;
@@ -212,7 +225,7 @@ function NPSPage() {
           <div className="flex justify-center py-20">Carregando...</div>
         ) : avaliacoes === undefined || (avaliacoes.length === 0 && !isLoading) ? (
           <div className="space-y-4">
-            {!avaliacoes ? (
+            {queryError ? (
               <Card className="border-destructive/50 bg-destructive/5">
                 <CardHeader className="flex flex-row items-center gap-2">
                   <AlertCircle className="text-destructive" size={20} />
@@ -222,9 +235,19 @@ function NPSPage() {
                   <p className="text-sm text-destructive/80">
                     Falha na comunicação com a view de avaliações NPS.
                   </p>
-                  <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["nps-avaliacoes"] })} className="border-destructive/30 text-destructive hover:bg-destructive/10">
-                    Tentar novamente
-                  </Button>
+                  {queryError instanceof Error && (
+                    <pre className="p-2 bg-black/5 rounded text-[10px] font-mono text-destructive/70 overflow-auto max-h-32">
+                      {queryError.message}
+                    </pre>
+                  )}
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["nps-avaliacoes"] })} className="border-destructive/30 text-destructive hover:bg-destructive/10">
+                      Tentar novamente
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="border-muted-foreground/30 text-muted-foreground">
+                      Recarregar página
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ) : (

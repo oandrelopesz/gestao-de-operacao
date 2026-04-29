@@ -383,7 +383,15 @@ export type Database = {
       nps_avaliacoes_view: {
         Row: {
           categoria: Database["public"]["Enums"]["cliente_nps_status"] | null
+          cliente_agencia: Database["public"]["Enums"]["agencia_enum"] | null
+          cliente_arquivado: boolean | null
+          cliente_em_onboarding: boolean | null
           cliente_id: string | null
+          cliente_nicho: string | null
+          cliente_nome: string | null
+          cliente_status_operacional:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
           conversao_vendas: number | null
           created_at: string | null
           data_avaliacao: string | null
@@ -395,36 +403,6 @@ export type Database = {
           resultados_campanha: number | null
           score_total: number | null
           user_id: string | null
-        }
-        Insert: {
-          categoria?: never
-          cliente_id?: string | null
-          conversao_vendas?: number | null
-          created_at?: string | null
-          data_avaliacao?: string | null
-          engajamento?: number | null
-          id?: string | null
-          observacoes?: string | null
-          potencial_crescimento?: number | null
-          relacionamento?: number | null
-          resultados_campanha?: number | null
-          score_total?: number | null
-          user_id?: string | null
-        }
-        Update: {
-          categoria?: never
-          cliente_id?: string | null
-          conversao_vendas?: number | null
-          created_at?: string | null
-          data_avaliacao?: string | null
-          engajamento?: number | null
-          id?: string | null
-          observacoes?: string | null
-          potencial_crescimento?: number | null
-          relacionamento?: number | null
-          resultados_campanha?: number | null
-          score_total?: number | null
-          user_id?: string | null
         }
         Relationships: [
           {
