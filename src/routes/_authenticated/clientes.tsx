@@ -99,7 +99,27 @@ function ClientesPage() {
   const [showPausados, setShowPausados] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ClienteView | null>(null);
+  const [editingSaldo, setEditingSaldo] = useState<{ plataformas: string[]; metodo_pagamento: "cartao" | "pix" | "boleto" } | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const openEdit = async (cliente: ClienteView) => {
+    setEditing(cliente);
+    // Busca saldo_ads existente para preencher plataformas/forma de pagamento
+    const { data } = await supabase
+      .from("saldo_ads")
+      .select("plataformas, metodo_pagamento")
+      .eq("cliente_id", cliente.id)
+      .maybeSingle();
+    if (data) {
+      setEditingSaldo({
+        plataformas: data.plataformas || [],
+        metodo_pagamento: (data.metodo_pagamento || "pix") as any,
+      });
+    } else {
+      setEditingSaldo(null);
+    }
+    setModalOpen(true);
+  };
 
   useEffect(() => { fetchClientes(); }, []);
 
