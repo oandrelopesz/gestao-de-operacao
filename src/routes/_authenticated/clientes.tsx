@@ -104,15 +104,27 @@ function ClientesPage() {
 
   const fetchClientes = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("clientes_view" as any)
-      .select("*")
-      .eq("arquivado", false)
-      .order("nome");
-    if (error) { toast.error("Erro ao carregar clientes"); console.error(error); }
-    else {
+    try {
+      const { data, error } = await supabase
+        .from("clientes_view" as any)
+        .select("*")
+        .eq("arquivado", false)
+        .order("nome");
+      
+      if (error) {
+        console.error("Erro detalhado fetchClientes:", error);
+        toast.error(`Erro ao carregar clientes: ${error.message}`);
+        return;
+      }
+
       // Fetch platform summary for each client
-      const { data: saldos } = await supabase.from("saldo_ads_view").select("cliente_id, plataformas, verba_diaria_calc");
+      const { data: saldos, error: saldosError } = await supabase
+        .from("saldo_ads_view")
+        .select("cliente_id, plataformas, verba_diaria_calc");
+      
+      if (saldosError) {
+        console.warn("Erro ao buscar saldos para enriquecimento:", saldosError);
+      }
       
       const enrichedData = (data as any[] || []).map(cli => {
         const cliSaldos = (saldos || []).filter(s => s.cliente_id === cli.id);
@@ -127,8 +139,12 @@ function ClientesPage() {
       });
       
       setClientes(enrichedData);
+    } catch (err: any) {
+      console.error("Erro inesperado em fetchClientes:", err);
+      toast.error("Ocorreu um erro inesperado ao carregar a lista de clientes.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const counts = useMemo(() => {
