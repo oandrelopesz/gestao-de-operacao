@@ -25,7 +25,7 @@ import { useState } from "react";
 const recargaSchema = z.object({
   data_recarga: z.string().min(1, "Data é obrigatória"),
   valor: z.number().min(0.01, "Valor deve ser maior que zero"),
-  metodo_pagamento: z.enum(["dinheiro", "cartao_credito", "cartao_debito", "pix", "boleto", "outros"]).optional().nullable(),
+  metodo_pagamento: z.enum(["cartao", "pix", "boleto"]).optional().nullable(),
   observacoes: z.string().optional(),
 });
 
