@@ -365,7 +365,7 @@ function CursosPage() {
               <p className="text-muted-foreground max-w-xs">
                 {currentTema === "todos" 
                   ? "Comece adicionando seu primeiro curso ou área de membros."
-                  : `Nenhum curso do tema "${TEMAS.find(t => t.id === currentTema)?.label}" cadastrado.`}
+                  : `Nenhum curso na categoria "${allTabs.find(t => t.id === currentTema)?.label}" cadastrado.`}
               </p>
             </div>
             <Button onClick={handleAddCourse}>Criar primeiro curso</Button>
