@@ -125,6 +125,39 @@ export type Database = {
           },
         ]
       }
+      notificacoes_config: {
+        Row: {
+          alerta_dias_antes: number
+          ativo: boolean
+          created_at: string
+          id: string
+          telegram_bot_token: string | null
+          telegram_chat_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alerta_dias_antes?: number
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          telegram_bot_token?: string | null
+          telegram_chat_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alerta_dias_antes?: number
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          telegram_bot_token?: string | null
+          telegram_chat_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       nps_avaliacoes: {
         Row: {
           cliente_id: string
@@ -185,56 +218,104 @@ export type Database = {
           },
         ]
       }
-      saldo: {
+      recargas: {
         Row: {
-          cliente_id: string
           created_at: string
-          data_recebimento: string | null
-          data_vencimento: string | null
+          data_recarga: string
           id: string
-          mes_referencia: string
-          status_pagamento: Database["public"]["Enums"]["pagamento_status"]
-          updated_at: string
-          user_id: string
-          valor_previsto: number
-          valor_recebido: number
+          metodo_pagamento:
+            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | null
+          observacoes: string | null
+          saldo_ads_id: string
+          valor: number
         }
         Insert: {
-          cliente_id: string
           created_at?: string
-          data_recebimento?: string | null
-          data_vencimento?: string | null
+          data_recarga?: string
           id?: string
-          mes_referencia: string
-          status_pagamento?: Database["public"]["Enums"]["pagamento_status"]
-          updated_at?: string
-          user_id: string
-          valor_previsto?: number
-          valor_recebido?: number
+          metodo_pagamento?:
+            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | null
+          observacoes?: string | null
+          saldo_ads_id: string
+          valor?: number
         }
         Update: {
-          cliente_id?: string
           created_at?: string
-          data_recebimento?: string | null
-          data_vencimento?: string | null
+          data_recarga?: string
           id?: string
-          mes_referencia?: string
-          status_pagamento?: Database["public"]["Enums"]["pagamento_status"]
-          updated_at?: string
-          user_id?: string
-          valor_previsto?: number
-          valor_recebido?: number
+          metodo_pagamento?:
+            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | null
+          observacoes?: string | null
+          saldo_ads_id?: string
+          valor?: number
         }
         Relationships: [
           {
-            foreignKeyName: "saldo_cliente_id_fkey"
+            foreignKeyName: "recargas_saldo_ads_id_fkey"
+            columns: ["saldo_ads_id"]
+            isOneToOne: false
+            referencedRelation: "saldo_ads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recargas_saldo_ads_id_fkey"
+            columns: ["saldo_ads_id"]
+            isOneToOne: false
+            referencedRelation: "saldo_ads_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saldo_ads: {
+        Row: {
+          ativo: boolean
+          cliente_id: string
+          created_at: string
+          id: string
+          metodo_pagamento: Database["public"]["Enums"]["metodo_pagamento_enum"]
+          observacoes: string | null
+          plataforma: Database["public"]["Enums"]["plataforma_enum"]
+          updated_at: string
+          user_id: string
+          verba_diaria: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          cliente_id: string
+          created_at?: string
+          id?: string
+          metodo_pagamento?: Database["public"]["Enums"]["metodo_pagamento_enum"]
+          observacoes?: string | null
+          plataforma: Database["public"]["Enums"]["plataforma_enum"]
+          updated_at?: string
+          user_id: string
+          verba_diaria?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          metodo_pagamento?: Database["public"]["Enums"]["metodo_pagamento_enum"]
+          observacoes?: string | null
+          plataforma?: Database["public"]["Enums"]["plataforma_enum"]
+          updated_at?: string
+          user_id?: string
+          verba_diaria?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saldo_ads_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "saldo_cliente_id_fkey"
+            foreignKeyName: "saldo_ads_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes_view"
@@ -254,18 +335,47 @@ export type Database = {
           id: string | null
           nicho: string | null
           nome: string | null
-          nps_status: Database["public"]["Enums"]["cliente_nps_status"] | null
+          nps_status: Database["public"]["Enums"]["nps_score_categoria"] | null
           observacoes: string | null
-          status_pagamento_mes:
-            | Database["public"]["Enums"]["pagamento_status"]
-            | null
           ultima_nps_data: string | null
           ultima_nps_score: number | null
           updated_at: string | null
           user_id: string | null
-          valor_previsto_mes: number | null
-          valor_recebido_mes: number | null
           verba_ads: number | null
+        }
+        Insert: {
+          agencia?: Database["public"]["Enums"]["agencia_enum"] | null
+          arquivado?: boolean | null
+          created_at?: string | null
+          data_inicio?: string | null
+          demandas_ativas?: never
+          id?: string | null
+          nicho?: string | null
+          nome?: string | null
+          nps_status?: never
+          observacoes?: string | null
+          ultima_nps_data?: never
+          ultima_nps_score?: never
+          updated_at?: string | null
+          user_id?: string | null
+          verba_ads?: number | null
+        }
+        Update: {
+          agencia?: Database["public"]["Enums"]["agencia_enum"] | null
+          arquivado?: boolean | null
+          created_at?: string | null
+          data_inicio?: string | null
+          demandas_ativas?: never
+          id?: string | null
+          nicho?: string | null
+          nome?: string | null
+          nps_status?: never
+          observacoes?: string | null
+          ultima_nps_data?: never
+          ultima_nps_score?: never
+          updated_at?: string | null
+          user_id?: string | null
+          verba_ads?: number | null
         }
         Relationships: []
       }
@@ -302,6 +412,49 @@ export type Database = {
           },
         ]
       }
+      saldo_ads_view: {
+        Row: {
+          ativo: boolean | null
+          cliente_agencia: Database["public"]["Enums"]["agencia_enum"] | null
+          cliente_id: string | null
+          cliente_nome: string | null
+          consumo_acumulado_estimado: number | null
+          created_at: string | null
+          data_prevista_fim: string | null
+          data_primeira_recarga: string | null
+          dias_decorridos: number | null
+          dias_restantes: number | null
+          id: string | null
+          metodo_pagamento:
+            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | null
+          observacoes: string | null
+          plataforma: Database["public"]["Enums"]["plataforma_enum"] | null
+          saldo_atual: number | null
+          status_alerta: string | null
+          total_recarregado: number | null
+          updated_at: string | null
+          user_id: string | null
+          verba_diaria: number | null
+          verba_diaria_calc: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saldo_ads_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_ads_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       get_nps_categoria: {
@@ -331,8 +484,16 @@ export type Database = {
         | "fazer_depois_amanha"
         | "standby"
         | "feito"
+      metodo_pagamento_enum:
+        | "dinheiro"
+        | "cartao_credito"
+        | "cartao_debito"
+        | "pix"
+        | "boleto"
+        | "outros"
       nps_score_categoria: "ancora" | "saudavel" | "em_risco" | "critico"
       pagamento_status: "em_dia" | "pendente" | "atrasado"
+      plataforma_enum: "meta" | "google" | "tiktok" | "outras"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -484,8 +645,17 @@ export const Constants = {
         "standby",
         "feito",
       ],
+      metodo_pagamento_enum: [
+        "dinheiro",
+        "cartao_credito",
+        "cartao_debito",
+        "pix",
+        "boleto",
+        "outros",
+      ],
       nps_score_categoria: ["ancora", "saudavel", "em_risco", "critico"],
       pagamento_status: ["em_dia", "pendente", "atrasado"],
+      plataforma_enum: ["meta", "google", "tiktok", "outras"],
     },
   },
 } as const
