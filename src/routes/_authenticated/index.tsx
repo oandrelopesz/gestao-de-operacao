@@ -618,9 +618,15 @@ function DemandasPage() {
                       setIsModalOpen(true);
                     }}
                     onEdit={handleOpenDrawer}
-                    onDelete={(id, name) => {
-                      setDeletingId(id);
-                      setDeletingName(name);
+                    onDelete={async (id) => {
+                      try {
+                        const { error } = await supabase.from("demandas").delete().eq("id", id);
+                        if (error) throw error;
+                        toast.success("Demanda deletada!");
+                        fetchDemandas();
+                      } catch (error: any) {
+                        toast.error(error.message || "Erro ao deletar");
+                      }
                     }}
                     onComplete={handleCompleteExecution}
                     onMoveToDone={async (id) => {
