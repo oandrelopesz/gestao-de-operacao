@@ -173,7 +173,7 @@ function DemandasPage() {
     }
   };
 
-  const handleUpdateDemanda = async (id: string, values: Partial<any>) => {
+  const handleUpdateDemanda = async (id: string, values: any) => {
     try {
       const { error } = await supabase
         .from("demandas")
@@ -562,6 +562,27 @@ function DemandasPage() {
           </div>
         )}
       </div>
+
+      <DemandaDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        demanda={selectedDemanda}
+        onUpdate={handleUpdateDemanda}
+        onDelete={async (id) => {
+          try {
+            const { error } = await supabase.from("demandas").delete().eq("id", id);
+            if (error) throw error;
+            toast.success("Demanda deletada!");
+            setIsDrawerOpen(false);
+            fetchDemandas();
+          } catch (err) {
+            toast.error("Erro ao deletar");
+          }
+        }}
+        onDuplicate={handleDuplicateDemanda}
+        clientes={clientes}
+        columns={COLUMNS}
+      />
 
       <Dialog open={isModalOpen} onOpenChange={(open) => {
           setIsModalOpen(open);
