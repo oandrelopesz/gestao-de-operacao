@@ -579,7 +579,7 @@ function ClientesPage() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/20">
           <UsersIcon size={36} className="text-muted-foreground mb-3 opacity-50" />
-          <h3 className="text-lg font-semibold">Nenhum cliente em {agenciaMeta.label}</h3>
+          <h3 className="text-lg font-semibold">Nenhum cliente em {agencia === "todos" ? "Todos os Clientes" : agenciaMeta.label}</h3>
           <p className="text-muted-foreground mb-4 text-sm">Cadastre o primeiro cliente desta agência ou ajuste os filtros.</p>
           <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
