@@ -66,8 +66,6 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [categorias, setCategorias] = useState<{ id: string; nome: string }[]>([]);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [openCombobox, setOpenCombobox] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
