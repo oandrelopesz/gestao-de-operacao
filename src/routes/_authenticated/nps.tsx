@@ -81,11 +81,19 @@ function NPSPage() {
 
   const filteredData = useMemo(() => {
     if (!avaliacoes) return [];
-    return avaliacoes.filter(item => {
+    const filtered = avaliacoes.filter(item => {
       const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
       const matchesCategory = filterCategory === "all" || item.categoria === filterCategory;
       const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesAgencia && matchesSearch && matchesCategory;
+    });
+    // Ordena por categoria: crítico → em risco → saudável → âncora; secundariamente por score crescente
+    const categoriaOrdem: Record<string, number> = { critico: 0, em_risco: 1, saudavel: 2, ancora: 3 };
+    return [...filtered].sort((a, b) => {
+      const ca = categoriaOrdem[a.categoria as string] ?? 99;
+      const cb = categoriaOrdem[b.categoria as string] ?? 99;
+      if (ca !== cb) return ca - cb;
+      return (a.score_total || 0) - (b.score_total || 0);
     });
   }, [avaliacoes, filterAgencia, filterCategory, searchQuery]);
 
