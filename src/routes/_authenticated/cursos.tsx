@@ -364,8 +364,8 @@ function CursosPage() {
               <h3 className="text-lg font-medium">Nenhum curso cadastrado ainda</h3>
               <p className="text-muted-foreground max-w-xs">
                 {currentTema === "todos" 
-                  ? "Comece adicionando seu primeiro curso ou área de membros."
-                  : `Nenhum curso na categoria "${allTabs.find(t => t.id === currentTema)?.label}" cadastrado.`}
+                  ? "Comece adicionando seu primeiro curso."
+                  : `Nenhum curso no tema "${allTabs.find(t => t.id === currentTema)?.label}" cadastrado.`}
               </p>
             </div>
             <Button onClick={handleAddCourse}>Criar primeiro curso</Button>
