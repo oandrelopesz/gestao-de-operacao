@@ -66,6 +66,15 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [categorias, setCategorias] = useState<{ id: string; nome: string }[]>([]);
+  const [fixedTemas] = useState([
+    { id: "ia", nome: "IA" },
+    { id: "trafego_pago", nome: "Tráfego Pago" },
+    { id: "vendas", nome: "Vendas" },
+    { id: "copywriting", nome: "Copywriting" },
+    { id: "trackeamento", nome: "Trackeamento" },
+    { id: "multiplos_temas", nome: "Múltiplos Temas" },
+    { id: "outros", nome: "Outros" }
+  ]);
   const [openCombobox, setOpenCombobox] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -224,7 +233,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="categoria_id"
+                name="tema"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Tema</FormLabel>
@@ -241,7 +250,9 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                             )}
                           >
                             {field.value
-                              ? categorias.find((cat) => cat.id === field.value)?.nome
+                              ? [...fixedTemas, ...categorias.map(c => ({ id: c.id, nome: c.nome }))].find(
+                                  (t) => t.id === field.value || t.nome === field.value
+                                )?.nome || field.value
                               : "Selecione o tema..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -255,26 +266,50 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                             onValueChange={setSearchQuery}
                           />
                           <CommandList>
-                            <CommandGroup>
-                              {categorias.map((cat) => (
+                            <CommandGroup heading="Temas Sugeridos">
+                              {fixedTemas.map((tema) => (
                                 <CommandItem
-                                  key={cat.id}
-                                  value={cat.nome}
+                                  key={tema.id}
+                                  value={tema.nome}
                                   onSelect={() => {
-                                    form.setValue("categoria_id", cat.id);
+                                    form.setValue("tema", tema.id);
+                                    form.setValue("categoria_id", null);
                                     setOpenCombobox(false);
                                   }}
                                 >
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      field.value === cat.id ? "opacity-100" : "opacity-0"
+                                      field.value === tema.id ? "opacity-100" : "opacity-0"
                                     )}
                                   />
-                                  {cat.nome}
+                                  {tema.nome}
                                 </CommandItem>
                               ))}
                             </CommandGroup>
+                            {categorias.length > 0 && (
+                              <CommandGroup heading="Meus Temas">
+                                {categorias.map((cat) => (
+                                  <CommandItem
+                                    key={cat.id}
+                                    value={cat.nome}
+                                    onSelect={() => {
+                                      form.setValue("categoria_id", cat.id);
+                                      form.setValue("tema", "outros");
+                                      setOpenCombobox(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value === cat.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {cat.nome}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            )}
                             <CommandEmpty>
                               <div className="p-2 space-y-2">
                                 <p className="text-xs text-muted-foreground">Nenhum tema encontrado.</p>
