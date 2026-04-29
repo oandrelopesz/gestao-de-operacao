@@ -105,7 +105,7 @@ export function KanbanCard({ demanda, onEdit, onDelete }: KanbanCardProps) {
           <div className="flex flex-wrap gap-1.5 items-center">
             {demanda.clientes?.nome && (
               <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal border-muted-foreground/20">
-                {demanda.clientes.nome}
+                {demanda.clientes.nome} {demanda.clientes.agencia && `— ${demanda.clientes.agencia.charAt(0).toUpperCase() + demanda.clientes.agencia.slice(1)}`}
               </Badge>
             )}
             <Badge 
