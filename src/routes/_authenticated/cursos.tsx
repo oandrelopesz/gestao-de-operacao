@@ -432,7 +432,9 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
     }
   };
 
-  const theme = TEMAS.find(t => t.id === curso.tema);
+  const theme = curso.curso_categorias?.nome 
+    ? { label: curso.curso_categorias.nome, color: "bg-purple-500" }
+    : TEMAS_LEGADO.find(t => t.id === curso.tema) || { label: "Outros", color: "bg-slate-500" };
 
   return (
     <Card className={cn(
