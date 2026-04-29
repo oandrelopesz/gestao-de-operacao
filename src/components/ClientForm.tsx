@@ -31,6 +31,7 @@ const clientSchema = z.object({
   verba_ads: z.number().min(0),
   observacoes: z.string().optional(),
   em_onboarding: z.boolean(),
+  status_operacional: z.enum(["ativo", "pausado", "churn"]),
 });
 
 export type ClientFormValues = z.infer<typeof clientSchema>;
@@ -52,6 +53,7 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       verba_ads: initialValues?.verba_ads ?? 0,
       observacoes: initialValues?.observacoes || "",
       em_onboarding: initialValues?.em_onboarding ?? false,
+      status_operacional: initialValues?.status_operacional || "ativo",
     },
   });
 
@@ -162,6 +164,29 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
               <FormControl>
                 <Textarea rows={3} placeholder="Notas, contexto, links..." {...field} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="status_operacional"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Status Operacional</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="ativo">Ativo</SelectItem>
+                  <SelectItem value="pausado">Pausado</SelectItem>
+                  <SelectItem value="churn">Churn</SelectItem>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}

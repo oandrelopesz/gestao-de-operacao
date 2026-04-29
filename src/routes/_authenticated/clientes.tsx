@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -65,6 +66,7 @@ interface ClienteView {
   observacoes: string | null;
   arquivado: boolean;
   em_onboarding: boolean;
+  status_operacional: "ativo" | "pausado" | "churn";
   ultima_nps_score: number | null;
   ultima_nps_data: string | null;
   nps_status: "ancora" | "saudavel" | "em_risco" | "critico" | "sem_avaliacao";
@@ -80,6 +82,8 @@ function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [operacionalFilter, setOperacionalFilter] = useState<string>("all_active");
+  const [showPausados, setShowPausados] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ClienteView | null>(null);
   const [saving, setSaving] = useState(false);
@@ -108,20 +112,29 @@ function ClientesPage() {
     return clientes
       .filter((c) => c.agencia === agencia)
       .filter((c) => statusFilter === "all" || c.nps_status === statusFilter)
+      .filter((c) => showPausados || c.status_operacional === "ativo")
       .filter((c) => !search || c.nome.toLowerCase().includes(search.toLowerCase()));
-  }, [clientes, agencia, statusFilter, search]);
+  }, [clientes, agencia, statusFilter, search, showPausados]);
 
   const metrics = useMemo(() => {
     const list = clientes.filter((c) => c.agencia === agencia);
+    const ativosList = list.filter((c) => c.status_operacional === "ativo");
+    
     const total = list.length;
-    const verbaTotal = list.reduce((s, c) => s + Number(c.verba_ads || 0), 0);
-    const clientesComVerba = list.filter((c) => Number(c.verba_ads || 0) > 0).length;
+    const ativos = ativosList.length;
+    const pausados = list.filter((c) => c.status_operacional === "pausado").length;
+    const churn = list.filter((c) => c.status_operacional === "churn").length;
+    
+    const verbaTotal = ativosList.reduce((s, c) => s + Number(c.verba_ads || 0), 0);
+    const clientesComVerba = ativosList.filter((c) => Number(c.verba_ads || 0) > 0).length;
     const verbaMedia = clientesComVerba > 0 ? verbaTotal / clientesComVerba : 0;
-    const ancora = list.filter((c) => c.nps_status === "ancora").length;
-    const saudavel = list.filter((c) => c.nps_status === "saudavel").length;
-    const em_risco = list.filter((c) => c.nps_status === "em_risco").length;
-    const critico = list.filter((c) => c.nps_status === "critico").length;
-    return { total, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
+    
+    const ancora = ativosList.filter((c) => c.nps_status === "ancora").length;
+    const saudavel = ativosList.filter((c) => c.nps_status === "saudavel").length;
+    const em_risco = ativosList.filter((c) => c.nps_status === "em_risco").length;
+    const critico = ativosList.filter((c) => c.nps_status === "critico").length;
+    
+    return { total, ativos, pausados, churn, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
   }, [clientes, agencia]);
 
   const agenciaMeta = AGENCIAS.find((a) => a.id === agencia)!;
@@ -207,9 +220,24 @@ function ClientesPage() {
 
       {/* Métricas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard icon={<UsersIcon size={16} />} label="Clientes ativos" value={String(metrics.total)} hint={`Agência ${agenciaMeta.label}`} />
-        <MetricCard icon={<DollarSign size={16} />} label="Verba total / mês" value={formatBRL(metrics.verbaTotal)} hint="Soma das verbas" />
-        <MetricCard icon={<TrendingUp size={16} />} label="Verba média / cliente" value={formatBRL(metrics.verbaMedia)} hint="Por cliente ativo" />
+        <MetricCard 
+          icon={<UsersIcon size={16} />} 
+          label="Clientes" 
+          value={String(metrics.total)} 
+          hint={`${metrics.ativos} ativos / ${metrics.pausados} pausados / ${metrics.churn} churn`} 
+        />
+        <MetricCard 
+          icon={<DollarSign size={16} />} 
+          label="Verba total / mês" 
+          value={formatBRL(metrics.verbaTotal)} 
+          hint="Considera apenas clientes ativos" 
+        />
+        <MetricCard 
+          icon={<TrendingUp size={16} />} 
+          label="Verba média / cliente" 
+          value={formatBRL(metrics.verbaMedia)} 
+          hint="Considera apenas clientes ativos" 
+        />
         <Card>
           <CardHeader className="flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Distribuição NPS</CardTitle>
@@ -247,6 +275,10 @@ function ClientesPage() {
             <SelectItem value="sem_avaliacao">Sem avaliação</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs">
+          <span className="font-medium">Mostrar pausados</span>
+          <Checkbox checked={showPausados} onCheckedChange={(v) => setShowPausados(!!v)} />
+        </div>
       </div>
 
       {/* Conteúdo */}
@@ -362,6 +394,7 @@ function ClientesPage() {
               verba_ads: Number(editing.verba_ads || 0),
               observacoes: editing.observacoes || "",
               em_onboarding: editing.em_onboarding || false,
+              status_operacional: editing.status_operacional || "ativo",
             } : { agencia }}
           />
         </DialogContent>

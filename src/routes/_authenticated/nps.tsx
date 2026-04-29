@@ -46,7 +46,7 @@ function NPSPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("nps_avaliacoes_view")
-        .select("*, clientes(nome, agencia)")
+        .select("*, clientes(nome, agencia, status_operacional, em_onboarding)")
         .order("data_avaliacao", { ascending: false });
 
       if (error) {

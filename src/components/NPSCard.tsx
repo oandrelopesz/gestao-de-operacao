@@ -27,7 +27,10 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
 
   return (
     <Card 
-      className="group hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-muted-foreground/10 outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
+      className={cn(
+        "group hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-muted-foreground/10 outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2",
+        avaliacao.clientes?.status_operacional === "pausado" && "opacity-75"
+      )}
       onClick={() => onClick(avaliacao)}
       tabIndex={0}
       onKeyDown={(e) => {
@@ -44,6 +47,14 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
             <Badge variant="outline" className="text-[10px] uppercase font-bold px-1.5 py-0">
               {avaliacao.clientes?.agencia}
             </Badge>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {avaliacao.clientes?.status_operacional === "pausado" && (
+              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50 h-4 px-1 px-1.5 font-bold uppercase">PAUSADO</Badge>
+            )}
+            {avaliacao.clientes?.em_onboarding && (
+              <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px] h-4 px-1.5 font-bold uppercase">ONBOARDING</Badge>
+            )}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Calendar size={12} />
