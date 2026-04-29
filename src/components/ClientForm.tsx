@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -19,15 +20,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AGENCIAS, maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
 
 const clientSchema = z.object({
   nome: z.string().min(2, "Nome é obrigatório"),
-  empresa: z.string().optional(),
-  email: z.string().email("E-mail inválido").optional().or(z.literal("")),
-  whatsapp: z.string().optional(),
+  agencia: z.enum(["effect", "spike", "alt", "pessoais"]),
   nicho: z.string().optional(),
-  status: z.enum(["ativo", "pausado", "churn"]),
-  valor_mensal: z.string(),
+  data_inicio: z.string().min(1, "Informe a data de início"),
+  verba_ads: z.number().min(0),
   observacoes: z.string().optional(),
 });
 
@@ -44,78 +44,58 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
     resolver: zodResolver(clientSchema),
     defaultValues: {
       nome: initialValues?.nome || "",
-      empresa: initialValues?.empresa || "",
-      email: initialValues?.email || "",
-      whatsapp: initialValues?.whatsapp || "",
+      agencia: (initialValues?.agencia as any) || "effect",
       nicho: initialValues?.nicho || "",
-      status: initialValues?.status || "ativo",
-      valor_mensal: initialValues?.valor_mensal || "0",
+      data_inicio: initialValues?.data_inicio || new Date().toISOString().slice(0, 10),
+      verba_ads: initialValues?.verba_ads ?? 0,
       observacoes: initialValues?.observacoes || "",
     },
   });
 
+  const [verbaDisplay, setVerbaDisplay] = useState(
+    initialValues?.verba_ads ? maskBRLInput(String(Math.round((initialValues.verba_ads || 0) * 100))) : ""
+  );
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="nome"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nome</FormLabel>
-                <FormControl>
-                  <Input placeholder="Nome do cliente" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="empresa"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Empresa</FormLabel>
-                <FormControl>
-                  <Input placeholder="Nome da empresa" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        <FormField
+          control={form.control}
+          name="nome"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nome do cliente</FormLabel>
+              <FormControl>
+                <Input placeholder="Ex: Atend Já" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="email"
+            name="agencia"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>E-mail</FormLabel>
-                <FormControl>
-                  <Input type="email" placeholder="cliente@email.com" {...field} />
-                </FormControl>
+                <FormLabel>Agência</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {AGENCIAS.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="whatsapp"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>WhatsApp</FormLabel>
-                <FormControl>
-                  <Input placeholder="(00) 00000-0000" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="nicho"
@@ -123,7 +103,23 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
               <FormItem>
                 <FormLabel>Nicho</FormLabel>
                 <FormControl>
-                  <Input placeholder="Ex: E-commerce, Saúde" {...field} />
+                  <Input placeholder="Ex: Saúde, Educação..." {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="data_inicio"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Data de início</FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -131,41 +127,28 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
           />
           <FormField
             control={form.control}
-            name="status"
+            name="verba_ads"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Status</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um status" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="ativo">Ativo</SelectItem>
-                    <SelectItem value="pausado">Pausado</SelectItem>
-                    <SelectItem value="churn">Churn</SelectItem>
-                  </SelectContent>
-                </Select>
+                <FormLabel>Verba de ads / mês</FormLabel>
+                <FormControl>
+                  <Input
+                    inputMode="numeric"
+                    placeholder="R$ 0,00"
+                    value={verbaDisplay}
+                    onChange={(e) => {
+                      const masked = maskBRLInput(e.target.value);
+                      setVerbaDisplay(masked);
+                      field.onChange(parseBRLInput(e.target.value));
+                    }}
+                  />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">{formatBRL(field.value)}</p>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-
-        <FormField
-          control={form.control}
-          name="valor_mensal"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Valor Mensal (R$)</FormLabel>
-              <FormControl>
-                <Input placeholder="0,00" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <FormField
           control={form.control}
@@ -174,7 +157,7 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
             <FormItem>
               <FormLabel>Observações</FormLabel>
               <FormControl>
-                <Textarea placeholder="Notas sobre o cliente..." {...field} />
+                <Textarea rows={3} placeholder="Notas, contexto, links..." {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -182,7 +165,7 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
         />
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Salvando..." : "Salvar Cliente"}
+          {loading ? "Salvando..." : "Salvar cliente"}
         </Button>
       </form>
     </Form>

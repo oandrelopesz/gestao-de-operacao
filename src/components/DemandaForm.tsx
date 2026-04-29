@@ -25,7 +25,7 @@ const demandaSchema = z.object({
   descricao: z.string().optional(),
   cliente_id: z.string().min(1, "Selecione um cliente"),
   status: z.enum(["fazer_hoje", "fazer_amanha", "fazer_depois_amanha", "standby", "feito"]),
-  prioridade: z.enum(["baixa", "média", "alta", "urgente"]),
+  prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
   prazo: z.string().optional(),
 });
 
@@ -45,7 +45,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
       descricao: initialValues?.descricao || "",
       cliente_id: initialValues?.cliente_id || "",
       status: initialValues?.status || "fazer_hoje",
-      prioridade: initialValues?.prioridade || "média",
+      prioridade: initialValues?.prioridade || "media",
       prazo: initialValues?.prazo || "",
     },
   });
@@ -134,7 +134,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="baixa">Baixa</SelectItem>
-                    <SelectItem value="média">Média</SelectItem>
+                    <SelectItem value="media">Média</SelectItem>
                     <SelectItem value="alta">Alta</SelectItem>
                     <SelectItem value="urgente">Urgente</SelectItem>
                   </SelectContent>

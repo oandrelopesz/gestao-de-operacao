@@ -1,10 +1,2 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Supabase credentials not found. Please check your .env file or project settings.");
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Re-export the auto-generated Supabase client for backward compatibility.
+export { supabase } from "@/integrations/supabase/client";

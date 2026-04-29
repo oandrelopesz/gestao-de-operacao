@@ -18,7 +18,7 @@ interface Demanda {
   titulo: string;
   descricao?: string;
   status: string;
-  prioridade: "baixa" | "média" | "alta" | "urgente";
+  prioridade: "baixa" | "media" | "alta" | "urgente";
   prazo?: string;
   cliente_id: string;
   clientes?: { nome: string };
@@ -32,7 +32,7 @@ interface KanbanCardProps {
 
 const priorityColors = {
   baixa: "bg-slate-100 text-slate-700 border-slate-200",
-  média: "bg-blue-50 text-blue-700 border-blue-200",
+  media: "bg-blue-50 text-blue-700 border-blue-200",
   alta: "bg-orange-50 text-orange-700 border-orange-200",
   urgente: "bg-red-50 text-red-700 border-red-200",
 };
