@@ -334,7 +334,6 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                 <CommandItem
                                   onSelect={() => {
                                     handleAddCategory(searchQuery);
-                                    setOpenCombobox(false);
                                   }}
                                   className="gap-2 text-primary cursor-pointer"
                                 >
