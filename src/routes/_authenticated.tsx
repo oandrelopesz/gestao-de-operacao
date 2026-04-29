@@ -129,6 +129,7 @@ function AuthenticatedLayout() {
             </h2>
           </div>
           <div className="flex items-center gap-4">
+             <NotificationBell />
              <div className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">Beta</div>
           </div>
         </header>
