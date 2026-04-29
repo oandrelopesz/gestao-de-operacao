@@ -44,7 +44,10 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-lg leading-tight">{avaliacao.clientes?.nome}</h3>
-            <Badge variant="outline" className="text-[10px] uppercase font-bold px-1.5 py-0">
+            <Badge variant="outline" className={cn(
+              "text-[10px] uppercase font-bold px-1.5 py-0",
+              avaliacao.clientes?.agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : ""
+            )}>
               {avaliacao.clientes?.agencia}
             </Badge>
           </div>
