@@ -77,6 +77,38 @@ export type Database = {
         }
         Relationships: []
       }
+      demanda_execucoes: {
+        Row: {
+          concluida: boolean | null
+          created_at: string | null
+          data_execucao: string
+          demanda_id: string
+          id: string
+        }
+        Insert: {
+          concluida?: boolean | null
+          created_at?: string | null
+          data_execucao?: string
+          demanda_id: string
+          id?: string
+        }
+        Update: {
+          concluida?: boolean | null
+          created_at?: string | null
+          data_execucao?: string
+          demanda_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demanda_execucoes_demanda_id_fkey"
+            columns: ["demanda_id"]
+            isOneToOne: false
+            referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demandas: {
         Row: {
           cliente_id: string | null
@@ -84,11 +116,17 @@ export type Database = {
           descricao: string | null
           dia_referencia: string | null
           frequencia: Database["public"]["Enums"]["demanda_frequencia"] | null
+          frequencia_dia_mes: number | null
+          frequencia_dias_semana: string[] | null
+          frequencia_intervalo_dias: number | null
+          frequencia_tipo: string | null
           id: string
           ordem: number
           prazo: string | null
           prioridade: Database["public"]["Enums"]["demanda_prioridade"]
+          proxima_execucao: string | null
           recorrente: boolean
+          recorrente_pai_id: string | null
           status: Database["public"]["Enums"]["demanda_status"]
           titulo: string
           ultima_execucao: string | null
@@ -101,11 +139,17 @@ export type Database = {
           descricao?: string | null
           dia_referencia?: string | null
           frequencia?: Database["public"]["Enums"]["demanda_frequencia"] | null
+          frequencia_dia_mes?: number | null
+          frequencia_dias_semana?: string[] | null
+          frequencia_intervalo_dias?: number | null
+          frequencia_tipo?: string | null
           id?: string
           ordem?: number
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          proxima_execucao?: string | null
           recorrente?: boolean
+          recorrente_pai_id?: string | null
           status?: Database["public"]["Enums"]["demanda_status"]
           titulo: string
           ultima_execucao?: string | null
@@ -118,11 +162,17 @@ export type Database = {
           descricao?: string | null
           dia_referencia?: string | null
           frequencia?: Database["public"]["Enums"]["demanda_frequencia"] | null
+          frequencia_dia_mes?: number | null
+          frequencia_dias_semana?: string[] | null
+          frequencia_intervalo_dias?: number | null
+          frequencia_tipo?: string | null
           id?: string
           ordem?: number
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          proxima_execucao?: string | null
           recorrente?: boolean
+          recorrente_pai_id?: string | null
           status?: Database["public"]["Enums"]["demanda_status"]
           titulo?: string
           ultima_execucao?: string | null
@@ -144,6 +194,13 @@ export type Database = {
             referencedRelation: "clientes_view"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "demandas_recorrente_pai_id_fkey"
+            columns: ["recorrente_pai_id"]
+            isOneToOne: false
+            referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notificacoes_config: {
@@ -151,7 +208,9 @@ export type Database = {
           alerta_dias_antes: number
           ativo: boolean
           created_at: string
+          horario_notificacao_matinal: string | null
           id: string
+          notificacao_matinal_ativa: boolean | null
           telegram_bot_token: string | null
           telegram_chat_id: string | null
           updated_at: string
@@ -161,7 +220,9 @@ export type Database = {
           alerta_dias_antes?: number
           ativo?: boolean
           created_at?: string
+          horario_notificacao_matinal?: string | null
           id?: string
+          notificacao_matinal_ativa?: boolean | null
           telegram_bot_token?: string | null
           telegram_chat_id?: string | null
           updated_at?: string
@@ -171,7 +232,9 @@ export type Database = {
           alerta_dias_antes?: number
           ativo?: boolean
           created_at?: string
+          horario_notificacao_matinal?: string | null
           id?: string
+          notificacao_matinal_ativa?: boolean | null
           telegram_bot_token?: string | null
           telegram_chat_id?: string | null
           updated_at?: string
@@ -459,6 +522,17 @@ export type Database = {
       }
     }
     Functions: {
+      calcular_proxima_execucao: {
+        Args: {
+          p_data_referencia?: string
+          p_dia_mes: number
+          p_dias_semana: string[]
+          p_intervalo_dias: number
+          p_tipo: string
+          p_ultima_execucao: string
+        }
+        Returns: string
+      }
       get_nps_categoria: {
         Args: { score: number }
         Returns: Database["public"]["Enums"]["cliente_nps_status"]
