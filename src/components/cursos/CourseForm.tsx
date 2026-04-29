@@ -323,33 +323,6 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="tema"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tema (Legado)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um tema" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="ia">IA</SelectItem>
-                      <SelectItem value="trafego_pago">Tráfego Pago</SelectItem>
-                      <SelectItem value="trackeamento">Trackeamento</SelectItem>
-                      <SelectItem value="copywriting">Copywriting</SelectItem>
-                      <SelectItem value="gestao">Gestão</SelectItem>
-                      <SelectItem value="vendas">Vendas</SelectItem>
-                      <SelectItem value="multiplos_temas">Múltiplos Temas</SelectItem>
-                      <SelectItem value="outros">Outros</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}
