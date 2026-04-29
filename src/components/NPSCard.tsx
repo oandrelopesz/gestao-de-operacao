@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { MoreVertical, Edit2, Trash2, Calendar, Target } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { getScoreCategory, getMetricColor } from "@/lib/nps";
+import { getScoreCategory, getMetricColor, isFridayToday, getDiasAteProximaSexta, getProximaSextaFormatada } from "@/lib/nps";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NPSCardProps {
   avaliacao: any;
@@ -16,6 +17,7 @@ interface NPSCardProps {
 }
 
 export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) {
+  const isFriday = isFridayToday();
   const category = getScoreCategory(avaliacao.score_total);
   const metrics = [
     { label: "Engajamento", value: avaliacao.engajamento },
@@ -29,7 +31,7 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
     <Card 
       className={cn(
         "group hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-muted-foreground/10 outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2",
-        avaliacao.clientes?.status_operacional === "pausado" && "opacity-75"
+        avaliacao.cliente_status_operacional === "pausado" && "opacity-75"
       )}
       onClick={() => onClick(avaliacao)}
       tabIndex={0}
