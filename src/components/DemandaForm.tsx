@@ -49,11 +49,12 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
       descricao: initialValues?.descricao || "",
       cliente_id: initialValues?.cliente_id || "",
       status: initialValues?.status || "fazer_hoje",
-      prioridade: initialValues?.prioridade || "media",
+      prioridade: (initialValues?.prioridade as any) || "media",
       prazo: initialValues?.prazo || "",
       recorrente: initialValues?.recorrente || false,
-      frequencia: initialValues?.frequencia || "semanal",
-      dia_referencia: initialValues?.dia_referencia || "",
+      frequencia_tipo: (initialValues as any)?.frequencia_tipo || "semanal",
+      frequencia_dia_mes: (initialValues as any)?.frequencia_dia_mes || null,
+      frequencia_intervalo_dias: (initialValues as any)?.frequencia_intervalo_dias || null,
     },
   });
 
