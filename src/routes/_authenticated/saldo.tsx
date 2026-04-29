@@ -365,7 +365,7 @@ function SaldoPage() {
     return {
       totalContas: data.length,
       uniqueClients,
-      saldoTotal: monitored.reduce((acc, curr) => acc + (curr.saldo_atual || 0), 0),
+      saldoTotal: monitored.reduce((acc, curr) => acc + (curr.saldo_atual_estimado || 0), 0),
       emAlerta: monitored.filter(i => i.status_alerta === "alerta").length,
       criticos: monitored.filter(i => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
       totalCartao: onCartao.length,
