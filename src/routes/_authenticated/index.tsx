@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Filter, List, Kanban as KanbanIcon, Search } from "lucide-react";
+import { Plus, Filter, List, Kanban as KanbanIcon, Search, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,8 +20,9 @@ import {
 } from "@/components/ui/select";
 import { DemandaForm, DemandaFormValues } from "@/components/DemandaForm";
 import { KanbanColumn } from "@/components/KanbanColumn";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AGENCIAS, AgenciaId } from "@/lib/clientes";
 import {
   DndContext,
   DragOverlay,
@@ -54,11 +55,12 @@ function DemandasPage() {
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [clientes, setClientes] = useState<{ id: string; nome: string }[]>([]);
+  const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: AgenciaId }[]>([]);
   const [demandas, setDemandas] = useState<any[]>([]);
   const [activeDemanda, setActiveDemanda] = useState<any | null>(null);
   const [editingDemanda, setEditingDemanda] = useState<any | null>(null);
   const [filterCliente, setFilterCliente] = useState<string>("all");
+  const [filterAgencia, setFilterAgencia] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const sensors = useSensors(
@@ -88,15 +90,15 @@ function DemandasPage() {
   }, []);
 
   const fetchClientes = async () => {
-    const { data, error } = await supabase.from("clientes").select("id, nome").order("nome");
+    const { data, error } = await supabase.from("clientes").select("id, nome, agencia").order("nome");
     if (error) console.error("Erro ao buscar clientes:", error);
-    else setClientes(data || []);
+    else setClientes((data as any) || []);
   };
 
   const fetchDemandas = async () => {
     const { data, error } = await supabase
       .from("demandas")
-      .select("*, clientes(nome)")
+      .select("*, clientes(nome, agencia)")
       .order("ordem", { ascending: true });
     
     if (error) console.error("Erro ao buscar demandas:", error);
@@ -194,11 +196,12 @@ function DemandasPage() {
   const filteredDemandas = useMemo(() => {
     return demandas.filter(d => {
       const matchesCliente = filterCliente === "all" || d.cliente_id === filterCliente;
+      const matchesAgencia = filterAgencia === "all" || d.clientes?.agencia === filterAgencia;
       const matchesSearch = d.titulo.toLowerCase().includes(searchQuery.toLowerCase()) || 
                            (d.clientes?.nome && d.clientes.nome.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesCliente && matchesSearch;
+      return matchesCliente && matchesAgencia && matchesSearch;
     });
-  }, [demandas, filterCliente, searchQuery]);
+  }, [demandas, filterCliente, filterAgencia, searchQuery]);
 
   // Drag and Drop Logic
   const onDragStart = (event: DragStartEvent) => {
@@ -337,6 +340,19 @@ function DemandasPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+        <Select value={filterAgencia} onValueChange={setFilterAgencia}>
+            <SelectTrigger className="w-[180px]">
+                <Building2 className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Filtrar por agência" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">Todas as agências</SelectItem>
+                {AGENCIAS.map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+
         <Select value={filterCliente} onValueChange={setFilterCliente}>
             <SelectTrigger className="w-[200px]">
                 <Filter className="w-4 h-4 mr-2" />
@@ -344,8 +360,12 @@ function DemandasPage() {
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">Todos os clientes</SelectItem>
-                {clientes.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                {clientes
+                  .filter(c => filterAgencia === "all" || c.agencia === filterAgencia)
+                  .map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome} — {AGENCIAS.find(a => a.id === c.agencia)?.label}
+                    </SelectItem>
                 ))}
             </SelectContent>
         </Select>
@@ -420,7 +440,7 @@ function DemandasPage() {
                                         {d.titulo}
                                     </h4>
                                     <p className="text-xs text-muted-foreground">
-                                        {d.clientes?.nome} • {COLUMNS.find(c => c.id === d.status)?.title}
+                                        {d.clientes?.nome} — {AGENCIAS.find(a => a.id === d.clientes?.agencia)?.label} • {COLUMNS.find(c => c.id === d.status)?.title}
                                     </p>
                                 </div>
                             </div>

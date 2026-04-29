@@ -57,7 +57,7 @@ interface ClienteView {
 
 function ClientesPage() {
   const { agencia, view } = Route.useSearch();
-  const navigate = useNavigate({ from: "/clientes" });
+  const navigate = Route.useNavigate();
 
   const [clientes, setClientes] = useState<ClienteView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,7 +158,7 @@ function ClientesPage() {
           <p className="text-muted-foreground">Visão por agência, com NPS e financeiro consolidados.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Tabs value={view} onValueChange={(v) => navigate({ search: (p) => ({ ...p, view: v as any }) })}>
+          <Tabs value={view} onValueChange={(v) => navigate({ search: { agencia, view: v as any } })}>
             <TabsList>
               <TabsTrigger value="cards" className="gap-1.5"><LayoutGrid size={14} />Cards</TabsTrigger>
               <TabsTrigger value="tabela" className="gap-1.5"><TableIcon size={14} />Tabela</TabsTrigger>
@@ -171,7 +171,7 @@ function ClientesPage() {
       </div>
 
       {/* Sub-tabs por agência */}
-      <Tabs value={agencia} onValueChange={(v) => navigate({ search: (p) => ({ ...p, agencia: v as AgenciaId }) })}>
+      <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v as AgenciaId } })}>
         <TabsList>
           {AGENCIAS.map((a) => (
             <TabsTrigger key={a.id} value={a.id} className="gap-2">
