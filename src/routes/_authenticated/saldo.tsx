@@ -658,14 +658,6 @@ function SaldoPage() {
                         }}>
                           <UserCog size={14} className="mr-2" /> Editar Cliente
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => {
-                          setEditing(null);
-                          // We pass the client_id as initial value for the new record
-                          setEditing({ cliente_id: group.cliente_id });
-                          setModalOpen(true);
-                        }}>
-                          <Plus size={14} className="mr-2" /> Adicionar Plataforma
-                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => fetchHistory(group, true)}>
                           <History size={14} className="mr-2" /> Ver Histórico Consolidado
