@@ -299,11 +299,44 @@ function DemandasPage() {
 
   const handleCompleteExecution = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from("demandas")
-        .update({ ultima_execucao: new Date().toISOString() })
-        .eq("id", id);
-      if (error) throw error;
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Registrar no histórico
+      const { error: execError } = await supabase
+        .from("demanda_execucoes")
+        .insert([{ demanda_id: id, data_execucao: today }]);
+      
+      if (execError) throw execError;
+
+      const demanda = demandas.find(d => d.id === id);
+      if (demanda?.recorrente) {
+        // Recalcular próxima execução
+        const { data: proximaData } = await supabase.rpc('calcular_proxima_execucao', {
+            p_tipo: demanda.frequencia_tipo,
+            p_dias_semana: demanda.frequencia_dias_semana,
+            p_dia_mes: demanda.frequencia_dia_mes,
+            p_intervalo_dias: demanda.frequencia_intervalo_dias,
+            p_ultima_execucao: today,
+            p_data_referencia: today
+        });
+
+        const { error: updateError } = await supabase
+            .from("demandas")
+            .update({ 
+                ultima_execucao: today,
+                proxima_execucao: proximaData
+            })
+            .eq("id", id);
+        
+        if (updateError) throw updateError;
+      } else {
+        const { error } = await supabase
+            .from("demandas")
+            .update({ ultima_execucao: today })
+            .eq("id", id);
+        if (error) throw error;
+      }
+
       toast.success("Execução registrada!");
       fetchDemandas();
     } catch (error: any) {
