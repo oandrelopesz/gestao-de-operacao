@@ -176,11 +176,19 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
               
               {isRecorrenteMae && (
                 <div className="flex items-center gap-1 ml-auto shrink-0">
+                  {demanda.proxima_execucao && !isDueToday && !isOverdue && (
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">
+                      Próxima: {formatProxima(demanda.proxima_execucao)}
+                    </span>
+                  )}
                   <span className={cn(
                     "text-[9px] px-1 py-0.5 rounded-full font-bold uppercase tracking-tighter",
-                    isDueToday ? "bg-primary text-white" : (isDoneForNow ? "bg-emerald-500 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500")
+                    isOverdue ? "bg-red-500 text-white" :
+                    isDueToday ? "bg-primary text-white" :
+                    isDoneForNow ? "bg-emerald-500 text-white" :
+                    "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
                   )}>
-                    {isDueToday ? "HOJE" : (isDoneForNow ? "OK" : (demanda.frequencia_tipo || "Repetir"))}
+                    {isOverdue ? "ATRASADA" : isDueToday ? "HOJE" : (isDoneForNow ? "OK" : (demanda.frequencia_tipo || "Repetir"))}
                   </span>
                 </div>
               )}
