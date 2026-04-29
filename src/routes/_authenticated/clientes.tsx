@@ -375,8 +375,8 @@ function ClienteCard({
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Última NPS</p>
             <p className="font-medium">
-              {cliente.ultima_nps_nota !== null
-                ? <>Nota {cliente.ultima_nps_nota} <span className="text-muted-foreground font-normal">· {cliente.ultima_nps_data ? new Date(cliente.ultima_nps_data).toLocaleDateString("pt-BR") : ""}</span></>
+              {cliente.ultima_nps_score !== null
+                ? <>Score {cliente.ultima_nps_score}/50 <span className="text-muted-foreground font-normal">· {cliente.ultima_nps_data ? new Date(cliente.ultima_nps_data).toLocaleDateString("pt-BR") : ""}</span></>
                 : <span className="text-muted-foreground">—</span>}
             </p>
           </div>
