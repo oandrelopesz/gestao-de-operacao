@@ -18,7 +18,11 @@ import {
   Filter,
   RefreshCw,
   History,
-  Check
+  Check,
+  UserCog,
+  LayoutGrid,
+  Archive,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +42,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -66,9 +71,11 @@ import {
 } from "@/components/ui/sheet";
 import { SaldoAdsForm, SaldoAdsFormValues } from "@/components/SaldoAdsForm";
 import { RecargaForm, RecargaFormValues } from "@/components/RecargaForm";
+import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 
 export const Route = createFileRoute("/_authenticated/saldo")({
   component: SaldoPage,
@@ -86,11 +93,11 @@ const PLATAFORMAS = [
 ];
 
 const STATUS_ALERTA = [
-  { id: "ok", label: "OK", color: "bg-emerald-500" },
-  { id: "alerta", label: "Alerta", color: "bg-amber-500" },
-  { id: "critico", label: "Crítico", color: "bg-red-500" },
-  { id: "zerado", label: "Zerado", color: "bg-gray-500" },
-  { id: "cartao", label: "Cartão (sem monitoramento)", color: "bg-blue-400" },
+  { id: "ok", label: "OK", color: "bg-emerald-500", weight: 0 },
+  { id: "alerta", label: "Alerta", color: "bg-amber-500", weight: 1 },
+  { id: "critico", label: "Crítico", color: "bg-red-500", weight: 2 },
+  { id: "zerado", label: "Zerado", color: "bg-gray-500", weight: 3 },
+  { id: "cartao", label: "Cartão (sem monitoramento)", color: "bg-blue-400", weight: -1 },
 ];
 
 function SaldoPage() {
@@ -105,11 +112,14 @@ function SaldoPage() {
   const [sortBy, setSortBy] = useState<string>("dias_restantes");
   
   const [modalOpen, setModalOpen] = useState(false);
+  const [clientModalOpen, setClientModalOpen] = useState(false);
   const [recargaModalOpen, setRecargaModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [editingClient, setEditingClient] = useState<any>(null);
   const [selectedForRecarga, setSelectedForRecarga] = useState<any>(null);
   const [selectedForHistory, setSelectedForHistory] = useState<any>(null);
+  const [historyIsConsolidated, setHistoryIsConsolidated] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [historyData, setHistoryData] = useState<any[]>([]);
