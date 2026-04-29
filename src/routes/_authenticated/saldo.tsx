@@ -442,8 +442,12 @@ function SaldoPage() {
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs h-10">
-          <span className="font-medium">Mostrar pausados</span>
+          <span className="font-medium text-muted-foreground">Pausados</span>
           <Checkbox checked={showPausados} onCheckedChange={(v) => setShowPausados(!!v)} />
+        </div>
+        <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs h-10">
+          <span className="font-medium text-muted-foreground">Cartão</span>
+          <Checkbox checked={showCartao} onCheckedChange={(v) => setShowCartao(!!v)} />
         </div>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Ordenar por:</span>
