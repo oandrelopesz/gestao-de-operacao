@@ -679,7 +679,7 @@ function ClientesPage() {
             onSubmit={handleSave}
             initialValues={editing ? {
               nome: editing.nome,
-              agencia: editing.agencia,
+              agencia: editing.agencia as any,
               nicho: editing.nicho || "",
               data_inicio: editing.data_inicio,
               verba_ads: Number(editing.verba_ads || 0),
@@ -689,7 +689,7 @@ function ClientesPage() {
               tipo_verba: editing.tipo_verba || "mensal",
               verba_total_contratada: editing.verba_total_contratada || 0,
               data_limite_verba: editing.data_limite_verba || "",
-            } : { agencia }}
+            } : { agencia: agencia === "todos" ? "effect" : agencia } as any}
           />
         </DialogContent>
       </Dialog>
