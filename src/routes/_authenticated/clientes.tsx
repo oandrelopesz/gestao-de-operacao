@@ -195,13 +195,15 @@ function ClientesPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2 text-sm">
-              <span className="text-emerald-600 font-bold text-lg">{metrics.promotores}</span>
+              <span className="text-emerald-900 font-bold text-lg" title="Âncora">{metrics.ancora}</span>
               <span className="text-muted-foreground">/</span>
-              <span className="text-amber-600 font-bold text-lg">{metrics.neutros}</span>
+              <span className="text-emerald-500 font-bold text-lg" title="Saudável">{metrics.saudavel}</span>
               <span className="text-muted-foreground">/</span>
-              <span className="text-red-600 font-bold text-lg">{metrics.detratores}</span>
+              <span className="text-amber-500 font-bold text-lg" title="Em risco">{metrics.em_risco}</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-red-500 font-bold text-lg" title="Crítico">{metrics.critico}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Promotores / Neutros / Detratores</p>
+            <p className="text-xs text-muted-foreground mt-1 text-center">Âncora / Saudável / Risco / Crítico</p>
           </CardContent>
         </Card>
       </div>
