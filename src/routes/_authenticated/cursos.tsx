@@ -261,11 +261,11 @@ function CursosPage() {
       <div className="flex flex-col gap-4">
         <Tabs value={currentTema} onValueChange={setTema} className="w-full">
           <TabsList className="w-full justify-start overflow-x-auto h-auto p-1 bg-muted/50">
-            {TEMAS.map(t => (
+            {allTabs.map(t => (
               <TabsTrigger key={t.id} value={t.id} className="gap-2 shrink-0">
                 {t.label}
                 <Badge variant="secondary" className="px-1.5 h-4 text-[10px] leading-none">
-                  {themeCounts[t.id] || 0}
+                  {categoryCounts[t.id] || 0}
                 </Badge>
               </TabsTrigger>
             ))}
