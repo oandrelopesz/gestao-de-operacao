@@ -206,25 +206,44 @@ function ClientesPage() {
 
       // Sanitiza campos opcionais para evitar erros no banco
       const payload: any = { ...values };
+      
+      // Converte verba_total_contratada para number se for string
+      if (typeof payload.verba_total_contratada === "string") {
+        if (payload.verba_total_contratada === "") {
+          payload.verba_total_contratada = null;
+        } else {
+          payload.verba_total_contratada = Number(payload.verba_total_contratada);
+        }
+      }
+
+      // Garante que campos opcionais sejam nulos se vazios ou não aplicáveis
       if (payload.tipo_verba === "mensal") {
         payload.verba_total_contratada = null;
         payload.data_limite_verba = null;
       } else {
         if (!payload.data_limite_verba) payload.data_limite_verba = null;
-        if (payload.verba_total_contratada === undefined) payload.verba_total_contratada = null;
+        if (payload.verba_total_contratada === undefined) {
+          payload.verba_total_contratada = null;
+        }
       }
 
       if (editing) {
         const { error } = await supabase.from("clientes")
           .update(payload).eq("id", editing.id);
-        if (error) throw error;
+        if (error) {
+          console.error("Erro ao atualizar cliente:", error);
+          throw error;
+        }
         toast.success("Cliente atualizado");
       } else {
         const { error } = await supabase.from("clientes").insert([{
           ...payload,
           user_id: user.id,
         }]);
-        if (error) throw error;
+        if (error) {
+          console.error("Erro ao inserir cliente:", error);
+          throw error;
+        }
         toast.success("Cliente criado");
       }
       setModalOpen(false);
@@ -719,7 +738,7 @@ function ClientesPage() {
               em_onboarding: editing.em_onboarding || false,
               status_operacional: editing.status_operacional || "ativo",
               tipo_verba: editing.tipo_verba || "mensal",
-              verba_total_contratada: editing.verba_total_contratada || 0,
+              verba_total_contratada: editing.verba_total_contratada ?? null,
               data_limite_verba: editing.data_limite_verba || "",
             } : { agencia: agencia === "todos" ? "effect" : agencia } as any}
           />

@@ -33,8 +33,8 @@ const clientSchema = z.object({
   em_onboarding: z.boolean(),
   status_operacional: z.enum(["ativo", "pausado", "churn"]),
   tipo_verba: z.enum(["mensal", "total_periodo"]),
-  verba_total_contratada: z.number().optional().nullable(),
-  data_limite_verba: z.string().optional().nullable(),
+  verba_total_contratada: z.union([z.number(), z.string().length(0)]).optional().nullable(),
+  data_limite_verba: z.string().optional().nullable().or(z.literal("")),
 });
 
 export type ClientFormValues = z.infer<typeof clientSchema>;
@@ -58,7 +58,7 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       em_onboarding: initialValues?.em_onboarding ?? false,
       status_operacional: initialValues?.status_operacional || "ativo",
       tipo_verba: initialValues?.tipo_verba || "mensal",
-      verba_total_contratada: initialValues?.verba_total_contratada ?? 0,
+      verba_total_contratada: initialValues?.verba_total_contratada ?? null,
       data_limite_verba: initialValues?.data_limite_verba || "",
     },
   });
