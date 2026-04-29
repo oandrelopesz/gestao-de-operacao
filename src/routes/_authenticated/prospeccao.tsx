@@ -294,7 +294,7 @@ function ProspeccaoPage() {
       
       const payload: any = {
         ...values,
-        user_id: user.id
+        user_id: userId
       };
       
       const { data: newClient, error } = await supabase.from("clientes").insert([payload]).select().single();
@@ -325,7 +325,7 @@ function ProspeccaoPage() {
 
       const { error } = await supabase.from("demandas").insert([{
         ...values,
-        user_id: user.id,
+        user_id: userId,
         prospeccao_id: leadForDemanda?.id
       }]);
       if (error) throw error;
