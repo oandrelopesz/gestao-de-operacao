@@ -206,25 +206,35 @@ function ClientesPage() {
 
       // Sanitiza campos opcionais para evitar erros no banco
       const payload: any = { ...values };
+      
+      // Garante que campos opcionais sejam nulos se vazios ou não aplicáveis
       if (payload.tipo_verba === "mensal") {
         payload.verba_total_contratada = null;
         payload.data_limite_verba = null;
       } else {
         if (!payload.data_limite_verba) payload.data_limite_verba = null;
-        if (payload.verba_total_contratada === undefined) payload.verba_total_contratada = null;
+        if (payload.verba_total_contratada === undefined || payload.verba_total_contratada === "") {
+          payload.verba_total_contratada = null;
+        }
       }
 
       if (editing) {
         const { error } = await supabase.from("clientes")
           .update(payload).eq("id", editing.id);
-        if (error) throw error;
+        if (error) {
+          console.error("Erro ao atualizar cliente:", error);
+          throw error;
+        }
         toast.success("Cliente atualizado");
       } else {
         const { error } = await supabase.from("clientes").insert([{
           ...payload,
           user_id: user.id,
         }]);
-        if (error) throw error;
+        if (error) {
+          console.error("Erro ao inserir cliente:", error);
+          throw error;
+        }
         toast.success("Cliente criado");
       }
       setModalOpen(false);
