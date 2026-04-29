@@ -678,7 +678,7 @@ function ClientesPage() {
           <UsersIcon size={36} className="text-muted-foreground mb-3 opacity-50" />
           <h3 className="text-lg font-semibold">Nenhum cliente em {agencia === "todos" ? "Todos os Clientes" : agenciaMeta.label}</h3>
           <p className="text-muted-foreground mb-4 text-sm">Cadastre o primeiro cliente desta agência ou ajuste os filtros.</p>
-          <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
+          <Button className="gap-2" onClick={() => { setEditing(null); setEditingSaldo(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
           </Button>
         </div>
