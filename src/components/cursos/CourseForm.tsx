@@ -124,6 +124,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
         form.reset({
           nome: editingCourse.nome || "",
           tema: (editingCourse.tema as any) || "outros",
+          categoria_id: editingCourse.categoria_id || null,
           link_area_membros: editingCourse.link_area_membros || "",
           login: editingCourse.login || "",
           senha: editingCourse.senha || "",
@@ -134,6 +135,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
         form.reset({
           nome: "",
           tema: "outros",
+          categoria_id: null,
           link_area_membros: "",
           login: "",
           senha: "",
@@ -159,7 +161,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
         ...values,
         link_area_membros: finalLink,
         user_id: userId
-      };
+      } as any;
 
       if (editingCourse) {
         const { error } = await supabase
