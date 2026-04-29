@@ -67,6 +67,8 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   const [categorias, setCategorias] = useState<{ id: string; nome: string }[]>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [openCombobox, setOpenCombobox] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const form = useForm<CourseFormValues>({
     resolver: zodResolver(courseSchema),
