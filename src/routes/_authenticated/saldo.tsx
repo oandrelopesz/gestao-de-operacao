@@ -186,6 +186,10 @@ function SaldoPage() {
     } catch (e: any) {
       toast.error(e.message || "Erro ao salvar");
     } finally {
+      setSaving(false);
+    }
+  };
+
   const handleUpdateClient = async (values: ClientFormValues) => {
     if (!editingClient) return;
     setSaving(true);
