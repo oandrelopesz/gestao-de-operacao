@@ -6,7 +6,7 @@ import {
   CheckCircle2, 
   Clock, 
   User, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   ArrowRight,
   Plus,
   Check,
@@ -28,11 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface Demanda {
   id: string;
@@ -129,6 +131,23 @@ export function DemandaDrawer({
     setIsSaving(false);
     setShowSaved(true);
     setTimeout(() => setShowSaved(false), 2000);
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date || !demanda) return;
+    
+    const isoDate = date.toISOString().split('T')[0];
+    const updates: Partial<Demanda> = { proxima_execucao: isoDate };
+    
+    // Automatizar a configuração baseada no dia escolhido
+    if (demanda.frequencia_tipo === 'mensal') {
+      updates.frequencia_dia_mes = date.getDate();
+    } else if (demanda.frequencia_tipo === 'semanal') {
+      // 0 é domingo no extract(dow) do Postgres, getDay() também retorna 0 para domingo
+      updates.frequencia_dias_semana = [date.getDay().toString()];
+    }
+    
+    saveUpdate(updates);
   };
 
   const currentColumn = columns.find(c => c.id === demanda.status);
@@ -313,12 +332,28 @@ export function DemandaDrawer({
                     </SelectContent>
                   </Select>
                 </div>
-                {demanda.proxima_execucao && (
-                  <div className="space-y-1">
-                    <span className="text-zinc-400">Próxima Execução</span>
-                    <div className="font-medium">{new Date(demanda.proxima_execucao).toLocaleDateString('pt-BR')}</div>
-                  </div>
-                )}
+                <div className="space-y-1">
+                  <span className="text-zinc-400">Próxima Execução</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" className="h-7 text-xs p-0 hover:bg-transparent font-medium flex gap-2">
+                        <CalendarIcon size={12} className="text-zinc-400" />
+                        {demanda.proxima_execucao 
+                          ? format(new Date(demanda.proxima_execucao + "T12:00:00"), "dd/MM/yyyy")
+                          : "Escolher dia"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={demanda.proxima_execucao ? new Date(demanda.proxima_execucao + "T12:00:00") : undefined}
+                        onSelect={handleDateSelect}
+                        initialFocus
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
 
               <div className="pt-2 flex gap-2">
