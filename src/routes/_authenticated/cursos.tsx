@@ -39,20 +39,26 @@ import { CourseForm } from "@/components/cursos/CourseForm";
 
 type Tema = "ia" | "trafego_pago" | "trackeamento" | "copywriting" | "gestao" | "vendas" | "multiplos_temas" | "outros";
 
+interface Categoria {
+  id: string;
+  nome: string;
+}
+
 interface Curso {
   id: string;
   nome: string;
   tema: Tema;
+  categoria_id: string | null;
   link_area_membros: string | null;
   login: string | null;
   senha: string | null;
   em_andamento: boolean;
   observacoes: string | null;
   ordem: number;
+  curso_categorias?: Categoria | null;
 }
 
-const TEMAS: { id: Tema | "todos"; label: string; color: string }[] = [
-  { id: "todos", label: "Todos", color: "bg-slate-500" },
+const TEMAS_LEGADO: { id: Tema; label: string; color: string }[] = [
   { id: "ia", label: "IA", color: "bg-purple-500" },
   { id: "trafego_pago", label: "Tráfego Pago", color: "bg-blue-500" },
   { id: "trackeamento", label: "Trackeamento", color: "bg-cyan-500" },
