@@ -67,31 +67,28 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
     <div 
       ref={setNodeRef} 
       style={style} 
+      {...attributes}
+      {...listeners}
       className={cn(
-        "group relative outline-none rounded-md mb-2",
+        "group relative outline-none rounded-md mb-2 cursor-grab active:cursor-grabbing",
         isDragging && "opacity-50 z-50",
         isRecorrenteMae && !isDueToday && "opacity-70"
       )}
     >
       <Card
         className={cn(
-          "cursor-default hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden",
+          "hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden",
           isDone && "opacity-60",
           isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20"
         )}
-        onClick={() => onEdit(demanda)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit(demanda);
+        }}
       >
         <div className="p-2.5 space-y-1.5 relative">
-          {/* Grab handle area */}
-          <div 
-            className="absolute inset-y-0 left-0 w-1 cursor-grab active:cursor-grabbing" 
-            {...attributes} 
-            {...listeners} 
-          />
-          
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-2 flex-1 min-w-0">
-              {/* Quick check mark on hover */}
               {!isDone && onMoveToDone && (
                 <button
                   onClick={(e) => {
@@ -121,14 +118,14 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[140px] text-xs">
-                  <DropdownMenuItem onClick={() => onEdit(demanda)} className="gap-2 py-1.5">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(demanda); }} className="gap-2 py-1.5">
                     <Pencil size={12} /> Detalhes
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {}} className="gap-2 py-1.5">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); }} className="gap-2 py-1.5">
                     <Copy size={12} /> Duplicar
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => onDelete(demanda.id, demanda.titulo)} 
+                    onClick={(e) => { e.stopPropagation(); onDelete(demanda.id, demanda.titulo); }} 
                     className="gap-2 py-1.5 text-destructive focus:text-destructive"
                   >
                     <Trash2 size={12} /> Remover
@@ -138,28 +135,14 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
             </div>
           </div>
 
-          {/* Description Preview */}
-          {descriptionPreview && (
-            <div className="text-[12px] text-zinc-400 leading-snug line-clamp-2 break-words">
-              {descriptionPreview}
-            </div>
-          )}
-
-          {/* Footer of the card */}
-          {(demanda.descricao || demanda.clientes?.nome || demanda.prazo || isRecorrenteMae) && (
-            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+          {(demanda.descricao || isRecorrenteMae) && (
+            <div className="flex items-center gap-2 pt-0.5">
               {demanda.descricao && (
                 <div title="Tem descrição">
                   <FileText size={12} className="text-zinc-400" />
                 </div>
               )}
               
-              {demanda.clientes?.nome && (
-                <span className="text-[10px] text-zinc-400 truncate font-medium">
-                  {demanda.clientes.nome}
-                </span>
-              )}
-
               {isRecorrenteMae && (
                 <div className="flex items-center gap-1 ml-auto shrink-0">
                   <span className={cn(
@@ -169,12 +152,6 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
                     {isDueToday ? "HOJE" : (demanda.frequencia_tipo || "Repetir")}
                   </span>
                 </div>
-              )}
-
-              {!isRecorrenteMae && demanda.prazo && (
-                <span className="text-[10px] text-zinc-400 ml-auto shrink-0">
-                  {new Date(demanda.prazo).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                </span>
               )}
             </div>
           )}
