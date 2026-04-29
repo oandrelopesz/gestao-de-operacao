@@ -26,6 +26,7 @@ interface SaldoAlerta {
 
 export function NotificationBell() {
   const [alertas, setAlertas] = useState<SaldoAlerta[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAlertas = async () => {
