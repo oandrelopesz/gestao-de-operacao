@@ -282,7 +282,9 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                               !field.value && "text-muted-foreground"
                             )}
                           >
-                            {field.value
+                            {selectedCategoriaId
+                              ? categorias.find((cat) => cat.id === selectedCategoriaId)?.nome || "Tema personalizado"
+                              : field.value
                               ? [...fixedTemas, ...categorias.map(c => ({ id: c.id, nome: c.nome }))].find(
                                   (t) => t.id === field.value || t.nome === field.value
                                 )?.nome || field.value
@@ -327,15 +329,15 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                     key={cat.id}
                                     value={cat.nome}
                                     onSelect={() => {
-                                      form.setValue("categoria_id", cat.id);
-                                      form.setValue("tema", "outros");
+                                      form.setValue("categoria_id", cat.id, { shouldDirty: true, shouldValidate: true });
+                                      form.setValue("tema", "outros", { shouldDirty: true, shouldValidate: true });
                                       setOpenCombobox(false);
                                     }}
                                   >
                                     <Check
                                       className={cn(
                                         "mr-2 h-4 w-4",
-                                        field.value === cat.id ? "opacity-100" : "opacity-0"
+                                        selectedCategoriaId === cat.id ? "opacity-100" : "opacity-0"
                                       )}
                                     />
                                     {cat.nome}
@@ -346,6 +348,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                             {searchQuery && ![...fixedTemas, ...categorias].some(t => t.nome.toLowerCase() === searchQuery.toLowerCase()) && (
                               <CommandGroup heading="Novo Tema">
                                 <CommandItem
+                                  value={`criar-${searchQuery}`}
                                   onSelect={() => {
                                     handleAddCategory(searchQuery);
                                   }}
