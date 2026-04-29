@@ -241,7 +241,14 @@ function SaldoPage() {
               </TableRow>
             ) : (
               filteredData.map((item) => (
-                <TableRow key={item.id} className="group">
+                <TableRow 
+                  key={item.id} 
+                  className="group outline-none focus:bg-muted/50"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Delete" || e.key === "Backspace") setDeletingId(item.id);
+                  }}
+                >
                   <TableCell className="font-medium">{item.clientes?.nome}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="font-normal text-[10px]">
@@ -335,4 +342,3 @@ function SaldoPage() {
     </div>
   );
 }
-
