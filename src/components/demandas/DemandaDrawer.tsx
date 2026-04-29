@@ -260,7 +260,7 @@ export function DemandaDrawer({
             )}
             
             {/* Add field placeholder button */}
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap gap-2">
                <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-7 text-[11px] text-zinc-400 gap-1.5 px-1.5 hover:text-zinc-600">
@@ -268,6 +268,7 @@ export function DemandaDrawer({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
+                  <DropdownMenuItem className="text-xs" onClick={() => saveUpdate({ recorrente: true, frequencia_tipo: 'semanal' })}>Recorrência</DropdownMenuItem>
                   <DropdownMenuItem className="text-xs">Prioridade</DropdownMenuItem>
                   <DropdownMenuItem className="text-xs">Prazo</DropdownMenuItem>
                   <DropdownMenuItem className="text-xs">Tags</DropdownMenuItem>
