@@ -55,12 +55,16 @@ interface CourseFormProps {
 export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: CourseFormProps) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [categorias, setCategorias] = useState<{ id: string; nome: string }[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
 
   const form = useForm<CourseFormValues>({
     resolver: zodResolver(courseSchema),
     defaultValues: {
       nome: "",
       tema: "outros",
+      categoria_id: null,
       link_area_membros: "",
       login: "",
       senha: "",
@@ -68,6 +72,51 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       observacoes: "",
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      fetchCategorias();
+    }
+  }, [open]);
+
+  const fetchCategorias = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("curso_categorias")
+        .select("id, nome")
+        .order("nome");
+      
+      if (error) throw error;
+      setCategorias(data || []);
+    } catch (error) {
+      console.error("Erro ao buscar categorias:", error);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
+
+      const { data, error } = await supabase
+        .from("curso_categorias")
+        .insert([{ nome: newCategoryName.trim(), user_id: userId }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success("Categoria criada!");
+      setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
+      form.setValue("categoria_id", data.id);
+      setNewCategoryName("");
+      setIsAddingCategory(false);
+    } catch (error: any) {
+      toast.error("Erro ao criar categoria");
+    }
+  };
 
   useEffect(() => {
     if (open) {
