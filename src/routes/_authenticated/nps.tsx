@@ -13,6 +13,16 @@ import { NPSCard } from "@/components/NPSCard";
 import { NPSForm } from "@/components/NPSForm";
 import { NPSHistoryDrawer } from "@/components/NPSHistoryDrawer";
 import { Dialog } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { NPS_SCORE_CATEGORIES } from "@/lib/nps";
 
@@ -28,6 +38,8 @@ function NPSPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAvaliacao, setEditingAvaliacao] = useState<any>(null);
   const [selectedCliente, setSelectedCliente] = useState<any>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingName, setDeletingName] = useState<string>("");
 
   const { data: avaliacoes, isLoading } = useQuery({
     queryKey: ["nps-avaliacoes"],
