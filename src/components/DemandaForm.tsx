@@ -23,7 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 const demandaSchema = z.object({
   titulo: z.string().min(2, "Título é obrigatório"),
   descricao: z.string().nullable().optional(),
-  cliente_id: z.string().min(1, "Selecione um cliente"),
+  cliente_id: z.string().min(1, "Selecione um cliente").nullable().optional(),
   status: z.enum(["recorrentes", "fazer_hoje", "fazer_amanha", "fazer_depois_amanha", "standby", "feito"]),
   prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
   prazo: z.string().nullable().optional(),
@@ -31,6 +31,7 @@ const demandaSchema = z.object({
   frequencia_tipo: z.enum(["diaria", "semanal", "quinzenal", "mensal", "customizada"]).nullable().optional(),
   frequencia_dia_mes: z.number().nullable().optional(),
   frequencia_intervalo_dias: z.number().nullable().optional(),
+  prospeccao_id: z.string().uuid().nullable().optional(),
 });
 
 export type DemandaFormValues = z.infer<typeof demandaSchema>;
