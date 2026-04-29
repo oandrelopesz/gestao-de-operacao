@@ -65,6 +65,7 @@ interface ClienteView {
   observacoes: string | null;
   arquivado: boolean;
   em_onboarding: boolean;
+  status_operacional: "ativo" | "pausado" | "churn";
   ultima_nps_score: number | null;
   ultima_nps_data: string | null;
   nps_status: "ancora" | "saudavel" | "em_risco" | "critico" | "sem_avaliacao";
@@ -80,6 +81,8 @@ function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [operacionalFilter, setOperacionalFilter] = useState<string>("all_active");
+  const [showPausados, setShowPausados] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ClienteView | null>(null);
   const [saving, setSaving] = useState(false);
@@ -207,9 +210,24 @@ function ClientesPage() {
 
       {/* Métricas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard icon={<UsersIcon size={16} />} label="Clientes ativos" value={String(metrics.total)} hint={`Agência ${agenciaMeta.label}`} />
-        <MetricCard icon={<DollarSign size={16} />} label="Verba total / mês" value={formatBRL(metrics.verbaTotal)} hint="Soma das verbas" />
-        <MetricCard icon={<TrendingUp size={16} />} label="Verba média / cliente" value={formatBRL(metrics.verbaMedia)} hint="Por cliente ativo" />
+        <MetricCard 
+          icon={<UsersIcon size={16} />} 
+          label="Clientes" 
+          value={String(metrics.total)} 
+          hint={`${metrics.ativos} ativos / ${metrics.pausados} pausados / ${metrics.churn} churn`} 
+        />
+        <MetricCard 
+          icon={<DollarSign size={16} />} 
+          label="Verba total / mês" 
+          value={formatBRL(metrics.verbaTotal)} 
+          hint="Considera apenas clientes ativos" 
+        />
+        <MetricCard 
+          icon={<TrendingUp size={16} />} 
+          label="Verba média / cliente" 
+          value={formatBRL(metrics.verbaMedia)} 
+          hint="Considera apenas clientes ativos" 
+        />
         <Card>
           <CardHeader className="flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Distribuição NPS</CardTitle>
@@ -247,6 +265,10 @@ function ClientesPage() {
             <SelectItem value="sem_avaliacao">Sem avaliação</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs">
+          <span className="font-medium">Mostrar pausados</span>
+          <Checkbox checked={showPausados} onCheckedChange={(v) => setShowPausados(!!v)} />
+        </div>
       </div>
 
       {/* Conteúdo */}
@@ -362,6 +384,7 @@ function ClientesPage() {
               verba_ads: Number(editing.verba_ads || 0),
               observacoes: editing.observacoes || "",
               em_onboarding: editing.em_onboarding || false,
+              status_operacional: editing.status_operacional || "ativo",
             } : { agencia }}
           />
         </DialogContent>

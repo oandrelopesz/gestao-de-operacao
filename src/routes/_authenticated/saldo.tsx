@@ -87,6 +87,7 @@ function SaldoPage() {
   const [filterPlataforma, setFilterPlataforma] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showPausados, setShowPausados] = useState(false);
   const [sortBy, setSortBy] = useState<string>("dias_restantes");
   
   const [modalOpen, setModalOpen] = useState(false);
@@ -107,7 +108,7 @@ function SaldoPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("saldo_ads_view")
-      .select("*")
+      .select("*, clientes!inner(status_operacional)")
       .order("dias_restantes", { ascending: true });
 
     if (error) {
@@ -212,7 +213,9 @@ function SaldoPage() {
       const matchesPlataforma = filterPlataforma === "all" || item.plataforma === filterPlataforma;
       const matchesStatus = filterStatus === "all" || item.status_alerta === filterStatus;
       const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesAgencia && matchesPlataforma && matchesStatus && matchesSearch;
+      const isPausado = item.clientes?.status_operacional === "pausado";
+      const matchesPausados = showPausados || !isPausado;
+      return matchesAgencia && matchesPlataforma && matchesStatus && matchesSearch && matchesPausados;
     });
 
     result.sort((a, b) => {
@@ -361,6 +364,10 @@ function SaldoPage() {
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs h-10">
+          <span className="font-medium">Mostrar pausados</span>
+          <Checkbox checked={showPausados} onCheckedChange={(v) => setShowPausados(!!v)} />
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Ordenar por:</span>
           <Select value={sortBy} onValueChange={setSortBy}>
@@ -395,7 +402,8 @@ function SaldoPage() {
               key={item.id} 
               className={cn(
                 "group relative border-l-4 transition-all hover:shadow-md cursor-pointer",
-                getStatusColor(item.status_alerta)
+                getStatusColor(item.status_alerta),
+                item.clientes?.status_operacional === "pausado" && "opacity-70"
               )}
               onClick={() => fetchHistory(item)}
             >
@@ -406,6 +414,11 @@ function SaldoPage() {
                     <Badge variant="outline" className="text-[10px] font-normal uppercase py-0 mt-1">
                       {AGENCIAS.find(a => a.id === item.cliente_agencia)?.label || item.cliente_agencia}
                     </Badge>
+                    {item.clientes?.status_operacional === "pausado" && (
+                      <Badge variant="outline" className="ml-1 text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0 mt-1">
+                        Pausado
+                      </Badge>
+                    )}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
