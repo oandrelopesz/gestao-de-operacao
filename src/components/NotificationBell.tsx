@@ -26,6 +26,7 @@ interface SaldoAlerta {
 
 export function NotificationBell() {
   const [alertas, setAlertas] = useState<SaldoAlerta[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAlertas = async () => {
@@ -48,7 +49,17 @@ export function NotificationBell() {
   useEffect(() => {
     fetchAlertas();
     
-    // Inscrever para mudanças (opcional, mas bom para tempo real)
+    // Carregar IDs ocultos do localStorage
+    const saved = localStorage.getItem("hidden_notification_ids");
+    if (saved) {
+      try {
+        setHiddenIds(JSON.parse(saved));
+      } catch (e) {
+        console.error("Erro ao carregar notificações ocultas", e);
+      }
+    }
+    
+    // Inscrever para mudanças
     const channel = supabase
       .channel('saldo-alertas')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'saldo_ads' }, () => {
@@ -64,7 +75,17 @@ export function NotificationBell() {
     };
   }, []);
 
-  const count = alertas.length;
+  const handleClearAll = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const allIds = alertas.map(a => a.id);
+    const newHiddenIds = Array.from(new Set([...hiddenIds, ...allIds]));
+    setHiddenIds(newHiddenIds);
+    localStorage.setItem("hidden_notification_ids", JSON.stringify(newHiddenIds));
+  };
+
+  const visibleAlertas = alertas.filter(a => !hiddenIds.includes(a.id));
+  const count = visibleAlertas.length;
 
   return (
     <DropdownMenu>
@@ -82,12 +103,17 @@ export function NotificationBell() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel className="flex items-center justify-between">
-          Notificações
+        <DropdownMenuLabel className="flex items-center justify-between py-2">
+          <span className="text-sm font-semibold">Notificações</span>
           {count > 0 && (
-            <Badge variant="outline" className="text-[10px] font-normal">
-              {count} {count === 1 ? 'alerta' : 'alertas'}
-            </Badge>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+              onClick={handleClearAll}
+            >
+              Limpar tudo
+            </Button>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -104,7 +130,7 @@ export function NotificationBell() {
               <p className="text-[11px] text-muted-foreground/60">Nenhum saldo crítico detectado.</p>
             </div>
           ) : (
-            alertas.map((alerta) => (
+            visibleAlertas.map((alerta) => (
               <DropdownMenuItem 
                 key={alerta.id} 
                 className="p-3 cursor-default focus:bg-accent/50"
