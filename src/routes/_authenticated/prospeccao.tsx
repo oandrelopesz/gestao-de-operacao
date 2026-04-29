@@ -220,7 +220,11 @@ function ProspeccaoPage() {
     try {
       const { error } = await supabase
         .from("prospeccao")
-        .update({ etapa, ...extraValues, updated_at: new Date().toISOString() })
+        .update({ 
+            etapa: etapa as any, 
+            ...extraValues, 
+            updated_at: new Date().toISOString() 
+        } as any)
         .eq("id", id);
       if (error) throw error;
       fetchLeads();
