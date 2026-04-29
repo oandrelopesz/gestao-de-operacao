@@ -114,7 +114,9 @@ function ClientesPage() {
           const verba = (s.verba_diaria_calc || 0) * 30;
           return `${platNames} ${formatBRL(verba)}`;
         }).join(" / ");
-        return { ...cli, saldo_ads_summary: summary };
+        const allPlats = cliSaldos.flatMap(s => s.plataformas || []);
+        const uniquePlats = Array.from(new Set(allPlats));
+        return { ...cli, saldo_ads_summary: summary, plataformas_ativas: uniquePlats };
       });
       
       setClientes(enrichedData);
