@@ -162,7 +162,8 @@ function DemandasPage() {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
+      const userId = user?.id || '00000000-0000-0000-0000-000000000000'; // Default ID for bypass
+
 
       if (editingDemanda?.id) {
         // Update
@@ -180,7 +181,7 @@ function DemandasPage() {
         
         const { error } = await supabase.from("demandas").insert([{
           ...values,
-          user_id: user.id,
+          user_id: userId,
           ordem: maxOrder + 1
         }]);
         if (error) throw error;
@@ -221,14 +222,15 @@ function DemandasPage() {
   const handleDuplicateDemanda = async (demanda: any) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
+      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+
 
       const { id, created_at, updated_at, clientes, ...rest } = demanda;
       
       const { error } = await supabase.from("demandas").insert([{
         ...rest,
         titulo: `${rest.titulo} (Cópia)`,
-        user_id: user.id,
+        user_id: userId,
       }]);
 
       if (error) throw error;
@@ -247,7 +249,8 @@ function DemandasPage() {
   const handleQuickAdd = async (status: string, titulo: string, event?: React.MouseEvent | React.TouchEvent) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
+      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+
 
       const columnDemandas = demandas.filter(d => d.status === status);
       const maxOrder = columnDemandas.length > 0 ? Math.max(...columnDemandas.map(d => d.ordem || 0)) : -1;
@@ -257,7 +260,7 @@ function DemandasPage() {
       const { data, error } = await supabase.from("demandas").insert([{
         titulo,
         status: status as any,
-        user_id: user.id,
+        user_id: userId,
         cliente_id: null,
         prioridade: "media" as const,
         ordem: maxOrder + 1,

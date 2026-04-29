@@ -258,9 +258,10 @@ function ProspeccaoPage() {
   const handleQuickAdd = async (nome: string, etapa: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+
       const { error } = await supabase.from("prospeccao").insert([{
-        nome, etapa: etapa as any, user_id: user.id
+        nome, etapa: etapa as any, user_id: userId
       }] as any);
       if (error) throw error;
       fetchLeads();
@@ -288,11 +289,12 @@ function ProspeccaoPage() {
   const handleCreateClient = async (values: ClientFormValues) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+
       
       const payload: any = {
         ...values,
-        user_id: user.id
+        user_id: userId
       };
       
       const { data: newClient, error } = await supabase.from("clientes").insert([payload]).select().single();
@@ -319,10 +321,11 @@ function ProspeccaoPage() {
   const submitDemanda = async (values: DemandaFormValues) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+
       const { error } = await supabase.from("demandas").insert([{
         ...values,
-        user_id: user.id,
+        user_id: userId,
         prospeccao_id: leadForDemanda?.id
       }]);
       if (error) throw error;
