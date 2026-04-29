@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -111,20 +112,29 @@ function ClientesPage() {
     return clientes
       .filter((c) => c.agencia === agencia)
       .filter((c) => statusFilter === "all" || c.nps_status === statusFilter)
+      .filter((c) => showPausados || c.status_operacional === "ativo")
       .filter((c) => !search || c.nome.toLowerCase().includes(search.toLowerCase()));
-  }, [clientes, agencia, statusFilter, search]);
+  }, [clientes, agencia, statusFilter, search, showPausados]);
 
   const metrics = useMemo(() => {
     const list = clientes.filter((c) => c.agencia === agencia);
+    const ativosList = list.filter((c) => c.status_operacional === "ativo");
+    
     const total = list.length;
-    const verbaTotal = list.reduce((s, c) => s + Number(c.verba_ads || 0), 0);
-    const clientesComVerba = list.filter((c) => Number(c.verba_ads || 0) > 0).length;
+    const ativos = ativosList.length;
+    const pausados = list.filter((c) => c.status_operacional === "pausado").length;
+    const churn = list.filter((c) => c.status_operacional === "churn").length;
+    
+    const verbaTotal = ativosList.reduce((s, c) => s + Number(c.verba_ads || 0), 0);
+    const clientesComVerba = ativosList.filter((c) => Number(c.verba_ads || 0) > 0).length;
     const verbaMedia = clientesComVerba > 0 ? verbaTotal / clientesComVerba : 0;
-    const ancora = list.filter((c) => c.nps_status === "ancora").length;
-    const saudavel = list.filter((c) => c.nps_status === "saudavel").length;
-    const em_risco = list.filter((c) => c.nps_status === "em_risco").length;
-    const critico = list.filter((c) => c.nps_status === "critico").length;
-    return { total, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
+    
+    const ancora = ativosList.filter((c) => c.nps_status === "ancora").length;
+    const saudavel = ativosList.filter((c) => c.nps_status === "saudavel").length;
+    const em_risco = ativosList.filter((c) => c.nps_status === "em_risco").length;
+    const critico = ativosList.filter((c) => c.nps_status === "critico").length;
+    
+    return { total, ativos, pausados, churn, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
   }, [clientes, agencia]);
 
   const agenciaMeta = AGENCIAS.find((a) => a.id === agencia)!;

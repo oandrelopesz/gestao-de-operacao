@@ -45,6 +45,14 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
               {avaliacao.clientes?.agencia}
             </Badge>
           </div>
+          <div className="flex flex-wrap gap-1">
+            {avaliacao.clientes?.status_operacional === "pausado" && (
+              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50 h-4 px-1 px-1.5 font-bold uppercase">PAUSADO</Badge>
+            )}
+            {avaliacao.clientes?.em_onboarding && (
+              <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px] h-4 px-1.5 font-bold uppercase">ONBOARDING</Badge>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Calendar size={12} />
             <span>

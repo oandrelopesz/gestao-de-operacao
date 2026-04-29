@@ -61,6 +61,7 @@ import { SaldoAdsForm, SaldoAdsFormValues } from "@/components/SaldoAdsForm";
 import { RecargaForm, RecargaFormValues } from "@/components/RecargaForm";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/_authenticated/saldo")({
   component: SaldoPage,
