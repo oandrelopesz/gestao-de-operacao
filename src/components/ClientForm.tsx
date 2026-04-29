@@ -50,6 +50,7 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       data_inicio: initialValues?.data_inicio || new Date().toISOString().slice(0, 10),
       verba_ads: initialValues?.verba_ads ?? 0,
       observacoes: initialValues?.observacoes || "",
+      em_onboarding: initialValues?.em_onboarding ?? false,
     },
   });
 
