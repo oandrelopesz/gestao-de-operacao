@@ -200,15 +200,17 @@ function DemandasPage() {
     }
   };
 
-  const handleDeleteDemanda = async (id: string) => {
-    if (!confirm("Tem certeza que deseja deletar esta demanda?")) return;
+  const handleDeleteDemanda = async () => {
+    if (!deletingId) return;
     try {
-      const { error } = await supabase.from("demandas").delete().eq("id", id);
+      const { error } = await supabase.from("demandas").delete().eq("id", deletingId);
       if (error) throw error;
       toast.success("Demanda deletada!");
       fetchDemandas();
     } catch (error: any) {
       toast.error(error.message || "Erro ao deletar");
+    } finally {
+      setDeletingId(null);
     }
   };
 
