@@ -134,9 +134,7 @@ function DemandasPage() {
 
   const catchUpRecorrentes = async () => {
     try {
-      await supabase.functions.invoke('materializar-recorrentes', {
-        queryString: { modo: 'catch_up' }
-      });
+      await supabase.functions.invoke('materializar-recorrentes');
       fetchDemandas();
     } catch (err) {
       console.error("Erro no catch-up de recorrentes:", err);
