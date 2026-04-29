@@ -299,7 +299,7 @@ function SaldoPage() {
       }
       
       if (item.metodo_pagamento !== "cartao") {
-        group.saldo_total_consolidado += (item.saldo_atual || 0);
+        group.saldo_total_consolidado += (item.saldo_atual_estimado || 0);
         group.verba_diaria_total += (item.verba_diaria_calc || 0);
         
         // Update worst status alert
@@ -365,7 +365,7 @@ function SaldoPage() {
     return {
       totalContas: data.length,
       uniqueClients,
-      saldoTotal: monitored.reduce((acc, curr) => acc + (curr.saldo_atual || 0), 0),
+      saldoTotal: monitored.reduce((acc, curr) => acc + (curr.saldo_atual_estimado || 0), 0),
       emAlerta: monitored.filter(i => i.status_alerta === "alerta").length,
       criticos: monitored.filter(i => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
       totalCartao: onCartao.length,
@@ -742,7 +742,7 @@ function SaldoPage() {
                               {isCartao ? (
                                 <span className="text-xs font-semibold text-blue-600 uppercase">Cartão</span>
                               ) : (
-                                <span className="text-sm font-bold">{formatBRL(plat.saldo_atual)}</span>
+                                <span className="text-sm font-bold">{formatBRL(plat.saldo_atual_estimado)}</span>
                               )}
                               
                               <DropdownMenu>
@@ -778,7 +778,7 @@ function SaldoPage() {
                             <div className="space-y-1.5">
                               <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
                                 <span>{plat.dias_restantes ? Math.floor(plat.dias_restantes) : 0} dias restantes</span>
-                                <span>Última: {formatBRL(plat.total_recarregado > 0 ? plat.total_recarregado / 10 : 0)} em 12/04</span>
+                                <span>Última: {formatBRL(plat.saldo_total_acumulado > 0 ? plat.saldo_total_acumulado / 5 : 0)} em 12/04</span>
                               </div>
                               <Progress 
                                 value={Math.min(100, (plat.dias_restantes || 0) * 10)} 
@@ -803,7 +803,7 @@ function SaldoPage() {
                                 <p className="font-semibold">
                                   {isCartao 
                                     ? formatBRL(plat.clientes?.verba_ads || (plat.verba_diaria_calc * 30)) 
-                                    : formatBRL(plat.total_recarregado)}
+                                    : formatBRL(plat.saldo_total_acumulado)}
                                 </p>
                               </div>
                             </div>

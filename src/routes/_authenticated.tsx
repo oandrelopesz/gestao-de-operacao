@@ -7,12 +7,14 @@ import {
   Wallet, 
   MessageSquare, 
   LogOut,
-  ChevronRight,
-  User as UserIcon
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+   ChevronRight,
+   User as UserIcon,
+   Bell
+ } from "lucide-react";
+ import { Button } from "@/components/ui/button";
+ import { Separator } from "@/components/ui/separator";
+ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+ import { NotificationBell } from "@/components/NotificationBell";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -127,6 +129,7 @@ function AuthenticatedLayout() {
             </h2>
           </div>
           <div className="flex items-center gap-4">
+             <NotificationBell />
              <div className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">Beta</div>
           </div>
         </header>

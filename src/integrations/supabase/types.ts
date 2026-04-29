@@ -534,12 +534,16 @@ export type Database = {
           cliente_id: string | null
           cliente_nome: string | null
           created_at: string | null
+          dias_restantes: number | null
           id: string | null
           metodo_pagamento:
             | Database["public"]["Enums"]["metodo_pagamento_simplificado"]
             | null
           observacoes: string | null
           plataformas: string[] | null
+          saldo_atual_estimado: number | null
+          saldo_total_acumulado: number | null
+          status_alerta: string | null
           updated_at: string | null
           user_id: string | null
           verba_diaria: number | null
