@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Filter, List, Kanban as KanbanIcon, Search } from "lucide-react";
+import { Plus, Filter, List, Kanban as KanbanIcon, Search, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,8 +20,9 @@ import {
 } from "@/components/ui/select";
 import { DemandaForm, DemandaFormValues } from "@/components/DemandaForm";
 import { KanbanColumn } from "@/components/KanbanColumn";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AGENCIAS, AgenciaId } from "@/lib/clientes";
 import {
   DndContext,
   DragOverlay,
