@@ -118,7 +118,12 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
+      const userId = user?.id;
+
+      if (!userId) {
+        toast.error("Usuário não autenticado");
+        return null;
+      }
 
       const { data, error } = await supabase
         .from("curso_categorias")
@@ -171,7 +176,13 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
+      const userId = user?.id;
+
+      if (!userId) {
+        toast.error("Usuário não autenticado");
+        setLoading(false);
+        return;
+      }
 
       let finalLink = values.link_area_membros;
       if (finalLink && !finalLink.startsWith("http://") && !finalLink.startsWith("https://")) {
