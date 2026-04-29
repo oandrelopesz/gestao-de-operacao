@@ -37,16 +37,16 @@ interface DemandaFormProps {
   loading?: boolean;
 }
 
-export function DemandaForm({ clientes, onSubmit, loading }: DemandaFormProps) {
+export function DemandaForm({ clientes, onSubmit, loading, initialValues }: DemandaFormProps & { initialValues?: Partial<DemandaFormValues> }) {
   const form = useForm<DemandaFormValues>({
     resolver: zodResolver(demandaSchema),
     defaultValues: {
-      titulo: "",
-      descricao: "",
-      cliente_id: "",
-      status: "a fazer",
-      prioridade: "média",
-      prazo: "",
+      titulo: initialValues?.titulo || "",
+      descricao: initialValues?.descricao || "",
+      cliente_id: initialValues?.cliente_id || "",
+      status: initialValues?.status || "fazer_hoje",
+      prioridade: initialValues?.prioridade || "média",
+      prazo: initialValues?.prazo || "",
     },
   });
 
