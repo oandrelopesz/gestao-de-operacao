@@ -215,7 +215,7 @@ function SaldoPage() {
   const filteredData = useMemo(() => {
     let result = data.filter(item => {
       const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
-      const matchesPlataforma = filterPlataforma === "all" || item.plataforma === filterPlataforma;
+      const matchesPlataforma = filterPlataforma === "all" || item.plataformas?.includes(filterPlataforma);
       const matchesStatus = filterStatus === "all" || item.status_alerta === filterStatus;
       const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
       const isPausado = item.clientes?.status_operacional === "pausado";
