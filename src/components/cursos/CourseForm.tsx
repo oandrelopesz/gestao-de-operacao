@@ -190,10 +190,16 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       }
 
       const payload = {
-        ...values,
+        nome: values.nome,
+        tema: values.tema,
+        categoria_id: values.categoria_id,
         link_area_membros: finalLink,
+        login: values.login,
+        senha: values.senha,
+        em_andamento: values.em_andamento,
+        observacoes: values.observacoes,
         user_id: userId
-      } as any;
+      };
 
       if (editingCourse) {
         const { error } = await supabase
@@ -324,12 +330,11 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                             {searchQuery && ![...fixedTemas, ...categorias].some(t => t.nome.toLowerCase() === searchQuery.toLowerCase()) && (
                               <CommandGroup heading="Novo Tema">
                                 <CommandItem
-                                  value={searchQuery}
                                   onSelect={() => {
                                     handleAddCategory(searchQuery);
                                     setOpenCombobox(false);
                                   }}
-                                  className="gap-2 text-primary"
+                                  className="gap-2 text-primary cursor-pointer"
                                 >
                                   <Plus size={14} /> Criar "{searchQuery}"
                                 </CommandItem>
