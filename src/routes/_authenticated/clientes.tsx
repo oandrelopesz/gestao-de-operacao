@@ -551,6 +551,15 @@ function ClienteCard({
               ? formatBRL(cliente.verba_total_contratada || 0) 
               : formatBRL(cliente.verba_ads)}
           </p>
+          {cliente.plataformas_ativas && cliente.plataformas_ativas.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2 mb-1">
+              {cliente.plataformas_ativas.map(plat => (
+                <Badge key={plat} variant="outline" className="text-[9px] h-4 px-1.5 font-normal">
+                  {plat}
+                </Badge>
+              ))}
+            </div>
+          )}
           {cliente.saldo_ads_summary && (
             <p className="text-[10px] text-muted-foreground mt-1 font-medium border-t pt-1 italic">
               {cliente.saldo_ads_summary}
