@@ -14,16 +14,253 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clientes: {
+        Row: {
+          agencia: Database["public"]["Enums"]["agencia_enum"]
+          arquivado: boolean
+          created_at: string
+          data_inicio: string
+          id: string
+          nicho: string | null
+          nome: string
+          observacoes: string | null
+          updated_at: string
+          user_id: string
+          verba_ads: number
+        }
+        Insert: {
+          agencia?: Database["public"]["Enums"]["agencia_enum"]
+          arquivado?: boolean
+          created_at?: string
+          data_inicio?: string
+          id?: string
+          nicho?: string | null
+          nome: string
+          observacoes?: string | null
+          updated_at?: string
+          user_id: string
+          verba_ads?: number
+        }
+        Update: {
+          agencia?: Database["public"]["Enums"]["agencia_enum"]
+          arquivado?: boolean
+          created_at?: string
+          data_inicio?: string
+          id?: string
+          nicho?: string | null
+          nome?: string
+          observacoes?: string | null
+          updated_at?: string
+          user_id?: string
+          verba_ads?: number
+        }
+        Relationships: []
+      }
+      demandas: {
+        Row: {
+          cliente_id: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          ordem: number
+          prazo: string | null
+          prioridade: Database["public"]["Enums"]["demanda_prioridade"]
+          status: Database["public"]["Enums"]["demanda_status"]
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cliente_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          ordem?: number
+          prazo?: string | null
+          prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          status?: Database["public"]["Enums"]["demanda_status"]
+          titulo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cliente_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          ordem?: number
+          prazo?: string | null
+          prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          status?: Database["public"]["Enums"]["demanda_status"]
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demandas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demandas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nps: {
+        Row: {
+          categoria: Database["public"]["Enums"]["nps_categoria"]
+          cliente_id: string
+          comentario: string | null
+          created_at: string
+          data_pesquisa: string
+          id: string
+          nota: number
+          user_id: string
+        }
+        Insert: {
+          categoria: Database["public"]["Enums"]["nps_categoria"]
+          cliente_id: string
+          comentario?: string | null
+          created_at?: string
+          data_pesquisa?: string
+          id?: string
+          nota: number
+          user_id: string
+        }
+        Update: {
+          categoria?: Database["public"]["Enums"]["nps_categoria"]
+          cliente_id?: string
+          comentario?: string | null
+          created_at?: string
+          data_pesquisa?: string
+          id?: string
+          nota?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nps_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nps_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saldo: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          data_recebimento: string | null
+          data_vencimento: string | null
+          id: string
+          mes_referencia: string
+          status_pagamento: Database["public"]["Enums"]["pagamento_status"]
+          updated_at: string
+          user_id: string
+          valor_previsto: number
+          valor_recebido: number
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          data_recebimento?: string | null
+          data_vencimento?: string | null
+          id?: string
+          mes_referencia: string
+          status_pagamento?: Database["public"]["Enums"]["pagamento_status"]
+          updated_at?: string
+          user_id: string
+          valor_previsto?: number
+          valor_recebido?: number
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          data_recebimento?: string | null
+          data_vencimento?: string | null
+          id?: string
+          mes_referencia?: string
+          status_pagamento?: Database["public"]["Enums"]["pagamento_status"]
+          updated_at?: string
+          user_id?: string
+          valor_previsto?: number
+          valor_recebido?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saldo_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      clientes_view: {
+        Row: {
+          agencia: Database["public"]["Enums"]["agencia_enum"] | null
+          arquivado: boolean | null
+          created_at: string | null
+          data_inicio: string | null
+          demandas_ativas: number | null
+          id: string | null
+          nicho: string | null
+          nome: string | null
+          nps_status: Database["public"]["Enums"]["cliente_nps_status"] | null
+          observacoes: string | null
+          status_pagamento_mes:
+            | Database["public"]["Enums"]["pagamento_status"]
+            | null
+          ultima_nps_data: string | null
+          ultima_nps_nota: number | null
+          updated_at: string | null
+          user_id: string | null
+          valor_previsto_mes: number | null
+          valor_recebido_mes: number | null
+          verba_ads: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      agencia_enum: "effect" | "spike" | "alt" | "pessoais"
+      cliente_nps_status: "promotor" | "neutro" | "detrator" | "sem_avaliacao"
+      demanda_prioridade: "baixa" | "media" | "alta" | "urgente"
+      demanda_status:
+        | "fazer_hoje"
+        | "fazer_amanha"
+        | "fazer_depois_amanha"
+        | "standby"
+        | "feito"
+      nps_categoria: "promotor" | "neutro" | "detrator"
+      pagamento_status: "em_dia" | "pendente" | "atrasado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +387,19 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      agencia_enum: ["effect", "spike", "alt", "pessoais"],
+      cliente_nps_status: ["promotor", "neutro", "detrator", "sem_avaliacao"],
+      demanda_prioridade: ["baixa", "media", "alta", "urgente"],
+      demanda_status: [
+        "fazer_hoje",
+        "fazer_amanha",
+        "fazer_depois_amanha",
+        "standby",
+        "feito",
+      ],
+      nps_categoria: ["promotor", "neutro", "detrator"],
+      pagamento_status: ["em_dia", "pendente", "atrasado"],
+    },
   },
 } as const
