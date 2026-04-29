@@ -349,8 +349,12 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                               <CommandGroup heading="Novo Tema">
                                 <CommandItem
                                   value={`criar-${searchQuery}`}
+                                  onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    void handleAddCategory(searchQuery);
+                                  }}
                                   onSelect={() => {
-                                    handleAddCategory(searchQuery);
+                                    void handleAddCategory(searchQuery);
                                   }}
                                   className="gap-2 text-primary cursor-pointer"
                                 >
