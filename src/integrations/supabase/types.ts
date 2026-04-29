@@ -364,11 +364,12 @@ export type Database = {
           id: string | null
           nicho: string | null
           nome: string | null
-          nps_status: Database["public"]["Enums"]["nps_score_categoria"] | null
+          nps_status: Database["public"]["Enums"]["cliente_nps_status"] | null
           observacoes: string | null
           status_operacional:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
+          status_pagamento_mes: string | null
           tipo_verba: Database["public"]["Enums"]["tipo_verba_enum"] | null
           ultima_nps_data: string | null
           ultima_nps_score: number | null
@@ -377,59 +378,11 @@ export type Database = {
           verba_ads: number | null
           verba_total_contratada: number | null
         }
-        Insert: {
-          agencia?: Database["public"]["Enums"]["agencia_enum"] | null
-          arquivado?: boolean | null
-          created_at?: string | null
-          data_inicio?: string | null
-          data_limite_verba?: string | null
-          demandas_ativas?: never
-          em_onboarding?: boolean | null
-          id?: string | null
-          nicho?: string | null
-          nome?: string | null
-          nps_status?: never
-          observacoes?: string | null
-          status_operacional?:
-            | Database["public"]["Enums"]["status_operacional_type"]
-            | null
-          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"] | null
-          ultima_nps_data?: never
-          ultima_nps_score?: never
-          updated_at?: string | null
-          user_id?: string | null
-          verba_ads?: number | null
-          verba_total_contratada?: number | null
-        }
-        Update: {
-          agencia?: Database["public"]["Enums"]["agencia_enum"] | null
-          arquivado?: boolean | null
-          created_at?: string | null
-          data_inicio?: string | null
-          data_limite_verba?: string | null
-          demandas_ativas?: never
-          em_onboarding?: boolean | null
-          id?: string | null
-          nicho?: string | null
-          nome?: string | null
-          nps_status?: never
-          observacoes?: string | null
-          status_operacional?:
-            | Database["public"]["Enums"]["status_operacional_type"]
-            | null
-          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"] | null
-          ultima_nps_data?: never
-          ultima_nps_score?: never
-          updated_at?: string | null
-          user_id?: string | null
-          verba_ads?: number | null
-          verba_total_contratada?: number | null
-        }
         Relationships: []
       }
       nps_avaliacoes_view: {
         Row: {
-          categoria: Database["public"]["Enums"]["nps_score_categoria"] | null
+          categoria: Database["public"]["Enums"]["cliente_nps_status"] | null
           cliente_id: string | null
           conversao_vendas: number | null
           created_at: string | null
@@ -442,6 +395,36 @@ export type Database = {
           resultados_campanha: number | null
           score_total: number | null
           user_id: string | null
+        }
+        Insert: {
+          categoria?: never
+          cliente_id?: string | null
+          conversao_vendas?: number | null
+          created_at?: string | null
+          data_avaliacao?: string | null
+          engajamento?: number | null
+          id?: string | null
+          observacoes?: string | null
+          potencial_crescimento?: number | null
+          relacionamento?: number | null
+          resultados_campanha?: number | null
+          score_total?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          categoria?: never
+          cliente_id?: string | null
+          conversao_vendas?: number | null
+          created_at?: string | null
+          data_avaliacao?: string | null
+          engajamento?: number | null
+          id?: string | null
+          observacoes?: string | null
+          potencial_crescimento?: number | null
+          relacionamento?: number | null
+          resultados_campanha?: number | null
+          score_total?: number | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -507,7 +490,7 @@ export type Database = {
     Functions: {
       get_nps_categoria: {
         Args: { score: number }
-        Returns: Database["public"]["Enums"]["nps_score_categoria"]
+        Returns: Database["public"]["Enums"]["cliente_nps_status"]
       }
     }
     Enums: {
