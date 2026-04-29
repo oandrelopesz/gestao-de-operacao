@@ -412,17 +412,20 @@ function SaldoPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="text-base line-clamp-1">{item.cliente_nome}</CardTitle>
-                    <Badge variant="outline" className={cn(
-                      "text-[10px] font-normal uppercase py-0 mt-1",
-                      item.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : ""
-                    )}>
-                      {AGENCIAS.find(a => a.id === item.cliente_agencia)?.label || item.cliente_agencia}
-                    </Badge>
-                    {item.clientes?.status_operacional === "pausado" && (
-                      <Badge variant="outline" className="ml-1 text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0 mt-1">
-                        Pausado
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <Badge variant="outline" className={cn(
+                        "text-[10px] font-normal uppercase py-0",
+                        item.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : "",
+                        item.cliente_agencia === "spike" ? "text-purple-600 border-purple-200 bg-purple-50" : ""
+                      )}>
+                        {AGENCIAS.find(a => a.id === item.cliente_agencia)?.label || item.cliente_agencia}
                       </Badge>
-                    )}
+                      {item.clientes?.status_operacional === "pausado" && (
+                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0">
+                          Pausado
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
