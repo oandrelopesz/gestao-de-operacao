@@ -449,25 +449,18 @@ export type Database = {
           cliente_agencia: Database["public"]["Enums"]["agencia_enum"] | null
           cliente_id: string | null
           cliente_nome: string | null
-          consumo_acumulado_estimado: number | null
           created_at: string | null
-          data_prevista_fim: string | null
-          data_primeira_recarga: string | null
-          dias_decorridos: number | null
-          dias_restantes: number | null
           id: string | null
           metodo_pagamento:
             | Database["public"]["Enums"]["metodo_pagamento_simplificado"]
             | null
           observacoes: string | null
           plataformas: string[] | null
-          saldo_atual: number | null
-          status_alerta: string | null
-          total_recarregado: number | null
           updated_at: string | null
           user_id: string | null
           verba_diaria: number | null
           verba_diaria_calc: number | null
+          verba_mensal_estimada: number | null
         }
         Relationships: [
           {
