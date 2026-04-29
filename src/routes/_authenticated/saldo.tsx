@@ -452,10 +452,14 @@ function SaldoPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Badge className={cn("capitalize", PLATAFORMAS.find(p => p.id === item.plataforma)?.color)}>
-                    {item.plataforma}
-                  </Badge>
+                <div className="flex items-start justify-between">
+                  <div className="flex flex-wrap gap-1">
+                    {item.plataformas?.map((plat: string) => (
+                      <Badge key={plat} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find(p => p.id === plat)?.color)}>
+                        {plat}
+                      </Badge>
+                    ))}
+                  </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold tracking-tight text-primary">
                       {formatBRL(item.saldo_atual)}
