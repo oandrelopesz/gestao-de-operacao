@@ -61,12 +61,16 @@ export type Database = {
           cliente_id: string | null
           created_at: string
           descricao: string | null
+          dia_referencia: string | null
+          frequencia: Database["public"]["Enums"]["demanda_frequencia"] | null
           id: string
           ordem: number
           prazo: string | null
           prioridade: Database["public"]["Enums"]["demanda_prioridade"]
+          recorrente: boolean
           status: Database["public"]["Enums"]["demanda_status"]
           titulo: string
+          ultima_execucao: string | null
           updated_at: string
           user_id: string
         }
@@ -74,12 +78,16 @@ export type Database = {
           cliente_id?: string | null
           created_at?: string
           descricao?: string | null
+          dia_referencia?: string | null
+          frequencia?: Database["public"]["Enums"]["demanda_frequencia"] | null
           id?: string
           ordem?: number
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          recorrente?: boolean
           status?: Database["public"]["Enums"]["demanda_status"]
           titulo: string
+          ultima_execucao?: string | null
           updated_at?: string
           user_id: string
         }
@@ -87,12 +95,16 @@ export type Database = {
           cliente_id?: string | null
           created_at?: string
           descricao?: string | null
+          dia_referencia?: string | null
+          frequencia?: Database["public"]["Enums"]["demanda_frequencia"] | null
           id?: string
           ordem?: number
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          recorrente?: boolean
           status?: Database["public"]["Enums"]["demanda_status"]
           titulo?: string
+          ultima_execucao?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -305,8 +317,15 @@ export type Database = {
         | "em_risco"
         | "critico"
         | "sem_avaliacao"
+      demanda_frequencia:
+        | "diaria"
+        | "semanal"
+        | "quinzenal"
+        | "mensal"
+        | "customizada"
       demanda_prioridade: "baixa" | "media" | "alta" | "urgente"
       demanda_status:
+        | "recorrentes"
         | "fazer_hoje"
         | "fazer_amanha"
         | "fazer_depois_amanha"
@@ -449,8 +468,16 @@ export const Constants = {
         "critico",
         "sem_avaliacao",
       ],
+      demanda_frequencia: [
+        "diaria",
+        "semanal",
+        "quinzenal",
+        "mensal",
+        "customizada",
+      ],
       demanda_prioridade: ["baixa", "media", "alta", "urgente"],
       demanda_status: [
+        "recorrentes",
         "fazer_hoje",
         "fazer_amanha",
         "fazer_depois_amanha",
