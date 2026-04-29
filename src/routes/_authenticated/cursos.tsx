@@ -124,7 +124,7 @@ function CursosPage() {
       setCursos(formattedData);
       setCategorias(catsRes.data || []);
     } catch (error: any) {
-      toast.error("Erro ao carregar dados");
+      toast.error("Erro ao carregar cursos");
     } finally {
       setLoading(false);
     }
