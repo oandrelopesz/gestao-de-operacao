@@ -183,16 +183,14 @@ function CursosPage() {
   const filteredCursos = useMemo(() => {
     return cursos
       .filter(c => {
-        const matchesTema = currentTema === "todos" || c.tema === currentTema;
+        const matchesTema = currentTema === "todos" || c.tema === currentTema || c.categoria_id === currentTema;
         const matchesSearch = c.nome.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesTema && matchesSearch;
       })
       .sort((a, b) => {
-        // First by status (em_andamento true first)
         if (a.em_andamento !== b.em_andamento) {
           return a.em_andamento ? -1 : 1;
         }
-        // Then by name
         return a.nome.localeCompare(b.nome);
       });
   }, [cursos, currentTema, searchQuery]);
@@ -206,13 +204,36 @@ function CursosPage() {
     };
   }, [filteredCursos]);
 
-  const themeCounts = useMemo(() => {
+  const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { todos: cursos.length };
     cursos.forEach(c => {
-      counts[c.tema] = (counts[c.tema] || 0) + 1;
+      if (c.categoria_id) {
+        counts[c.categoria_id] = (counts[c.categoria_id] || 0) + 1;
+      } else if (c.tema) {
+        counts[c.tema] = (counts[c.tema] || 0) + 1;
+      }
     });
     return counts;
   }, [cursos]);
+
+  const allTabs = useMemo(() => {
+    const tabs = [{ id: "todos", label: "Todos" }];
+    
+    // Add dynamic categories
+    categorias.forEach(cat => {
+      tabs.push({ id: cat.id, label: cat.nome });
+    });
+
+    // Add legacy themes only if they have courses and no category
+    TEMAS_LEGADO.forEach(t => {
+      const hasCourses = cursos.some(c => c.tema === t.id && !c.categoria_id);
+      if (hasCourses) {
+        tabs.push({ id: t.id, label: t.label });
+      }
+    });
+
+    return tabs;
+  }, [categorias, cursos]);
 
   const setTema = (tema: string) => {
     navigate({
