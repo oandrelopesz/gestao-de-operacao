@@ -257,7 +257,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                           <CommandList>
                             <CommandEmpty>
                               <div className="p-2 space-y-2">
-                                <p className="text-xs text-muted-foreground">Nenhuma categoria encontrada.</p>
+                                <p className="text-xs text-muted-foreground">Nenhum tema encontrado.</p>
                                 {searchQuery && (
                                   <Button 
                                     type="button"
