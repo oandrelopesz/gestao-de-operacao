@@ -245,7 +245,7 @@ export type Database = {
           data_recarga: string
           id: string
           metodo_pagamento:
-            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | Database["public"]["Enums"]["metodo_pagamento_simplificado"]
             | null
           observacoes: string | null
           saldo_ads_id: string
@@ -256,7 +256,7 @@ export type Database = {
           data_recarga?: string
           id?: string
           metodo_pagamento?:
-            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | Database["public"]["Enums"]["metodo_pagamento_simplificado"]
             | null
           observacoes?: string | null
           saldo_ads_id: string
@@ -267,7 +267,7 @@ export type Database = {
           data_recarga?: string
           id?: string
           metodo_pagamento?:
-            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | Database["public"]["Enums"]["metodo_pagamento_simplificado"]
             | null
           observacoes?: string | null
           saldo_ads_id?: string
@@ -297,10 +297,10 @@ export type Database = {
           created_at: string
           id: string
           metodo_pagamento:
-            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | Database["public"]["Enums"]["metodo_pagamento_simplificado"]
             | null
           observacoes: string | null
-          plataforma: Database["public"]["Enums"]["plataforma_enum"]
+          plataformas: string[]
           updated_at: string
           user_id: string
           verba_diaria: number | null
@@ -311,10 +311,10 @@ export type Database = {
           created_at?: string
           id?: string
           metodo_pagamento?:
-            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | Database["public"]["Enums"]["metodo_pagamento_simplificado"]
             | null
           observacoes?: string | null
-          plataforma: Database["public"]["Enums"]["plataforma_enum"]
+          plataformas?: string[]
           updated_at?: string
           user_id: string
           verba_diaria?: number | null
@@ -325,10 +325,10 @@ export type Database = {
           created_at?: string
           id?: string
           metodo_pagamento?:
-            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | Database["public"]["Enums"]["metodo_pagamento_simplificado"]
             | null
           observacoes?: string | null
-          plataforma?: Database["public"]["Enums"]["plataforma_enum"]
+          plataformas?: string[]
           updated_at?: string
           user_id?: string
           verba_diaria?: number | null
@@ -474,10 +474,10 @@ export type Database = {
           dias_restantes: number | null
           id: string | null
           metodo_pagamento:
-            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | Database["public"]["Enums"]["metodo_pagamento_simplificado"]
             | null
           observacoes: string | null
-          plataforma: Database["public"]["Enums"]["plataforma_enum"] | null
+          plataformas: string[] | null
           saldo_atual: number | null
           status_alerta: string | null
           total_recarregado: number | null
@@ -539,6 +539,7 @@ export type Database = {
         | "pix"
         | "boleto"
         | "outros"
+      metodo_pagamento_simplificado: "cartao" | "pix" | "boleto"
       nps_score_categoria: "ancora" | "saudavel" | "em_risco" | "critico"
       pagamento_status: "em_dia" | "pendente" | "atrasado"
       plataforma_enum: "meta" | "google" | "tiktok" | "outras"
@@ -703,6 +704,7 @@ export const Constants = {
         "boleto",
         "outros",
       ],
+      metodo_pagamento_simplificado: ["cartao", "pix", "boleto"],
       nps_score_categoria: ["ancora", "saudavel", "em_risco", "critico"],
       pagamento_status: ["em_dia", "pendente", "atrasado"],
       plataforma_enum: ["meta", "google", "tiktok", "outras"],
