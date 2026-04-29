@@ -340,6 +340,19 @@ function DemandasPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+        <Select value={filterAgencia} onValueChange={setFilterAgencia}>
+            <SelectTrigger className="w-[180px]">
+                <Building2 className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Filtrar por agência" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">Todas as agências</SelectItem>
+                {AGENCIAS.map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+
         <Select value={filterCliente} onValueChange={setFilterCliente}>
             <SelectTrigger className="w-[200px]">
                 <Filter className="w-4 h-4 mr-2" />
@@ -347,8 +360,12 @@ function DemandasPage() {
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">Todos os clientes</SelectItem>
-                {clientes.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                {clientes
+                  .filter(c => filterAgencia === "all" || c.agencia === filterAgencia)
+                  .map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome} — {AGENCIAS.find(a => a.id === c.agencia)?.label}
+                    </SelectItem>
                 ))}
             </SelectContent>
         </Select>
