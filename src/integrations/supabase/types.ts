@@ -20,6 +20,7 @@ export type Database = {
           arquivado: boolean
           created_at: string
           data_inicio: string
+          data_limite_verba: string | null
           em_onboarding: boolean | null
           id: string
           nicho: string | null
@@ -28,15 +29,18 @@ export type Database = {
           status_operacional:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
+          tipo_verba: Database["public"]["Enums"]["tipo_verba_enum"]
           updated_at: string
           user_id: string
           verba_ads: number
+          verba_total_contratada: number | null
         }
         Insert: {
           agencia?: Database["public"]["Enums"]["agencia_enum"]
           arquivado?: boolean
           created_at?: string
           data_inicio?: string
+          data_limite_verba?: string | null
           em_onboarding?: boolean | null
           id?: string
           nicho?: string | null
@@ -45,15 +49,18 @@ export type Database = {
           status_operacional?:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
+          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"]
           updated_at?: string
           user_id: string
           verba_ads?: number
+          verba_total_contratada?: number | null
         }
         Update: {
           agencia?: Database["public"]["Enums"]["agencia_enum"]
           arquivado?: boolean
           created_at?: string
           data_inicio?: string
+          data_limite_verba?: string | null
           em_onboarding?: boolean | null
           id?: string
           nicho?: string | null
@@ -62,9 +69,11 @@ export type Database = {
           status_operacional?:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
+          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"]
           updated_at?: string
           user_id?: string
           verba_ads?: number
+          verba_total_contratada?: number | null
         }
         Relationships: []
       }
@@ -525,6 +534,7 @@ export type Database = {
       pagamento_status: "em_dia" | "pendente" | "atrasado"
       plataforma_enum: "meta" | "google" | "tiktok" | "outras"
       status_operacional_type: "ativo" | "pausado" | "churn"
+      tipo_verba_enum: "mensal" | "total_periodo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -688,6 +698,7 @@ export const Constants = {
       pagamento_status: ["em_dia", "pendente", "atrasado"],
       plataforma_enum: ["meta", "google", "tiktok", "outras"],
       status_operacional_type: ["ativo", "pausado", "churn"],
+      tipo_verba_enum: ["mensal", "total_periodo"],
     },
   },
 } as const
