@@ -10,7 +10,8 @@ import {
   ChevronRight,
   User as UserIcon,
   Bell,
-  DollarSign
+  DollarSign,
+  Target
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
