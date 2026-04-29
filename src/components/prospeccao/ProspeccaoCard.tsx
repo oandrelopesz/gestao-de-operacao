@@ -21,6 +21,7 @@ export interface Lead {
   agencia_destino?: string;
   etapa: string;
   origem?: string;
+  origem_detalhe?: string;
   valor_estimado?: number;
   probabilidade?: number;
   data_proximo_contato?: string;
@@ -29,6 +30,7 @@ export interface Lead {
   data_fechamento?: string;
   data_perda?: string;
   motivo_perda?: string;
+  cliente_id?: string | null;
 }
 
 interface ProspeccaoCardProps {
