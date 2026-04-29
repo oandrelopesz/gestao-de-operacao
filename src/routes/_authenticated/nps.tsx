@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { Plus, Search, Building2, Filter, AlertTriangle, TrendingUp, Users, Target, AlertCircle } from "lucide-react";
+import { Plus, Search, Building2, Filter, AlertTriangle, TrendingUp, Users, Target, AlertCircle, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { NPS_SCORE_CATEGORIES } from "@/lib/nps";
+import { NPS_SCORE_CATEGORIES, isFridayToday, getDiasAteProximaSexta, getProximaSextaFormatada } from "@/lib/nps";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/_authenticated/nps")({
   component: NPSPage,
