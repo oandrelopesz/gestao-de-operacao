@@ -418,7 +418,10 @@ function DemandasPage() {
                       setEditingDemanda(demanda);
                       setIsModalOpen(true);
                     }}
-                    onDelete={handleDeleteDemanda}
+                    onDelete={(id, name) => {
+                      setDeletingId(id);
+                      setDeletingName(name);
+                    }}
                   />
                 ))}
               </div>
