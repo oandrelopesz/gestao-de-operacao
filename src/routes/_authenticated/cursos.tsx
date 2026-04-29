@@ -76,9 +76,10 @@ export const Route = createFileRoute("/_authenticated/cursos")({
 function CursosPage() {
   const navigate = useNavigate();
   const searchParams = Route.useSearch() as { tema?: string };
-  const currentTema = (searchParams.tema as Tema | "todos") || "todos";
+  const currentTema = (searchParams.tema as string) || "todos";
 
   const [cursos, setCursos] = useState<Curso[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
