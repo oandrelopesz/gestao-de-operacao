@@ -168,7 +168,7 @@ function DemandasPage() {
         status,
         user_id: user.id,
         cliente_id: clientes[0].id,
-        prioridade: "média",
+        prioridade: "media",
         ordem: maxOrder + 1
       }]);
 

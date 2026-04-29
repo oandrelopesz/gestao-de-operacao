@@ -45,7 +45,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
       descricao: initialValues?.descricao || "",
       cliente_id: initialValues?.cliente_id || "",
       status: initialValues?.status || "fazer_hoje",
-      prioridade: initialValues?.prioridade || "média",
+      prioridade: initialValues?.prioridade || "media",
       prazo: initialValues?.prazo || "",
     },
   });
@@ -134,7 +134,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="baixa">Baixa</SelectItem>
-                    <SelectItem value="média">Média</SelectItem>
+                    <SelectItem value="media">Média</SelectItem>
                     <SelectItem value="alta">Alta</SelectItem>
                     <SelectItem value="urgente">Urgente</SelectItem>
                   </SelectContent>
