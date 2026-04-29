@@ -404,7 +404,7 @@ function SaldoPage() {
                   <div>
                     <CardTitle className="text-base line-clamp-1">{item.cliente_nome}</CardTitle>
                     <Badge variant="outline" className="text-[10px] font-normal uppercase py-0 mt-1">
-                      {item.cliente_agencia}
+                      {AGENCIAS.find(a => a.id === item.cliente_agencia)?.label || item.cliente_agencia}
                     </Badge>
                   </div>
                   <DropdownMenu>

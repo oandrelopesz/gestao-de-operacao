@@ -122,7 +122,7 @@ export function NPSForm({ onSuccess, onClose, initialData }: NPSFormProps) {
               <SelectContent>
                 {clientes?.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.nome} — <span className="opacity-60 capitalize">{c.agencia}</span>
+                    {c.nome} — <span className="opacity-60">{c.agencia && c.agencia.charAt(0).toUpperCase() + c.agencia.slice(1)}</span>
                   </SelectItem>
                 ))}
               </SelectContent>

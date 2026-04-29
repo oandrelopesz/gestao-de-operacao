@@ -278,7 +278,9 @@ export type Database = {
           cliente_id: string
           created_at: string
           id: string
-          metodo_pagamento: Database["public"]["Enums"]["metodo_pagamento_enum"]
+          metodo_pagamento:
+            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | null
           observacoes: string | null
           plataforma: Database["public"]["Enums"]["plataforma_enum"]
           updated_at: string
@@ -290,7 +292,9 @@ export type Database = {
           cliente_id: string
           created_at?: string
           id?: string
-          metodo_pagamento?: Database["public"]["Enums"]["metodo_pagamento_enum"]
+          metodo_pagamento?:
+            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | null
           observacoes?: string | null
           plataforma: Database["public"]["Enums"]["plataforma_enum"]
           updated_at?: string
@@ -302,7 +306,9 @@ export type Database = {
           cliente_id?: string
           created_at?: string
           id?: string
-          metodo_pagamento?: Database["public"]["Enums"]["metodo_pagamento_enum"]
+          metodo_pagamento?:
+            | Database["public"]["Enums"]["metodo_pagamento_enum"]
+            | null
           observacoes?: string | null
           plataforma?: Database["public"]["Enums"]["plataforma_enum"]
           updated_at?: string

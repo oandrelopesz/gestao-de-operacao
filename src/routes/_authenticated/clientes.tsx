@@ -115,7 +115,8 @@ function ClientesPage() {
     const list = clientes.filter((c) => c.agencia === agencia);
     const total = list.length;
     const verbaTotal = list.reduce((s, c) => s + Number(c.verba_ads || 0), 0);
-    const verbaMedia = total > 0 ? verbaTotal / total : 0;
+    const clientesComVerba = list.filter((c) => Number(c.verba_ads || 0) > 0).length;
+    const verbaMedia = clientesComVerba > 0 ? verbaTotal / clientesComVerba : 0;
     const ancora = list.filter((c) => c.nps_status === "ancora").length;
     const saudavel = list.filter((c) => c.nps_status === "saudavel").length;
     const em_risco = list.filter((c) => c.nps_status === "em_risco").length;
@@ -456,6 +457,11 @@ function ClienteCard({
               {cliente.em_onboarding && (
                 <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
                   Onboarding
+                </Badge>
+              )}
+              {Number(cliente.verba_ads || 0) === 0 && (
+                <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
+                  Sem verba
                 </Badge>
               )}
             </div>
