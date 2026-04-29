@@ -35,17 +35,11 @@ import { toast } from "sonner";
 const courseSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   tema: z.enum(["ia", "trafego_pago", "trackeamento", "copywriting", "gestao", "vendas", "multiplos_temas", "outros"]),
-  link_area_membros: z.string().optional().transform((val) => {
-    if (!val) return val;
-    if (!val.startsWith("http://") && !val.startsWith("https://")) {
-      return `https://${val}`;
-    }
-    return val;
-  }),
-  login: z.string().optional(),
-  senha: z.string().optional(),
-  em_andamento: z.boolean().default(false),
-  observacoes: z.string().optional(),
+  link_area_membros: z.string().optional().or(z.literal("")),
+  login: z.string().optional().or(z.literal("")),
+  senha: z.string().optional().or(z.literal("")),
+  em_andamento: z.boolean(),
+  observacoes: z.string().optional().or(z.literal("")),
 });
 
 type CourseFormValues = z.infer<typeof courseSchema>;
@@ -75,43 +69,55 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   });
 
   useEffect(() => {
-    if (editingCourse) {
-      form.reset({
-        nome: editingCourse.nome,
-        tema: editingCourse.tema,
-        link_area_membros: editingCourse.link_area_membros || "",
-        login: editingCourse.login || "",
-        senha: editingCourse.senha || "",
-        em_andamento: !!editingCourse.em_andamento,
-        observacoes: editingCourse.observacoes || "",
-      });
-    } else {
-      form.reset({
-        nome: "",
-        tema: "outros",
-        link_area_membros: "",
-        login: "",
-        senha: "",
-        em_andamento: false,
-        observacoes: "",
-      });
+    if (open) {
+      if (editingCourse) {
+        form.reset({
+          nome: editingCourse.nome || "",
+          tema: (editingCourse.tema as any) || "outros",
+          link_area_membros: editingCourse.link_area_membros || "",
+          login: editingCourse.login || "",
+          senha: editingCourse.senha || "",
+          em_andamento: !!editingCourse.em_andamento,
+          observacoes: editingCourse.observacoes || "",
+        });
+      } else {
+        form.reset({
+          nome: "",
+          tema: "outros",
+          link_area_membros: "",
+          login: "",
+          senha: "",
+          em_andamento: false,
+          observacoes: "",
+        });
+      }
     }
   }, [editingCourse, open, form]);
 
   const onSubmit = async (values: CourseFormValues) => {
     setLoading(true);
     try {
+      let finalLink = values.link_area_membros;
+      if (finalLink && !finalLink.startsWith("http://") && !finalLink.startsWith("https://")) {
+        finalLink = `https://${finalLink}`;
+      }
+
+      const payload = {
+        ...values,
+        link_area_membros: finalLink,
+      };
+
       if (editingCourse) {
         const { error } = await supabase
           .from("cursos")
-          .update(values)
+          .update(payload)
           .eq("id", editingCourse.id);
         if (error) throw error;
         toast.success("Curso atualizado!");
       } else {
         const { error } = await supabase
           .from("cursos")
-          .insert([values]);
+          .insert([payload]);
         if (error) throw error;
         toast.success("Curso criado!");
       }
@@ -154,7 +160,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tema</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione um tema" />
