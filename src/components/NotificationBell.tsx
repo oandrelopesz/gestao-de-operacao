@@ -49,7 +49,17 @@ export function NotificationBell() {
   useEffect(() => {
     fetchAlertas();
     
-    // Inscrever para mudanças (opcional, mas bom para tempo real)
+    // Carregar IDs ocultos do localStorage
+    const saved = localStorage.getItem("hidden_notification_ids");
+    if (saved) {
+      try {
+        setHiddenIds(JSON.parse(saved));
+      } catch (e) {
+        console.error("Erro ao carregar notificações ocultas", e);
+      }
+    }
+    
+    // Inscrever para mudanças
     const channel = supabase
       .channel('saldo-alertas')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'saldo_ads' }, () => {
@@ -65,7 +75,17 @@ export function NotificationBell() {
     };
   }, []);
 
-  const count = alertas.length;
+  const handleClearAll = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const allIds = alertas.map(a => a.id);
+    const newHiddenIds = Array.from(new Set([...hiddenIds, ...allIds]));
+    setHiddenIds(newHiddenIds);
+    localStorage.setItem("hidden_notification_ids", JSON.stringify(newHiddenIds));
+  };
+
+  const visibleAlertas = alertas.filter(a => !hiddenIds.includes(a.id));
+  const count = visibleAlertas.length;
 
   return (
     <DropdownMenu>
