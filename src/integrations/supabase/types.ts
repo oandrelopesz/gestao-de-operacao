@@ -25,6 +25,9 @@ export type Database = {
           nicho: string | null
           nome: string
           observacoes: string | null
+          status_operacional:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
           updated_at: string
           user_id: string
           verba_ads: number
@@ -39,6 +42,9 @@ export type Database = {
           nicho?: string | null
           nome: string
           observacoes?: string | null
+          status_operacional?:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
           updated_at?: string
           user_id: string
           verba_ads?: number
@@ -53,6 +59,9 @@ export type Database = {
           nicho?: string | null
           nome?: string
           observacoes?: string | null
+          status_operacional?:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
           updated_at?: string
           user_id?: string
           verba_ads?: number
@@ -341,11 +350,15 @@ export type Database = {
           created_at: string | null
           data_inicio: string | null
           demandas_ativas: number | null
+          em_onboarding: boolean | null
           id: string | null
           nicho: string | null
           nome: string | null
           nps_status: Database["public"]["Enums"]["nps_score_categoria"] | null
           observacoes: string | null
+          status_operacional:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
           ultima_nps_data: string | null
           ultima_nps_score: number | null
           updated_at: string | null
@@ -358,11 +371,15 @@ export type Database = {
           created_at?: string | null
           data_inicio?: string | null
           demandas_ativas?: never
+          em_onboarding?: boolean | null
           id?: string | null
           nicho?: string | null
           nome?: string | null
           nps_status?: never
           observacoes?: string | null
+          status_operacional?:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
           ultima_nps_data?: never
           ultima_nps_score?: never
           updated_at?: string | null
@@ -375,11 +392,15 @@ export type Database = {
           created_at?: string | null
           data_inicio?: string | null
           demandas_ativas?: never
+          em_onboarding?: boolean | null
           id?: string | null
           nicho?: string | null
           nome?: string | null
           nps_status?: never
           observacoes?: string | null
+          status_operacional?:
+            | Database["public"]["Enums"]["status_operacional_type"]
+            | null
           ultima_nps_data?: never
           ultima_nps_score?: never
           updated_at?: string | null
@@ -503,6 +524,7 @@ export type Database = {
       nps_score_categoria: "ancora" | "saudavel" | "em_risco" | "critico"
       pagamento_status: "em_dia" | "pendente" | "atrasado"
       plataforma_enum: "meta" | "google" | "tiktok" | "outras"
+      status_operacional_type: "ativo" | "pausado" | "churn"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -665,6 +687,7 @@ export const Constants = {
       nps_score_categoria: ["ancora", "saudavel", "em_risco", "critico"],
       pagamento_status: ["em_dia", "pendente", "atrasado"],
       plataforma_enum: ["meta", "google", "tiktok", "outras"],
+      status_operacional_type: ["ativo", "pausado", "churn"],
     },
   },
 } as const
