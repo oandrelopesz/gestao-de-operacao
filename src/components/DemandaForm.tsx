@@ -188,7 +188,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
             <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
               <FormField
                 control={form.control}
-                name="frequencia"
+                name="frequencia_tipo"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Frequência</FormLabel>
@@ -212,12 +212,12 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
               />
               <FormField
                 control={form.control}
-                name="dia_referencia"
+                name="frequencia_intervalo_dias"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Dia de Referência</FormLabel>
+                    <FormLabel>Intervalo (dias)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: Toda segunda" {...field} value={field.value || ""} />
+                      <Input type="number" placeholder="Ex: 3" {...field} value={field.value || ""} onChange={e => field.onChange(parseInt(e.target.value))} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
