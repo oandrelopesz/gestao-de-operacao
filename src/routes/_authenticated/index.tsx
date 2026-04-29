@@ -86,7 +86,8 @@ function DemandasPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedDemanda, setSelectedDemanda] = useState<any | null>(null);
   const [showCalendar, setShowCalendar] = useState(() => {
-    const saved = localStorage.getItem("demandas_calendar_visible");
+    if (typeof window === "undefined") return true;
+    const saved = window.localStorage.getItem("demandas_calendar_visible");
     return saved !== null ? JSON.parse(saved) : true;
   });
   const [calendarMode, setCalendarMode] = useState<"7days" | "30days">("7days");
