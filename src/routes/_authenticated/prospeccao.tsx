@@ -271,7 +271,7 @@ function ProspeccaoPage() {
 
   const handleUpdateLead = async (id: string, values: Partial<Lead>) => {
     try {
-      const { error } = await supabase.from("prospeccao").update(values).eq("id", id);
+      const { error } = await supabase.from("prospeccao").update(values as any).eq("id", id);
       if (error) throw error;
       setLeads(prev => prev.map(l => l.id === id ? { ...l, ...values } : l));
       if (selectedLead?.id === id) setSelectedLead(prev => prev ? { ...prev, ...values } : null);
@@ -290,15 +290,17 @@ function ProspeccaoPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       
-      const { data: newClient, error } = await supabase.from("clientes").insert([{
+      const payload: any = {
         ...values,
         user_id: user.id
-      }]).select().single();
+      };
+      
+      const { data: newClient, error } = await supabase.from("clientes").insert([payload]).select().single();
       
       if (error) throw error;
       
       if (selectedLead) {
-        await supabase.from("prospeccao").update({ cliente_id: newClient.id }).eq("id", selectedLead.id);
+        await supabase.from("prospeccao").update({ cliente_id: newClient.id } as any).eq("id", selectedLead.id);
         fetchLeads();
       }
       
