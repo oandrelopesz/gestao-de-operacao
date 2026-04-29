@@ -31,6 +31,7 @@ export interface Lead {
   data_perda?: string;
   motivo_perda?: string;
   cliente_id?: string | null;
+  created_at?: string;
 }
 
 interface ProspeccaoCardProps {
