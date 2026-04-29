@@ -147,7 +147,13 @@ export function KanbanColumn({
 
         {isAdding && (
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md p-2 mb-2 shadow-sm animate-in fade-in zoom-in duration-200">
-            <form onSubmit={handleQuickAdd}>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const event = (e as any).nativeEvent;
+              onQuickAdd(id, quickTitle, event);
+              setQuickTitle("");
+              if (inputRef.current) inputRef.current.focus();
+            }}>
               <Input
                 ref={inputRef}
                 placeholder="Nova tarefa..."
