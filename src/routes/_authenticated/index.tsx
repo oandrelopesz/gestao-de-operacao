@@ -156,25 +156,36 @@ function DemandasPage() {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63'; // ID consolidado para acesso sem login
+      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
 
+      // Sanitize values
+      const sanitizedValues: any = { ...values };
+      if (sanitizedValues.cliente_id === "" || sanitizedValues.cliente_id === "none") {
+        sanitizedValues.cliente_id = null;
+      }
+      if (sanitizedValues.prazo === "") {
+        sanitizedValues.prazo = null;
+      }
+      if (sanitizedValues.frequencia_dia_mes === "") {
+        sanitizedValues.frequencia_dia_mes = null;
+      }
+      if (sanitizedValues.frequencia_intervalo_dias === "" || isNaN(sanitizedValues.frequencia_intervalo_dias)) {
+        sanitizedValues.frequencia_intervalo_dias = null;
+      }
 
       if (editingDemanda?.id) {
-        // Update
         const { error } = await supabase
           .from("demandas")
-          .update({ ...values })
+          .update(sanitizedValues)
           .eq("id", editingDemanda.id);
         if (error) throw error;
         toast.success("Demanda atualizada!");
       } else {
-        // Create
-        // Get max order for this column
-        const columnDemandas = demandas.filter(d => d.status === values.status);
+        const columnDemandas = demandas.filter(d => d.status === sanitizedValues.status);
         const maxOrder = columnDemandas.length > 0 ? Math.max(...columnDemandas.map(d => d.ordem || 0)) : -1;
         
         const { error } = await supabase.from("demandas").insert([{
-          ...values,
+          ...sanitizedValues,
           user_id: userId,
           ordem: maxOrder + 1
         }]);

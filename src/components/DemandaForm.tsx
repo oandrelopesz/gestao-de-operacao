@@ -23,7 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 const demandaSchema = z.object({
   titulo: z.string().min(2, "Título é obrigatório"),
   descricao: z.string().nullable().optional(),
-  cliente_id: z.string().min(1, "Selecione um cliente").nullable().optional(),
+  cliente_id: z.string().optional().nullable().or(z.literal("")),
   status: z.enum(["recorrentes", "fazer_hoje", "fazer_amanha", "fazer_depois_amanha", "standby", "feito"]),
   prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
   prazo: z.string().nullable().optional(),
@@ -85,7 +85,7 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
               <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione um cliente" />
+                    <SelectValue placeholder="Sem cliente (opcional)" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
