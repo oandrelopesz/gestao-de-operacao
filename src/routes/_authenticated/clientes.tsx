@@ -271,7 +271,7 @@ function ClientesPage() {
                   </h2>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {clientes.filter(c => c.status_operacional === "ativo" && (c.verba_ads > 0 || c.verba_total_contratada > 0)).length} clientes ativos em {new Set(clientes.filter(c => c.status_operacional === "ativo").map(c => c.agencia)).size} agências
+                  {clientes.filter(c => c.status_operacional === "ativo" && (Number(c.verba_ads || 0) > 0 || Number(c.verba_total_contratada || 0) > 0)).length} clientes ativos em {new Set(clientes.filter(c => c.status_operacional === "ativo").map(c => c.agencia)).size} agências
                 </p>
               </div>
 
@@ -304,7 +304,7 @@ function ClientesPage() {
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Verba média / cliente</p>
                 <p className="text-xl font-bold">
                   {(() => {
-                    const ativosComVerba = clientes.filter(c => c.status_operacional === "ativo" && (c.verba_ads > 0 || c.verba_total_contratada > 0));
+                    const ativosComVerba = clientes.filter(c => c.status_operacional === "ativo" && (Number(c.verba_ads || 0) > 0 || Number(c.verba_total_contratada || 0) > 0));
                     if (ativosComVerba.length === 0) return "R$ 0,00";
                     const totalVerba = ativosComVerba.reduce((acc, c) => {
                       if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
