@@ -22,11 +22,36 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
+import { Badge } from "@/components/ui/badge";
+import { X, Plus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const PLATAFORMAS_DISPONIVEIS = [
+  "Meta",
+  "Google",
+  "Pinterest",
+  "X Ads",
+  "LinkedIn",
+  "TikTok",
+  "Taboola",
+  "Outbrain"
+];
+
+const METODOS_PAGAMENTO = [
+  { value: "cartao", label: "Cartão" },
+  { value: "pix", label: "Pix" },
+  { value: "boleto", label: "Boleto" }
+];
 
 const saldoAdsSchema = z.object({
   cliente_id: z.string().min(1, "Selecione um cliente"),
-  plataforma: z.enum(["meta", "google", "tiktok", "outras"]),
-  metodo_pagamento: z.enum(["dinheiro", "cartao_credito", "cartao_debito", "pix", "boleto", "outros"]),
+  plataformas: z.array(z.string()).min(1, "Selecione pelo menos uma plataforma"),
+  metodo_pagamento: z.enum(["cartao", "pix", "boleto"]),
   verba_diaria: z.number().min(0, "Valor inválido").optional().nullable(),
   observacoes: z.string().optional(),
 });
@@ -46,8 +71,8 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
     resolver: zodResolver(saldoAdsSchema),
     defaultValues: {
       cliente_id: initialValues?.cliente_id || "",
-      plataforma: initialValues?.plataforma || "meta",
-      metodo_pagamento: initialValues?.metodo_pagamento || "outros",
+      plataformas: initialValues?.plataformas || [],
+      metodo_pagamento: initialValues?.metodo_pagamento || "pix",
       verba_diaria: initialValues?.verba_diaria ?? undefined,
       observacoes: initialValues?.observacoes || "",
     },
@@ -65,7 +90,6 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
     fetchClientes();
   }, []);
 
-  // Update verba_diaria when cliente_id changes and it's a new record
   const selectedClienteId = form.watch("cliente_id");
   useEffect(() => {
     if (!initialValues?.cliente_id && selectedClienteId) {
@@ -85,6 +109,18 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
       }
     }
   }, [selectedClienteId, clientes]);
+
+  const removePlataforma = (plat: string) => {
+    const current = form.getValues("plataformas");
+    form.setValue("plataformas", current.filter(p => p !== plat), { shouldValidate: true });
+  };
+
+  const addPlataforma = (plat: string) => {
+    const current = form.getValues("plataformas");
+    if (!current.includes(plat)) {
+      form.setValue("plataformas", [...current, plat], { shouldValidate: true });
+    }
+  };
 
   return (
     <Form {...form}>
@@ -114,26 +150,41 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="plataforma"
+            name="plataformas"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Plataforma</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="meta">Meta</SelectItem>
-                    <SelectItem value="google">Google Ads</SelectItem>
-                    <SelectItem value="tiktok">TikTok Ads</SelectItem>
-                    <SelectItem value="outras">Outras</SelectItem>
-                  </SelectContent>
-                </Select>
+              <FormItem className="flex flex-col">
+                <FormLabel>Plataformas</FormLabel>
+                <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md items-center">
+                  {field.value.map((plat) => (
+                    <Badge key={plat} variant="secondary" className="gap-1 pr-1">
+                      {plat}
+                      <button
+                        type="button"
+                        onClick={() => removePlataforma(plat)}
+                        className="hover:text-destructive"
+                      >
+                        <X size={12} />
+                      </button>
+                    </Badge>
+                  ))}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full">
+                        <Plus size={14} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {PLATAFORMAS_DISPONIVEIS.filter(p => !field.value.includes(p)).map((plat) => (
+                        <DropdownMenuItem key={plat} onClick={() => addPlataforma(plat)}>
+                          {plat}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -151,12 +202,9 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                    <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
-                    <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
-                    <SelectItem value="pix">PIX</SelectItem>
-                    <SelectItem value="boleto">Boleto</SelectItem>
-                    <SelectItem value="outros">Outros</SelectItem>
+                    {METODOS_PAGAMENTO.map(m => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />

@@ -76,6 +76,7 @@ interface ClienteView {
   verba_total_contratada: number | null;
   data_limite_verba: string | null;
   saldo_ads_summary?: string;
+  plataformas_ativas?: string[];
 }
 
 function ClientesPage() {
@@ -104,16 +105,18 @@ function ClientesPage() {
     if (error) { toast.error("Erro ao carregar clientes"); console.error(error); }
     else {
       // Fetch platform summary for each client
-      const { data: saldos } = await supabase.from("saldo_ads_view").select("cliente_id, plataforma, verba_diaria_calc");
+      const { data: saldos } = await supabase.from("saldo_ads_view").select("cliente_id, plataformas, verba_diaria_calc");
       
       const enrichedData = (data as any[] || []).map(cli => {
         const cliSaldos = (saldos || []).filter(s => s.cliente_id === cli.id);
         const summary = cliSaldos.map(s => {
-          const platName = s.plataforma ? s.plataforma.charAt(0).toUpperCase() + s.plataforma.slice(1) : "Outras";
+          const platNames = s.plataformas && s.plataformas.length > 0 ? s.plataformas.join(", ") : "Outras";
           const verba = (s.verba_diaria_calc || 0) * 30;
-          return `${platName} ${formatBRL(verba)}`;
+          return `${platNames} ${formatBRL(verba)}`;
         }).join(" / ");
-        return { ...cli, saldo_ads_summary: summary };
+        const allPlats = cliSaldos.flatMap(s => s.plataformas || []);
+        const uniquePlats = Array.from(new Set(allPlats));
+        return { ...cli, saldo_ads_summary: summary, plataformas_ativas: uniquePlats };
       });
       
       setClientes(enrichedData);
@@ -548,6 +551,15 @@ function ClienteCard({
               ? formatBRL(cliente.verba_total_contratada || 0) 
               : formatBRL(cliente.verba_ads)}
           </p>
+          {cliente.plataformas_ativas && cliente.plataformas_ativas.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2 mb-1">
+              {cliente.plataformas_ativas.map(plat => (
+                <Badge key={plat} variant="outline" className="text-[9px] h-4 px-1.5 font-normal">
+                  {plat}
+                </Badge>
+              ))}
+            </div>
+          )}
           {cliente.saldo_ads_summary && (
             <p className="text-[10px] text-muted-foreground mt-1 font-medium border-t pt-1 italic">
               {cliente.saldo_ads_summary}

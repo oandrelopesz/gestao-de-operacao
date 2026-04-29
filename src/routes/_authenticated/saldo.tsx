@@ -68,10 +68,14 @@ export const Route = createFileRoute("/_authenticated/saldo")({
 });
 
 const PLATAFORMAS = [
-  { id: "meta", label: "Meta", color: "bg-blue-500" },
-  { id: "google", label: "Google", color: "bg-red-500" },
-  { id: "tiktok", label: "TikTok", color: "bg-black" },
-  { id: "outras", label: "Outras", color: "bg-gray-500" },
+  { id: "Meta", label: "Meta", color: "bg-blue-500" },
+  { id: "Google", label: "Google", color: "bg-red-500" },
+  { id: "Pinterest", label: "Pinterest", color: "bg-rose-500" },
+  { id: "X Ads", label: "X Ads", color: "bg-black" },
+  { id: "LinkedIn", label: "LinkedIn", color: "bg-blue-700" },
+  { id: "TikTok", label: "TikTok", color: "bg-zinc-800" },
+  { id: "Taboola", label: "Taboola", color: "bg-blue-400" },
+  { id: "Outbrain", label: "Outbrain", color: "bg-orange-500" },
 ];
 
 const STATUS_ALERTA = [
@@ -211,7 +215,7 @@ function SaldoPage() {
   const filteredData = useMemo(() => {
     let result = data.filter(item => {
       const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
-      const matchesPlataforma = filterPlataforma === "all" || item.plataforma === filterPlataforma;
+      const matchesPlataforma = filterPlataforma === "all" || item.plataformas?.includes(filterPlataforma);
       const matchesStatus = filterStatus === "all" || item.status_alerta === filterStatus;
       const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
       const isPausado = item.clientes?.status_operacional === "pausado";
@@ -434,12 +438,12 @@ function SaldoPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[140px]">
-                      <DropdownMenuItem onClick={() => { setEditing(item); setModalOpen(true); }}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(item); setModalOpen(true); }}>
                         <Pencil size={14} className="mr-2" /> Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         className="text-destructive focus:text-destructive" 
-                        onClick={() => setDeletingId(item.id)}
+                        onClick={(e) => { e.stopPropagation(); setDeletingId(item.id); }}
                       >
                         <Trash2 size={14} className="mr-2" /> Remover
                       </DropdownMenuItem>
@@ -448,10 +452,14 @@ function SaldoPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Badge className={cn("capitalize", PLATAFORMAS.find(p => p.id === item.plataforma)?.color)}>
-                    {item.plataforma}
-                  </Badge>
+                <div className="flex items-start justify-between">
+                  <div className="flex flex-wrap gap-1">
+                    {item.plataformas?.map((plat: string) => (
+                      <Badge key={plat} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find(p => p.id === plat)?.color)}>
+                        {plat}
+                      </Badge>
+                    ))}
+                  </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold tracking-tight text-primary">
                       {formatBRL(item.saldo_atual)}
@@ -516,7 +524,7 @@ function SaldoPage() {
             onSubmit={handleSave}
             initialValues={editing ? {
               cliente_id: editing.cliente_id,
-              plataforma: editing.plataforma,
+              plataformas: editing.plataformas || [],
               metodo_pagamento: editing.metodo_pagamento,
               verba_diaria: editing.verba_diaria,
               observacoes: editing.observacoes,
@@ -549,7 +557,7 @@ function SaldoPage() {
               Histórico de Recargas
             </SheetTitle>
             <SheetDescription>
-              {selectedForHistory?.cliente_nome} — <span className="capitalize">{selectedForHistory?.plataforma}</span>
+              {selectedForHistory?.cliente_nome} — {selectedForHistory?.plataformas?.join(", ")}
             </SheetDescription>
           </SheetHeader>
           

@@ -25,7 +25,7 @@ import { useState } from "react";
 const recargaSchema = z.object({
   data_recarga: z.string().min(1, "Data é obrigatória"),
   valor: z.number().min(0.01, "Valor deve ser maior que zero"),
-  metodo_pagamento: z.enum(["dinheiro", "cartao_credito", "cartao_debito", "pix", "boleto", "outros"]).optional().nullable(),
+  metodo_pagamento: z.enum(["cartao", "pix", "boleto"]).optional().nullable(),
   observacoes: z.string().optional(),
 });
 
@@ -106,12 +106,9 @@ export function RecargaForm({ defaultMetodo, onSubmit, loading }: RecargaFormPro
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
-                  <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
+                  <SelectItem value="cartao">Cartão</SelectItem>
                   <SelectItem value="pix">PIX</SelectItem>
                   <SelectItem value="boleto">Boleto</SelectItem>
-                  <SelectItem value="outros">Outros</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
