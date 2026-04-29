@@ -292,9 +292,19 @@ function ClientesPage() {
             <TableBody>
               {filtered.map((c) => {
                 const nps = NPS_STATUS_META[c.nps_status];
-                const pag = c.status_pagamento_mes ? PAGAMENTO_META[c.status_pagamento_mes] : null;
+                const pag = cliente.status_pagamento_mes ? PAGAMENTO_META[cliente.status_pagamento_mes] : null;
                 return (
-                  <TableRow key={c.id}>
+                  <TableRow 
+                    key={c.id}
+                    className="group outline-none focus:bg-muted/50"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Delete" || e.key === "Backspace") {
+                        setDeletingId(c.id);
+                        setDeletingName(c.nome);
+                      }
+                    }}
+                  >
                     <TableCell className="font-medium">{c.nome}</TableCell>
                     <TableCell className="text-muted-foreground">{c.nicho || "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{tempoDeCasa(c.data_inicio)}</TableCell>
