@@ -104,7 +104,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   };
 
   const handleAddCategory = async (nameOverride?: string) => {
-    const nameToUse = nameOverride || newCategoryName;
+    const nameToUse = nameOverride || searchQuery;
     if (!nameToUse.trim()) return;
     
     try {
@@ -122,8 +122,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       toast.success("Categoria criada!");
       setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
       form.setValue("categoria_id", data.id);
-      setNewCategoryName("");
-      setIsAddingCategory(false);
+      setSearchQuery("");
       return data.id;
     } catch (error: any) {
       toast.error("Erro ao criar categoria");
