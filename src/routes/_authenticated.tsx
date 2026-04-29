@@ -11,7 +11,8 @@ import {
   User as UserIcon,
   Bell,
   DollarSign,
-  Target
+  Target,
+  BookOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
