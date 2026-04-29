@@ -216,24 +216,40 @@ function SaldoPage() {
 
   const filteredData = useMemo(() => {
     let result = data.filter(item => {
+      const isCartao = item.metodo_pagamento === "cartao";
       const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
       const matchesPlataforma = filterPlataforma === "all" || item.plataformas?.includes(filterPlataforma);
-      const matchesStatus = filterStatus === "all" || item.status_alerta === filterStatus;
+      
+      let matchesStatus = filterStatus === "all" || item.status_alerta === filterStatus;
+      if (filterStatus === "cartao") {
+        matchesStatus = isCartao;
+      } else if (filterStatus !== "all" && isCartao) {
+        // If filtering by status but it's a card (which has its own status), exclude unless it's specifically cartao filter
+        matchesStatus = false;
+      }
+
       const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
       const isPausado = item.clientes?.status_operacional === "pausado";
       const matchesPausados = showPausados || !isPausado;
-      return matchesAgencia && matchesPlataforma && matchesStatus && matchesSearch && matchesPausados;
+      const matchesCartao = showCartao || !isCartao;
+
+      return matchesAgencia && matchesPlataforma && matchesStatus && matchesSearch && matchesPausados && matchesCartao;
     });
 
     result.sort((a, b) => {
-      if (sortBy === "dias_restantes") return (a.dias_restantes || 0) - (b.dias_restantes || 0);
+      // Put card items at the end when sorting by days remaining
+      if (sortBy === "dias_restantes") {
+        if (a.metodo_pagamento === "cartao" && b.metodo_pagamento !== "cartao") return 1;
+        if (a.metodo_pagamento !== "cartao" && b.metodo_pagamento === "cartao") return -1;
+        return (a.dias_restantes || 0) - (b.dias_restantes || 0);
+      }
       if (sortBy === "nome") return (a.cliente_nome || "").localeCompare(b.cliente_nome || "");
       if (sortBy === "valor") return (b.saldo_atual || 0) - (a.saldo_atual || 0);
       return 0;
     });
 
     return result;
-  }, [data, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy]);
+  }, [data, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy, showPausados, showCartao]);
 
   const metrics = useMemo(() => {
     return {
