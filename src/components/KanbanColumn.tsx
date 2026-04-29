@@ -25,7 +25,7 @@ interface KanbanColumnProps {
   onQuickAdd: (status: string, title: string) => Promise<void>;
   onFullAdd: (status: string) => void;
   onEdit: (demanda: Demanda) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, name: string) => void;
 }
 
 export function KanbanColumn({

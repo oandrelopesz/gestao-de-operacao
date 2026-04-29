@@ -13,6 +13,16 @@ import { NPSCard } from "@/components/NPSCard";
 import { NPSForm } from "@/components/NPSForm";
 import { NPSHistoryDrawer } from "@/components/NPSHistoryDrawer";
 import { Dialog } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { NPS_SCORE_CATEGORIES } from "@/lib/nps";
 
@@ -28,6 +38,8 @@ function NPSPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAvaliacao, setEditingAvaliacao] = useState<any>(null);
   const [selectedCliente, setSelectedCliente] = useState<any>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingName, setDeletingName] = useState<string>("");
 
   const { data: avaliacoes, isLoading } = useQuery({
     queryKey: ["nps-avaliacoes"],
@@ -213,7 +225,10 @@ function NPSPage() {
                   setEditingAvaliacao(a);
                   setIsFormOpen(true);
                 }}
-                onDelete={(id) => deleteMutation.mutate(id)}
+                onDelete={(id) => {
+                  setDeletingId(id);
+                  setDeletingName(item.clientes?.nome || "esta avaliação");
+                }}
                 onClick={(a) => setSelectedCliente({ id: a.cliente_id, nome: a.clientes?.nome, agencia: a.clientes?.agencia })}
               />
             ))}
@@ -241,6 +256,29 @@ function NPSPage() {
           onClose={() => setSelectedCliente(null)} 
         />
       )}
+
+      <AlertDialog open={!!deletingId} onOpenChange={(o) => { if (!o) setDeletingId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza que deseja remover?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A avaliação de {deletingName} será permanentemente deletada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (deletingId) deleteMutation.mutate(deletingId);
+                setDeletingId(null);
+              }} 
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

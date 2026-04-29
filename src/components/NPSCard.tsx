@@ -1,10 +1,10 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Edit2, Trash2, Calendar, Target, Users, BarChart3, TrendingUp, Sparkles } from "lucide-react";
+import { MoreVertical, Edit2, Trash2, Calendar, Target } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { getScoreCategory, getMetricColor, getMetricLabel } from "@/lib/nps";
+import { getScoreCategory, getMetricColor } from "@/lib/nps";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -27,10 +27,17 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
 
   return (
     <Card 
-      className="group hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-muted-foreground/10"
+      className="group hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-muted-foreground/10 outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
       onClick={() => onClick(avaliacao)}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Delete" || e.key === "Backspace") {
+          e.stopPropagation();
+          onDelete(avaliacao.id);
+        }
+      }}
     >
-      <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0">
+      <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0 relative">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-lg leading-tight">{avaliacao.clientes?.nome}</h3>
@@ -47,24 +54,26 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
           </div>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-              <MoreVertical size={16} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(avaliacao); }}>
-              <Edit2 size={14} className="mr-2" /> Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              className="text-destructive" 
-              onClick={(e) => { e.stopPropagation(); onDelete(avaliacao.id); }}
-            >
-              <Trash2 size={14} className="mr-2" /> Remover
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical size={16} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[140px]">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(avaliacao); }}>
+                <Edit2 size={14} className="mr-2" /> Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="text-destructive focus:text-destructive" 
+                onClick={(e) => { e.stopPropagation(); onDelete(avaliacao.id); }}
+              >
+                <Trash2 size={14} className="mr-2" /> Remover
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-4">

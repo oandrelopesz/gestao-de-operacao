@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Filter, List, Kanban as KanbanIcon, Search, Building2 } from "lucide-react";
+import { Plus, Filter, List, Kanban as KanbanIcon, Search, Building2, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DemandaForm, DemandaFormValues } from "@/components/DemandaForm";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +54,7 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { KanbanCard } from "@/components/KanbanCard";
+import { cn } from "@/lib/utils";
 
 const COLUMNS = [
   { id: "fazer_hoje", title: "Fazer hoje" },
@@ -62,6 +79,8 @@ function DemandasPage() {
   const [filterCliente, setFilterCliente] = useState<string>("all");
   const [filterAgencia, setFilterAgencia] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingName, setDeletingName] = useState<string>("");
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -181,15 +200,17 @@ function DemandasPage() {
     }
   };
 
-  const handleDeleteDemanda = async (id: string) => {
-    if (!confirm("Tem certeza que deseja deletar esta demanda?")) return;
+  const handleDeleteDemanda = async () => {
+    if (!deletingId) return;
     try {
-      const { error } = await supabase.from("demandas").delete().eq("id", id);
+      const { error } = await supabase.from("demandas").delete().eq("id", deletingId);
       if (error) throw error;
       toast.success("Demanda deletada!");
       fetchDemandas();
     } catch (error: any) {
       toast.error(error.message || "Erro ao deletar");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -397,7 +418,10 @@ function DemandasPage() {
                       setEditingDemanda(demanda);
                       setIsModalOpen(true);
                     }}
-                    onDelete={handleDeleteDemanda}
+                    onDelete={(id, name) => {
+                      setDeletingId(id);
+                      setDeletingName(name);
+                    }}
                   />
                 ))}
               </div>
@@ -479,6 +503,26 @@ function DemandasPage() {
           />
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deletingId} onOpenChange={(o) => { if (!o) setDeletingId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza que deseja remover?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A demanda "{deletingName}" será permanentemente deletada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteDemanda} 
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

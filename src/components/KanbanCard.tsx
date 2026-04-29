@@ -27,7 +27,7 @@ interface Demanda {
 interface KanbanCardProps {
   demanda: Demanda;
   onEdit: (demanda: Demanda) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, name: string) => void;
 }
 
 const priorityColors = {
@@ -55,8 +55,20 @@ export function KanbanCard({ demanda, onEdit, onDelete }: KanbanCardProps) {
 
   const isDone = demanda.status === "feito";
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Delete" || e.key === "Backspace") {
+      onDelete(demanda.id, demanda.titulo);
+    }
+  };
+
   return (
-    <div ref={setNodeRef} style={style} className="group relative">
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className="group relative outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 rounded-lg"
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+    >
       <Card
         className={cn(
           "mb-3 cursor-grab active:cursor-grabbing hover:border-primary/50 transition-colors bg-card",
@@ -84,7 +96,7 @@ export function KanbanCard({ demanda, onEdit, onDelete }: KanbanCardProps) {
                     <MoreVertical size={14} />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-32">
+                <DropdownMenuContent align="end" className="w-[140px]">
                   <DropdownMenuItem onClick={() => onEdit(demanda)} className="gap-2">
                     <Pencil size={14} /> Editar
                   </DropdownMenuItem>
@@ -92,10 +104,10 @@ export function KanbanCard({ demanda, onEdit, onDelete }: KanbanCardProps) {
                     <Copy size={14} /> Duplicar
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => onDelete(demanda.id)} 
+                    onClick={() => onDelete(demanda.id, demanda.titulo)} 
                     className="gap-2 text-destructive focus:text-destructive"
                   >
-                    <Trash2 size={14} /> Deletar
+                    <Trash2 size={14} /> Remover
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
