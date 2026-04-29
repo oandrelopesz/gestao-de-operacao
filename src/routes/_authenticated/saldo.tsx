@@ -1,9 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
-import { DollarSign, Receipt, Clock, AlertCircle, Plus, Search, Building2, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { 
+  DollarSign, 
+  Receipt, 
+  Clock, 
+  AlertCircle, 
+  Plus, 
+  Search, 
+  Building2, 
+  MoreVertical, 
+  Pencil, 
+  Trash2, 
+  Wallet, 
+  Calendar, 
+  TrendingUp, 
+  ArrowUpCircle,
+  Filter,
+  RefreshCw,
+  History
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,23 +50,54 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SaldoForm, SaldoFormValues } from "@/components/SaldoForm";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { SaldoAdsForm, SaldoAdsFormValues } from "@/components/SaldoAdsForm";
+import { RecargaForm, RecargaFormValues } from "@/components/RecargaForm";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 export const Route = createFileRoute("/_authenticated/saldo")({
   component: SaldoPage,
 });
 
+const PLATAFORMAS = [
+  { id: "meta", label: "Meta", color: "bg-blue-500" },
+  { id: "google", label: "Google", color: "bg-red-500" },
+  { id: "tiktok", label: "TikTok", color: "bg-black" },
+  { id: "outras", label: "Outras", color: "bg-gray-500" },
+];
+
+const STATUS_ALERTA = [
+  { id: "ok", label: "OK", color: "bg-emerald-500" },
+  { id: "alerta", label: "Alerta", color: "bg-amber-500" },
+  { id: "critico", label: "Crítico", color: "bg-red-500" },
+  { id: "zerado", label: "Zerado", color: "bg-gray-500" },
+];
+
 function SaldoPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterAgencia, setFilterAgencia] = useState<string>("all");
+  const [filterPlataforma, setFilterPlataforma] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<string>("dias_restantes");
   
   const [modalOpen, setModalOpen] = useState(false);
+  const [recargaModalOpen, setRecargaModalOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [selectedForRecarga, setSelectedForRecarga] = useState<any>(null);
+  const [selectedForHistory, setSelectedForHistory] = useState<any>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [historyData, setHistoryData] = useState<any[]>([]);
 
   useEffect(() => {
     fetchSaldo();
@@ -58,12 +106,12 @@ function SaldoPage() {
   const fetchSaldo = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("saldo")
-      .select("*, clientes(nome, agencia)")
-      .order("created_at", { ascending: false });
+      .from("saldo_ads_view")
+      .select("*")
+      .order("dias_restantes", { ascending: true });
 
     if (error) {
-      toast.error("Erro ao carregar dados financeiros");
+      toast.error("Erro ao carregar saldos de mídia");
       console.error(error);
     } else {
       setData(data || []);
@@ -71,7 +119,7 @@ function SaldoPage() {
     setLoading(false);
   };
 
-  const handleSave = async (values: SaldoFormValues) => {
+  const handleSave = async (values: SaldoAdsFormValues) => {
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -79,17 +127,22 @@ function SaldoPage() {
 
       if (editing) {
         const { error } = await supabase
-          .from("saldo")
+          .from("saldo_ads")
           .update({ ...values })
           .eq("id", editing.id);
         if (error) throw error;
         toast.success("Registro atualizado");
       } else {
-        const { error } = await supabase
-          .from("saldo")
-          .insert([{ ...values, user_id: user.id }]);
+        const { data: newRecord, error } = await supabase
+          .from("saldo_ads")
+          .insert([{ ...values, user_id: user.id }])
+          .select()
+          .single();
         if (error) throw error;
         toast.success("Registro criado");
+        // Automatically open first reload modal
+        setSelectedForRecarga(newRecord);
+        setRecargaModalOpen(true);
       }
       setModalOpen(false);
       setEditing(null);
@@ -101,10 +154,32 @@ function SaldoPage() {
     }
   };
 
+  const handleRecarga = async (values: RecargaFormValues) => {
+    if (!selectedForRecarga) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("recargas")
+        .insert([{ 
+          ...values, 
+          saldo_ads_id: selectedForRecarga.id 
+        }]);
+      if (error) throw error;
+      toast.success("Recarga adicionada com sucesso");
+      setRecargaModalOpen(false);
+      setSelectedForRecarga(null);
+      fetchSaldo();
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao salvar recarga");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deletingId) return;
     try {
-      const { error } = await supabase.from("saldo").delete().eq("id", deletingId);
+      const { error } = await supabase.from("saldo_ads").delete().eq("id", deletingId);
       if (error) throw error;
       toast.success("Registro removido");
       fetchSaldo();
@@ -115,83 +190,132 @@ function SaldoPage() {
     }
   };
 
+  const fetchHistory = async (record: any) => {
+    setSelectedForHistory(record);
+    setHistoryOpen(true);
+    const { data, error } = await supabase
+      .from("recargas")
+      .select("*")
+      .eq("saldo_ads_id", record.id)
+      .order("data_recarga", { ascending: false });
+    
+    if (error) {
+      toast.error("Erro ao carregar histórico");
+    } else {
+      setHistoryData(data || []);
+    }
+  };
+
   const filteredData = useMemo(() => {
-    return data.filter(item => {
-      const matchesAgencia = filterAgencia === "all" || item.clientes?.agencia === filterAgencia;
-      const matchesSearch = item.clientes?.nome?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesAgencia && matchesSearch;
+    let result = data.filter(item => {
+      const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
+      const matchesPlataforma = filterPlataforma === "all" || item.plataforma === filterPlataforma;
+      const matchesStatus = filterStatus === "all" || item.status_alerta === filterStatus;
+      const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesAgencia && matchesPlataforma && matchesStatus && matchesSearch;
     });
-  }, [data, filterAgencia, searchQuery]);
+
+    result.sort((a, b) => {
+      if (sortBy === "dias_restantes") return (a.dias_restantes || 0) - (b.dias_restantes || 0);
+      if (sortBy === "nome") return (a.cliente_nome || "").localeCompare(b.cliente_nome || "");
+      if (sortBy === "valor") return (b.saldo_atual || 0) - (a.saldo_atual || 0);
+      return 0;
+    });
+
+    return result;
+  }, [data, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy]);
 
   const metrics = useMemo(() => {
-    const list = filteredData;
-    const previsto = list.reduce((acc, curr) => acc + (curr.valor_previsto || 0), 0);
-    const recebido = list.reduce((acc, curr) => acc + (curr.valor_recebido || 0), 0);
-    const emAberto = previsto - recebido;
-    const atrasado = list
-      .filter(i => i.status_pagamento === "atrasado")
-      .reduce((acc, curr) => acc + (curr.valor_previsto || 0), 0);
-    
-    return { previsto, recebido, emAberto, atrasado };
-  }, [filteredData]);
+    return {
+      totalContas: data.length,
+      saldoTotal: data.reduce((acc, curr) => acc + (curr.saldo_atual || 0), 0),
+      emAlerta: data.filter(i => i.status_alerta === "alerta").length,
+      criticos: data.filter(i => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
+    };
+  }, [data]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "ok": return "border-emerald-500";
+      case "alerta": return "border-amber-500";
+      case "critico": return "border-red-500";
+      case "zerado": return "border-gray-400";
+      default: return "border-border";
+    }
+  };
+
+  const getProgressColor = (status: string) => {
+    switch (status) {
+      case "ok": return "bg-emerald-500";
+      case "alerta": return "bg-amber-500";
+      case "critico": return "bg-red-500";
+      case "zerado": return "bg-gray-400";
+      default: return "bg-primary";
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Saldo</h1>
-          <p className="text-muted-foreground">Controle financeiro por cliente e status de pagamento.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Monitor de Saldo de Mídia</h1>
+          <p className="text-muted-foreground">Acompanhe verba e recargas de anúncios em tempo real.</p>
         </div>
-        <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Plus size={16} />
-          Registrar recebimento
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={fetchSaldo} disabled={loading}>
+            <RefreshCw size={16} className={cn(loading && "animate-spin")} />
+          </Button>
+          <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
+            <Plus size={16} />
+            Novo registro de saldo
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Faturamento Previsto</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Contas Monitoradas</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(metrics.previsto)}</div>
-            <p className="text-xs text-muted-foreground">Total contratado (filtros aplicados)</p>
+            <div className="text-2xl font-bold">{metrics.totalContas}</div>
+            <p className="text-xs text-muted-foreground">Total de registros ativos</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recebido</CardTitle>
-            <Receipt className="h-4 w-4 text-emerald-500" />
+            <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
+            <Wallet className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(metrics.recebido)}</div>
-            <p className="text-xs text-muted-foreground">Valor já compensado</p>
+            <div className="text-2xl font-bold">{formatBRL(metrics.saldoTotal)}</div>
+            <p className="text-xs text-muted-foreground">Soma de todas as plataformas</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Em Aberto</CardTitle>
+            <CardTitle className="text-sm font-medium">Em Alerta</CardTitle>
             <Clock className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(metrics.emAberto)}</div>
-            <p className="text-xs text-muted-foreground">Aguardando pagamento</p>
+            <div className="text-2xl font-bold">{metrics.emAlerta}</div>
+            <p className="text-xs text-muted-foreground">Saldo dura entre 2 e 4 dias</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Atrasado</CardTitle>
+            <CardTitle className="text-sm font-medium">Críticos / Zerados</CardTitle>
             <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(metrics.atrasado)}</div>
-            <p className="text-xs text-muted-foreground">Soma dos pagamentos atrasados</p>
+            <div className="text-2xl font-bold">{metrics.criticos}</div>
+            <p className="text-xs text-muted-foreground">Saldo dura menos de 1 dia</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -202,133 +326,270 @@ function SaldoPage() {
           />
         </div>
         <Select value={filterAgencia} onValueChange={setFilterAgencia}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[140px]">
             <Building2 className="w-4 h-4 mr-2" />
             <SelectValue placeholder="Agência" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas as agências</SelectItem>
+            <SelectItem value="all">Todas</SelectItem>
             {AGENCIAS.map(a => (
               <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
+        <Select value={filterPlataforma} onValueChange={setFilterPlataforma}>
+          <SelectTrigger className="w-[140px]">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Plataforma" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Plataformas</SelectItem>
+            {PLATAFORMAS.map(p => (
+              <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-[130px]">
+            <AlertCircle className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Status</SelectItem>
+            {STATUS_ALERTA.map(s => (
+              <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Ordenar por:</span>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[140px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="dias_restantes">Dias restantes</SelectItem>
+              <SelectItem value="nome">Nome do cliente</SelectItem>
+              <SelectItem value="valor">Maior saldo</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="rounded-md border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Agência</TableHead>
-              <TableHead>Contratado</TableHead>
-              <TableHead>Recebido</TableHead>
-              <TableHead>Vencimento</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center">Carregando...</TableCell>
-              </TableRow>
-            ) : filteredData.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                  Nenhum registro financeiro encontrado.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredData.map((item) => (
-                <TableRow 
-                  key={item.id} 
-                  className="group outline-none focus:bg-muted/50"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Delete" || e.key === "Backspace") setDeletingId(item.id);
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {loading ? (
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-[280px] rounded-xl border bg-card animate-pulse" />
+          ))
+        ) : filteredData.length === 0 ? (
+          <div className="col-span-full h-64 flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/30 text-muted-foreground">
+            <Wallet size={48} className="mb-4 opacity-20" />
+            <p>Nenhum registro encontrado.</p>
+            <Button variant="link" onClick={() => { setFilterAgencia("all"); setFilterPlataforma("all"); setFilterStatus("all"); setSearchQuery(""); }}>
+              Limpar filtros
+            </Button>
+          </div>
+        ) : (
+          filteredData.map((item) => (
+            <Card 
+              key={item.id} 
+              className={cn(
+                "group relative border-l-4 transition-all hover:shadow-md cursor-pointer",
+                getStatusColor(item.status_alerta)
+              )}
+              onClick={() => fetchHistory(item)}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-base line-clamp-1">{item.cliente_nome}</CardTitle>
+                    <Badge variant="outline" className="text-[10px] font-normal uppercase py-0 mt-1">
+                      {item.cliente_agencia}
+                    </Badge>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
+                        <MoreVertical size={16} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[140px]">
+                      <DropdownMenuItem onClick={() => { setEditing(item); setModalOpen(true); }}>
+                        <Pencil size={14} className="mr-2" /> Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className="text-destructive focus:text-destructive" 
+                        onClick={() => setDeletingId(item.id)}
+                      >
+                        <Trash2 size={14} className="mr-2" /> Remover
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Badge className={cn("capitalize", PLATAFORMAS.find(p => p.id === item.plataforma)?.color)}>
+                    {item.plataforma}
+                  </Badge>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold tracking-tight text-primary">
+                      {formatBRL(item.saldo_atual)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-medium">
+                    <span>{item.dias_restantes ? Math.floor(item.dias_restantes) : 0} dias restantes</span>
+                    <span className="text-muted-foreground">
+                      Fim: {item.data_prevista_fim ? new Date(item.data_prevista_fim).toLocaleDateString("pt-BR") : "—"}
+                    </span>
+                  </div>
+                  <Progress 
+                    value={Math.min(100, (item.dias_restantes || 0) * 10)} 
+                    className="h-2"
+                    indicatorClassName={getProgressColor(item.status_alerta)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t">
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground">Verba Diária</p>
+                    <p className="font-semibold">{formatBRL(item.verba_diaria_calc)}</p>
+                  </div>
+                  <div className="space-y-1 text-right">
+                    <p className="text-muted-foreground">Total Investido</p>
+                    <p className="font-semibold">{formatBRL(item.total_recarregado)}</p>
+                  </div>
+                </div>
+
+                <Button 
+                  className="w-full h-8 text-xs gap-2" 
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedForRecarga(item);
+                    setRecargaModalOpen(true);
                   }}
                 >
-                  <TableCell className="font-medium">{item.clientes?.nome}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="font-normal text-[10px]">
-                      {AGENCIAS.find(a => a.id === item.clientes?.agencia)?.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{formatBRL(item.valor_previsto)}</TableCell>
-                  <TableCell>{formatBRL(item.valor_recebido)}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {item.data_vencimento ? new Date(item.data_vencimento).toLocaleDateString("pt-BR") : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant="outline" 
-                      className={cn(
-                        "font-normal",
-                        item.status_pagamento === "em_dia" && "bg-emerald-50 text-emerald-700 border-emerald-200",
-                        item.status_pagamento === "pendente" && "bg-amber-50 text-amber-700 border-amber-200",
-                        item.status_pagamento === "atrasado" && "bg-red-50 text-red-700 border-red-200",
-                      )}
-                    >
-                      {item.status_pagamento === "em_dia" ? "Em dia" : item.status_pagamento === "pendente" ? "Pendente" : "Atrasado"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical size={16} />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-[140px]">
-                        <DropdownMenuItem onClick={() => { setEditing(item); setModalOpen(true); }}>
-                          <Pencil size={14} className="mr-2" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive focus:text-destructive" 
-                          onClick={() => setDeletingId(item.id)}
-                        >
-                          <Trash2 size={14} className="mr-2" /> Remover
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                  <ArrowUpCircle size={14} />
+                  Adicionar recarga
+                </Button>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
+      {/* Modals and Sheets */}
       <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) setEditing(null); }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{editing ? "Editar registro" : "Registrar recebimento"}</DialogTitle>
+            <DialogTitle>{editing ? "Editar Registro" : "Novo Registro de Saldo"}</DialogTitle>
             <DialogDescription>
-              {editing ? "Atualize os dados deste registro financeiro." : "Lance um novo registro de pagamento esperado ou recebido."}
+              Configure o monitoramento de verba para uma plataforma de anúncios.
             </DialogDescription>
           </DialogHeader>
-          <SaldoForm
+          <SaldoAdsForm
             loading={saving}
             onSubmit={handleSave}
             initialValues={editing ? {
               cliente_id: editing.cliente_id,
-              valor_previsto: editing.valor_previsto,
-              valor_recebido: editing.valor_recebido,
-              data_vencimento: editing.data_vencimento,
-              status_pagamento: editing.status_pagamento,
-              mes_referencia: editing.mes_referencia,
+              plataforma: editing.plataforma,
+              metodo_pagamento: editing.metodo_pagamento,
+              verba_diaria: editing.verba_diaria,
+              observacoes: editing.observacoes,
             } : {}}
           />
         </DialogContent>
       </Dialog>
+
+      <Dialog open={recargaModalOpen} onOpenChange={(o) => { setRecargaModalOpen(o); if (!o) setSelectedForRecarga(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Adicionar Recarga</DialogTitle>
+            <DialogDescription>
+              Lance um novo aporte de verba para <strong>{selectedForRecarga?.cliente_nome}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <RecargaForm
+            loading={saving}
+            defaultMetodo={selectedForRecarga?.metodo_pagamento}
+            onSubmit={handleRecarga}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+        <SheetContent className="sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Histórico de Recargas
+            </SheetTitle>
+            <SheetDescription>
+              {selectedForHistory?.cliente_nome} — <span className="capitalize">{selectedForHistory?.plataforma}</span>
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-8 space-y-6">
+            <div className="p-4 rounded-xl bg-muted/50 border space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status Atual</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] text-muted-foreground">Saldo</p>
+                  <p className="text-lg font-bold">{formatBRL(selectedForHistory?.saldo_atual)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground">Previsão</p>
+                  <p className="text-lg font-bold">
+                    {selectedForHistory?.dias_restantes ? Math.floor(selectedForHistory.dias_restantes) : 0} dias
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold">Todas as Recargas</h4>
+              {historyData.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma recarga registrada.</p>
+              ) : (
+                <div className="relative space-y-4 before:absolute before:left-3.5 before:top-2 before:bottom-2 before:w-px before:bg-border">
+                  {historyData.map((recarga, i) => (
+                    <div key={recarga.id} className="relative pl-8">
+                      <div className="absolute left-0 top-1 h-7 w-7 rounded-full bg-background border flex items-center justify-center">
+                        <TrendingUp size={14} className="text-emerald-500" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-bold">{formatBRL(recarga.valor)}</p>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {new Date(recarga.data_recarga).toLocaleDateString("pt-BR")}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {recarga.metodo_pagamento?.replace("_", " ")}
+                        </p>
+                        {recarga.observacoes && (
+                          <p className="text-[10px] bg-muted/50 p-1.5 rounded italic">"{recarga.observacoes}"</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog open={!!deletingId} onOpenChange={(o) => { if (!o) setDeletingId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Tem certeza que deseja remover?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. O registro financeiro será permanentemente deletado.
+              Esta ação removerá o monitoramento desta conta de mídia e todo seu histórico de recargas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
