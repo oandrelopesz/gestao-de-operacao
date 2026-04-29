@@ -7,12 +7,14 @@ import {
   Wallet, 
   MessageSquare, 
   LogOut,
-  ChevronRight,
-  User as UserIcon
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+   ChevronRight,
+   User as UserIcon,
+   Bell
+ } from "lucide-react";
+ import { Button } from "@/components/ui/button";
+ import { Separator } from "@/components/ui/separator";
+ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+ import { NotificationBell } from "@/components/NotificationBell";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
