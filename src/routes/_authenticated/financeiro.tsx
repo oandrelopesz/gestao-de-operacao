@@ -58,6 +58,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL, parseBRLInput, maskBRLInput } from "@/lib/clientes";
 import { toast } from "sonner";
