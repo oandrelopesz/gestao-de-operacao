@@ -103,12 +103,17 @@ export function NotificationBell() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel className="flex items-center justify-between">
-          Notificações
+        <DropdownMenuLabel className="flex items-center justify-between py-2">
+          <span className="text-sm font-semibold">Notificações</span>
           {count > 0 && (
-            <Badge variant="outline" className="text-[10px] font-normal">
-              {count} {count === 1 ? 'alerta' : 'alertas'}
-            </Badge>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+              onClick={handleClearAll}
+            >
+              Limpar tudo
+            </Button>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -125,7 +130,7 @@ export function NotificationBell() {
               <p className="text-[11px] text-muted-foreground/60">Nenhum saldo crítico detectado.</p>
             </div>
           ) : (
-            alertas.map((alerta) => (
+            visibleAlertas.map((alerta) => (
               <DropdownMenuItem 
                 key={alerta.id} 
                 className="p-3 cursor-default focus:bg-accent/50"
