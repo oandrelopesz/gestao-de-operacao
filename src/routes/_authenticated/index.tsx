@@ -165,10 +165,10 @@ function DemandasPage() {
 
       const { error } = await supabase.from("demandas").insert([{
         titulo,
-        status,
+        status: status as any,
         user_id: user.id,
         cliente_id: clientes[0].id,
-        prioridade: "media",
+        prioridade: "media" as const,
         ordem: maxOrder + 1
       }]);
 
