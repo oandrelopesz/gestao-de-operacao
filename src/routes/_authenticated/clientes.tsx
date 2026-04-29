@@ -51,14 +51,15 @@ import {
 } from "@/lib/clientes";
 import { cn } from "@/lib/utils";
 
-type SearchParams = { agencia?: AgenciaId; view?: "cards" | "tabela" };
+type SearchParams = { agencia?: AgenciaId; view?: "cards" | "tabela"; subAgencia?: string };
 
 export const Route = createFileRoute("/_authenticated/clientes")({
   validateSearch: (search: Record<string, unknown>): SearchParams => ({
-    agencia: (["effect", "spike", "alt", "pessoais"].includes(search.agencia as string)
+    agencia: (["effect", "spike", "alt", "pessoais", "todos"].includes(search.agencia as string)
       ? (search.agencia as AgenciaId)
-      : "effect"),
+      : "todos"),
     view: search.view === "tabela" ? "tabela" : "cards",
+    subAgencia: typeof search.subAgencia === "string" ? search.subAgencia : undefined,
   }),
   component: ClientesPage,
 });
@@ -87,7 +88,7 @@ interface ClienteView {
 }
 
 function ClientesPage() {
-  const { agencia, view } = Route.useSearch();
+  const { agencia, view, subAgencia } = Route.useSearch();
   const navigate = Route.useNavigate();
 
   const [clientes, setClientes] = useState<ClienteView[]>([]);
@@ -130,6 +131,7 @@ function ClientesPage() {
         const cliSaldos = (saldos || []).filter(s => s.cliente_id === cli.id);
         const summary = cliSaldos.map(s => {
           const platNames = s.plataformas && s.plataformas.length > 0 ? s.plataformas.join(", ") : "Outras";
+          // We use verba_diaria_calc for consistent calculation
           const verba = (s.verba_diaria_calc || 0) * 30;
           return `${platNames} ${formatBRL(verba)}`;
         }).join(" / ");
@@ -155,14 +157,15 @@ function ClientesPage() {
 
   const filtered = useMemo(() => {
     return clientes
-      .filter((c) => c.agencia === agencia)
+      .filter((c) => agencia === "todos" ? true : c.agencia === agencia)
+      .filter((c) => !subAgencia || c.agencia === subAgencia)
       .filter((c) => statusFilter === "all" || c.nps_status === statusFilter)
       .filter((c) => showPausados || c.status_operacional === "ativo")
       .filter((c) => !search || c.nome.toLowerCase().includes(search.toLowerCase()));
-  }, [clientes, agencia, statusFilter, search, showPausados]);
+  }, [clientes, agencia, subAgencia, statusFilter, search, showPausados]);
 
   const metrics = useMemo(() => {
-    const list = clientes.filter((c) => c.agencia === agencia);
+    const list = clientes.filter((c) => agencia === "todos" ? true : c.agencia === agencia);
     const ativosList = list.filter((c) => c.status_operacional === "ativo");
     
     const total = list.length;
@@ -170,8 +173,17 @@ function ClientesPage() {
     const pausados = list.filter((c) => c.status_operacional === "pausado").length;
     const churn = list.filter((c) => c.status_operacional === "churn").length;
     
-    const verbaTotal = ativosList.reduce((s, c) => s + Number(c.verba_ads || 0), 0);
-    const clientesComVerba = ativosList.filter((c) => Number(c.verba_ads || 0) > 0).length;
+    const verbaTotal = ativosList.reduce((acc, c) => {
+      if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
+        const inicio = new Date(c.data_inicio);
+        const fim = new Date(c.data_limite_verba);
+        const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+        return acc + ((Number(c.verba_total_contratada) / dias) * 30);
+      }
+      return acc + Number(c.verba_ads || 0);
+    }, 0);
+    
+    const clientesComVerba = ativosList.filter((c) => (Number(c.verba_ads || 0) > 0 || Number(c.verba_total_contratada || 0) > 0)).length;
     const verbaMedia = clientesComVerba > 0 ? verbaTotal / clientesComVerba : 0;
     
     const ancora = ativosList.filter((c) => c.nps_status === "ancora").length;
@@ -182,7 +194,9 @@ function ClientesPage() {
     return { total, ativos, pausados, churn, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
   }, [clientes, agencia]);
 
-  const agenciaMeta = AGENCIAS.find((a) => a.id === agencia)!;
+  const agenciaMeta = agencia === "todos" 
+    ? { id: "todos", label: "Todos", border: "border-l-primary" }
+    : AGENCIAS.find((a) => a.id === agencia)!;
 
   const handleSave = async (values: ClientFormValues) => {
     setSaving(true);
@@ -361,8 +375,12 @@ function ClientesPage() {
       </div>
 
       {/* Sub-tabs por agência */}
-      <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v as AgenciaId } })}>
+      <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v as AgenciaId, subAgencia: undefined } })}>
         <TabsList>
+          <TabsTrigger value="todos" className="gap-2">
+            Todos
+            <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{clientes.length}</Badge>
+          </TabsTrigger>
           {AGENCIAS.map((a) => (
             <TabsTrigger key={a.id} value={a.id} className="gap-2">
               {a.label}
@@ -372,62 +390,78 @@ function ClientesPage() {
         </TabsList>
       </Tabs>
 
+      {/* Banner de fim de campanha próximo */}
+      {(() => {
+        const agora = new Date();
+        const limite90dias = new Date();
+        limite90dias.setDate(agora.getDate() + 90);
+        
+        const clientesFimProximo = clientes.filter(c => 
+          c.status_operacional === "ativo" && 
+          c.data_limite_verba && 
+          new Date(c.data_limite_verba) > agora && 
+          new Date(c.data_limite_verba) <= limite90dias
+        );
+
+        if (clientesFimProximo.length === 0 || (agencia !== "todos" && agencia !== "spike")) return null;
+
+        const impactoTotal = clientesFimProximo.reduce((acc, c) => {
+          if (c.verba_total_contratada && c.data_inicio && c.data_limite_verba) {
+            const inicio = new Date(c.data_inicio);
+            const fim = new Date(c.data_limite_verba);
+            const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+            return acc + ((Number(c.verba_total_contratada) / dias) * 30);
+          }
+          return acc + Number(c.verba_ads || 0);
+        }, 0);
+
+        return (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 bg-amber-100 p-1.5 rounded-full text-amber-600">
+                <AlertCircle size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-amber-900">⚠️ Campanhas com fim previsto nos próximos 90 dias</h4>
+                <p className="text-sm text-amber-800/80">
+                  {clientesFimProximo.length} {clientesFimProximo.length === 1 ? 'cliente vai' : 'clientes vão'} encerrar contratos em breve ({clientesFimProximo.map(c => c.nome).join(", ")}).
+                </p>
+                <p className="text-xs text-amber-700 font-medium mt-1">Impacto previsto: redução de {formatBRL(impactoTotal)}/mês na verba gerenciada</p>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-white hover:bg-amber-100 border-amber-200 text-amber-800 shrink-0"
+              onClick={() => setSearch(clientesFimProximo.map(c => c.nome).join("|"))}
+            >
+              Ver detalhes
+            </Button>
+          </div>
+        );
+      })()}
+
       {/* Métricas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard 
-          icon={<UsersIcon size={16} />} 
-          label="Clientes" 
-          value={String(metrics.total)} 
-          hint={`${metrics.ativos} ativos / ${metrics.pausados} pausados / ${metrics.churn} churn`} 
-        />
-        <MetricCard 
-          icon={<DollarSign size={16} />} 
-          label="Verba total / mês" 
-          value={formatBRL(metrics.verbaTotal)} 
-          hint="Considera apenas clientes ativos" 
-        />
-        <MetricCard 
-          icon={<TrendingUp size={16} />} 
-          label="Verba média / cliente" 
-          value={formatBRL(metrics.verbaMedia)} 
-          hint="Considera apenas clientes ativos" 
-        />
-        <Card>
-          <CardHeader className="flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Distribuição NPS</CardTitle>
-            <Smile size={16} className="text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline gap-2 text-sm">
-              <span className="text-emerald-900 font-bold text-lg" title="Âncora">{metrics.ancora}</span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-emerald-500 font-bold text-lg" title="Saudável">{metrics.saudavel}</span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-amber-500 font-bold text-lg" title="Em risco">{metrics.em_risco}</span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-red-500 font-bold text-lg" title="Crítico">{metrics.critico}</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 text-center">Âncora / Saudável / Risco / Crítico</p>
-          </CardContent>
-        </Card>
-      </div>
-
+...
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por nome..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        {agencia === "todos" && (
+          <Select value={subAgencia || "all"} onValueChange={(v) => navigate({ search: { view, agencia, subAgencia: v === "all" ? undefined : v } })}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por agência" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as agências</SelectItem>
+              {AGENCIAS.map(a => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os status NPS</SelectItem>
-            <SelectItem value="ancora">Âncoras</SelectItem>
-            <SelectItem value="saudavel">Saudáveis</SelectItem>
-            <SelectItem value="em_risco">Em risco</SelectItem>
-            <SelectItem value="critico">Críticos</SelectItem>
-            <SelectItem value="sem_avaliacao">Sem avaliação</SelectItem>
-          </SelectContent>
+...
+          </Select>
         </Select>
         <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs">
           <span className="font-medium">Mostrar pausados</span>
@@ -470,7 +504,8 @@ function ClientesPage() {
             <ClienteCard
               key={c.id}
               cliente={c}
-              borderClass={agenciaMeta.border}
+              borderClass={agencia === "todos" ? (AGENCIAS.find(a => a.id === c.agencia)?.border || "border-l-primary") : agenciaMeta.border}
+              showAgenciaBadge={agencia === "todos"}
               onEdit={() => { setEditing(c); setModalOpen(true); }}
               onArchive={() => handleArchive(c.id)}
               onDelete={() => { setDeletingId(c.id); setDeletingName(c.nome); }}
@@ -608,10 +643,11 @@ function MetricCard({ icon, label, value, hint }: { icon: React.ReactNode; label
 }
 
 function ClienteCard({
-  cliente, borderClass, onEdit, onArchive, onDelete,
+  cliente, borderClass, showAgenciaBadge, onEdit, onArchive, onDelete,
 }: {
   cliente: ClienteView;
   borderClass: string;
+  showAgenciaBadge?: boolean;
   onEdit: () => void;
   onArchive: () => void;
   onDelete: () => void;
@@ -657,7 +693,17 @@ function ClienteCard({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 pr-6">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              {showAgenciaBadge && (
+                <Badge variant="outline" className={cn("text-[9px] h-4 px-1 font-bold uppercase tracking-tight", 
+                  cliente.agencia === 'effect' && "border-blue-500 text-blue-500 bg-blue-500/5",
+                  cliente.agencia === 'spike' && "border-violet-500 text-violet-500 bg-violet-500/5",
+                  cliente.agencia === 'alt' && "border-amber-500 text-amber-500 bg-amber-500/5",
+                  cliente.agencia === 'pessoais' && "border-emerald-500 text-emerald-500 bg-emerald-500/5",
+                )}>
+                  {AGENCIAS.find(a => a.id === cliente.agencia)?.label}
+                </Badge>
+              )}
               <CardTitle className="text-base font-semibold truncate">{cliente.nome}</CardTitle>
               {cliente.em_onboarding && (
                 <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
