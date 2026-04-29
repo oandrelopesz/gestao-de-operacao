@@ -48,9 +48,9 @@ interface ClienteView {
   verba_ads: number;
   observacoes: string | null;
   arquivado: boolean;
-  ultima_nps_nota: number | null;
+  ultima_nps_score: number | null;
   ultima_nps_data: string | null;
-  nps_status: "promotor" | "neutro" | "detrator" | "sem_avaliacao";
+  nps_status: "ancora" | "saudavel" | "em_risco" | "critico" | "sem_avaliacao";
   demandas_ativas: number;
   status_pagamento_mes: "em_dia" | "pendente" | "atrasado" | null;
 }
