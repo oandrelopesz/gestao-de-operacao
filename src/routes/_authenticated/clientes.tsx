@@ -48,9 +48,9 @@ interface ClienteView {
   verba_ads: number;
   observacoes: string | null;
   arquivado: boolean;
-  ultima_nps_nota: number | null;
+  ultima_nps_score: number | null;
   ultima_nps_data: string | null;
-  nps_status: "promotor" | "neutro" | "detrator" | "sem_avaliacao";
+  nps_status: "ancora" | "saudavel" | "em_risco" | "critico" | "sem_avaliacao";
   demandas_ativas: number;
   status_pagamento_mes: "em_dia" | "pendente" | "atrasado" | null;
 }
@@ -99,10 +99,11 @@ function ClientesPage() {
     const total = list.length;
     const verbaTotal = list.reduce((s, c) => s + Number(c.verba_ads || 0), 0);
     const verbaMedia = total > 0 ? verbaTotal / total : 0;
-    const promotores = list.filter((c) => c.nps_status === "promotor").length;
-    const neutros = list.filter((c) => c.nps_status === "neutro").length;
-    const detratores = list.filter((c) => c.nps_status === "detrator").length;
-    return { total, verbaTotal, verbaMedia, promotores, neutros, detratores };
+    const ancora = list.filter((c) => c.nps_status === "ancora").length;
+    const saudavel = list.filter((c) => c.nps_status === "saudavel").length;
+    const em_risco = list.filter((c) => c.nps_status === "em_risco").length;
+    const critico = list.filter((c) => c.nps_status === "critico").length;
+    return { total, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
   }, [clientes, agencia]);
 
   const agenciaMeta = AGENCIAS.find((a) => a.id === agencia)!;
@@ -194,13 +195,15 @@ function ClientesPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2 text-sm">
-              <span className="text-emerald-600 font-bold text-lg">{metrics.promotores}</span>
+              <span className="text-emerald-900 font-bold text-lg" title="Âncora">{metrics.ancora}</span>
               <span className="text-muted-foreground">/</span>
-              <span className="text-amber-600 font-bold text-lg">{metrics.neutros}</span>
+              <span className="text-emerald-500 font-bold text-lg" title="Saudável">{metrics.saudavel}</span>
               <span className="text-muted-foreground">/</span>
-              <span className="text-red-600 font-bold text-lg">{metrics.detratores}</span>
+              <span className="text-amber-500 font-bold text-lg" title="Em risco">{metrics.em_risco}</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-red-500 font-bold text-lg" title="Crítico">{metrics.critico}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Promotores / Neutros / Detratores</p>
+            <p className="text-xs text-muted-foreground mt-1 text-center">Âncora / Saudável / Risco / Crítico</p>
           </CardContent>
         </Card>
       </div>
@@ -215,9 +218,10 @@ function ClientesPage() {
           <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os status NPS</SelectItem>
-            <SelectItem value="promotor">Promotores</SelectItem>
-            <SelectItem value="neutro">Neutros</SelectItem>
-            <SelectItem value="detrator">Detratores</SelectItem>
+            <SelectItem value="ancora">Âncoras</SelectItem>
+            <SelectItem value="saudavel">Saudáveis</SelectItem>
+            <SelectItem value="em_risco">Em risco</SelectItem>
+            <SelectItem value="critico">Críticos</SelectItem>
             <SelectItem value="sem_avaliacao">Sem avaliação</SelectItem>
           </SelectContent>
         </Select>
@@ -372,8 +376,8 @@ function ClienteCard({
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Última NPS</p>
             <p className="font-medium">
-              {cliente.ultima_nps_nota !== null
-                ? <>Nota {cliente.ultima_nps_nota} <span className="text-muted-foreground font-normal">· {cliente.ultima_nps_data ? new Date(cliente.ultima_nps_data).toLocaleDateString("pt-BR") : ""}</span></>
+              {cliente.ultima_nps_score !== null
+                ? <>Score {cliente.ultima_nps_score}/50 <span className="text-muted-foreground font-normal">· {cliente.ultima_nps_data ? new Date(cliente.ultima_nps_data).toLocaleDateString("pt-BR") : ""}</span></>
                 : <span className="text-muted-foreground">—</span>}
             </p>
           </div>

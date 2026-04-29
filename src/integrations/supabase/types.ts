@@ -113,47 +113,59 @@ export type Database = {
           },
         ]
       }
-      nps: {
+      nps_avaliacoes: {
         Row: {
-          categoria: Database["public"]["Enums"]["nps_categoria"]
           cliente_id: string
-          comentario: string | null
+          conversao_vendas: number
           created_at: string
-          data_pesquisa: string
+          data_avaliacao: string
+          engajamento: number
           id: string
-          nota: number
+          observacoes: string | null
+          potencial_crescimento: number
+          relacionamento: number
+          resultados_campanha: number
+          score_total: number
           user_id: string
         }
         Insert: {
-          categoria: Database["public"]["Enums"]["nps_categoria"]
           cliente_id: string
-          comentario?: string | null
+          conversao_vendas: number
           created_at?: string
-          data_pesquisa?: string
+          data_avaliacao?: string
+          engajamento: number
           id?: string
-          nota: number
+          observacoes?: string | null
+          potencial_crescimento: number
+          relacionamento: number
+          resultados_campanha: number
+          score_total: number
           user_id: string
         }
         Update: {
-          categoria?: Database["public"]["Enums"]["nps_categoria"]
           cliente_id?: string
-          comentario?: string | null
+          conversao_vendas?: number
           created_at?: string
-          data_pesquisa?: string
+          data_avaliacao?: string
+          engajamento?: number
           id?: string
-          nota?: number
+          observacoes?: string | null
+          potencial_crescimento?: number
+          relacionamento?: number
+          resultados_campanha?: number
+          score_total?: number
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "nps_cliente_id_fkey"
+            foreignKeyName: "nps_avaliacoes_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "nps_cliente_id_fkey"
+            foreignKeyName: "nps_avaliacoes_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes_view"
@@ -236,7 +248,7 @@ export type Database = {
             | Database["public"]["Enums"]["pagamento_status"]
             | null
           ultima_nps_data: string | null
-          ultima_nps_nota: number | null
+          ultima_nps_score: number | null
           updated_at: string | null
           user_id: string | null
           valor_previsto_mes: number | null
@@ -245,13 +257,54 @@ export type Database = {
         }
         Relationships: []
       }
+      nps_avaliacoes_view: {
+        Row: {
+          categoria: Database["public"]["Enums"]["nps_score_categoria"] | null
+          cliente_id: string | null
+          conversao_vendas: number | null
+          created_at: string | null
+          data_avaliacao: string | null
+          engajamento: number | null
+          id: string | null
+          observacoes: string | null
+          potencial_crescimento: number | null
+          relacionamento: number | null
+          resultados_campanha: number | null
+          score_total: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nps_avaliacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nps_avaliacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      get_nps_categoria: {
+        Args: { score: number }
+        Returns: Database["public"]["Enums"]["nps_score_categoria"]
+      }
     }
     Enums: {
       agencia_enum: "effect" | "spike" | "alt" | "pessoais"
-      cliente_nps_status: "promotor" | "neutro" | "detrator" | "sem_avaliacao"
+      cliente_nps_status:
+        | "ancora"
+        | "saudavel"
+        | "em_risco"
+        | "critico"
+        | "sem_avaliacao"
       demanda_prioridade: "baixa" | "media" | "alta" | "urgente"
       demanda_status:
         | "fazer_hoje"
@@ -259,7 +312,7 @@ export type Database = {
         | "fazer_depois_amanha"
         | "standby"
         | "feito"
-      nps_categoria: "promotor" | "neutro" | "detrator"
+      nps_score_categoria: "ancora" | "saudavel" | "em_risco" | "critico"
       pagamento_status: "em_dia" | "pendente" | "atrasado"
     }
     CompositeTypes: {
@@ -389,7 +442,13 @@ export const Constants = {
   public: {
     Enums: {
       agencia_enum: ["effect", "spike", "alt", "pessoais"],
-      cliente_nps_status: ["promotor", "neutro", "detrator", "sem_avaliacao"],
+      cliente_nps_status: [
+        "ancora",
+        "saudavel",
+        "em_risco",
+        "critico",
+        "sem_avaliacao",
+      ],
       demanda_prioridade: ["baixa", "media", "alta", "urgente"],
       demanda_status: [
         "fazer_hoje",
@@ -398,7 +457,7 @@ export const Constants = {
         "standby",
         "feito",
       ],
-      nps_categoria: ["promotor", "neutro", "detrator"],
+      nps_score_categoria: ["ancora", "saudavel", "em_risco", "critico"],
       pagamento_status: ["em_dia", "pendente", "atrasado"],
     },
   },

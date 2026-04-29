@@ -43,18 +43,23 @@ export function tempoDeCasa(dataInicio: string | null | undefined): string {
 }
 
 export const NPS_STATUS_META: Record<string, { label: string; classes: string; dot: string }> = {
-  promotor: {
-    label: "Promotor",
+  ancora: {
+    label: "Âncora",
+    classes: "bg-emerald-900/10 text-emerald-900 dark:text-emerald-300 border-emerald-900/20",
+    dot: "bg-emerald-900",
+  },
+  saudavel: {
+    label: "Saudável",
     classes: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
     dot: "bg-emerald-500",
   },
-  neutro: {
-    label: "Neutro",
+  em_risco: {
+    label: "Em risco",
     classes: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
     dot: "bg-amber-500",
   },
-  detrator: {
-    label: "Detrator",
+  critico: {
+    label: "Crítico",
     classes: "bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/20",
     dot: "bg-red-500",
   },
