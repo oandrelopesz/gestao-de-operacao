@@ -47,7 +47,7 @@ function NPSPage() {
       try {
         const { data, error } = await supabase
           .from("nps_avaliacoes_view")
-          .select("*, clientes(nome, agencia, status_operacional, em_onboarding)")
+          .select("*")
           .order("data_avaliacao", { ascending: false });
 
         if (error) {
@@ -55,7 +55,20 @@ function NPSPage() {
           toast.error(`Erro ao carregar feedbacks NPS: ${error.message}`);
           throw error;
         }
-        return data || [];
+
+        // Mapear para estrutura compatível com o resto do componente
+        const mapped = (data || []).map((item: any) => ({
+          ...item,
+          clientes: {
+            nome: item.cliente_nome,
+            agencia: item.cliente_agencia,
+            status_operacional: item.cliente_status_operacional,
+            em_onboarding: item.cliente_em_onboarding,
+            nicho: item.cliente_nicho,
+          }
+        }));
+
+        return mapped;
       } catch (err: any) {
         console.error("Erro inesperado na query NPS:", err);
         throw err;
