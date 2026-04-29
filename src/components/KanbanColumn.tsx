@@ -12,14 +12,18 @@ interface Demanda {
   titulo: string;
   descricao?: string;
   status: string;
-  prioridade: "baixa" | "media" | "alta" | "urgente";
+  prioridade: string;
   prazo?: string;
   cliente_id: string | null;
-  clientes?: { nome: string };
   recorrente?: boolean;
-  frequencia?: string;
-  dia_referencia?: string;
+  frequencia_tipo?: string;
+  frequencia_dias_semana?: string[];
+  frequencia_dia_mes?: number;
+  frequencia_intervalo_dias?: number;
   ultima_execucao?: string;
+  proxima_execucao?: string;
+  recorrente_pai_id?: string;
+  clientes?: { nome: string; agencia?: string };
 }
 
 interface KanbanColumnProps {
