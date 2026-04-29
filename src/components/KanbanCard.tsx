@@ -146,8 +146,8 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
           )}
 
           {/* Footer of the card */}
-          {(demanda.descricao || demanda.clientes?.nome || demanda.prazo) && (
-            <div className="flex items-center gap-2 pt-0.5">
+          {(demanda.descricao || demanda.clientes?.nome || demanda.prazo || isRecorrenteMae) && (
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
               {demanda.descricao && (
                 <div title="Tem descrição">
                   <FileText size={12} className="text-zinc-400" />
@@ -160,7 +160,18 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
                 </span>
               )}
 
-              {demanda.prazo && (
+              {isRecorrenteMae && (
+                <div className="flex items-center gap-1 ml-auto shrink-0">
+                  <span className={cn(
+                    "text-[9px] px-1 py-0.5 rounded-full font-bold uppercase tracking-tighter",
+                    isDueToday ? "bg-primary text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                  )}>
+                    {isDueToday ? "HOJE" : (demanda.frequencia_tipo || "Repetir")}
+                  </span>
+                </div>
+              )}
+
+              {!isRecorrenteMae && demanda.prazo && (
                 <span className="text-[10px] text-zinc-400 ml-auto shrink-0">
                   {new Date(demanda.prazo).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                 </span>
