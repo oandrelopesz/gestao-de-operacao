@@ -15,6 +15,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
 import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
 import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
+import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated/livros'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
@@ -48,6 +49,11 @@ const AuthenticatedNpsRoute = AuthenticatedNpsRouteImport.update({
   path: '/nps',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedLivrosRoute = AuthenticatedLivrosRouteImport.update({
+  id: '/livros',
+  path: '/livros',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedFinanceiroRoute = AuthenticatedFinanceiroRouteImport.update({
   id: '/financeiro',
   path: '/financeiro',
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/clientes': typeof AuthenticatedClientesRoute
   '/cursos': typeof AuthenticatedCursosRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
+  '/livros': typeof AuthenticatedLivrosRoute
   '/nps': typeof AuthenticatedNpsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/saldo': typeof AuthenticatedSaldoRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByTo {
   '/clientes': typeof AuthenticatedClientesRoute
   '/cursos': typeof AuthenticatedCursosRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
+  '/livros': typeof AuthenticatedLivrosRoute
   '/nps': typeof AuthenticatedNpsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/saldo': typeof AuthenticatedSaldoRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/cursos': typeof AuthenticatedCursosRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
+  '/_authenticated/livros': typeof AuthenticatedLivrosRoute
   '/_authenticated/nps': typeof AuthenticatedNpsRoute
   '/_authenticated/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/cursos'
     | '/financeiro'
+    | '/livros'
     | '/nps'
     | '/prospeccao'
     | '/saldo'
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/cursos'
     | '/financeiro'
+    | '/livros'
     | '/nps'
     | '/prospeccao'
     | '/saldo'
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | '/_authenticated/clientes'
     | '/_authenticated/cursos'
     | '/_authenticated/financeiro'
+    | '/_authenticated/livros'
     | '/_authenticated/nps'
     | '/_authenticated/prospeccao'
     | '/_authenticated/saldo'
@@ -179,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedNpsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/livros': {
+      id: '/_authenticated/livros'
+      path: '/livros'
+      fullPath: '/livros'
+      preLoaderRoute: typeof AuthenticatedLivrosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/financeiro': {
       id: '/_authenticated/financeiro'
       path: '/financeiro'
@@ -207,6 +226,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedCursosRoute: typeof AuthenticatedCursosRoute
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
+  AuthenticatedLivrosRoute: typeof AuthenticatedLivrosRoute
   AuthenticatedNpsRoute: typeof AuthenticatedNpsRoute
   AuthenticatedProspeccaoRoute: typeof AuthenticatedProspeccaoRoute
   AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
@@ -217,6 +237,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedCursosRoute: AuthenticatedCursosRoute,
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
+  AuthenticatedLivrosRoute: AuthenticatedLivrosRoute,
   AuthenticatedNpsRoute: AuthenticatedNpsRoute,
   AuthenticatedProspeccaoRoute: AuthenticatedProspeccaoRoute,
   AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,

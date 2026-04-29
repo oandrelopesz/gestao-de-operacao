@@ -92,7 +92,7 @@ function LivrosPage() {
         .select("*")
         .order("nome");
       if (error) throw error;
-      setLivros(data || []);
+      setLivros((data as any[]) || []);
     } catch (error: any) {
       toast.error("Erro ao carregar livros: " + error.message);
     } finally {
