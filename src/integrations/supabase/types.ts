@@ -188,13 +188,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "demandas_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes_view"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "demandas_recorrente_pai_id_fkey"
             columns: ["recorrente_pai_id"]
             isOneToOne: false
@@ -211,6 +204,7 @@ export type Database = {
           horario_notificacao_matinal: string | null
           id: string
           notificacao_matinal_ativa: boolean | null
+          nps_override_dia_semana: boolean | null
           telegram_bot_token: string | null
           telegram_chat_id: string | null
           updated_at: string
@@ -223,6 +217,7 @@ export type Database = {
           horario_notificacao_matinal?: string | null
           id?: string
           notificacao_matinal_ativa?: boolean | null
+          nps_override_dia_semana?: boolean | null
           telegram_bot_token?: string | null
           telegram_chat_id?: string | null
           updated_at?: string
@@ -235,6 +230,7 @@ export type Database = {
           horario_notificacao_matinal?: string | null
           id?: string
           notificacao_matinal_ativa?: boolean | null
+          nps_override_dia_semana?: boolean | null
           telegram_bot_token?: string | null
           telegram_chat_id?: string | null
           updated_at?: string
@@ -291,13 +287,6 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "nps_avaliacoes_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes_view"
             referencedColumns: ["id"]
           },
         ]
@@ -404,50 +393,14 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "saldo_ads_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes_view"
-            referencedColumns: ["id"]
-          },
         ]
       }
     }
     Views: {
-      clientes_view: {
-        Row: {
-          agencia: Database["public"]["Enums"]["agencia_enum"] | null
-          arquivado: boolean | null
-          created_at: string | null
-          data_inicio: string | null
-          data_limite_verba: string | null
-          demandas_ativas: number | null
-          em_onboarding: boolean | null
-          id: string | null
-          nicho: string | null
-          nome: string | null
-          nps_status: Database["public"]["Enums"]["cliente_nps_status"] | null
-          observacoes: string | null
-          status_operacional:
-            | Database["public"]["Enums"]["status_operacional_type"]
-            | null
-          status_pagamento_mes: string | null
-          tipo_verba: Database["public"]["Enums"]["tipo_verba_enum"] | null
-          ultima_nps_data: string | null
-          ultima_nps_score: number | null
-          updated_at: string | null
-          user_id: string | null
-          verba_ads: number | null
-          verba_total_contratada: number | null
-        }
-        Relationships: []
-      }
       nps_avaliacoes_view: {
         Row: {
-          categoria: Database["public"]["Enums"]["cliente_nps_status"] | null
+          categoria: string | null
           cliente_agencia: Database["public"]["Enums"]["agencia_enum"] | null
-          cliente_arquivado: boolean | null
           cliente_em_onboarding: boolean | null
           cliente_id: string | null
           cliente_nicho: string | null
@@ -473,13 +426,6 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "nps_avaliacoes_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes_view"
             referencedColumns: ["id"]
           },
         ]
@@ -511,13 +457,6 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "saldo_ads_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes_view"
-            referencedColumns: ["id"]
-          },
         ]
       }
     }
@@ -533,10 +472,7 @@ export type Database = {
         }
         Returns: string
       }
-      get_nps_categoria: {
-        Args: { score: number }
-        Returns: Database["public"]["Enums"]["cliente_nps_status"]
-      }
+      get_nps_categoria: { Args: { score: number }; Returns: string }
     }
     Enums: {
       agencia_enum: "effect" | "spike" | "alt" | "pessoais"

@@ -13,7 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { NPS_METRICS, getScoreCategory, getMetricColor } from "@/lib/nps";
+import { NPS_METRICS, getScoreCategory, getMetricColor, isFridayToday } from "@/lib/nps";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 
@@ -54,6 +54,12 @@ export function NPSForm({ onSuccess, onClose, initialData }: NPSFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isFridayToday()) {
+      toast.error("Hoje não é sexta-feira. A gravação de NPS está bloqueada.");
+      return;
+    }
+
     if (!clienteId) {
       toast.error("Selecione um cliente");
       return;

@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { MoreVertical, Edit2, Trash2, Calendar, Target } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { getScoreCategory, getMetricColor } from "@/lib/nps";
+import { getScoreCategory, getMetricColor, isFridayToday, getDiasAteProximaSexta, getProximaSextaFormatada } from "@/lib/nps";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NPSCardProps {
   avaliacao: any;
@@ -16,6 +17,7 @@ interface NPSCardProps {
 }
 
 export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) {
+  const isFriday = isFridayToday();
   const category = getScoreCategory(avaliacao.score_total);
   const metrics = [
     { label: "Engajamento", value: avaliacao.engajamento },
@@ -29,7 +31,7 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
     <Card 
       className={cn(
         "group hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-muted-foreground/10 outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2",
-        avaliacao.clientes?.status_operacional === "pausado" && "opacity-75"
+        avaliacao.cliente_status_operacional === "pausado" && "opacity-75"
       )}
       onClick={() => onClick(avaliacao)}
       tabIndex={0}
@@ -43,19 +45,19 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
       <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0 relative">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-lg leading-tight">{avaliacao.clientes?.nome}</h3>
+            <h3 className="font-bold text-lg leading-tight">{avaliacao.cliente_nome}</h3>
             <Badge variant="outline" className={cn(
               "text-[10px] uppercase font-bold px-1.5 py-0",
-              avaliacao.clientes?.agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : ""
+              avaliacao.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : ""
             )}>
-              {avaliacao.clientes?.agencia}
+              {avaliacao.cliente_agencia}
             </Badge>
           </div>
           <div className="flex flex-wrap gap-1">
-            {avaliacao.clientes?.status_operacional === "pausado" && (
-              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50 h-4 px-1 px-1.5 font-bold uppercase">PAUSADO</Badge>
+            {avaliacao.cliente_status_operacional === "pausado" && (
+              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50 h-4 px-1.5 font-bold uppercase">PAUSADO</Badge>
             )}
-            {avaliacao.clientes?.em_onboarding && (
+            {avaliacao.cliente_em_onboarding && (
               <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px] h-4 px-1.5 font-bold uppercase">ONBOARDING</Badge>
             )}
           </div>
@@ -69,24 +71,54 @@ export function NPSCard({ avaliacao, onEdit, onDelete, onClick }: NPSCardProps) 
         </div>
 
         <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[140px]">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(avaliacao); }}>
-                <Edit2 size={14} className="mr-2" /> Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                className="text-destructive focus:text-destructive" 
-                onClick={(e) => { e.stopPropagation(); onDelete(avaliacao.id); }}
-              >
-                <Trash2 size={14} className="mr-2" /> Remover
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <TooltipProvider>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[140px]">
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <div className="w-full">
+                      <DropdownMenuItem 
+                        disabled={!isFriday}
+                        onClick={(e) => { e.stopPropagation(); if (isFriday) onEdit(avaliacao); }}
+                        className={cn(!isFriday && "opacity-50 cursor-not-allowed")}
+                      >
+                        <Edit2 size={14} className="mr-2" /> Editar
+                      </DropdownMenuItem>
+                    </div>
+                  </TooltipTrigger>
+                  {!isFriday && (
+                    <TooltipContent side="left">
+                      <p>Edição bloqueada fora de sexta-feira.</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <div className="w-full">
+                      <DropdownMenuItem 
+                        disabled={!isFriday}
+                        className={cn("text-destructive focus:text-destructive", !isFriday && "opacity-50 cursor-not-allowed")} 
+                        onClick={(e) => { e.stopPropagation(); if (isFriday) onDelete(avaliacao.id); }}
+                      >
+                        <Trash2 size={14} className="mr-2" /> Remover
+                      </DropdownMenuItem>
+                    </div>
+                  </TooltipTrigger>
+                  {!isFriday && (
+                    <TooltipContent side="left">
+                      <p>Remoção bloqueada fora de sexta-feira.</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TooltipProvider>
         </div>
       </CardHeader>
 
