@@ -1,9 +1,8 @@
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Calendar, MoreVertical, Pencil, Copy, Trash2, Repeat, CheckCircle2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,7 +19,7 @@ interface Demanda {
   status: string;
   prioridade: "baixa" | "media" | "alta" | "urgente";
   prazo?: string;
-  cliente_id: string;
+  cliente_id: string | null;
   recorrente?: boolean;
   frequencia?: string;
   dia_referencia?: string;
@@ -33,16 +32,10 @@ interface KanbanCardProps {
   onEdit: (demanda: Demanda) => void;
   onDelete: (id: string, name: string) => void;
   onComplete?: (id: string) => void;
+  onMoveToDone?: (id: string) => void;
 }
 
-const priorityColors = {
-  baixa: "bg-slate-100 text-slate-700 border-slate-200",
-  media: "bg-blue-50 text-blue-700 border-blue-200",
-  alta: "bg-orange-50 text-orange-700 border-orange-200",
-  urgente: "bg-red-50 text-red-700 border-red-200",
-};
-
-export function KanbanCard({ demanda, onEdit, onDelete, onComplete }: KanbanCardProps) {
+export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone }: KanbanCardProps) {
   const {
     attributes,
     listeners,
@@ -55,136 +48,99 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete }: KanbanCard
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
   };
 
   const isDone = demanda.status === "feito";
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Delete" || e.key === "Backspace") {
-      onDelete(demanda.id, demanda.titulo);
-    }
-  };
-
-  const timeSinceLastExecution = (dateString?: string) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return "Hoje";
-    if (diffDays === 1) return "Ontem";
-    return `há ${diffDays} dias`;
-  };
 
   return (
     <div 
       ref={setNodeRef} 
       style={style} 
-      className="group relative outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 rounded-lg"
-      onKeyDown={handleKeyDown}
-      tabIndex={0}
+      className={cn(
+        "group relative outline-none focus-within:ring-1 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-600 rounded-md mb-2",
+        isDragging && "opacity-50 z-50"
+      )}
     >
       <Card
         className={cn(
-          "mb-3 cursor-grab active:cursor-grabbing hover:border-primary/50 transition-colors bg-card",
-          isDone && "opacity-60 grayscale-[0.5]"
+          "cursor-grab active:cursor-grabbing hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden",
+          isDone && "opacity-60"
         )}
         onClick={() => onEdit(demanda)}
       >
-        <div 
-          className="absolute top-0 bottom-0 left-0 w-1 rounded-l-md" 
-          {...attributes} 
-          {...listeners} 
-        />
-        <CardContent className="p-3 space-y-3">
+        <div className="p-2.5 space-y-1 relative">
+          {/* Grab handle area */}
+          <div 
+            className="absolute inset-y-0 left-0 w-1" 
+            {...attributes} 
+            {...listeners} 
+          />
+          
           <div className="flex items-start justify-between gap-2">
-            <div className="flex flex-col gap-1 w-full">
-              <div className="flex items-center gap-1.5">
-                {demanda.recorrente && <Repeat size={12} className="text-primary shrink-0" />}
-                <h4 className={cn(
-                  "text-sm font-medium leading-tight",
-                  isDone && "line-through text-muted-foreground"
-                )}>
-                  {demanda.titulo}
-                </h4>
-              </div>
-              {demanda.recorrente && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[9px] py-0 px-1 font-normal bg-primary/10 text-primary border-none">
-                    {demanda.frequencia} {demanda.dia_referencia && `• ${demanda.dia_referencia}`}
-                  </Badge>
-                  {demanda.ultima_execucao && (
-                    <span className="text-[9px] text-muted-foreground">
-                      Última: {timeSinceLastExecution(demanda.ultima_execucao)}
-                    </span>
-                  )}
-                </div>
+            <div className="flex items-start gap-2 flex-1 min-w-0">
+              {/* Quick check mark on hover */}
+              {!isDone && onMoveToDone && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveToDone(demanda.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity mt-1 h-4 w-4 rounded-sm border border-zinc-300 dark:border-zinc-700 flex items-center justify-center hover:bg-emerald-500 hover:border-emerald-500 hover:text-white shrink-0"
+                >
+                  <Check size={10} />
+                </button>
               )}
+              
+              <h4 className={cn(
+                "text-[14px] font-medium leading-snug break-words",
+                isDone && "line-through text-zinc-500"
+              )}>
+                {demanda.titulo}
+              </h4>
             </div>
-            <div onClick={(e) => e.stopPropagation()}>
+
+            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
                     <MoreVertical size={14} />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[140px]">
-                  <DropdownMenuItem onClick={() => onEdit(demanda)} className="gap-2">
-                    <Pencil size={14} /> Editar
+                <DropdownMenuContent align="end" className="w-[140px] text-xs">
+                  <DropdownMenuItem onClick={() => onEdit(demanda)} className="gap-2 py-1.5">
+                    <Pencil size={12} /> Editar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {}} className="gap-2">
-                    <Copy size={14} /> Duplicar
+                  <DropdownMenuItem onClick={() => {}} className="gap-2 py-1.5">
+                    <Copy size={12} /> Duplicar
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={() => onDelete(demanda.id, demanda.titulo)} 
-                    className="gap-2 text-destructive focus:text-destructive"
+                    className="gap-2 py-1.5 text-destructive focus:text-destructive"
                   >
-                    <Trash2 size={14} /> Remover
+                    <Trash2 size={12} /> Remover
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {demanda.recorrente && onComplete && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-[10px] gap-1 hover:bg-emerald-50 hover:text-emerald-600 text-muted-foreground"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onComplete(demanda.id);
-                }}
-              >
-                <CheckCircle2 size={12} />
-                Concluir execução
-              </Button>
-            )}
-
-            {demanda.clientes?.nome && (
-              <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal border-muted-foreground/20">
-                {demanda.clientes.nome} {demanda.clientes.agencia && `— ${demanda.clientes.agencia.charAt(0).toUpperCase() + demanda.clientes.agencia.slice(1)}`}
-              </Badge>
-            )}
-            <Badge 
-              variant="outline" 
-              className={cn(
-                "text-[10px] py-0 px-1.5 font-normal border-transparent capitalize",
-                priorityColors[demanda.prioridade]
+          {/* Footer of the card */}
+          {(demanda.descricao || demanda.clientes?.nome || demanda.prazo) && (
+            <div className="flex items-center gap-2 pt-1">
+              {demanda.descricao && (
+                <FileText size={12} className="text-zinc-400" />
               )}
-            >
-              {demanda.prioridade}
-            </Badge>
-            {demanda.prazo && (
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground ml-auto">
-                <Calendar size={10} />
-                {new Date(demanda.prazo).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}
-              </div>
-            )}
-          </div>
-        </CardContent>
+              
+              {/* Optional: if client exists, show tiny indicator or keep minimal as requested */}
+              {/* Keeping minimal: labels only if edited manually later */}
+              {demanda.clientes?.nome && (
+                <span className="text-[10px] text-zinc-400 truncate">
+                  {demanda.clientes.nome}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </Card>
     </div>
   );
