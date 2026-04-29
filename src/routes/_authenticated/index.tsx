@@ -85,6 +85,19 @@ function DemandasPage() {
   const [deletingName, setDeletingName] = useState<string>("");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedDemanda, setSelectedDemanda] = useState<any | null>(null);
+  const [showCalendar, setShowCalendar] = useState(() => {
+    const saved = localStorage.getItem("demandas_calendar_visible");
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [calendarMode, setCalendarMode] = useState<"7days" | "30days">("7days");
+  const [popoverConfig, setPopoverConfig] = useState<{ id: string; x: number; y: number } | null>(null);
+
+  const toggleCalendar = () => {
+    setShowCalendar((prev: boolean) => {
+      localStorage.setItem("demandas_calendar_visible", JSON.stringify(!prev));
+      return !prev;
+    });
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
