@@ -243,7 +243,7 @@ function DemandasPage() {
     setIsDrawerOpen(true);
   };
 
-  const handleQuickAdd = async (status: string, titulo: string) => {
+  const handleQuickAdd = async (status: string, titulo: string, event?: React.MouseEvent | React.TouchEvent) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
@@ -260,14 +260,22 @@ function DemandasPage() {
         cliente_id: null,
         prioridade: "media" as const,
         ordem: maxOrder + 1,
-        recorrente: isRecorrente,
-        frequencia: isRecorrente ? "semanal" : null
+        recorrente: isRecorrente
       }]).select().single();
 
       if (error) throw error;
       
       // Optimistic update
       setDemandas(prev => [...prev, data]);
+      
+      if (isRecorrente && event) {
+        setPopoverConfig({
+          id: data.id,
+          x: (event as any).clientX || 200,
+          y: (event as any).clientY || 200
+        });
+      }
+
       // Silently fetch to sync relationships
       fetchDemandas();
     } catch (error: any) {
