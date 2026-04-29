@@ -463,7 +463,7 @@ export function ProspeccaoDrawer({
                 placeholder="Notas gerais sobre o lead..." 
                 className="min-h-[150px] text-sm leading-relaxed"
                 defaultValue={lead.observacoes || ""}
-                onChange={(e) => debouncedUpdateObs(e.target.value)}
+                onChange={(e) => handleUpdateObs(e.target.value)}
               />
             </section>
 
