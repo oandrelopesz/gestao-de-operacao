@@ -76,7 +76,8 @@ function AuthenticatedLayout() {
   }, []);
 
   useEffect(() => {
-    if (session?.user?.email) {
+    const userEmail = (session as any)?.user?.email;
+    if (userEmail) {
       setUserName(session.user.email.split("@")[0]);
     } else {
       setUserName("Admin");
