@@ -10,7 +10,9 @@ import {
   ArrowRight,
   Plus,
   Check,
-  ChevronDown
+  ChevronDown,
+  Repeat,
+  History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
