@@ -68,7 +68,11 @@ export function NPSForm({ onSuccess, onClose, initialData }: NPSFormProps) {
       user_id: user.id,
       cliente_id: clienteId,
       data_avaliacao: format(dataAvaliacao, "yyyy-MM-dd"),
-      ...metrics,
+      engajamento: metrics.engajamento,
+      resultados_campanha: metrics.resultados_campanha,
+      conversao_vendas: metrics.conversao_vendas,
+      relacionamento: metrics.relacionamento,
+      potencial_crescimento: metrics.potencial_crescimento,
       score_total: scoreTotal,
       observacoes,
     };
@@ -83,7 +87,7 @@ export function NPSForm({ onSuccess, onClose, initialData }: NPSFormProps) {
     } else {
       const { error: insertError } = await supabase
         .from("nps_avaliacoes")
-        .insert(payload);
+        .insert([payload]);
       error = insertError;
     }
 
