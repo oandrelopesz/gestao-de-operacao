@@ -260,8 +260,8 @@ function ProspeccaoPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { error } = await supabase.from("prospeccao").insert([{
-        nome, etapa, user_id: user.id
-      }]);
+        nome, etapa: etapa as any, user_id: user.id
+      }] as any);
       if (error) throw error;
       fetchLeads();
     } catch (error: any) {
