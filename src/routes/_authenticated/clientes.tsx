@@ -64,6 +64,7 @@ interface ClienteView {
   verba_ads: number;
   observacoes: string | null;
   arquivado: boolean;
+  em_onboarding: boolean;
   ultima_nps_score: number | null;
   ultima_nps_data: string | null;
   nps_status: "ancora" | "saudavel" | "em_risco" | "critico" | "sem_avaliacao";
