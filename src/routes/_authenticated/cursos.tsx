@@ -39,20 +39,26 @@ import { CourseForm } from "@/components/cursos/CourseForm";
 
 type Tema = "ia" | "trafego_pago" | "trackeamento" | "copywriting" | "gestao" | "vendas" | "multiplos_temas" | "outros";
 
+interface Categoria {
+  id: string;
+  nome: string;
+}
+
 interface Curso {
   id: string;
   nome: string;
   tema: Tema;
+  categoria_id: string | null;
   link_area_membros: string | null;
   login: string | null;
   senha: string | null;
   em_andamento: boolean;
   observacoes: string | null;
   ordem: number;
+  curso_categorias?: Categoria | null;
 }
 
-const TEMAS: { id: Tema | "todos"; label: string; color: string }[] = [
-  { id: "todos", label: "Todos", color: "bg-slate-500" },
+const TEMAS_LEGADO: { id: Tema; label: string; color: string }[] = [
   { id: "ia", label: "IA", color: "bg-purple-500" },
   { id: "trafego_pago", label: "Tráfego Pago", color: "bg-blue-500" },
   { id: "trackeamento", label: "Trackeamento", color: "bg-cyan-500" },
@@ -70,9 +76,10 @@ export const Route = createFileRoute("/_authenticated/cursos")({
 function CursosPage() {
   const navigate = useNavigate();
   const searchParams = Route.useSearch() as { tema?: string };
-  const currentTema = (searchParams.tema as Tema | "todos") || "todos";
+  const currentTema = (searchParams.tema as string) || "todos";
 
   const [cursos, setCursos] = useState<Curso[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -80,7 +87,7 @@ function CursosPage() {
   const [deletingCourse, setDeletingCourse] = useState<Curso | null>(null);
 
   useEffect(() => {
-    fetchCursos();
+    fetchData();
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "n" && !isModalOpen && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
@@ -92,26 +99,38 @@ function CursosPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const fetchCursos = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("cursos")
-        .select("*")
-        .order("nome", { ascending: true });
+      const [cursosRes, catsRes] = await Promise.all([
+        supabase
+          .from("cursos")
+          .select("*, curso_categorias(id, nome)")
+          .order("nome", { ascending: true }),
+        supabase
+          .from("curso_categorias")
+          .select("id, nome")
+          .order("nome")
+      ]);
 
-      if (error) throw error;
-      const formattedData = (data || []).map(c => ({
+      if (cursosRes.error) throw cursosRes.error;
+      if (catsRes.error) throw catsRes.error;
+
+      const formattedData = (cursosRes.data || []).map(c => ({
         ...c,
         em_andamento: !!c.em_andamento
       })) as Curso[];
+      
       setCursos(formattedData);
+      setCategorias(catsRes.data || []);
     } catch (error: any) {
-      toast.error("Erro ao carregar cursos");
+      toast.error("Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchCursos = fetchData; // Keep the name for backward compatibility if needed
 
   const handleAddCourse = () => {
     setEditingCourse(null);
@@ -164,16 +183,14 @@ function CursosPage() {
   const filteredCursos = useMemo(() => {
     return cursos
       .filter(c => {
-        const matchesTema = currentTema === "todos" || c.tema === currentTema;
+        const matchesTema = currentTema === "todos" || c.tema === currentTema || c.categoria_id === currentTema;
         const matchesSearch = c.nome.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesTema && matchesSearch;
       })
       .sort((a, b) => {
-        // First by status (em_andamento true first)
         if (a.em_andamento !== b.em_andamento) {
           return a.em_andamento ? -1 : 1;
         }
-        // Then by name
         return a.nome.localeCompare(b.nome);
       });
   }, [cursos, currentTema, searchQuery]);
@@ -187,13 +204,36 @@ function CursosPage() {
     };
   }, [filteredCursos]);
 
-  const themeCounts = useMemo(() => {
+  const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { todos: cursos.length };
     cursos.forEach(c => {
-      counts[c.tema] = (counts[c.tema] || 0) + 1;
+      if (c.categoria_id) {
+        counts[c.categoria_id] = (counts[c.categoria_id] || 0) + 1;
+      } else if (c.tema) {
+        counts[c.tema] = (counts[c.tema] || 0) + 1;
+      }
     });
     return counts;
   }, [cursos]);
+
+  const allTabs = useMemo(() => {
+    const tabs = [{ id: "todos", label: "Todos" }];
+    
+    // Add dynamic categories
+    categorias.forEach(cat => {
+      tabs.push({ id: cat.id, label: cat.nome });
+    });
+
+    // Add legacy themes only if they have courses and no category
+    TEMAS_LEGADO.forEach(t => {
+      const hasCourses = cursos.some(c => c.tema === t.id && !c.categoria_id);
+      if (hasCourses) {
+        tabs.push({ id: t.id, label: t.label });
+      }
+    });
+
+    return tabs;
+  }, [categorias, cursos]);
 
   const setTema = (tema: string) => {
     navigate({
@@ -221,11 +261,11 @@ function CursosPage() {
       <div className="flex flex-col gap-4">
         <Tabs value={currentTema} onValueChange={setTema} className="w-full">
           <TabsList className="w-full justify-start overflow-x-auto h-auto p-1 bg-muted/50">
-            {TEMAS.map(t => (
+            {allTabs.map(t => (
               <TabsTrigger key={t.id} value={t.id} className="gap-2 shrink-0">
                 {t.label}
                 <Badge variant="secondary" className="px-1.5 h-4 text-[10px] leading-none">
-                  {themeCounts[t.id] || 0}
+                  {categoryCounts[t.id] || 0}
                 </Badge>
               </TabsTrigger>
             ))}
@@ -325,7 +365,7 @@ function CursosPage() {
               <p className="text-muted-foreground max-w-xs">
                 {currentTema === "todos" 
                   ? "Comece adicionando seu primeiro curso ou área de membros."
-                  : `Nenhum curso do tema "${TEMAS.find(t => t.id === currentTema)?.label}" cadastrado.`}
+                  : `Nenhum curso na categoria "${allTabs.find(t => t.id === currentTema)?.label}" cadastrado.`}
               </p>
             </div>
             <Button onClick={handleAddCourse}>Criar primeiro curso</Button>
@@ -392,7 +432,9 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
     }
   };
 
-  const theme = TEMAS.find(t => t.id === curso.tema);
+  const theme = curso.curso_categorias?.nome 
+    ? { label: curso.curso_categorias.nome, color: "bg-purple-500" }
+    : TEMAS_LEGADO.find(t => t.id === curso.tema) || { label: "Outros", color: "bg-slate-500" };
 
   return (
     <Card className={cn(

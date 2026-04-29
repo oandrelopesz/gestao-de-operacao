@@ -28,13 +28,14 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const courseSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
-  tema: z.enum(["ia", "trafego_pago", "trackeamento", "copywriting", "gestao", "vendas", "multiplos_temas", "outros"]),
+  tema: z.string().optional(),
+  categoria_id: z.string().optional().nullable(),
   link_area_membros: z.string().optional().or(z.literal("")),
   login: z.string().optional().or(z.literal("")),
   senha: z.string().optional().or(z.literal("")),
@@ -54,12 +55,16 @@ interface CourseFormProps {
 export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: CourseFormProps) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [categorias, setCategorias] = useState<{ id: string; nome: string }[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
 
   const form = useForm<CourseFormValues>({
     resolver: zodResolver(courseSchema),
     defaultValues: {
       nome: "",
       tema: "outros",
+      categoria_id: null,
       link_area_membros: "",
       login: "",
       senha: "",
@@ -70,10 +75,56 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
   useEffect(() => {
     if (open) {
+      fetchCategorias();
+    }
+  }, [open]);
+
+  const fetchCategorias = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("curso_categorias")
+        .select("id, nome")
+        .order("nome");
+      
+      if (error) throw error;
+      setCategorias(data || []);
+    } catch (error) {
+      console.error("Erro ao buscar categorias:", error);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
+
+      const { data, error } = await supabase
+        .from("curso_categorias")
+        .insert([{ nome: newCategoryName.trim(), user_id: userId }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success("Categoria criada!");
+      setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
+      form.setValue("categoria_id", data.id);
+      setNewCategoryName("");
+      setIsAddingCategory(false);
+    } catch (error: any) {
+      toast.error("Erro ao criar categoria");
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
       if (editingCourse) {
         form.reset({
           nome: editingCourse.nome || "",
           tema: (editingCourse.tema as any) || "outros",
+          categoria_id: editingCourse.categoria_id || null,
           link_area_membros: editingCourse.link_area_membros || "",
           login: editingCourse.login || "",
           senha: editingCourse.senha || "",
@@ -84,6 +135,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
         form.reset({
           nome: "",
           tema: "outros",
+          categoria_id: null,
           link_area_membros: "",
           login: "",
           senha: "",
@@ -109,7 +161,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
         ...values,
         link_area_membros: finalLink,
         user_id: userId
-      };
+      } as any;
 
       if (editingCourse) {
         const { error } = await supabase
@@ -157,30 +209,72 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="tema"
+                name="categoria_id"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tema</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um tema" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="ia">IA</SelectItem>
-                        <SelectItem value="trafego_pago">Tráfego Pago</SelectItem>
-                        <SelectItem value="trackeamento">Trackeamento</SelectItem>
-                        <SelectItem value="copywriting">Copywriting</SelectItem>
-                        <SelectItem value="gestao">Gestão</SelectItem>
-                        <SelectItem value="vendas">Vendas</SelectItem>
-                        <SelectItem value="multiplos_temas">Múltiplos Temas</SelectItem>
-                        <SelectItem value="outros">Outros</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="flex items-center justify-between">
+                      Categoria
+                      {!isAddingCategory && (
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 px-2 text-[10px] gap-1"
+                          onClick={() => setIsAddingCategory(true)}
+                        >
+                          <Plus size={10} /> Nova
+                        </Button>
+                      )}
+                    </FormLabel>
+                    {isAddingCategory ? (
+                      <div className="flex gap-2">
+                        <Input 
+                          placeholder="Nome da categoria" 
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          className="h-9"
+                          autoFocus
+                        />
+                        <Button 
+                          type="button" 
+                          size="sm" 
+                          onClick={handleAddCategory}
+                          className="h-9 px-3"
+                        >
+                          OK
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setIsAddingCategory(false)}
+                          className="h-9 px-3"
+                        >
+                          X
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione uma categoria" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categorias.map(cat => (
+                            <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
+                          ))}
+                          {categorias.length === 0 && (
+                            <div className="p-2 text-xs text-center text-muted-foreground">
+                              Nenhuma categoria criada
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -191,7 +285,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 name="em_andamento"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="mb-2">Em andamento</FormLabel>
+                    <FormLabel className="mb-2 h-6 flex items-center">Em andamento</FormLabel>
                     <FormControl>
                       <div className="flex items-center h-10">
                         <Switch
@@ -205,6 +299,34 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="tema"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tema (Legado)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um tema" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="ia">IA</SelectItem>
+                      <SelectItem value="trafego_pago">Tráfego Pago</SelectItem>
+                      <SelectItem value="trackeamento">Trackeamento</SelectItem>
+                      <SelectItem value="copywriting">Copywriting</SelectItem>
+                      <SelectItem value="gestao">Gestão</SelectItem>
+                      <SelectItem value="vendas">Vendas</SelectItem>
+                      <SelectItem value="multiplos_temas">Múltiplos Temas</SelectItem>
+                      <SelectItem value="outros">Outros</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

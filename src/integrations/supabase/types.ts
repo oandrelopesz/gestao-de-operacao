@@ -77,8 +77,33 @@ export type Database = {
         }
         Relationships: []
       }
+      curso_categorias: {
+        Row: {
+          cor: string | null
+          created_at: string | null
+          id: string
+          nome: string
+          user_id: string
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          user_id: string
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cursos: {
         Row: {
+          categoria_id: string | null
           created_at: string | null
           em_andamento: boolean | null
           id: string
@@ -93,6 +118,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          categoria_id?: string | null
           created_at?: string | null
           em_andamento?: boolean | null
           id?: string
@@ -107,6 +133,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          categoria_id?: string | null
           created_at?: string | null
           em_andamento?: boolean | null
           id?: string
@@ -120,7 +147,15 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cursos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "curso_categorias"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       demanda_execucoes: {
         Row: {
