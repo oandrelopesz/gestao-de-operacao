@@ -209,30 +209,72 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="tema"
+                name="categoria_id"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tema</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um tema" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="ia">IA</SelectItem>
-                        <SelectItem value="trafego_pago">Tráfego Pago</SelectItem>
-                        <SelectItem value="trackeamento">Trackeamento</SelectItem>
-                        <SelectItem value="copywriting">Copywriting</SelectItem>
-                        <SelectItem value="gestao">Gestão</SelectItem>
-                        <SelectItem value="vendas">Vendas</SelectItem>
-                        <SelectItem value="multiplos_temas">Múltiplos Temas</SelectItem>
-                        <SelectItem value="outros">Outros</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="flex items-center justify-between">
+                      Categoria
+                      {!isAddingCategory && (
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 px-2 text-[10px] gap-1"
+                          onClick={() => setIsAddingCategory(true)}
+                        >
+                          <Plus size={10} /> Nova
+                        </Button>
+                      )}
+                    </FormLabel>
+                    {isAddingCategory ? (
+                      <div className="flex gap-2">
+                        <Input 
+                          placeholder="Nome da categoria" 
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          className="h-9"
+                          autoFocus
+                        />
+                        <Button 
+                          type="button" 
+                          size="sm" 
+                          onClick={handleAddCategory}
+                          className="h-9 px-3"
+                        >
+                          OK
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setIsAddingCategory(false)}
+                          className="h-9 px-3"
+                        >
+                          X
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione uma categoria" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categorias.map(cat => (
+                            <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
+                          ))}
+                          {categorias.length === 0 && (
+                            <div className="p-2 text-xs text-center text-muted-foreground">
+                              Nenhuma categoria criada
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -243,7 +285,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 name="em_andamento"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="mb-2">Em andamento</FormLabel>
+                    <FormLabel className="mb-2 h-6 flex items-center">Em andamento</FormLabel>
                     <FormControl>
                       <div className="flex items-center h-10">
                         <Switch
@@ -257,6 +299,34 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="tema"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tema (Legado)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um tema" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="ia">IA</SelectItem>
+                      <SelectItem value="trafego_pago">Tráfego Pago</SelectItem>
+                      <SelectItem value="trackeamento">Trackeamento</SelectItem>
+                      <SelectItem value="copywriting">Copywriting</SelectItem>
+                      <SelectItem value="gestao">Gestão</SelectItem>
+                      <SelectItem value="vendas">Vendas</SelectItem>
+                      <SelectItem value="multiplos_temas">Múltiplos Temas</SelectItem>
+                      <SelectItem value="outros">Outros</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
