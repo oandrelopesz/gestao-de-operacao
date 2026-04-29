@@ -96,7 +96,7 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
                 <SelectContent>
                   {clientes.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.nome} — <span className="capitalize">{c.agencia}</span>
+                      {c.nome} — <span>{c.agencia && c.agencia.charAt(0).toUpperCase() + c.agencia.slice(1)}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
