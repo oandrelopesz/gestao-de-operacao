@@ -125,7 +125,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       setSearchQuery("");
       return data.id;
     } catch (error: any) {
-      toast.error("Erro ao criar categoria");
+      toast.error("Erro ao criar tema");
       return null;
     }
   };
