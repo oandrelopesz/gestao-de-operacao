@@ -115,7 +115,8 @@ function ClientesPage() {
     const list = clientes.filter((c) => c.agencia === agencia);
     const total = list.length;
     const verbaTotal = list.reduce((s, c) => s + Number(c.verba_ads || 0), 0);
-    const verbaMedia = total > 0 ? verbaTotal / total : 0;
+    const clientesComVerba = list.filter((c) => Number(c.verba_ads || 0) > 0).length;
+    const verbaMedia = clientesComVerba > 0 ? verbaTotal / clientesComVerba : 0;
     const ancora = list.filter((c) => c.nps_status === "ancora").length;
     const saudavel = list.filter((c) => c.nps_status === "saudavel").length;
     const em_risco = list.filter((c) => c.nps_status === "em_risco").length;
