@@ -79,6 +79,8 @@ function DemandasPage() {
   const [filterCliente, setFilterCliente] = useState<string>("all");
   const [filterAgencia, setFilterAgencia] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingName, setDeletingName] = useState<string>("");
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
