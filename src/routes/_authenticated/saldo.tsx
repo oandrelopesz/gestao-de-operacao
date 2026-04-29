@@ -742,7 +742,7 @@ function SaldoPage() {
                               {isCartao ? (
                                 <span className="text-xs font-semibold text-blue-600 uppercase">Cartão</span>
                               ) : (
-                                <span className="text-sm font-bold">{formatBRL(plat.saldo_atual)}</span>
+                                <span className="text-sm font-bold">{formatBRL(plat.saldo_atual_estimado)}</span>
                               )}
                               
                               <DropdownMenu>
