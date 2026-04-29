@@ -32,7 +32,7 @@ interface KanbanColumnProps {
   color: string;
   hex: string;
   demandas: Demanda[];
-  onQuickAdd: (status: string, title: string) => Promise<void>;
+  onQuickAdd: (status: string, title: string, event?: any) => Promise<void>;
   onFullAdd: (status: string) => void;
   onEdit: (demanda: Demanda) => void;
   onDelete: (id: string, name: string) => void;
