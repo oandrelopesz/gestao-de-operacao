@@ -227,24 +227,72 @@ function ClientesPage() {
         }
       }
 
+      // Separa campos do cliente dos campos do saldo_ads
+      const { metodo_pagamento, plataformas, ...clientePayload } = payload;
+
+      // Calcula a verba diária estimada para sincronizar saldo_ads
+      const computeVerbaDiaria = (cli: any) => {
+        if (cli.tipo_verba === "total_periodo" && cli.verba_total_contratada && cli.data_inicio && cli.data_limite_verba) {
+          const inicio = new Date(cli.data_inicio);
+          const fim = new Date(cli.data_limite_verba);
+          const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+          return Number(cli.verba_total_contratada) / dias;
+        }
+        return Number(cli.verba_ads || 0) / 30;
+      };
+
+      let clienteId: string;
       if (editing) {
         const { error } = await supabase.from("clientes")
-          .update(payload).eq("id", editing.id);
+          .update(clientePayload).eq("id", editing.id);
         if (error) {
           console.error("Erro ao atualizar cliente:", error);
           throw error;
         }
+        clienteId = editing.id;
         toast.success("Cliente atualizado");
       } else {
-        const { error } = await supabase.from("clientes").insert([{
-          ...payload,
+        const { data: novoCliente, error } = await supabase.from("clientes").insert([{
+          ...clientePayload,
           user_id: user.id,
-        }]);
+        }]).select().single();
         if (error) {
           console.error("Erro ao inserir cliente:", error);
           throw error;
         }
+        clienteId = novoCliente.id;
         toast.success("Cliente criado");
+      }
+
+      // Sincroniza saldo_ads (forma de pagamento + plataformas)
+      if (plataformas && plataformas.length > 0 && metodo_pagamento) {
+        const verbaDiaria = computeVerbaDiaria(payload);
+
+        // Verifica se já existe registro saldo_ads para esse cliente
+        const { data: existente } = await supabase
+          .from("saldo_ads")
+          .select("id")
+          .eq("cliente_id", clienteId)
+          .maybeSingle();
+
+        if (existente) {
+          await supabase.from("saldo_ads")
+            .update({
+              plataformas,
+              metodo_pagamento,
+              verba_diaria: verbaDiaria,
+            })
+            .eq("id", existente.id);
+        } else {
+          await supabase.from("saldo_ads").insert([{
+            cliente_id: clienteId,
+            user_id: user.id,
+            plataformas,
+            metodo_pagamento,
+            verba_diaria: verbaDiaria,
+            ativo: true,
+          }]);
+        }
       }
       setModalOpen(false);
       setEditing(null);
