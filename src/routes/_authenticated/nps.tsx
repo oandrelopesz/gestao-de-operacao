@@ -332,7 +332,7 @@ function NPSPage() {
         ) : (
           <div className="rounded-lg border bg-card divide-y">
             {filteredData.map((item) => {
-              const cat = getScoreCategory(item.score_total);
+              const cat = getScoreCategory(item.score_total ?? 0);
               const isPausado = item.cliente_status_operacional === "pausado";
               return (
                 <div
