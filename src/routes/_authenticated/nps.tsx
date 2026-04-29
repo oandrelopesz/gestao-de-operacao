@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { Plus, Search, Building2, Filter, AlertTriangle, TrendingUp, Users, Target } from "lucide-react";
+import { Plus, Search, Building2, Filter, AlertTriangle, TrendingUp, Users, Target, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,16 +44,22 @@ function NPSPage() {
   const { data: avaliacoes, isLoading } = useQuery({
     queryKey: ["nps-avaliacoes"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("nps_avaliacoes_view")
-        .select("*, clientes(nome, agencia, status_operacional, em_onboarding)")
-        .order("data_avaliacao", { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from("nps_avaliacoes_view")
+          .select("*, clientes(nome, agencia, status_operacional, em_onboarding)")
+          .order("data_avaliacao", { ascending: false });
 
-      if (error) {
-        toast.error("Erro ao carregar feedbacks NPS");
-        throw error;
+        if (error) {
+          console.error("Erro detalhado NPS query:", error);
+          toast.error(`Erro ao carregar feedbacks NPS: ${error.message}`);
+          throw error;
+        }
+        return data || [];
+      } catch (err: any) {
+        console.error("Erro inesperado na query NPS:", err);
+        throw err;
       }
-      return data || [];
     },
   });
 
@@ -204,16 +210,43 @@ function NPSPage() {
       <div className="space-y-4">
         {isLoading ? (
           <div className="flex justify-center py-20">Carregando...</div>
+        ) : avaliacoes === undefined || (avaliacoes.length === 0 && !isLoading) ? (
+          <div className="space-y-4">
+            {!avaliacoes ? (
+              <Card className="border-destructive/50 bg-destructive/5">
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <AlertCircle className="text-destructive" size={20} />
+                  <CardTitle className="text-destructive">Erro ao carregar NPS</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-destructive/80">
+                    Falha na comunicação com a view de avaliações NPS.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["nps-avaliacoes"] })} className="border-destructive/30 text-destructive hover:bg-destructive/10">
+                    Tentar novamente
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/30 text-center">
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Target size={24} className="opacity-20" />
+                </div>
+                <h3 className="text-lg font-semibold">Nenhuma avaliação encontrada</h3>
+                <p className="text-muted-foreground max-w-xs">Use filtros diferentes ou registre uma nova avaliação de saúde para este cliente.</p>
+                <Button variant="outline" className="mt-4" onClick={() => setIsFormOpen(true)}>
+                  Criar primeira avaliação
+                </Button>
+              </div>
+            )}
+          </div>
         ) : filteredData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/30 text-center">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
               <Target size={24} className="opacity-20" />
             </div>
-            <h3 className="text-lg font-semibold">Nenhuma avaliação encontrada</h3>
-            <p className="text-muted-foreground max-w-xs">Use filtros diferentes ou registre uma nova avaliação de saúde para este cliente.</p>
-            <Button variant="outline" className="mt-4" onClick={() => setIsFormOpen(true)}>
-              Criar primeira avaliação
-            </Button>
+            <h3 className="text-lg font-semibold">Nenhum resultado para os filtros</h3>
+            <p className="text-muted-foreground">Tente ajustar seus critérios de busca ou agência.</p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
