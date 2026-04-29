@@ -127,7 +127,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
       const { data, error } = await supabase
         .from("curso_categorias")
-        .upsert([{ nome: nameToUse.trim(), user_id: userId }], { onConflict: 'nome' })
+        .upsert([{ nome: nameToUse.trim(), user_id: userId }], { onConflict: 'nome,user_id' })
         .select()
         .single();
 
@@ -136,7 +136,9 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       toast.success("Tema criado!");
       setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
       form.setValue("categoria_id", data.id);
+      form.setValue("tema", "outros");
       setSearchQuery("");
+      setOpenCombobox(false);
       return data.id;
     } catch (error: any) {
       toast.error("Erro ao criar tema");
@@ -332,7 +334,6 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                 <CommandItem
                                   onSelect={() => {
                                     handleAddCategory(searchQuery);
-                                    setOpenCombobox(false);
                                   }}
                                   className="gap-2 text-primary cursor-pointer"
                                 >
