@@ -1,0 +1,1 @@
+ALTER TABLE public.saldo_ads ALTER COLUMN metodo_pagamento DROP NOT NULL;
