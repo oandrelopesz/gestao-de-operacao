@@ -119,7 +119,8 @@ function DemandasPage() {
     const { data, error } = await supabase
       .from("demandas")
       .select("*, clientes(nome, agencia)")
-      .order("ordem", { ascending: true });
+      .order("ordem", { ascending: true })
+      .order("created_at", { ascending: false });
     
     if (error) console.error("Erro ao buscar demandas:", error);
     else setDemandas(data || []);
@@ -307,6 +308,9 @@ function DemandasPage() {
         return;
     }
 
+    const overColumnDemandas = demandas.filter(d => d.status === overStatus);
+    const newOrder = overColumnDemandas.length;
+
     if (activeTask.recorrente && overStatus !== "recorrentes") {
       const confirm = window.confirm("Deseja desativar a recorrência desta tarefa?");
       if (!confirm) {
@@ -320,6 +324,7 @@ function DemandasPage() {
         .from("demandas")
         .update({ 
           status: overStatus as any,
+          ordem: newOrder,
           recorrente: overStatus === "recorrentes" ? true : (activeTask.recorrente && overStatus !== "recorrentes" ? false : activeTask.recorrente)
         })
         .eq("id", String(activeId));
@@ -333,68 +338,71 @@ function DemandasPage() {
   };
 
   return (
-    <div className="space-y-6 flex flex-col h-[calc(100vh-8rem)]">
+    <div className="space-y-4 flex flex-col h-[calc(100vh-8rem)]">
       <div className="flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Demandas</h1>
-          <p className="text-muted-foreground">Arraste e solte para organizar suas prioridades.</p>
+          <h1 className="text-xl font-bold tracking-tight">Demandas</h1>
         </div>
         
-        <div className="flex items-center gap-3">
-            <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-            <TabsList>
-                <TabsTrigger value="kanban" className="gap-2">
-                <KanbanIcon size={14} />
-                Kanban
+        <div className="flex items-center gap-2">
+            <Tabs value={view} onValueChange={(v) => setView(v as any)} className="h-8">
+            <TabsList className="h-8 p-0.5">
+                <TabsTrigger value="kanban" className="gap-1.5 text-xs px-2 h-7">
+                <KanbanIcon size={12} />
+                Board
                 </TabsTrigger>
-                <TabsTrigger value="list" className="gap-2">
-                <List size={14} />
+                <TabsTrigger value="list" className="gap-1.5 text-xs px-2 h-7">
+                <List size={12} />
                 Lista
                 </TabsTrigger>
             </TabsList>
             </Tabs>
-            <Button className="gap-2" onClick={() => openNewDemanda()}>
-                <Plus size={16} />
-                Nova demanda
+            <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => openNewDemanda()}>
+                <Plus size={14} />
+                Nova
             </Button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 shrink-0">
-        <div className="relative w-full max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="relative w-full max-w-[200px]">
+          <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Buscar por título ou cliente..."
-            className="pl-9"
+            placeholder="Buscar..."
+            className="pl-7 h-8 text-xs"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         <Select value={filterAgencia} onValueChange={setFilterAgencia}>
-            <SelectTrigger className="w-[180px]">
-                <Building2 className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filtrar por agência" />
+            <SelectTrigger className="w-[140px] h-8 text-xs">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Building2 className="w-3.5 h-3.5" />
+                  <SelectValue placeholder="Agência" />
+                </div>
             </SelectTrigger>
             <SelectContent>
-                <SelectItem value="all">Todas as agências</SelectItem>
+                <SelectItem value="all" className="text-xs">Todas as agências</SelectItem>
                 {AGENCIAS.map(a => (
-                    <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
+                    <SelectItem key={a.id} value={a.id} className="text-xs">{a.label}</SelectItem>
                 ))}
             </SelectContent>
         </Select>
 
         <Select value={filterCliente} onValueChange={setFilterCliente}>
-            <SelectTrigger className="w-[200px]">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filtrar por cliente" />
+            <SelectTrigger className="w-[160px] h-8 text-xs">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Filter className="w-3.5 h-3.5" />
+                  <SelectValue placeholder="Cliente" />
+                </div>
             </SelectTrigger>
             <SelectContent>
-                <SelectItem value="all">Todos os clientes</SelectItem>
+                <SelectItem value="all" className="text-xs">Todos os clientes</SelectItem>
                 {clientes
                   .filter(c => filterAgencia === "all" || c.agencia === filterAgencia)
                   .map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nome} — {AGENCIAS.find(a => a.id === c.agencia)?.label}
+                    <SelectItem key={c.id} value={c.id} className="text-xs">
+                      {c.nome}
                     </SelectItem>
                 ))}
             </SelectContent>
