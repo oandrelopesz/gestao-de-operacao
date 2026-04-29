@@ -34,6 +34,14 @@ interface Demanda {
   prazo?: string;
   cliente_id: string | null;
   created_at?: string;
+  recorrente?: boolean;
+  frequencia_tipo?: string;
+  frequencia_dias_semana?: string[];
+  frequencia_dia_mes?: number;
+  frequencia_intervalo_dias?: number;
+  ultima_execucao?: string;
+  proxima_execucao?: string;
+  recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
 }
 
