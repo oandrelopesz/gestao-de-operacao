@@ -218,9 +218,10 @@ function ClientesPage() {
           <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os status NPS</SelectItem>
-            <SelectItem value="promotor">Promotores</SelectItem>
-            <SelectItem value="neutro">Neutros</SelectItem>
-            <SelectItem value="detrator">Detratores</SelectItem>
+            <SelectItem value="ancora">Âncoras</SelectItem>
+            <SelectItem value="saudavel">Saudáveis</SelectItem>
+            <SelectItem value="em_risco">Em risco</SelectItem>
+            <SelectItem value="critico">Críticos</SelectItem>
             <SelectItem value="sem_avaliacao">Sem avaliação</SelectItem>
           </SelectContent>
         </Select>
