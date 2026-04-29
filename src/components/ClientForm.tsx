@@ -29,6 +29,7 @@ const clientSchema = z.object({
   data_inicio: z.string().min(1, "Informe a data de início"),
   verba_ads: z.number().min(0),
   observacoes: z.string().optional(),
+  em_onboarding: z.boolean().default(false),
 });
 
 export type ClientFormValues = z.infer<typeof clientSchema>;
