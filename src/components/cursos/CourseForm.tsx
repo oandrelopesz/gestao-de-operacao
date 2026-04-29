@@ -255,25 +255,6 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                             onValueChange={setSearchQuery}
                           />
                           <CommandList>
-                            <CommandEmpty>
-                              <div className="p-2 space-y-2">
-                                <p className="text-xs text-muted-foreground">Nenhum tema encontrado.</p>
-                                {searchQuery && (
-                                  <Button 
-                                    type="button"
-                                    size="sm" 
-                                    className="w-full h-8 text-xs gap-1"
-                                    onClick={() => {
-                                      handleAddCategory(searchQuery);
-                                      setOpenCombobox(false);
-                                      setSearchQuery("");
-                                    }}
-                                  >
-                                    <Plus size={12} /> Criar "{searchQuery}"
-                                  </Button>
-                                )}
-                              </div>
-                            </CommandEmpty>
                             <CommandGroup>
                               {categorias.map((cat) => (
                                 <CommandItem
@@ -294,6 +275,25 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                 </CommandItem>
                               ))}
                             </CommandGroup>
+                            <CommandEmpty>
+                              <div className="p-2 space-y-2">
+                                <p className="text-xs text-muted-foreground">Nenhum tema encontrado.</p>
+                                {searchQuery && (
+                                  <Button 
+                                    type="button"
+                                    size="sm" 
+                                    className="w-full h-8 text-xs gap-1"
+                                    onClick={() => {
+                                      handleAddCategory(searchQuery);
+                                      setOpenCombobox(false);
+                                      setSearchQuery("");
+                                    }}
+                                  >
+                                    <Plus size={12} /> Criar "{searchQuery}"
+                                  </Button>
+                                )}
+                              </div>
+                            </CommandEmpty>
                           </CommandList>
                         </Command>
                       </PopoverContent>
