@@ -24,7 +24,7 @@ const demandaSchema = z.object({
   titulo: z.string().min(2, "Título é obrigatório"),
   descricao: z.string().optional(),
   cliente_id: z.string().min(1, "Selecione um cliente"),
-  status: z.enum(["a fazer", "em andamento", "em revisão", "concluída"]),
+  status: z.enum(["fazer_hoje", "fazer_amanha", "fazer_depois_amanha", "standby", "feito"]),
   prioridade: z.enum(["baixa", "média", "alta", "urgente"]),
   prazo: z.string().optional(),
 });
@@ -37,16 +37,16 @@ interface DemandaFormProps {
   loading?: boolean;
 }
 
-export function DemandaForm({ clientes, onSubmit, loading }: DemandaFormProps) {
+export function DemandaForm({ clientes, onSubmit, loading, initialValues }: DemandaFormProps & { initialValues?: Partial<DemandaFormValues> }) {
   const form = useForm<DemandaFormValues>({
     resolver: zodResolver(demandaSchema),
     defaultValues: {
-      titulo: "",
-      descricao: "",
-      cliente_id: "",
-      status: "a fazer",
-      prioridade: "média",
-      prazo: "",
+      titulo: initialValues?.titulo || "",
+      descricao: initialValues?.descricao || "",
+      cliente_id: initialValues?.cliente_id || "",
+      status: initialValues?.status || "fazer_hoje",
+      prioridade: initialValues?.prioridade || "média",
+      prazo: initialValues?.prazo || "",
     },
   });
 
@@ -101,18 +101,19 @@ export function DemandaForm({ clientes, onSubmit, loading }: DemandaFormProps) {
             name="status"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Status</FormLabel>
+                <FormLabel>Coluna</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Status" />
+                      <SelectValue placeholder="Coluna" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="a fazer">A fazer</SelectItem>
-                    <SelectItem value="em andamento">Em andamento</SelectItem>
-                    <SelectItem value="em revisão">Em revisão</SelectItem>
-                    <SelectItem value="concluída">Concluída</SelectItem>
+                    <SelectItem value="fazer_hoje">Fazer hoje</SelectItem>
+                    <SelectItem value="fazer_amanha">Fazer amanhã</SelectItem>
+                    <SelectItem value="fazer_depois_amanha">Fazer depois de amanhã</SelectItem>
+                    <SelectItem value="standby">Standby</SelectItem>
+                    <SelectItem value="feito">Feito</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
