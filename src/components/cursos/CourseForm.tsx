@@ -136,7 +136,9 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       toast.success("Tema criado!");
       setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
       form.setValue("categoria_id", data.id);
+      form.setValue("tema", "outros");
       setSearchQuery("");
+      setOpenCombobox(false);
       return data.id;
     } catch (error: any) {
       toast.error("Erro ao criar tema");
