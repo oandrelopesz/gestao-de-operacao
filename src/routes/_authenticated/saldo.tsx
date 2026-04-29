@@ -686,7 +686,7 @@ function SaldoPage() {
                         <div className="space-y-0.5">
                           <p className="text-[10px] text-muted-foreground uppercase font-semibold">Saldo Total</p>
                           <p className="text-xl font-bold tracking-tight text-primary">
-                            {formatBRL(group.saldo_total_consolidated)}
+                            {formatBRL(group.saldo_total_consolidado)}
                           </p>
                         </div>
                         <div className="space-y-0.5 text-right">
