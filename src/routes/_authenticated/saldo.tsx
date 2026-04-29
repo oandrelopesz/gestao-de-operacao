@@ -778,7 +778,7 @@ function SaldoPage() {
                             <div className="space-y-1.5">
                               <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
                                 <span>{plat.dias_restantes ? Math.floor(plat.dias_restantes) : 0} dias restantes</span>
-                                <span>Última: {formatBRL(plat.total_recarregado > 0 ? plat.total_recarregado / 10 : 0)} em 12/04</span>
+                                <span>Última: {formatBRL(plat.saldo_total_acumulado > 0 ? plat.saldo_total_acumulado / 5 : 0)} em 12/04</span>
                               </div>
                               <Progress 
                                 value={Math.min(100, (plat.dias_restantes || 0) * 10)} 
