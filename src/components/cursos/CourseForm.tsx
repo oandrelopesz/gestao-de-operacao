@@ -118,11 +118,16 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
+      const userId = user?.id;
+
+      if (!userId) {
+        toast.error("Usuário não autenticado");
+        return null;
+      }
 
       const { data, error } = await supabase
         .from("curso_categorias")
-        .insert([{ nome: nameToUse.trim(), user_id: userId }])
+        .upsert([{ nome: nameToUse.trim(), user_id: userId }], { onConflict: 'nome' })
         .select()
         .single();
 
@@ -171,7 +176,13 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
+      const userId = user?.id;
+
+      if (!userId) {
+        toast.error("Usuário não autenticado");
+        setLoading(false);
+        return;
+      }
 
       let finalLink = values.link_area_membros;
       if (finalLink && !finalLink.startsWith("http://") && !finalLink.startsWith("https://")) {
@@ -310,24 +321,22 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                 ))}
                               </CommandGroup>
                             )}
+                            {searchQuery && ![...fixedTemas, ...categorias].some(t => t.nome.toLowerCase() === searchQuery.toLowerCase()) && (
+                              <CommandGroup heading="Novo Tema">
+                                <CommandItem
+                                  value={searchQuery}
+                                  onSelect={() => {
+                                    handleAddCategory(searchQuery);
+                                    setOpenCombobox(false);
+                                  }}
+                                  className="gap-2 text-primary"
+                                >
+                                  <Plus size={14} /> Criar "{searchQuery}"
+                                </CommandItem>
+                              </CommandGroup>
+                            )}
                             <CommandEmpty>
-                              <div className="p-2 space-y-2">
-                                <p className="text-xs text-muted-foreground">Nenhum tema encontrado.</p>
-                                {searchQuery && (
-                                  <Button 
-                                    type="button"
-                                    size="sm" 
-                                    className="w-full h-8 text-xs gap-1"
-                                    onClick={() => {
-                                      handleAddCategory(searchQuery);
-                                      setOpenCombobox(false);
-                                      setSearchQuery("");
-                                    }}
-                                  >
-                                    <Plus size={12} /> Criar "{searchQuery}"
-                                  </Button>
-                                )}
-                              </div>
+                              <p className="p-2 text-xs text-muted-foreground">Nenhum tema encontrado.</p>
                             </CommandEmpty>
                           </CommandList>
                         </Command>
