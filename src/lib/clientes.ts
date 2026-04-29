@@ -5,9 +5,10 @@ export const AGENCIAS = [
   { id: "pessoais", label: "Pessoais", accent: "from-emerald-500/15 to-emerald-500/0", border: "border-l-emerald-500" },
 ] as const;
 
-export type AgenciaId = typeof AGENCIAS[number]["id"];
+export type AgenciaId = typeof AGENCIAS[number]["id"] | "todos";
 
 export function agenciaLabel(id: string | null | undefined): string {
+  if (id === "todos") return "Todos os Clientes";
   return AGENCIAS.find((a) => a.id === id)?.label ?? "—";
 }
 

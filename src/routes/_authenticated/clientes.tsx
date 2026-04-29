@@ -51,14 +51,15 @@ import {
 } from "@/lib/clientes";
 import { cn } from "@/lib/utils";
 
-type SearchParams = { agencia?: AgenciaId; view?: "cards" | "tabela" };
+type SearchParams = { agencia?: AgenciaId; view?: "cards" | "tabela"; subAgencia?: string };
 
 export const Route = createFileRoute("/_authenticated/clientes")({
   validateSearch: (search: Record<string, unknown>): SearchParams => ({
-    agencia: (["effect", "spike", "alt", "pessoais"].includes(search.agencia as string)
+    agencia: (["effect", "spike", "alt", "pessoais", "todos"].includes(search.agencia as string)
       ? (search.agencia as AgenciaId)
-      : "effect"),
+      : "todos"),
     view: search.view === "tabela" ? "tabela" : "cards",
+    subAgencia: typeof search.subAgencia === "string" ? search.subAgencia : undefined,
   }),
   component: ClientesPage,
 });
@@ -87,7 +88,7 @@ interface ClienteView {
 }
 
 function ClientesPage() {
-  const { agencia, view } = Route.useSearch();
+  const { agencia, view, subAgencia } = Route.useSearch();
   const navigate = Route.useNavigate();
 
   const [clientes, setClientes] = useState<ClienteView[]>([]);
@@ -130,6 +131,7 @@ function ClientesPage() {
         const cliSaldos = (saldos || []).filter(s => s.cliente_id === cli.id);
         const summary = cliSaldos.map(s => {
           const platNames = s.plataformas && s.plataformas.length > 0 ? s.plataformas.join(", ") : "Outras";
+          // We use verba_diaria_calc for consistent calculation
           const verba = (s.verba_diaria_calc || 0) * 30;
           return `${platNames} ${formatBRL(verba)}`;
         }).join(" / ");
@@ -155,14 +157,15 @@ function ClientesPage() {
 
   const filtered = useMemo(() => {
     return clientes
-      .filter((c) => c.agencia === agencia)
+      .filter((c) => agencia === "todos" ? true : c.agencia === agencia)
+      .filter((c) => !subAgencia || c.agencia === subAgencia)
       .filter((c) => statusFilter === "all" || c.nps_status === statusFilter)
       .filter((c) => showPausados || c.status_operacional === "ativo")
       .filter((c) => !search || c.nome.toLowerCase().includes(search.toLowerCase()));
-  }, [clientes, agencia, statusFilter, search, showPausados]);
+  }, [clientes, agencia, subAgencia, statusFilter, search, showPausados]);
 
   const metrics = useMemo(() => {
-    const list = clientes.filter((c) => c.agencia === agencia);
+    const list = clientes.filter((c) => agencia === "todos" ? true : c.agencia === agencia);
     const ativosList = list.filter((c) => c.status_operacional === "ativo");
     
     const total = list.length;
@@ -170,8 +173,17 @@ function ClientesPage() {
     const pausados = list.filter((c) => c.status_operacional === "pausado").length;
     const churn = list.filter((c) => c.status_operacional === "churn").length;
     
-    const verbaTotal = ativosList.reduce((s, c) => s + Number(c.verba_ads || 0), 0);
-    const clientesComVerba = ativosList.filter((c) => Number(c.verba_ads || 0) > 0).length;
+    const verbaTotal = ativosList.reduce((acc, c) => {
+      if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
+        const inicio = new Date(c.data_inicio);
+        const fim = new Date(c.data_limite_verba);
+        const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+        return acc + ((Number(c.verba_total_contratada) / dias) * 30);
+      }
+      return acc + Number(c.verba_ads || 0);
+    }, 0);
+    
+    const clientesComVerba = ativosList.filter((c) => (Number(c.verba_ads || 0) > 0 || Number(c.verba_total_contratada || 0) > 0)).length;
     const verbaMedia = clientesComVerba > 0 ? verbaTotal / clientesComVerba : 0;
     
     const ancora = ativosList.filter((c) => c.nps_status === "ancora").length;
@@ -182,7 +194,9 @@ function ClientesPage() {
     return { total, ativos, pausados, churn, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
   }, [clientes, agencia]);
 
-  const agenciaMeta = AGENCIAS.find((a) => a.id === agencia)!;
+  const agenciaMeta = agencia === "todos" 
+    ? { id: "todos", label: "Todos", border: "border-l-primary" }
+    : AGENCIAS.find((a) => a.id === agencia)!;
 
   const handleSave = async (values: ClientFormValues) => {
     setSaving(true);
@@ -361,8 +375,12 @@ function ClientesPage() {
       </div>
 
       {/* Sub-tabs por agência */}
-      <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v as AgenciaId } })}>
+      <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v as AgenciaId, subAgencia: undefined } })}>
         <TabsList>
+          <TabsTrigger value="todos" className="gap-2">
+            Todos
+            <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{clientes.length}</Badge>
+          </TabsTrigger>
           {AGENCIAS.map((a) => (
             <TabsTrigger key={a.id} value={a.id} className="gap-2">
               {a.label}
@@ -371,6 +389,100 @@ function ClientesPage() {
           ))}
         </TabsList>
       </Tabs>
+
+      {/* Banner de fim de campanha próximo */}
+      {(() => {
+        const agora = new Date();
+        const limite90dias = new Date();
+        limite90dias.setDate(agora.getDate() + 90);
+        
+        const clientesFimProximo = clientes.filter(c => 
+          c.status_operacional === "ativo" && 
+          c.data_limite_verba && 
+          new Date(c.data_limite_verba) > agora && 
+          new Date(c.data_limite_verba) <= limite90dias
+        );
+
+        if (clientesFimProximo.length === 0 || (agencia !== "todos" && agencia !== "spike")) return null;
+
+        const impactoTotal = clientesFimProximo.reduce((acc, c) => {
+          if (c.verba_total_contratada && c.data_inicio && c.data_limite_verba) {
+            const inicio = new Date(c.data_inicio);
+            const fim = new Date(c.data_limite_verba);
+            const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+            return acc + ((Number(c.verba_total_contratada) / dias) * 30);
+          }
+          return acc + Number(c.verba_ads || 0);
+        }, 0);
+
+        return (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 bg-amber-100 p-1.5 rounded-full text-amber-600">
+                <AlertCircle size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-amber-900">⚠️ Campanhas com fim previsto nos próximos 90 dias</h4>
+                <p className="text-sm text-amber-800/80">
+                  {clientesFimProximo.length} {clientesFimProximo.length === 1 ? 'cliente vai' : 'clientes vão'} encerrar contratos em breve ({clientesFimProximo.map(c => c.nome).join(", ")}).
+                </p>
+                <p className="text-xs text-amber-700 font-medium mt-1">Impacto previsto: redução de {formatBRL(impactoTotal)}/mês na verba gerenciada</p>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-white hover:bg-amber-100 border-amber-200 text-amber-800 shrink-0"
+              onClick={() => setSearch(clientesFimProximo.map(c => c.nome).join("|"))}
+            >
+              Ver detalhes
+            </Button>
+          </div>
+        );
+      })()}
+
+      {/* Breakdown por agência (mini-cards) */}
+      {agencia === "todos" && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {AGENCIAS.map(a => {
+            const agAtivos = clientes.filter(c => c.agencia === a.id && c.status_operacional === "ativo");
+            const agVerba = agAtivos.reduce((acc, c) => {
+              if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
+                const inicio = new Date(c.data_inicio);
+                const fim = new Date(c.data_limite_verba);
+                const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                return acc + ((Number(c.verba_total_contratada) / dias) * 30);
+              }
+              return acc + Number(c.verba_ads || 0);
+            }, 0);
+            const totalVerbaGlobal = clientes.filter(c => c.status_operacional === "ativo").reduce((acc, c) => {
+              if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
+                const inicio = new Date(c.data_inicio);
+                const fim = new Date(c.data_limite_verba);
+                const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                return acc + ((Number(c.verba_total_contratada) / dias) * 30);
+              }
+              return acc + Number(c.verba_ads || 0);
+            }, 0);
+            const percent = totalVerbaGlobal > 0 ? (agVerba / totalVerbaGlobal) * 100 : 0;
+            
+            return (
+              <button 
+                key={a.id} 
+                onClick={() => navigate({ search: { view, agencia: a.id } })}
+                className="text-left p-3 rounded-lg bg-card border border-border hover:border-primary/50 transition-all group/breakdown"
+              >
+                <div className="flex justify-between items-start mb-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider group-hover/breakdown:text-primary">{a.label}</p>
+                  <Badge variant="secondary" className="h-4 px-1 text-[9px]">{counts[a.id] || 0}</Badge>
+                </div>
+                <p className="text-sm font-bold">{formatBRL(agVerba)}</p>
+                <p className="text-[9px] text-muted-foreground">{percent.toFixed(1)}% do total gerenciado</p>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Métricas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -418,6 +530,15 @@ function ClientesPage() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por nome..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        {agencia === "todos" && (
+          <Select value={subAgencia || "all"} onValueChange={(v) => navigate({ search: { view, agencia, subAgencia: v === "all" ? undefined : v } })}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por agência" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as agências</SelectItem>
+              {AGENCIAS.map(a => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -458,7 +579,7 @@ function ClientesPage() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/20">
           <UsersIcon size={36} className="text-muted-foreground mb-3 opacity-50" />
-          <h3 className="text-lg font-semibold">Nenhum cliente em {agenciaMeta.label}</h3>
+          <h3 className="text-lg font-semibold">Nenhum cliente em {agencia === "todos" ? "Todos os Clientes" : agenciaMeta.label}</h3>
           <p className="text-muted-foreground mb-4 text-sm">Cadastre o primeiro cliente desta agência ou ajuste os filtros.</p>
           <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
@@ -470,7 +591,8 @@ function ClientesPage() {
             <ClienteCard
               key={c.id}
               cliente={c}
-              borderClass={agenciaMeta.border}
+              borderClass={agencia === "todos" ? (AGENCIAS.find(a => a.id === c.agencia)?.border || "border-l-primary") : agenciaMeta.border}
+              showAgenciaBadge={agencia === "todos"}
               onEdit={() => { setEditing(c); setModalOpen(true); }}
               onArchive={() => handleArchive(c.id)}
               onDelete={() => { setDeletingId(c.id); setDeletingName(c.nome); }}
@@ -483,6 +605,7 @@ function ClientesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Cliente</TableHead>
+                {agencia === "todos" && <TableHead>Agência</TableHead>}
                 <TableHead>Nicho</TableHead>
                 <TableHead>Início</TableHead>
                 <TableHead>Verba/mês</TableHead>
@@ -509,9 +632,30 @@ function ClientesPage() {
                     }}
                   >
                     <TableCell className="font-medium">{c.nome}</TableCell>
+                    {agencia === "todos" && (
+                      <TableCell>
+                        <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5 font-bold uppercase", 
+                          c.agencia === 'effect' && "border-blue-500 text-blue-500 bg-blue-500/5",
+                          c.agencia === 'spike' && "border-violet-500 text-violet-500 bg-violet-500/5",
+                          c.agencia === 'alt' && "border-amber-500 text-amber-500 bg-amber-500/5",
+                          c.agencia === 'pessoais' && "border-emerald-500 text-emerald-500 bg-emerald-500/5",
+                        )}>
+                          {AGENCIAS.find(a => a.id === c.agencia)?.label}
+                        </Badge>
+                      </TableCell>
+                    )}
                     <TableCell className="text-muted-foreground">{c.nicho || "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{tempoDeCasa(c.data_inicio)}</TableCell>
-                    <TableCell>{formatBRL(c.verba_ads)}</TableCell>
+                    <TableCell>
+                      {c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba
+                        ? (() => {
+                            const inicio = new Date(c.data_inicio);
+                            const fim = new Date(c.data_limite_verba);
+                            const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                            return formatBRL((Number(c.verba_total_contratada) / dias) * 30);
+                          })()
+                        : formatBRL(c.verba_ads)}
+                    </TableCell>
                     <TableCell><Badge variant="outline" className={cn("font-normal", nps.classes)}>{nps.label}</Badge></TableCell>
                     <TableCell>{c.demandas_ativas}</TableCell>
                     <TableCell>{pag ? <Badge variant="outline" className={cn("font-normal", pag.classes)}>{pag.label}</Badge> : <span className="text-muted-foreground text-xs">—</span>}</TableCell>
@@ -557,7 +701,7 @@ function ClientesPage() {
             onSubmit={handleSave}
             initialValues={editing ? {
               nome: editing.nome,
-              agencia: editing.agencia,
+              agencia: editing.agencia as any,
               nicho: editing.nicho || "",
               data_inicio: editing.data_inicio,
               verba_ads: Number(editing.verba_ads || 0),
@@ -567,7 +711,7 @@ function ClientesPage() {
               tipo_verba: editing.tipo_verba || "mensal",
               verba_total_contratada: editing.verba_total_contratada || 0,
               data_limite_verba: editing.data_limite_verba || "",
-            } : { agencia }}
+            } : { agencia: agencia === "todos" ? "effect" : agencia } as any}
           />
         </DialogContent>
       </Dialog>
@@ -608,10 +752,11 @@ function MetricCard({ icon, label, value, hint }: { icon: React.ReactNode; label
 }
 
 function ClienteCard({
-  cliente, borderClass, onEdit, onArchive, onDelete,
+  cliente, borderClass, showAgenciaBadge, onEdit, onArchive, onDelete,
 }: {
   cliente: ClienteView;
   borderClass: string;
+  showAgenciaBadge?: boolean;
   onEdit: () => void;
   onArchive: () => void;
   onDelete: () => void;
@@ -657,7 +802,17 @@ function ClienteCard({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 pr-6">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              {showAgenciaBadge && (
+                <Badge variant="outline" className={cn("text-[9px] h-4 px-1 font-bold uppercase tracking-tight", 
+                  cliente.agencia === 'effect' && "border-blue-500 text-blue-500 bg-blue-500/5",
+                  cliente.agencia === 'spike' && "border-violet-500 text-violet-500 bg-violet-500/5",
+                  cliente.agencia === 'alt' && "border-amber-500 text-amber-500 bg-amber-500/5",
+                  cliente.agencia === 'pessoais' && "border-emerald-500 text-emerald-500 bg-emerald-500/5",
+                )}>
+                  {AGENCIAS.find(a => a.id === cliente.agencia)?.label}
+                </Badge>
+              )}
               <CardTitle className="text-base font-semibold truncate">{cliente.nome}</CardTitle>
               {cliente.em_onboarding && (
                 <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
@@ -691,13 +846,23 @@ function ClienteCard({
 
         <div className="rounded-md bg-muted/40 px-3 py-2">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {cliente.tipo_verba === "total_periodo" ? "Verba Total Contratada" : "Verba de ads / mês"}
+            {cliente.tipo_verba === "total_periodo" ? "Verba Mensal Equiv. (Período)" : "Verba de ads / mês"}
           </p>
           <p className="text-lg font-bold">
-            {cliente.tipo_verba === "total_periodo" 
-              ? formatBRL(cliente.verba_total_contratada || 0) 
+            {cliente.tipo_verba === "total_periodo" && cliente.verba_total_contratada !== null && cliente.data_inicio && cliente.data_limite_verba
+              ? (() => {
+                  const inicio = new Date(cliente.data_inicio);
+                  const fim = new Date(cliente.data_limite_verba);
+                  const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                  return formatBRL((Number(cliente.verba_total_contratada) / dias) * 30);
+                })()
               : formatBRL(cliente.verba_ads)}
           </p>
+          {cliente.tipo_verba === "total_periodo" && (
+            <p className="text-[9px] text-muted-foreground mt-0.5">
+              Total contratado: {formatBRL(cliente.verba_total_contratada)} até {cliente.data_limite_verba ? new Date(cliente.data_limite_verba).toLocaleDateString("pt-BR") : "—"}
+            </p>
+          )}
           {cliente.plataformas_ativas && cliente.plataformas_ativas.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2 mb-1">
               {cliente.plataformas_ativas.map(plat => (
