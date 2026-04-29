@@ -119,7 +119,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
       if (error) throw error;
 
-      toast.success("Categoria criada!");
+      toast.success("Tema criado!");
       setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
       form.setValue("categoria_id", data.id);
       setSearchQuery("");
