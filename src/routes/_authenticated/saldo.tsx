@@ -18,7 +18,11 @@ import {
   Filter,
   RefreshCw,
   History,
-  Check
+  Check,
+  UserCog,
+  LayoutGrid,
+  Archive,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +42,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -66,9 +71,11 @@ import {
 } from "@/components/ui/sheet";
 import { SaldoAdsForm, SaldoAdsFormValues } from "@/components/SaldoAdsForm";
 import { RecargaForm, RecargaFormValues } from "@/components/RecargaForm";
+import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 
 export const Route = createFileRoute("/_authenticated/saldo")({
   component: SaldoPage,
@@ -86,11 +93,11 @@ const PLATAFORMAS = [
 ];
 
 const STATUS_ALERTA = [
-  { id: "ok", label: "OK", color: "bg-emerald-500" },
-  { id: "alerta", label: "Alerta", color: "bg-amber-500" },
-  { id: "critico", label: "Crítico", color: "bg-red-500" },
-  { id: "zerado", label: "Zerado", color: "bg-gray-500" },
-  { id: "cartao", label: "Cartão (sem monitoramento)", color: "bg-blue-400" },
+  { id: "ok", label: "OK", color: "bg-emerald-500", weight: 0 },
+  { id: "alerta", label: "Alerta", color: "bg-amber-500", weight: 1 },
+  { id: "critico", label: "Crítico", color: "bg-red-500", weight: 2 },
+  { id: "zerado", label: "Zerado", color: "bg-gray-500", weight: 3 },
+  { id: "cartao", label: "Cartão (sem monitoramento)", color: "bg-blue-400", weight: -1 },
 ];
 
 function SaldoPage() {
@@ -105,11 +112,14 @@ function SaldoPage() {
   const [sortBy, setSortBy] = useState<string>("dias_restantes");
   
   const [modalOpen, setModalOpen] = useState(false);
+  const [clientModalOpen, setClientModalOpen] = useState(false);
   const [recargaModalOpen, setRecargaModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [editingClient, setEditingClient] = useState<any>(null);
   const [selectedForRecarga, setSelectedForRecarga] = useState<any>(null);
   const [selectedForHistory, setSelectedForHistory] = useState<any>(null);
+  const [historyIsConsolidated, setHistoryIsConsolidated] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [historyData, setHistoryData] = useState<any[]>([]);
@@ -180,6 +190,26 @@ function SaldoPage() {
     }
   };
 
+  const handleUpdateClient = async (values: ClientFormValues) => {
+    if (!editingClient) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("clientes")
+        .update(values)
+        .eq("id", editingClient.id);
+      if (error) throw error;
+      toast.success("Dados do cliente atualizados");
+      setClientModalOpen(false);
+      setEditingClient(null);
+      fetchSaldo();
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao atualizar cliente");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleRecarga = async (values: RecargaFormValues) => {
     if (!selectedForRecarga) return;
     setSaving(true);
@@ -216,14 +246,22 @@ function SaldoPage() {
     }
   };
 
-  const fetchHistory = async (record: any) => {
+  const fetchHistory = async (record: any, consolidated: boolean = false) => {
     setSelectedForHistory(record);
+    setHistoryIsConsolidated(consolidated);
     setHistoryOpen(true);
-    const { data, error } = await supabase
+    
+    let query = supabase
       .from("recargas")
-      .select("*")
-      .eq("saldo_ads_id", record.id)
-      .order("data_recarga", { ascending: false });
+      .select("*, saldo_ads!inner(plataformas)");
+      
+    if (consolidated) {
+      query = query.eq("saldo_ads.cliente_id", record.cliente_id);
+    } else {
+      query = query.eq("saldo_ads_id", record.id);
+    }
+    
+    const { data, error } = await query.order("data_recarga", { ascending: false });
     
     if (error) {
       toast.error("Erro ao carregar histórico");
@@ -232,53 +270,106 @@ function SaldoPage() {
     }
   };
 
-  const filteredData = useMemo(() => {
-    let result = data.filter(item => {
-      const isCartao = item.metodo_pagamento === "cartao";
-      const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
-      const matchesPlataforma = filterPlataforma === "all" || item.plataformas?.includes(filterPlataforma);
-      
-      let matchesStatus = filterStatus === "all" || item.status_alerta === filterStatus;
-      if (filterStatus === "cartao") {
-        matchesStatus = isCartao;
-      } else if (filterStatus !== "all" && isCartao) {
-        // If filtering by status but it's a card (which has its own status), exclude unless it's specifically cartao filter
-        matchesStatus = false;
+  const groupedData = useMemo(() => {
+    const groups: Record<string, any> = {};
+    
+    data.forEach(item => {
+      const clientId = item.cliente_id;
+      if (!groups[clientId]) {
+        groups[clientId] = {
+          cliente_id: clientId,
+          cliente_nome: item.cliente_nome,
+          cliente_agencia: item.cliente_agencia,
+          status_operacional: item.clientes?.status_operacional,
+          metodo_pagamento_principal: item.metodo_pagamento,
+          plataformas: [],
+          saldo_total_consolidado: 0,
+          verba_diaria_total: 0,
+          pior_status_alerta: "ok",
+          data_prevista_fim_proxima: null,
+          plataforma_mais_proxima: "",
+        };
       }
+      
+      const group = groups[clientId];
+      group.plataformas.push(item);
+      
+      if (item.metodo_pagamento !== group.metodo_pagamento_principal) {
+        group.metodo_pagamento_principal = "misto";
+      }
+      
+      if (item.metodo_pagamento !== "cartao") {
+        group.saldo_total_consolidado += (item.saldo_atual || 0);
+        group.verba_diaria_total += (item.verba_diaria_calc || 0);
+        
+        // Update worst status alert
+        const currentWeight = STATUS_ALERTA.find(s => s.id === item.status_alerta)?.weight || 0;
+        const worstWeight = STATUS_ALERTA.find(s => s.id === group.pior_status_alerta)?.weight || 0;
+        if (currentWeight > worstWeight) {
+          group.pior_status_alerta = item.status_alerta;
+        }
+        
+        // Update next end date
+        if (item.data_prevista_fim) {
+          const currentEnd = new Date(item.data_prevista_fim);
+          if (!group.data_prevista_fim_proxima || currentEnd < new Date(group.data_prevista_fim_proxima)) {
+            group.data_prevista_fim_proxima = item.data_prevista_fim;
+            group.plataforma_mais_proxima = item.plataformas?.[0] || "";
+          }
+        }
+      } else if (group.pior_status_alerta === "ok") {
+        group.pior_status_alerta = "cartao";
+      }
+    });
+    
+    return Object.values(groups);
+  }, [data]);
 
-      const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
-      const isPausado = item.clientes?.status_operacional === "pausado";
+  const filteredData = useMemo(() => {
+    let result = groupedData.filter(group => {
+      const matchesAgencia = filterAgencia === "all" || group.cliente_agencia === filterAgencia;
+      const matchesSearch = group.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
+      const isPausado = group.status_operacional === "pausado";
       const matchesPausados = showPausados || !isPausado;
-      const matchesCartao = showCartao || !isCartao;
+      
+      const hasPlataforma = filterPlataforma === "all" || group.plataformas.some((p: any) => p.plataformas?.includes(filterPlataforma));
+      const hasStatus = filterStatus === "all" || group.plataformas.some((p: any) => p.status_alerta === filterStatus);
+      const hasCartao = showCartao || group.plataformas.some((p: any) => p.metodo_pagamento !== "cartao");
 
-      return matchesAgencia && matchesPlataforma && matchesStatus && matchesSearch && matchesPausados && matchesCartao;
+      return matchesAgencia && matchesSearch && matchesPausados && hasPlataforma && hasStatus && hasCartao;
     });
 
     result.sort((a, b) => {
-      // Put card items at the end when sorting by days remaining
       if (sortBy === "dias_restantes") {
-        if (a.metodo_pagamento === "cartao" && b.metodo_pagamento !== "cartao") return 1;
-        if (a.metodo_pagamento !== "cartao" && b.metodo_pagamento === "cartao") return -1;
-        return (a.dias_restantes || 0) - (b.dias_restantes || 0);
+        if (!a.data_prevista_fim_proxima) return 1;
+        if (!b.data_prevista_fim_proxima) return -1;
+        return new Date(a.data_prevista_fim_proxima).getTime() - new Date(b.data_prevista_fim_proxima).getTime();
       }
       if (sortBy === "nome") return (a.cliente_nome || "").localeCompare(b.cliente_nome || "");
-      if (sortBy === "valor") return (b.saldo_atual || 0) - (a.saldo_atual || 0);
+      if (sortBy === "valor") return (b.saldo_total_consolidado || 0) - (a.saldo_total_consolidado || 0);
       return 0;
     });
 
     return result;
-  }, [data, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy, showPausados, showCartao]);
+  }, [groupedData, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy, showPausados, showCartao]);
 
   const metrics = useMemo(() => {
     const monitored = data.filter(i => i.metodo_pagamento !== "cartao");
     const onCartao = data.filter(i => i.metodo_pagamento === "cartao");
+    const uniqueClients = new Set(data.map(i => i.cliente_id)).size;
+    
+    const criticalClient = [...data]
+      .filter(i => i.metodo_pagamento !== "cartao" && i.data_prevista_fim)
+      .sort((a, b) => new Date(a.data_prevista_fim).getTime() - new Date(b.data_prevista_fim).getTime())[0];
 
     return {
-      totalContas: monitored.length,
+      totalContas: data.length,
+      uniqueClients,
       saldoTotal: monitored.reduce((acc, curr) => acc + (curr.saldo_atual || 0), 0),
       emAlerta: monitored.filter(i => i.status_alerta === "alerta").length,
       criticos: monitored.filter(i => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
-      totalCartao: onCartao.length
+      totalCartao: onCartao.length,
+      criticalClientName: criticalClient?.cliente_nome
     };
   }, [data]);
 
@@ -288,6 +379,7 @@ function SaldoPage() {
       case "alerta": return "border-amber-500";
       case "critico": return "border-red-500";
       case "zerado": return "border-gray-400";
+      case "cartao": return "border-blue-300";
       default: return "border-border";
     }
   };
@@ -321,22 +413,40 @@ function SaldoPage() {
       </div>
 
       <TooltipProvider>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Tooltip>
             <TooltipTrigger asChild>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Contas Monitoradas</CardTitle>
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <LayoutGrid className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{metrics.totalContas}</div>
-                  <p className="text-xs text-muted-foreground">Total de registros ativos</p>
+                  <p className="text-xs text-muted-foreground">Registros saldo_ads</p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Clientes no cartão não entram no monitoramento de saldo</p>
+              <p>Total de registros individuais por plataforma</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Clientes Únicos</CardTitle>
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{metrics.uniqueClients}</div>
+                  <p className="text-xs text-muted-foreground">Clientes monitorados</p>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Contagem distinta de clientes na aba Saldo</p>
             </TooltipContent>
           </Tooltip>
 
@@ -362,12 +472,12 @@ function SaldoPage() {
             <TooltipTrigger asChild>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Em Alerta</CardTitle>
-                  <Clock className="h-4 w-4 text-amber-500" />
+                  <CardTitle className="text-sm font-medium">Em Alerta / Críticos</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-destructive" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{metrics.emAlerta}</div>
-                  <p className="text-xs text-muted-foreground">Saldo dura entre 2 e 4 dias</p>
+                  <div className="text-2xl font-bold">{metrics.criticos + metrics.emAlerta}</div>
+                  <p className="text-xs text-muted-foreground">{metrics.criticos} críticos, {metrics.emAlerta} em alerta</p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
@@ -378,19 +488,21 @@ function SaldoPage() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card>
+              <Card className="bg-red-50/50 border-red-100">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Críticos / Zerados</CardTitle>
-                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  <CardTitle className="text-sm font-medium text-red-800">Mais Crítico</CardTitle>
+                  <ArrowRight className="h-4 w-4 text-red-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{metrics.criticos}</div>
-                  <p className="text-xs text-muted-foreground">Saldo dura menos de 1 dia</p>
+                  <div className="text-base font-bold text-red-700 line-clamp-1">
+                    {metrics.criticalClientName || "Nenhum"}
+                  </div>
+                  <p className="text-xs text-red-600/80">Zera em breve</p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Ignora clientes no cartão</p>
+              <p>Cliente com plataforma que vai zerar primeiro</p>
             </TooltipContent>
           </Tooltip>
         </div>
@@ -476,10 +588,10 @@ function SaldoPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
         {loading ? (
-          Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-[280px] rounded-xl border bg-card animate-pulse" />
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-[300px] rounded-xl border bg-card animate-pulse" />
           ))
         ) : filteredData.length === 0 ? (
           <div className="col-span-full h-64 flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/30 text-muted-foreground">
@@ -490,141 +602,231 @@ function SaldoPage() {
             </Button>
           </div>
         ) : (
-          filteredData.map((item) => {
-            const isCartao = item.metodo_pagamento === "cartao";
-            const isPausado = item.clientes?.status_operacional === "pausado";
+          filteredData.map((group) => {
+            const hasMultiple = group.plataformas.length > 1;
+            const isPausado = group.status_operacional === "pausado";
+            const mainPlataforma = group.plataformas[0];
+            const isCartaoOnly = group.plataformas.every((p: any) => p.metodo_pagamento === "cartao");
 
             return (
               <Card 
-                key={item.id} 
+                key={group.cliente_id} 
                 className={cn(
-                  "group relative border-l-4 transition-all hover:shadow-md cursor-pointer",
-                  isCartao ? "border-blue-300 opacity-90 shadow-sm" : getStatusColor(item.status_alerta),
-                  isPausado && "opacity-70"
+                  "group relative border-l-4 transition-all hover:shadow-md flex flex-col",
+                  getStatusColor(group.pior_status_alerta),
+                  isPausado && "opacity-75"
                 )}
-                onClick={() => fetchHistory(item)}
               >
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-base line-clamp-1">{item.cliente_nome}</CardTitle>
-                      <div className="flex flex-wrap gap-1 mt-1">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg font-bold">{group.cliente_nome}</CardTitle>
+                      <div className="flex flex-wrap gap-1.5">
                         <Badge variant="outline" className={cn(
-                          "text-[10px] font-normal uppercase py-0",
-                          item.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : "",
-                          item.cliente_agencia === "spike" ? "text-purple-600 border-purple-200 bg-purple-50" : ""
+                          "text-[10px] font-semibold uppercase py-0",
+                          group.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : "",
+                          group.cliente_agencia === "spike" ? "text-purple-600 border-purple-200 bg-purple-50" : "",
+                          group.cliente_agencia === "effect" ? "text-blue-600 border-blue-200 bg-blue-50" : "",
+                          group.cliente_agencia === "pessoais" ? "text-emerald-600 border-emerald-200 bg-emerald-50" : ""
                         )}>
-                          {AGENCIAS.find(a => a.id === item.cliente_agencia)?.label || item.cliente_agencia}
+                          {AGENCIAS.find(a => a.id === group.cliente_agencia)?.label || group.cliente_agencia}
                         </Badge>
-                        {isCartao && (
-                          <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 text-[10px] uppercase py-0">
-                            Cartão
-                          </Badge>
-                        )}
                         {isPausado && (
                           <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0">
                             Pausado
                           </Badge>
                         )}
+                        <Badge variant="secondary" className="text-[10px] uppercase py-0">
+                          {group.metodo_pagamento_principal === "misto" ? "Misto" : group.metodo_pagamento_principal}
+                        </Badge>
                       </div>
                     </div>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
                           <MoreVertical size={16} />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-[140px]">
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(item); setModalOpen(true); }}>
-                          <Pencil size={14} className="mr-2" /> Editar
+                      <DropdownMenuContent align="end" className="w-[200px]">
+                        <DropdownMenuItem onClick={() => {
+                          setEditingClient({ id: group.cliente_id, nome: group.cliente_nome, agencia: group.cliente_agencia });
+                          setClientModalOpen(true);
+                        }}>
+                          <UserCog size={14} className="mr-2" /> Editar Cliente
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive focus:text-destructive" 
-                          onClick={(e) => { e.stopPropagation(); setDeletingId(item.id); }}
-                        >
-                          <Trash2 size={14} className="mr-2" /> Remover
+                        <DropdownMenuItem onClick={() => {
+                          setEditing(null);
+                          // We pass the client_id as initial value for the new record
+                          setEditing({ cliente_id: group.cliente_id });
+                          setModalOpen(true);
+                        }}>
+                          <Plus size={14} className="mr-2" /> Adicionar Plataforma
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => fetchHistory(group, true)}>
+                          <History size={14} className="mr-2" /> Ver Histórico Consolidado
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-amber-600">
+                          <Archive size={14} className="mr-2" /> Arquivar Cliente
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive">
+                          <Trash2 size={14} className="mr-2" /> Remover Cliente
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex flex-wrap gap-1">
-                      {item.plataformas?.map((plat: string) => (
-                        <Badge key={plat} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find(p => p.id === plat)?.color)}>
-                          {plat}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="text-right">
-                      {isCartao ? (
-                        <div className="text-sm font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
-                          Cartão
+                
+                <CardContent className="flex-1 space-y-4 pb-4">
+                  {/* Bloco Consolidado se houver múltiplas plataformas */}
+                  {hasMultiple && (
+                    <div className="bg-muted/30 rounded-lg p-3 border space-y-3">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Saldo Total</p>
+                          <p className="text-xl font-bold tracking-tight text-primary">
+                            {formatBRL(group.saldo_total_consolidado)}
+                          </p>
                         </div>
-                      ) : (
-                        <div className="text-2xl font-bold tracking-tight text-primary">
-                          {formatBRL(item.saldo_atual)}
+                        <div className="space-y-0.5 text-right">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Verba Diária Total</p>
+                          <p className="text-sm font-bold">
+                            {formatBRL(group.verba_diaria_total)}<span className="text-[10px] text-muted-foreground font-normal">/dia</span>
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {!isCartaoOnly && group.data_prevista_fim_proxima && (
+                        <div className="flex items-center justify-between text-[11px] bg-background/50 p-2 rounded border border-dashed">
+                          <span className="flex items-center gap-1.5 text-muted-foreground">
+                            <Clock size={12} className="text-amber-500" /> Próximo fim previsto:
+                          </span>
+                          <span className="font-bold text-amber-700">
+                            {new Date(group.data_prevista_fim_proxima).toLocaleDateString("pt-BR")} 
+                            <span className="ml-1 text-[10px] font-normal opacity-70">({group.plataforma_mais_proxima})</span>
+                          </span>
                         </div>
                       )}
                     </div>
-                  </div>
-
-                  {!isCartao ? (
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-medium">
-                        <span>{item.dias_restantes ? Math.floor(item.dias_restantes) : 0} dias restantes</span>
-                        <span className="text-muted-foreground">
-                          Fim: {item.data_prevista_fim ? new Date(item.data_prevista_fim).toLocaleDateString("pt-BR") : "—"}
-                        </span>
-                      </div>
-                      <Progress 
-                        value={Math.min(100, (item.dias_restantes || 0) * 10)} 
-                        className="h-2"
-                        indicatorClassName={getProgressColor(item.status_alerta)}
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-10 flex items-center justify-center bg-muted/30 rounded-md border border-dashed">
-                      <p className="text-[11px] text-muted-foreground italic">Pagamento direto no cartão</p>
-                    </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t">
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground">Verba Diária</p>
-                      <p className="font-semibold">{formatBRL(item.verba_diaria_calc)}</p>
-                    </div>
-                    <div className="space-y-1 text-right">
-                      <p className="text-muted-foreground">{isCartao ? "Verba Mensal" : "Total Investido"}</p>
-                      <p className="font-semibold">
-                        {isCartao 
-                          ? formatBRL(item.clientes?.verba_ads || (item.verba_diaria_calc * 30)) 
-                          : formatBRL(item.total_recarregado)}
-                      </p>
-                    </div>
-                  </div>
+                  {/* Lista de Plataformas */}
+                  <div className="space-y-2">
+                    {group.plataformas.map((plat: any, idx: number) => {
+                      const isFilteringThis = filterPlataforma !== "all" && plat.plataformas?.includes(filterPlataforma);
+                      const isFilteringOther = filterPlataforma !== "all" && !isFilteringThis;
+                      const isCartao = plat.metodo_pagamento === "cartao";
+                      
+                      return (
+                        <div 
+                          key={plat.id} 
+                          className={cn(
+                            "relative group/row rounded-md border p-2.5 transition-all",
+                            isFilteringThis ? "bg-primary/5 border-primary/20" : "bg-card",
+                            isFilteringOther && "opacity-40 grayscale-[0.2]",
+                            !hasMultiple && "border-none p-0 bg-transparent"
+                          )}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {plat.plataformas?.map((p: string) => (
+                                <Badge key={p} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find(plt => plt.id === p)?.color)}>
+                                  {p}
+                                </Badge>
+                              ))}
+                              {isCartao && <Badge variant="outline" className="text-[9px] h-4 py-0 text-blue-600 border-blue-200">Cartão</Badge>}
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              {isCartao ? (
+                                <span className="text-xs font-semibold text-blue-600 uppercase">Cartão</span>
+                              ) : (
+                                <span className="text-sm font-bold">{formatBRL(plat.saldo_atual)}</span>
+                              )}
+                              
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                                    <MoreVertical size={12} />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-[180px]">
+                                  <DropdownMenuItem onClick={() => { setEditing(plat); setModalOpen(true); }}>
+                                    <Pencil size={12} className="mr-2" /> Editar Registro
+                                  </DropdownMenuItem>
+                                  {!isCartao && (
+                                    <>
+                                      <DropdownMenuItem onClick={() => { setSelectedForRecarga(plat); setRecargaModalOpen(true); }}>
+                                        <Plus size={12} className="mr-2" /> Adicionar Recarga
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => fetchHistory(plat)}>
+                                        <History size={12} className="mr-2" /> Ver Histórico
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(plat.id)}>
+                                    <Trash2 size={12} className="mr-2" /> Remover Plataforma
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
 
-                  {!isCartao ? (
-                    <Button 
-                      className="w-full h-8 text-xs gap-2" 
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedForRecarga(item);
-                        setRecargaModalOpen(true);
-                      }}
-                    >
-                      <ArrowUpCircle size={14} />
-                      Adicionar recarga
-                    </Button>
-                  ) : (
-                    <div className="h-8 flex items-center justify-center">
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Check size={10} className="text-emerald-500" /> Pagamento no cartão
-                      </span>
-                    </div>
-                  )}
+                          {!isCartao ? (
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
+                                <span>{plat.dias_restantes ? Math.floor(plat.dias_restantes) : 0} dias restantes</span>
+                                <span>Última: {formatBRL(plat.total_recarregado > 0 ? plat.total_recarregado / 10 : 0)} em 12/04</span>
+                              </div>
+                              <Progress 
+                                value={Math.min(100, (plat.dias_restantes || 0) * 10)} 
+                                className="h-1.5"
+                                indicatorClassName={getProgressColor(plat.status_alerta)}
+                              />
+                            </div>
+                          ) : !hasMultiple && (
+                            <div className="h-10 flex items-center justify-center bg-muted/30 rounded-md border border-dashed">
+                              <p className="text-[11px] text-muted-foreground italic">Pagamento direto no cartão</p>
+                            </div>
+                          )}
+
+                          {!hasMultiple && (
+                            <div className="grid grid-cols-2 gap-2 text-[11px] pt-3 mt-3 border-t">
+                              <div className="space-y-0.5">
+                                <p className="text-muted-foreground">Verba Diária</p>
+                                <p className="font-semibold">{formatBRL(plat.verba_diaria_calc)}</p>
+                              </div>
+                              <div className="space-y-0.5 text-right">
+                                <p className="text-muted-foreground">{isCartao ? "Verba Mensal" : "Total Investido"}</p>
+                                <p className="font-semibold">
+                                  {isCartao 
+                                    ? formatBRL(plat.clientes?.verba_ads || (plat.verba_diaria_calc * 30)) 
+                                    : formatBRL(plat.total_recarregado)}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {!isCartao && !hasMultiple && (
+                            <Button 
+                              className="w-full h-8 text-xs gap-2 mt-4" 
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedForRecarga(plat);
+                                setRecargaModalOpen(true);
+                              }}
+                            >
+                              <ArrowUpCircle size={14} />
+                              Adicionar recarga
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -636,7 +838,7 @@ function SaldoPage() {
       <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) setEditing(null); }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{editing ? "Editar Registro" : "Novo Registro de Saldo"}</DialogTitle>
+            <DialogTitle>{editing?.id ? "Editar Registro" : "Novo Registro de Saldo"}</DialogTitle>
             <DialogDescription>
               Configure o monitoramento de verba para uma plataforma de anúncios.
             </DialogDescription>
@@ -651,6 +853,22 @@ function SaldoPage() {
               verba_diaria: editing.verba_diaria,
               observacoes: editing.observacoes,
             } : {}}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={clientModalOpen} onOpenChange={(o) => { setClientModalOpen(o); if (!o) setEditingClient(null); }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Cliente</DialogTitle>
+            <DialogDescription>
+              Atualize as informações cadastrais do cliente.
+            </DialogDescription>
+          </DialogHeader>
+          <ClientForm
+            loading={saving}
+            onSubmit={handleUpdateClient}
+            initialValues={editingClient}
           />
         </DialogContent>
       </Dialog>
@@ -676,39 +894,41 @@ function SaldoPage() {
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
-              Histórico de Recargas
+              {historyIsConsolidated ? "Histórico Consolidado" : "Histórico de Recargas"}
             </SheetTitle>
             <SheetDescription>
-              {selectedForHistory?.cliente_nome} — {selectedForHistory?.plataformas?.join(", ")}
+              {selectedForHistory?.cliente_nome} {historyIsConsolidated ? "— Todas plataformas" : `— ${selectedForHistory?.plataformas?.join(", ")}`}
             </SheetDescription>
           </SheetHeader>
           
           <div className="mt-8 space-y-6">
-            <div className="p-4 rounded-xl bg-muted/50 border space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status Atual</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[10px] text-muted-foreground">
-                    {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Método' : 'Saldo'}
-                  </p>
-                  <p className="text-lg font-bold">
-                    {selectedForHistory?.metodo_pagamento === 'cartao' 
-                      ? 'Cartão' 
-                      : formatBRL(selectedForHistory?.saldo_atual)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground">
-                    {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Monitoramento' : 'Previsão'}
-                  </p>
-                  <p className="text-lg font-bold">
-                    {selectedForHistory?.metodo_pagamento === 'cartao' 
-                      ? 'Desativado' 
-                      : `${selectedForHistory?.dias_restantes ? Math.floor(selectedForHistory.dias_restantes) : 0} dias`}
-                  </p>
+            {!historyIsConsolidated && (
+              <div className="p-4 rounded-xl bg-muted/50 border space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status Atual</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Método' : 'Saldo'}
+                    </p>
+                    <p className="text-lg font-bold">
+                      {selectedForHistory?.metodo_pagamento === 'cartao' 
+                        ? 'Cartão' 
+                        : formatBRL(selectedForHistory?.saldo_atual)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Monitoramento' : 'Previsão'}
+                    </p>
+                    <p className="text-lg font-bold">
+                      {selectedForHistory?.metodo_pagamento === 'cartao' 
+                        ? 'Desativado' 
+                        : `${selectedForHistory?.dias_restantes ? Math.floor(selectedForHistory.dias_restantes) : 0} dias`}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {selectedForHistory?.metodo_pagamento === 'cartao' && historyData.length > 0 && (
               <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-700">
@@ -729,7 +949,12 @@ function SaldoPage() {
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-bold">{formatBRL(recarga.valor)}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold">{formatBRL(recarga.valor)}</p>
+                            {historyIsConsolidated && recarga.saldo_ads?.plataformas?.map((p: string) => (
+                              <Badge key={p} variant="outline" className="text-[9px] h-4 py-0">{p}</Badge>
+                            ))}
+                          </div>
                           <span className="text-[10px] text-muted-foreground font-mono">
                             {new Date(recarga.data_recarga).toLocaleDateString("pt-BR")}
                           </span>
