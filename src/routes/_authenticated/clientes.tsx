@@ -833,13 +833,23 @@ function ClienteCard({
 
         <div className="rounded-md bg-muted/40 px-3 py-2">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {cliente.tipo_verba === "total_periodo" ? "Verba Total Contratada" : "Verba de ads / mês"}
+            {cliente.tipo_verba === "total_periodo" ? "Verba Mensal Equiv. (Período)" : "Verba de ads / mês"}
           </p>
           <p className="text-lg font-bold">
-            {cliente.tipo_verba === "total_periodo" 
-              ? formatBRL(cliente.verba_total_contratada || 0) 
+            {cliente.tipo_verba === "total_periodo" && cliente.verba_total_contratada !== null && cliente.data_inicio && cliente.data_limite_verba
+              ? (() => {
+                  const inicio = new Date(cliente.data_inicio);
+                  const fim = new Date(cliente.data_limite_verba);
+                  const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+                  return formatBRL((Number(cliente.verba_total_contratada) / dias) * 30);
+                })()
               : formatBRL(cliente.verba_ads)}
           </p>
+          {cliente.tipo_verba === "total_periodo" && (
+            <p className="text-[9px] text-muted-foreground mt-0.5">
+              Total contratado: {formatBRL(cliente.verba_total_contratada)} até {cliente.data_limite_verba ? new Date(cliente.data_limite_verba).toLocaleDateString("pt-BR") : "—"}
+            </p>
+          )}
           {cliente.plataformas_ativas && cliente.plataformas_ativas.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2 mb-1">
               {cliente.plataformas_ativas.map(plat => (
