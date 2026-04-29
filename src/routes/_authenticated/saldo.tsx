@@ -68,10 +68,14 @@ export const Route = createFileRoute("/_authenticated/saldo")({
 });
 
 const PLATAFORMAS = [
-  { id: "meta", label: "Meta", color: "bg-blue-500" },
-  { id: "google", label: "Google", color: "bg-red-500" },
-  { id: "tiktok", label: "TikTok", color: "bg-black" },
-  { id: "outras", label: "Outras", color: "bg-gray-500" },
+  { id: "Meta", label: "Meta", color: "bg-blue-500" },
+  { id: "Google", label: "Google", color: "bg-red-500" },
+  { id: "Pinterest", label: "Pinterest", color: "bg-rose-500" },
+  { id: "X Ads", label: "X Ads", color: "bg-black" },
+  { id: "LinkedIn", label: "LinkedIn", color: "bg-blue-700" },
+  { id: "TikTok", label: "TikTok", color: "bg-zinc-800" },
+  { id: "Taboola", label: "Taboola", color: "bg-blue-400" },
+  { id: "Outbrain", label: "Outbrain", color: "bg-orange-500" },
 ];
 
 const STATUS_ALERTA = [
