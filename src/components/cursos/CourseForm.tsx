@@ -321,24 +321,22 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                 ))}
                               </CommandGroup>
                             )}
+                            {searchQuery && ![...fixedTemas, ...categorias].some(t => t.nome.toLowerCase() === searchQuery.toLowerCase()) && (
+                              <CommandGroup heading="Novo Tema">
+                                <CommandItem
+                                  value={searchQuery}
+                                  onSelect={() => {
+                                    handleAddCategory(searchQuery);
+                                    setOpenCombobox(false);
+                                  }}
+                                  className="gap-2 text-primary"
+                                >
+                                  <Plus size={14} /> Criar "{searchQuery}"
+                                </CommandItem>
+                              </CommandGroup>
+                            )}
                             <CommandEmpty>
-                              <div className="p-2 space-y-2">
-                                <p className="text-xs text-muted-foreground">Nenhum tema encontrado.</p>
-                                {searchQuery && (
-                                  <Button 
-                                    type="button"
-                                    size="sm" 
-                                    className="w-full h-8 text-xs gap-1"
-                                    onClick={() => {
-                                      handleAddCategory(searchQuery);
-                                      setOpenCombobox(false);
-                                      setSearchQuery("");
-                                    }}
-                                  >
-                                    <Plus size={12} /> Criar "{searchQuery}"
-                                  </Button>
-                                )}
-                              </div>
+                              <p className="p-2 text-xs text-muted-foreground">Nenhum tema encontrado.</p>
                             </CommandEmpty>
                           </CommandList>
                         </Command>
