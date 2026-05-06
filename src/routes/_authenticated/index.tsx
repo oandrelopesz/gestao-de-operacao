@@ -461,19 +461,28 @@ function DemandasPage() {
     });
 
     try {
-      const updates = targetCol.map((d, idx) =>
+      // Atualiza primeiro o card movido (essencial). Se falhar, reverte.
+      const movedIdx = targetCol.findIndex(d => d.id === activeId);
+      const { error: movedError } = await supabase
+        .from("demandas")
+        .update({
+          status: overStatus as any,
+          ordem: movedIdx >= 0 ? movedIdx : 0,
+          recorrente: newRecorrente,
+        })
+        .eq("id", activeId);
+      if (movedError) throw movedError;
+
+      // Atualiza ordem dos demais em background, ignorando falhas individuais (RLS de outros usuários, etc.)
+      targetCol.forEach((d, idx) => {
+        if (d.id === activeId) return;
         supabase
           .from("demandas")
-          .update({
-            status: overStatus as any,
-            ordem: idx,
-            ...(d.id === activeId ? { recorrente: newRecorrente } : {}),
-          })
+          .update({ ordem: idx })
           .eq("id", d.id)
-      );
-      const results = await Promise.all(updates);
-      const firstError = results.find(r => r.error)?.error;
-      if (firstError) throw firstError;
+          .then(() => {});
+      });
+
       fetchDemandas();
     } catch (error: any) {
       toast.error("Erro ao sincronizar movimento");
