@@ -370,46 +370,8 @@ function DemandasPage() {
     setActiveDemanda(demanda);
   };
 
-  const onDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeId = active.id;
-    const overId = over.id;
-
-    if (activeId === overId) return;
-
-    const isActiveTask = active.data.current?.type !== "Column";
-    const isOverTask = over.data.current?.type !== "Column";
-
-    if (!isActiveTask) return;
-
-    const activeTask = demandas.find(d => d.id === activeId);
-    if (!activeTask) return;
-
-    let overStatus = overId as string;
-    if (isOverTask) {
-      const overTask = demandas.find(d => d.id === overId);
-      if (overTask) overStatus = overTask.status;
-    }
-
-    if (activeTask.status !== overStatus) {
-      setDemandas((prev) => {
-        const activeIndex = prev.findIndex((d) => d.id === activeId);
-        const overIndex = isOverTask 
-          ? prev.findIndex((d) => d.id === overId)
-          : prev.length;
-
-        const updated = [...prev];
-        updated[activeIndex] = { 
-          ...updated[activeIndex], 
-          status: overStatus,
-          recorrente: overStatus === "recorrentes" ? true : updated[activeIndex].recorrente
-        };
-        
-        return arrayMove(updated, activeIndex, overIndex);
-      });
-    }
+  const onDragOver = (_event: DragOverEvent) => {
+    // Sem reordenação otimista durante o drag - tudo é resolvido no onDragEnd
   };
 
   const onDragEnd = async (event: DragEndEvent) => {
@@ -424,30 +386,33 @@ function DemandasPage() {
     const activeTask = demandas.find(d => d.id === activeId);
     if (!activeTask) return;
 
+    // Cards recorrentes (mãe) ficam travados - única coluna bloqueada
+    if (activeTask.status === "recorrentes") return;
+
     const overTask = demandas.find(d => d.id === overId);
     let overStatus: string;
     if (overTask) overStatus = overTask.status;
     else if (COLUMNS.some(c => c.id === overId)) overStatus = overId;
     else return;
 
-    if (activeTask.status === "recorrentes" && overStatus !== "recorrentes") {
-      toast.error("Tarefas recorrentes vivem na coluna Recorrentes. Mova a instância gerada hoje em Fazer hoje.");
-      fetchDemandas();
-      return;
-    }
+    // Não permite mover nada PARA recorrentes via drag
+    if (overStatus === "recorrentes") return;
+
+    if (activeTask.status === overStatus && activeId === overId) return;
 
     // Build new ordered list for target column
     const otherDemandas = demandas.filter(d => d.id !== activeId);
-    const targetCol = otherDemandas.filter(d => d.status === overStatus).sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+    const targetCol = otherDemandas
+      .filter(d => d.status === overStatus)
+      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 
     let insertIndex = targetCol.length;
-    if (overTask && overTask.id !== activeId) {
+    if (overTask && overTask.id !== activeId && overTask.status === overStatus) {
       insertIndex = targetCol.findIndex(d => d.id === overTask.id);
       if (insertIndex < 0) insertIndex = targetCol.length;
     }
 
-    const newRecorrente = overStatus === "recorrentes" ? true : (activeTask.status === "recorrentes" ? false : activeTask.recorrente);
-    const movedTask = { ...activeTask, status: overStatus, recorrente: newRecorrente };
+    const movedTask = { ...activeTask, status: overStatus };
     targetCol.splice(insertIndex, 0, movedTask);
 
     // Optimistic local update
@@ -455,32 +420,25 @@ function DemandasPage() {
       const map = new Map(prev.map(d => [d.id, d]));
       targetCol.forEach((d, idx) => {
         const existing = map.get(d.id);
-        if (existing) map.set(d.id, { ...existing, status: overStatus, ordem: idx, recorrente: d.id === activeId ? newRecorrente : existing.recorrente });
+        if (existing) map.set(d.id, { ...existing, status: overStatus, ordem: idx });
       });
       return Array.from(map.values());
     });
 
     try {
-      // Atualiza primeiro o card movido (essencial). Se falhar, reverte.
       const movedIdx = targetCol.findIndex(d => d.id === activeId);
       const { error: movedError } = await supabase
         .from("demandas")
         .update({
           status: overStatus as any,
           ordem: movedIdx >= 0 ? movedIdx : 0,
-          recorrente: newRecorrente,
         })
         .eq("id", activeId);
       if (movedError) throw movedError;
 
-      // Atualiza ordem dos demais em background, ignorando falhas individuais (RLS de outros usuários, etc.)
       targetCol.forEach((d, idx) => {
         if (d.id === activeId) return;
-        supabase
-          .from("demandas")
-          .update({ ordem: idx })
-          .eq("id", d.id)
-          .then(() => {});
+        supabase.from("demandas").update({ ordem: idx }).eq("id", d.id).then(() => {});
       });
 
       fetchDemandas();
