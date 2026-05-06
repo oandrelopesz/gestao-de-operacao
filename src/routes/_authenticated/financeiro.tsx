@@ -165,9 +165,8 @@ function FinanceiroPage() {
       const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
       // if (!user) return; // Removido para permitir acesso sem login
 
-      const mesReferencia = new Date();
-      mesReferencia.setDate(1);
-      const mesRefStr = mesReferencia.toISOString().slice(0, 10);
+      const now = new Date();
+      const mesRefStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
       if (item.recebimento_id) {
         // Alterna o estado

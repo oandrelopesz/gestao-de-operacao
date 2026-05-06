@@ -418,42 +418,62 @@ function DemandasPage() {
 
     if (!over) return;
 
-    const activeId = active.id;
-    const overId = over.id;
+    const activeId = String(active.id);
+    const overId = String(over.id);
 
     const activeTask = demandas.find(d => d.id === activeId);
     if (!activeTask) return;
 
-    let overStatus = overId as string;
     const overTask = demandas.find(d => d.id === overId);
+    let overStatus: string;
     if (overTask) overStatus = overTask.status;
-    else if (!COLUMNS.some(c => c.id === overId)) {
-        return;
-    }
-
-    const overColumnDemandas = demandas.filter(d => d.status === overStatus);
-    const newOrder = overColumnDemandas.length;
+    else if (COLUMNS.some(c => c.id === overId)) overStatus = overId;
+    else return;
 
     if (activeTask.status === "recorrentes" && overStatus !== "recorrentes") {
       toast.error("Tarefas recorrentes vivem na coluna Recorrentes. Mova a instância gerada hoje em Fazer hoje.");
+      fetchDemandas();
       return;
     }
 
-    if (activeTask.recorrente && overStatus !== "recorrentes" && activeTask.status === "recorrentes") {
-      return;
+    // Build new ordered list for target column
+    const otherDemandas = demandas.filter(d => d.id !== activeId);
+    const targetCol = otherDemandas.filter(d => d.status === overStatus).sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+
+    let insertIndex = targetCol.length;
+    if (overTask && overTask.id !== activeId) {
+      insertIndex = targetCol.findIndex(d => d.id === overTask.id);
+      if (insertIndex < 0) insertIndex = targetCol.length;
     }
+
+    const newRecorrente = overStatus === "recorrentes" ? true : (activeTask.status === "recorrentes" ? false : activeTask.recorrente);
+    const movedTask = { ...activeTask, status: overStatus, recorrente: newRecorrente };
+    targetCol.splice(insertIndex, 0, movedTask);
+
+    // Optimistic local update
+    setDemandas(prev => {
+      const map = new Map(prev.map(d => [d.id, d]));
+      targetCol.forEach((d, idx) => {
+        const existing = map.get(d.id);
+        if (existing) map.set(d.id, { ...existing, status: overStatus, ordem: idx, recorrente: d.id === activeId ? newRecorrente : existing.recorrente });
+      });
+      return Array.from(map.values());
+    });
 
     try {
-      const { error } = await supabase
-        .from("demandas")
-        .update({ 
-          status: overStatus as any,
-          ordem: newOrder,
-          recorrente: overStatus === "recorrentes" ? true : (activeTask.recorrente && overStatus !== "recorrentes" ? false : activeTask.recorrente)
-        })
-        .eq("id", String(activeId));
-      
-      if (error) throw error;
+      const updates = targetCol.map((d, idx) =>
+        supabase
+          .from("demandas")
+          .update({
+            status: overStatus as any,
+            ordem: idx,
+            ...(d.id === activeId ? { recorrente: newRecorrente } : {}),
+          })
+          .eq("id", d.id)
+      );
+      const results = await Promise.all(updates);
+      const firstError = results.find(r => r.error)?.error;
+      if (firstError) throw firstError;
       fetchDemandas();
     } catch (error: any) {
       toast.error("Erro ao sincronizar movimento");
