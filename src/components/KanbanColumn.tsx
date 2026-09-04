@@ -3,7 +3,14 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { KanbanCard } from "./KanbanCard";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, MoreVertical, Pencil, Eraser, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +45,11 @@ interface KanbanColumnProps {
   onDelete: (id: string, name: string) => void;
   onComplete?: (id: string) => void;
   onMoveToDone?: (id: string) => void;
+  onRenameColumn?: () => void;
+  onClearColumn?: () => void;
+  onDeleteColumn?: () => void;
+  /** Colunas de sistema (recorrentes, feito) podem ser renomeadas, mas não excluídas */
+  isSystem?: boolean;
 }
 
 const emptyMessages: Record<string, string> = {
@@ -61,6 +73,10 @@ export function KanbanColumn({
   onDelete,
   onComplete,
   onMoveToDone,
+  onRenameColumn,
+  onClearColumn,
+  onDeleteColumn,
+  isSystem,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const [isAdding, setIsAdding] = useState(false);
@@ -118,6 +134,49 @@ export function KanbanColumn({
             {demandas.length}
           </span>
         </div>
+        {(onRenameColumn || onClearColumn || onDeleteColumn) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 -mr-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                title="Configurações da coluna"
+              >
+                <MoreVertical size={14} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[190px] text-xs">
+              {onRenameColumn && (
+                <DropdownMenuItem onClick={onRenameColumn} className="gap-2 py-1.5">
+                  <Pencil size={12} /> Editar nome
+                </DropdownMenuItem>
+              )}
+              {onClearColumn && (
+                <DropdownMenuItem
+                  onClick={onClearColumn}
+                  disabled={demandas.length === 0}
+                  className="gap-2 py-1.5"
+                >
+                  <Eraser size={12} /> Zerar demandas
+                </DropdownMenuItem>
+              )}
+              {onDeleteColumn && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={onDeleteColumn}
+                    disabled={isSystem}
+                    title={isSystem ? "Coluna fixa do sistema" : undefined}
+                    className="gap-2 py-1.5 text-destructive focus:text-destructive"
+                  >
+                    <Trash2 size={12} /> Excluir coluna
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       <div

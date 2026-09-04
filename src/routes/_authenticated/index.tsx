@@ -1,23 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Filter, List, Kanban as KanbanIcon, Search, Building2, MoreVertical, Pencil, Trash2, Repeat, Calendar as CalendarIcon, ChevronDown, ChevronUp, X } from "lucide-react";
+import { Plus, List, Kanban as KanbanIcon, Search, MoreVertical, Pencil, Trash2, Repeat, Calendar as CalendarIcon, ChevronDown, ChevronUp, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Dialog, 
   DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle, 
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,15 +54,13 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { KanbanCard } from "@/components/KanbanCard";
 import { cn } from "@/lib/utils";
+import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId, fetchDemandaColunas } from "@/lib/demandaColunas";
 
-const COLUMNS = [
-  { id: "recorrentes", title: "Recorrentes", color: "slate-500", hex: "#64748b" },
-  { id: "fazer_hoje", title: "Fazer hoje", color: "red-500", hex: "#ef4444" },
-  { id: "fazer_amanha", title: "Fazer amanhã", color: "yellow-500", hex: "#eab308" },
-  { id: "fazer_depois_amanha", title: "Fazer depois de amanhã", color: "orange-500", hex: "#f97316" },
-  { id: "standby", title: "Standby", color: "blue-500", hex: "#3b82f6" },
-  { id: "feito", title: "Feito", color: "green-500", hex: "#22c55e" },
-];
+type ColumnDialogState =
+  | { mode: "create"; title: string; hex: string }
+  | { mode: "rename"; id: string; title: string; hex: string };
+
+type ColumnConfirmState = { type: "clear" | "delete"; column: KanbanColumnDef };
 
 export const Route = createFileRoute("/_authenticated/")({
   component: DemandasPage,
@@ -81,8 +74,10 @@ function DemandasPage() {
   const [demandas, setDemandas] = useState<any[]>([]);
   const [activeDemanda, setActiveDemanda] = useState<any | null>(null);
   const [editingDemanda, setEditingDemanda] = useState<any | null>(null);
-  const [filterCliente, setFilterCliente] = useState<string>("all");
-  const [filterAgencia, setFilterAgencia] = useState<string>("all");
+  const [columns, setColumns] = useState<KanbanColumnDef[]>([]);
+  const [columnDialog, setColumnDialog] = useState<ColumnDialogState | null>(null);
+  const [columnConfirm, setColumnConfirm] = useState<ColumnConfirmState | null>(null);
+  const [columnSaving, setColumnSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingName, setDeletingName] = useState<string>("");
@@ -115,10 +110,9 @@ function DemandasPage() {
   );
 
   useEffect(() => {
+    fetchColumns();
     fetchClientes();
     fetchDemandas();
-
-
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "n" && !isModalOpen && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
@@ -138,6 +132,79 @@ function DemandasPage() {
   };
 
   // Removido catchUpRecorrentes para evitar materialização automática em Fazer Hoje
+
+  const fetchColumns = async () => {
+    setColumns(await fetchDemandaColunas());
+  };
+
+  const handleSaveColumn = async () => {
+    if (!columnDialog) return;
+    const title = columnDialog.title.trim();
+    if (!title) {
+      toast.error("Informe o nome da coluna");
+      return;
+    }
+    setColumnSaving(true);
+    try {
+      if (columnDialog.mode === "rename") {
+        const { error } = await supabase
+          .from("demanda_colunas")
+          .update({ titulo: title, hex: columnDialog.hex })
+          .eq("id", columnDialog.id);
+        if (error) throw error;
+        toast.success("Coluna atualizada");
+      } else {
+        // Nova coluna entra antes de "Feito" (última coluna de sistema), se existir
+        const feitoIdx = columns.findIndex((c) => c.id === "feito");
+        const ordem = feitoIdx >= 0 ? feitoIdx : columns.length;
+        const { error } = await supabase
+          .from("demanda_colunas")
+          .insert([{ id: slugifyColumnId(title), titulo: title, hex: columnDialog.hex, ordem }]);
+        if (error) throw error;
+        // Empurra as colunas seguintes para manter a ordem consistente
+        await Promise.all(
+          columns.slice(ordem).map((c, i) =>
+            supabase.from("demanda_colunas").update({ ordem: ordem + 1 + i }).eq("id", c.id)
+          )
+        );
+        toast.success("Coluna criada");
+      }
+      setColumnDialog(null);
+      fetchColumns();
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao salvar coluna");
+    } finally {
+      setColumnSaving(false);
+    }
+  };
+
+  const handleConfirmColumnAction = async () => {
+    if (!columnConfirm) return;
+    const { type, column } = columnConfirm;
+    setColumnSaving(true);
+    try {
+      if (type === "clear") {
+        const { error } = await supabase.from("demandas").delete().eq("status", column.id);
+        if (error) throw error;
+        toast.success(`Coluna "${column.title}" zerada`);
+      } else {
+        if (column.sistema) throw new Error("Esta coluna não pode ser excluída");
+        // Remove as demandas primeiro (o FK também faria em cascata, mas assim fica explícito)
+        const { error: delDemandas } = await supabase.from("demandas").delete().eq("status", column.id);
+        if (delDemandas) throw delDemandas;
+        const { error } = await supabase.from("demanda_colunas").delete().eq("id", column.id);
+        if (error) throw error;
+        toast.success(`Coluna "${column.title}" excluída`);
+      }
+      setColumnConfirm(null);
+      fetchColumns();
+      fetchDemandas();
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao executar ação");
+    } finally {
+      setColumnSaving(false);
+    }
+  };
 
   const fetchDemandas = async () => {
     const { data, error } = await supabase
@@ -357,14 +424,12 @@ function DemandasPage() {
   };
 
   const filteredDemandas = useMemo(() => {
+    const q = searchQuery.toLowerCase();
     return demandas.filter(d => {
-      const matchesCliente = filterCliente === "all" || d.cliente_id === filterCliente;
-      const matchesAgencia = filterAgencia === "all" || d.clientes?.agencia === filterAgencia;
-      const matchesSearch = d.titulo.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           (d.clientes?.nome && d.clientes.nome.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesCliente && matchesAgencia && matchesSearch;
+      return d.titulo.toLowerCase().includes(q) ||
+             (d.clientes?.nome && d.clientes.nome.toLowerCase().includes(q));
     });
-  }, [demandas, filterCliente, filterAgencia, searchQuery]);
+  }, [demandas, searchQuery]);
 
   // Drag and Drop Logic
   // Detecção de colisão por coluna: primeiro descobre em qual coluna o ponteiro
@@ -372,7 +437,7 @@ function DemandasPage() {
   // vazia, a própria coluna vira o alvo - assim é possível soltar em colunas sem cards.
   const collisionDetection: CollisionDetection = (args) => {
     const pointerCollisions = pointerWithin(args);
-    const overColumn = pointerCollisions.find((c) => COLUMNS.some((col) => col.id === c.id));
+    const overColumn = pointerCollisions.find((c) => columns.some((col) => col.id === c.id));
 
     if (overColumn) {
       const columnId = String(overColumn.id);
@@ -417,7 +482,7 @@ function DemandasPage() {
     const overTask = demandas.find(d => d.id === overId);
     let overStatus: string;
     if (overTask) overStatus = overTask.status;
-    else if (COLUMNS.some(c => c.id === overId)) overStatus = overId;
+    else if (columns.some(c => c.id === overId)) overStatus = overId;
     else return;
 
     // Não permite mover nada PARA recorrentes via drag
@@ -579,39 +644,6 @@ function DemandasPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Select value={filterAgencia} onValueChange={setFilterAgencia}>
-            <SelectTrigger className="w-[140px] h-8 text-xs">
-                <div className="flex items-center gap-1.5 truncate">
-                  <Building2 className="w-3.5 h-3.5" />
-                  <SelectValue placeholder="Agência" />
-                </div>
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all" className="text-xs">Todas as agências</SelectItem>
-                {AGENCIAS.map(a => (
-                    <SelectItem key={a.id} value={a.id} className="text-xs">{a.label}</SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-
-        <Select value={filterCliente} onValueChange={setFilterCliente}>
-            <SelectTrigger className="w-[160px] h-8 text-xs">
-                <div className="flex items-center gap-1.5 truncate">
-                  <Filter className="w-3.5 h-3.5" />
-                  <SelectValue placeholder="Cliente" />
-                </div>
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all" className="text-xs">Todos os clientes</SelectItem>
-                {clientes
-                  .filter(c => filterAgencia === "all" || c.agencia === filterAgencia)
-                  .map(c => (
-                    <SelectItem key={c.id} value={c.id} className="text-xs">
-                      {c.nome}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
@@ -625,13 +657,17 @@ function DemandasPage() {
               onDragEnd={onDragEnd}
             >
               <div className="flex gap-4 h-full min-w-max pb-4">
-                {COLUMNS.map((col) => (
+                {columns.map((col) => (
                   <KanbanColumn
                     key={col.id}
                     id={col.id}
                     title={col.title}
                     color={col.color}
                     hex={col.hex}
+                    isSystem={col.sistema}
+                    onRenameColumn={() => setColumnDialog({ mode: "rename", id: col.id, title: col.title, hex: col.hex })}
+                    onClearColumn={() => setColumnConfirm({ type: "clear", column: col })}
+                    onDeleteColumn={() => setColumnConfirm({ type: "delete", column: col })}
                     demandas={filteredDemandas.filter((d) => d.status === col.id)}
                     onQuickAdd={handleQuickAdd}
                     onFullAdd={(status) => {
@@ -664,6 +700,16 @@ function DemandasPage() {
                     }}
                   />
                 ))}
+
+                <button
+                  type="button"
+                  onClick={() => setColumnDialog({ mode: "create", title: "", hex: COLUMN_COLORS[columns.length % COLUMN_COLORS.length] })}
+                  className="flex flex-col items-center justify-center gap-2 w-[200px] shrink-0 h-full max-h-[160px] rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors text-sm"
+                  title="Nova coluna"
+                >
+                  <Plus size={20} />
+                  Nova coluna
+                </button>
               </div>
 
               <DragOverlay dropAnimation={{
@@ -704,7 +750,7 @@ function DemandasPage() {
                                         {d.titulo}
                                     </h4>
                                     <p className="text-xs text-muted-foreground">
-                                        {d.clientes?.nome} — {AGENCIAS.find(a => a.id === d.clientes?.agencia)?.label} • {COLUMNS.find(c => c.id === d.status)?.title}
+                                        {d.clientes?.nome} — {AGENCIAS.find(a => a.id === d.clientes?.agencia)?.label} • {columns.find(c => c.id === d.status)?.title}
                                     </p>
                                 </div>
                             </div>
@@ -724,6 +770,86 @@ function DemandasPage() {
         )}
       </div>
 
+      <Dialog open={!!columnDialog} onOpenChange={(open) => { if (!open) setColumnDialog(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>{columnDialog?.mode === "rename" ? "Editar coluna" : "Nova coluna"}</DialogTitle>
+          </DialogHeader>
+          {columnDialog && (
+            <form
+              className="space-y-4"
+              onSubmit={(e) => { e.preventDefault(); handleSaveColumn(); }}
+            >
+              <div className="space-y-2">
+                <Label htmlFor="coluna-nome">Nome</Label>
+                <Input
+                  id="coluna-nome"
+                  autoFocus
+                  placeholder="Ex.: Esta semana"
+                  value={columnDialog.title}
+                  onChange={(e) => setColumnDialog({ ...columnDialog, title: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cor</Label>
+                <div className="flex flex-wrap gap-2">
+                  {COLUMN_COLORS.map((hex) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      onClick={() => setColumnDialog({ ...columnDialog, hex })}
+                      className={cn(
+                        "h-7 w-7 rounded-full flex items-center justify-center transition-transform hover:scale-110",
+                        columnDialog.hex === hex && "ring-2 ring-offset-2 ring-offset-background ring-zinc-900 dark:ring-zinc-100"
+                      )}
+                      style={{ backgroundColor: hex }}
+                      title={hex}
+                    >
+                      {columnDialog.hex === hex && <Check size={14} className="text-white" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setColumnDialog(null)} disabled={columnSaving}>Cancelar</Button>
+                <Button type="submit" disabled={columnSaving}>
+                  {columnSaving ? "Salvando..." : columnDialog.mode === "rename" ? "Salvar" : "Criar coluna"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!columnConfirm} onOpenChange={(o) => { if (!o) setColumnConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {columnConfirm?.type === "delete" ? "Excluir coluna?" : "Zerar demandas da coluna?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {columnConfirm && (() => {
+                const count = demandas.filter(d => d.status === columnConfirm.column.id).length;
+                const plural = count === 1 ? "demanda" : "demandas";
+                return columnConfirm.type === "delete"
+                  ? `A coluna "${columnConfirm.column.title}" e ${count} ${plural} serão removidas permanentemente.`
+                  : `${count} ${plural} da coluna "${columnConfirm.column.title}" serão removidas permanentemente.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={columnSaving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleConfirmColumnAction(); }}
+              disabled={columnSaving}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {columnSaving ? "Aguarde..." : columnConfirm?.type === "delete" ? "Excluir coluna" : "Zerar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <DemandaDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
@@ -742,7 +868,7 @@ function DemandasPage() {
         }}
         onDuplicate={handleDuplicateDemanda}
         clientes={clientes}
-        columns={COLUMNS}
+        columns={columns}
       />
 
       <Dialog open={isModalOpen} onOpenChange={(open) => {
@@ -756,8 +882,9 @@ function DemandasPage() {
               Preencha os detalhes da tarefa abaixo.
             </DialogDescription>
           </DialogHeader>
-          <DemandaForm 
-            clientes={clientes} 
+          <DemandaForm
+            clientes={clientes}
+            columns={columns}
             onSubmit={handleCreateOrUpdateDemanda} 
             loading={loading}
             initialValues={editingDemanda}

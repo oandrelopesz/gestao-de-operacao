@@ -231,6 +231,36 @@ export type Database = {
           },
         ]
       }
+      demanda_colunas: {
+        Row: {
+          created_at: string
+          hex: string
+          id: string
+          ordem: number
+          sistema: boolean
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hex?: string
+          id: string
+          ordem?: number
+          sistema?: boolean
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hex?: string
+          id?: string
+          ordem?: number
+          sistema?: boolean
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       demandas: {
         Row: {
           cliente_id: string | null
@@ -250,7 +280,7 @@ export type Database = {
           proxima_execucao: string | null
           recorrente: boolean
           recorrente_pai_id: string | null
-          status: Database["public"]["Enums"]["demanda_status"]
+          status: string
           titulo: string
           ultima_execucao: string | null
           updated_at: string
@@ -274,7 +304,7 @@ export type Database = {
           proxima_execucao?: string | null
           recorrente?: boolean
           recorrente_pai_id?: string | null
-          status?: Database["public"]["Enums"]["demanda_status"]
+          status?: string
           titulo: string
           ultima_execucao?: string | null
           updated_at?: string
@@ -298,13 +328,20 @@ export type Database = {
           proxima_execucao?: string | null
           recorrente?: boolean
           recorrente_pai_id?: string | null
-          status?: Database["public"]["Enums"]["demanda_status"]
+          status?: string
           titulo?: string
           ultima_execucao?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "demandas_status_fkey"
+            columns: ["status"]
+            isOneToOne: false
+            referencedRelation: "demanda_colunas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "demandas_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -1099,13 +1136,6 @@ export type Database = {
         | "mensal"
         | "customizada"
       demanda_prioridade: "baixa" | "media" | "alta" | "urgente"
-      demanda_status:
-        | "recorrentes"
-        | "fazer_hoje"
-        | "fazer_amanha"
-        | "fazer_depois_amanha"
-        | "standby"
-        | "feito"
       metodo_pagamento_enum:
         | "dinheiro"
         | "cartao_credito"
@@ -1290,14 +1320,6 @@ export const Constants = {
         "customizada",
       ],
       demanda_prioridade: ["baixa", "media", "alta", "urgente"],
-      demanda_status: [
-        "recorrentes",
-        "fazer_hoje",
-        "fazer_amanha",
-        "fazer_depois_amanha",
-        "standby",
-        "feito",
-      ],
       metodo_pagamento_enum: [
         "dinheiro",
         "cartao_credito",

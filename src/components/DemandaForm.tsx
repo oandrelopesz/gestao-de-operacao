@@ -24,7 +24,7 @@ const demandaSchema = z.object({
   titulo: z.string().min(2, "Título é obrigatório"),
   descricao: z.string().nullable().optional(),
   cliente_id: z.string().optional().nullable().or(z.literal("")),
-  status: z.enum(["recorrentes", "fazer_hoje", "fazer_amanha", "fazer_depois_amanha", "standby", "feito"]),
+  status: z.string().min(1, "Selecione a coluna"),
   prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
   prazo: z.string().nullable().optional(),
   recorrente: z.boolean(),
@@ -38,11 +38,12 @@ export type DemandaFormValues = z.infer<typeof demandaSchema>;
 
 interface DemandaFormProps {
   clientes: { id: string; nome: string; agencia?: string }[];
+  columns: { id: string; title: string }[];
   onSubmit: (values: DemandaFormValues) => void;
   loading?: boolean;
 }
 
-export function DemandaForm({ clientes, onSubmit, loading, initialValues }: DemandaFormProps & { initialValues?: Partial<DemandaFormValues> }) {
+export function DemandaForm({ clientes, columns, onSubmit, loading, initialValues }: DemandaFormProps & { initialValues?: Partial<DemandaFormValues> }) {
   const form = useForm<DemandaFormValues>({
     resolver: zodResolver(demandaSchema),
     defaultValues: {
@@ -118,12 +119,9 @@ export function DemandaForm({ clientes, onSubmit, loading, initialValues }: Dema
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="recorrentes">Recorrentes</SelectItem>
-                    <SelectItem value="fazer_hoje">Fazer hoje</SelectItem>
-                    <SelectItem value="fazer_amanha">Fazer amanhã</SelectItem>
-                    <SelectItem value="fazer_depois_amanha">Fazer depois de amanhã</SelectItem>
-                    <SelectItem value="standby">Standby</SelectItem>
-                    <SelectItem value="feito">Feito</SelectItem>
+                    {columns.map((col) => (
+                      <SelectItem key={col.id} value={col.id}>{col.title}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />

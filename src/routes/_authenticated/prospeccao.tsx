@@ -65,6 +65,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { DemandaForm, DemandaFormValues } from "@/components/DemandaForm";
+import { useDemandaColunas } from "@/lib/demandaColunas";
 
 const COLUMNS = [
   { id: "lead", title: "Lead", color: "slate-500", hex: "#64748b" },
@@ -337,6 +338,8 @@ function ProspeccaoPage() {
       toast.error("Erro ao cadastrar cliente");
     }
   };
+
+  const { colunas: demandaColunas } = useDemandaColunas();
 
   const handleCreateDemanda = (lead: Lead) => {
     setLeadForDemanda(lead);
@@ -641,8 +644,9 @@ function ProspeccaoPage() {
           <DialogHeader>
             <DialogTitle>Agendar Demanda de Follow-up</DialogTitle>
           </DialogHeader>
-          <DemandaForm 
+          <DemandaForm
             clientes={[]} // No drawer we won't select client, it's linked to lead
+            columns={demandaColunas}
             initialValues={{
               titulo: `Follow-up: ${leadForDemanda?.nome}`,
               status: 'fazer_amanha',
