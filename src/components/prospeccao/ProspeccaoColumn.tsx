@@ -76,7 +76,7 @@ export function ProspeccaoColumn({
         ref={setNodeRef}
         className="flex-1 min-h-0 bg-zinc-50/50 dark:bg-zinc-900/50 rounded-lg p-2 overflow-y-auto"
       >
-        <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext id={id} items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
           {leads.map((lead) => (
             <ProspeccaoCard
               key={lead.id}

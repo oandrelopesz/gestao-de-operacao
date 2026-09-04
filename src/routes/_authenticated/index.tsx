@@ -44,6 +44,9 @@ import {
   DndContext,
   DragOverlay,
   closestCorners,
+  closestCenter,
+  pointerWithin,
+  CollisionDetection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -364,6 +367,28 @@ function DemandasPage() {
   }, [demandas, filterCliente, filterAgencia, searchQuery]);
 
   // Drag and Drop Logic
+  // Detecção de colisão por coluna: primeiro descobre em qual coluna o ponteiro
+  // está, depois escolhe o card mais próximo dentro dela. Se a coluna estiver
+  // vazia, a própria coluna vira o alvo - assim é possível soltar em colunas sem cards.
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointerCollisions = pointerWithin(args);
+    const overColumn = pointerCollisions.find((c) => COLUMNS.some((col) => col.id === c.id));
+
+    if (overColumn) {
+      const columnId = String(overColumn.id);
+      const cardsInColumn = args.droppableContainers.filter(
+        (container) => container.data.current?.sortable?.containerId === columnId
+      );
+      if (cardsInColumn.length > 0) {
+        const closest = closestCenter({ ...args, droppableContainers: cardsInColumn });
+        if (closest.length > 0) return closest;
+      }
+      return [overColumn];
+    }
+
+    return closestCorners(args);
+  };
+
   const onDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const demanda = demandas.find((d) => d.id === active.id);
@@ -594,7 +619,7 @@ function DemandasPage() {
           <div className="h-full overflow-x-auto pb-4">
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCorners}
+              collisionDetection={collisionDetection}
               onDragStart={onDragStart}
               onDragOver={onDragOver}
               onDragEnd={onDragEnd}

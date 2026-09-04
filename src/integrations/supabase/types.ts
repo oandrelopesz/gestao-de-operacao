@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      acessos_clientes: {
+        Row: {
+          agencia: string
+          created_at: string
+          id: string
+          link: string
+          login: string | null
+          nome: string
+          observacoes: string | null
+          senha: string | null
+          tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agencia: string
+          created_at?: string
+          id?: string
+          link: string
+          login?: string | null
+          nome: string
+          observacoes?: string | null
+          senha?: string | null
+          tipo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agencia?: string
+          created_at?: string
+          id?: string
+          link?: string
+          login?: string | null
+          nome?: string
+          observacoes?: string | null
+          senha?: string | null
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           agencia: Database["public"]["Enums"]["agencia_enum"]

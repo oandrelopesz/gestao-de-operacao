@@ -101,7 +101,7 @@ export function KanbanColumn({
 
   return (
     <div className={cn(
-      "flex flex-col w-[280px] shrink-0 rounded-lg p-0 max-h-full transition-colors",
+      "flex flex-col w-[280px] shrink-0 rounded-lg p-0 h-full transition-colors",
       "bg-zinc-50/50 dark:bg-zinc-900/50",
       isOver && "bg-zinc-100 dark:bg-zinc-800"
     )}>
@@ -125,6 +125,7 @@ export function KanbanColumn({
         className="flex-1 overflow-y-auto overflow-x-hidden min-h-[150px] px-2 py-1 scrollbar-hide"
       >
         <SortableContext
+          id={id}
           items={demandas.map((d) => d.id)}
           strategy={verticalListSortingStrategy}
         >
