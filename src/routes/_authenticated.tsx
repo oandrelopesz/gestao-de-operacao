@@ -16,7 +16,6 @@ import {
   Target,
   BookOpen,
   Book,
-  ClipboardList,
   KeyRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -106,12 +105,11 @@ function AuthenticatedLayout() {
 
   const links = [
     { label: "Demandas", icon: <LayoutDashboard size={18} />, to: "/" },
-    { label: "Pendências", icon: <ClipboardList size={18} />, to: "/pendencias" },
+    { label: "Planilha/CRM", icon: <KeyRound size={18} />, to: "/acessos" },
     { label: "Saldo", icon: <Wallet size={18} />, to: "/saldo" },
     { label: "NPS de Clientes", icon: <MessageSquare size={18} />, to: "/nps" },
     { label: "Clientes Ativos", icon: <Users size={18} />, to: "/clientes" },
     { label: "Prospecção", icon: <Target size={18} />, to: "/prospeccao" },
-    { label: "Planilha/CRM", icon: <KeyRound size={18} />, to: "/acessos" },
     { label: "Financeiro", icon: <DollarSign size={18} />, to: "/financeiro" },
     { label: "Cursos", icon: <BookOpen size={18} />, to: "/cursos" },
     { label: "Livros", icon: <Book size={18} />, to: "/livros" },
