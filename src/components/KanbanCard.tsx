@@ -39,25 +39,32 @@ interface KanbanCardProps {
   onMoveToDone?: (id: string) => void;
 }
 
-export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone }: KanbanCardProps) {
-  const isRecorrenteMae = demanda.status === "recorrentes";
-  
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ 
-    id: demanda.id,
-    disabled: isRecorrenteMae 
-  });
+interface SortableBindings {
+  setNodeRef: (el: HTMLElement | null) => void;
+  style: React.CSSProperties;
+  attributes: Record<string, any>;
+  listeners: Record<string, any> | undefined;
+  isDragging: boolean;
+}
 
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-  };
+export function KanbanCard(props: KanbanCardProps) {
+  const isRecorrenteMae = props.demanda.status === "recorrentes";
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.demanda.id,
+    disabled: isRecorrenteMae,
+  });
+  return (
+    <KanbanCardView
+      {...props}
+      sortable={{ setNodeRef, attributes, listeners, isDragging, style: { transform: CSS.Translate.toString(transform), transition } }}
+    />
+  );
+}
+
+/** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
+export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
+  const isRecorrenteMae = demanda.status === "recorrentes";
+  const isDragging = sortable?.isDragging ?? false;
 
   const isDone = demanda.status === "feito";
 
@@ -77,11 +84,11 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
   };
 
   return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes}
-      {...listeners}
+    <div
+      ref={sortable?.setNodeRef}
+      style={sortable?.style}
+      {...(sortable?.attributes ?? {})}
+      {...(sortable?.listeners ?? {})}
       className={cn(
         "group relative outline-none rounded-md mb-2",
         !isRecorrenteMae && "cursor-grab active:cursor-grabbing",

@@ -54,7 +54,8 @@ import { useCachedState, hasCached } from "@/lib/pageCache";
 import { CACHE_KEYS, loadLeads } from "@/lib/data";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Lead, ProspeccaoCard } from "@/components/prospeccao/ProspeccaoCard";
+import { Lead, ProspeccaoCard, ProspeccaoCardView } from "@/components/prospeccao/ProspeccaoCard";
+import { useKanbanDnd } from "@/lib/useKanbanDnd";
 import { ProspeccaoColumn } from "@/components/prospeccao/ProspeccaoColumn";
 import { ProspeccaoDrawer } from "@/components/prospeccao/ProspeccaoDrawer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -174,128 +175,39 @@ function ProspeccaoPage() {
     return { pipelineTotal, pipelinePonderado, fechadoMes, conversao, activeLeadsCount: activePipeline.length };
   }, [leads]);
 
-  // Detecção de colisão por coluna: primeiro descobre em qual coluna o ponteiro
-  // está, depois escolhe o card mais próximo dentro dela. Se a coluna estiver
-  // vazia, a própria coluna vira o alvo - assim é possível soltar em colunas sem cards.
-  const collisionDetection: CollisionDetection = (args) => {
-    const pointerCollisions = pointerWithin(args);
-    const overColumn = pointerCollisions.find((c) => COLUMNS.some((col) => col.id === c.id));
+  const byOrdem = (a: Lead, b: Lead) => (a.ordem ?? 0) - (b.ordem ?? 0);
 
-    if (overColumn) {
-      const columnId = String(overColumn.id);
-      const cardsInColumn = args.droppableContainers.filter(
-        (container) => container.data.current?.sortable?.containerId === columnId
+  // Drag-and-drop do Kanban (mover entre colunas e reordenar) - ver src/lib/useKanbanDnd.ts
+  const { collisionDetection, measuring, onDragStart, onDragOver, onDragEnd, onDragCancel } = useKanbanDnd<Lead>({
+    items: leads,
+    setItems: setLeads,
+    containerIds: COLUMNS.map((c) => c.id),
+    getContainer: (l) => l.etapa,
+    setContainer: (l, etapa) => ({ ...l, etapa }),
+    onStart: (l) => setActiveLead(l),
+    onCancel: () => setActiveLead(null),
+    onDrop: async (finalList, activeId, origin, target) => {
+      setActiveLead(null);
+      const affected = Array.from(new Set([origin, target]));
+      // Ordem das colunas envolvidas é sempre persistida
+      await Promise.all(
+        finalList
+          .filter((l) => affected.includes(l.etapa))
+          .map((l) => supabase.from("prospeccao").update({ ordem: l.ordem ?? 0 } as any).eq("id", l.id))
       );
-      if (cardsInColumn.length > 0) {
-        const closest = closestCenter({ ...args, droppableContainers: cardsInColumn });
-        if (closest.length > 0) return closest;
+      if (origin === target) return;
+      const lead = finalList.find((l) => l.id === activeId);
+      if (!lead) return;
+      if (target === "fechado") {
+        await handleMoveToFechado(lead);
+      } else if (target === "perdido") {
+        setLeadForPerda({ id: lead.id, name: lead.nome });
+        setIsPerdaModalOpen(true);
+      } else {
+        await syncMovement(lead.id, target as any);
       }
-      return [overColumn];
-    }
-
-    return closestCorners(args);
-  };
-
-  const onDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    setActiveLead(leads.find(l => l.id === active.id) || null);
-  };
-
-  // Reordenação otimista durante o arrasto (mesma lógica da aba Demandas)
-  const dragOriginEtapa = useRef<string | null>(null);
-  const byOrdem = (a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0);
-
-  const isActiveBelowOver = (active: DragOverEvent["active"], over: NonNullable<DragOverEvent["over"]>) => {
-    const activeRect = active.rect.current.translated;
-    if (!activeRect) return false;
-    return activeRect.top + activeRect.height / 2 > over.rect.top + over.rect.height / 2;
-  };
-
-  const computeMove = (list: Lead[], activeId: string, overId: string, overIsColumn: boolean, insertAfter: boolean): Lead[] | null => {
-    const active = list.find((l) => l.id === activeId);
-    if (!active) return null;
-    const targetEtapa = overIsColumn ? overId : list.find((l) => l.id === overId)?.etapa;
-    if (!targetEtapa) return null;
-
-    const targetList = list.filter((l) => l.etapa === targetEtapa && l.id !== activeId).sort(byOrdem);
-    let insertAt = targetList.length;
-    if (!overIsColumn) {
-      const overIdx = targetList.findIndex((l) => l.id === overId);
-      if (overIdx >= 0) insertAt = insertAfter ? overIdx + 1 : overIdx;
-    }
-
-    const currentList = list.filter((l) => l.etapa === targetEtapa).sort(byOrdem);
-    if (active.etapa === targetEtapa && currentList[insertAt]?.id === activeId) return null;
-
-    targetList.splice(insertAt, 0, { ...active, etapa: targetEtapa });
-    const nextOrdem = new Map(targetList.map((l, i) => [l.id, i]));
-    return list.map((l) => (nextOrdem.has(l.id) ? { ...l, etapa: targetEtapa, ordem: nextOrdem.get(l.id) } : l));
-  };
-
-  const resolveOver = (over: NonNullable<DragOverEvent["over"]>) => {
-    const overId = String(over.id);
-    return { overId, overIsColumn: COLUMNS.some((c) => c.id === overId) };
-  };
-
-  const onDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const activeId = String(active.id);
-    const activeLeadItem = leads.find((l) => l.id === activeId);
-    if (!activeLeadItem) return;
-    if (dragOriginEtapa.current === null) dragOriginEtapa.current = activeLeadItem.etapa;
-
-    const { overId, overIsColumn } = resolveOver(over);
-    const next = computeMove(leads, activeId, overId, overIsColumn, !overIsColumn && isActiveBelowOver(active, over));
-    if (next) setLeads(next);
-  };
-
-  const persistLeadOrder = async (list: Lead[], etapas: string[]) => {
-    const updates = list
-      .filter((l) => etapas.includes(l.etapa))
-      .map((l) => supabase.from("prospeccao").update({ ordem: l.ordem ?? 0 } as any).eq("id", l.id));
-    await Promise.all(updates);
-  };
-
-  const onDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveLead(null);
-    const origin = dragOriginEtapa.current;
-    dragOriginEtapa.current = null;
-
-    const activeId = String(active.id);
-    const activeLeadItem = leads.find((l) => l.id === activeId);
-    if (!activeLeadItem) return;
-
-    let finalList = leads;
-    if (over && over.id !== active.id) {
-      const { overId, overIsColumn } = resolveOver(over);
-      const next = computeMove(leads, activeId, overId, overIsColumn, !overIsColumn && isActiveBelowOver(active, over));
-      if (next) {
-        finalList = next;
-        setLeads(next);
-      }
-    }
-
-    const finalLead = finalList.find((l) => l.id === activeId);
-    if (!finalLead) return;
-    const overStatus = finalLead.etapa;
-    const affected = Array.from(new Set([overStatus, origin].filter(Boolean))) as string[];
-
-    // Ordem das colunas envolvidas é sempre persistida
-    await persistLeadOrder(finalList, affected);
-
-    if (overStatus === activeLeadItem.etapa && origin === overStatus) return;
-
-    if (overStatus === 'fechado') {
-      await handleMoveToFechado(activeLeadItem);
-    } else if (overStatus === 'perdido') {
-      setLeadForPerda({ id: activeLeadItem.id, name: activeLeadItem.nome });
-      setIsPerdaModalOpen(true);
-    } else {
-      await syncMovement(activeLeadItem.id, overStatus as any);
-    }
-  };
+    },
+  });
 
   const syncMovement = async (id: string, etapa: string, extraValues: any = {}) => {
     try {
@@ -564,9 +476,11 @@ function ProspeccaoPage() {
             <DndContext
               sensors={sensors}
               collisionDetection={collisionDetection}
+              measuring={measuring}
               onDragStart={onDragStart}
               onDragOver={onDragOver}
               onDragEnd={onDragEnd}
+              onDragCancel={onDragCancel}
             >
               <div className="flex gap-4 h-full min-w-max pb-4">
                 {COLUMNS.map((col) => (
@@ -603,7 +517,7 @@ function ProspeccaoPage() {
                   }),
                 }}>
                 {activeLead ? (
-                  <ProspeccaoCard lead={activeLead} onEdit={() => {}} onDelete={() => {}} onDuplicate={() => {}} />
+                  <ProspeccaoCardView lead={activeLead} onEdit={() => {}} onDelete={() => {}} onDuplicate={() => {}} />
                 ) : null}
               </DragOverlay>
             </DndContext>

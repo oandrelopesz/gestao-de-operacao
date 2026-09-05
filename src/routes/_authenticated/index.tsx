@@ -54,7 +54,8 @@ import {
   defaultDropAnimationSideEffects,
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { KanbanCard } from "@/components/KanbanCard";
+import { KanbanCardView } from "@/components/KanbanCard";
+import { useKanbanDnd } from "@/lib/useKanbanDnd";
 import { cn } from "@/lib/utils";
 import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId } from "@/lib/demandaColunas";
 
@@ -440,133 +441,38 @@ function DemandasPage() {
   }, [demandas, searchQuery]);
 
   // Drag and Drop Logic
-  // Detecção de colisão por coluna: primeiro descobre em qual coluna o ponteiro
-  // está, depois escolhe o card mais próximo dentro dela. Se a coluna estiver
-  // vazia, a própria coluna vira o alvo - assim é possível soltar em colunas sem cards.
-  const collisionDetection: CollisionDetection = (args) => {
-    const pointerCollisions = pointerWithin(args);
-    const overColumn = pointerCollisions.find((c) => columns.some((col) => col.id === c.id));
-
-    if (overColumn) {
-      const columnId = String(overColumn.id);
-      const cardsInColumn = args.droppableContainers.filter(
-        (container) => container.data.current?.sortable?.containerId === columnId
-      );
-      if (cardsInColumn.length > 0) {
-        const closest = closestCenter({ ...args, droppableContainers: cardsInColumn });
-        if (closest.length > 0) return closest;
-      }
-      return [overColumn];
-    }
-
-    return closestCorners(args);
-  };
-
-  const onDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const demanda = demandas.find((d) => d.id === active.id);
-    setActiveDemanda(demanda);
-  };
-
-  // Reordenação otimista durante o arrasto: os cards abrem espaço e a posição
-  // final é exatamente a que o usuário vê. A persistência acontece no onDragEnd.
-  const dragOriginStatus = useRef<string | null>(null);
-
   const byOrdem = (a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0);
 
-  // Card ativo abaixo do centro do card de destino => entra depois dele
-  const isActiveBelowOver = (active: DragOverEvent["active"], over: NonNullable<DragOverEvent["over"]>) => {
-    const activeRect = active.rect.current.translated;
-    if (!activeRect) return false;
-    return activeRect.top + activeRect.height / 2 > over.rect.top + over.rect.height / 2;
-  };
-
-  // Calcula a nova lista com o card ativo na posição indicada. Retorna null se nada muda.
-  const computeMove = (list: any[], activeId: string, overId: string, overIsColumn: boolean, insertAfter: boolean) => {
-    const active = list.find((d) => d.id === activeId);
-    if (!active) return null;
-    const targetStatus = overIsColumn ? overId : list.find((d) => d.id === overId)?.status;
-    if (!targetStatus || targetStatus === "recorrentes") return null;
-
-    const targetList = list.filter((d) => d.status === targetStatus && d.id !== activeId).sort(byOrdem);
-    let insertAt = targetList.length;
-    if (!overIsColumn) {
-      const overIdx = targetList.findIndex((d) => d.id === overId);
-      if (overIdx >= 0) insertAt = insertAfter ? overIdx + 1 : overIdx;
-    }
-
-    const currentList = list.filter((d) => d.status === targetStatus).sort(byOrdem);
-    if (active.status === targetStatus && currentList[insertAt]?.id === activeId) return null;
-
-    targetList.splice(insertAt, 0, { ...active, status: targetStatus });
-    const nextOrdem = new Map(targetList.map((d, i) => [d.id, i]));
-    return list.map((d) => (nextOrdem.has(d.id) ? { ...d, status: targetStatus, ordem: nextOrdem.get(d.id) } : d));
-  };
-
-  const resolveOver = (over: NonNullable<DragOverEvent["over"]>) => {
-    const overId = String(over.id);
-    const overIsColumn = columns.some((c) => c.id === overId);
-    return { overId, overIsColumn };
-  };
-
-  const onDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const activeId = String(active.id);
-    const activeTask = demandas.find((d) => d.id === activeId);
-    if (!activeTask || activeTask.status === "recorrentes") return;
-    if (dragOriginStatus.current === null) dragOriginStatus.current = activeTask.status;
-
-    const { overId, overIsColumn } = resolveOver(over);
-    const next = computeMove(demandas, activeId, overId, overIsColumn, !overIsColumn && isActiveBelowOver(active, over));
-    if (next) setDemandas(next);
-  };
-
-  const onDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveDemanda(null);
-    const origin = dragOriginStatus.current;
-    dragOriginStatus.current = null;
-
-    const activeId = String(active.id);
-    const activeTask = demandas.find((d) => d.id === activeId);
-    // Cards recorrentes (mãe) ficam travados - única coluna bloqueada
-    if (!activeTask || activeTask.status === "recorrentes") return;
-
-    let finalList = demandas;
-    if (over && over.id !== active.id) {
-      const { overId, overIsColumn } = resolveOver(over);
-      const next = computeMove(demandas, activeId, overId, overIsColumn, !overIsColumn && isActiveBelowOver(active, over));
-      if (next) {
-        finalList = next;
-        setDemandas(next);
-      }
-    }
-
-    const finalTask = finalList.find((d) => d.id === activeId);
-    if (!finalTask) return;
-    const affected = new Set<string>([finalTask.status]);
-    if (origin) affected.add(origin);
-
-    try {
-      // Persiste status + ordem de todas as colunas envolvidas (origem e destino)
-      const updates = finalList
-        .filter((d) => affected.has(d.status))
-        .map((d) =>
-          supabase
-            .from("demandas")
-            .update({ status: d.status as any, ordem: d.ordem ?? 0 })
-            .eq("id", d.id)
+  // Drag-and-drop do Kanban (mover entre colunas e reordenar) - ver src/lib/useKanbanDnd.ts
+  const { collisionDetection, measuring, onDragStart, onDragOver, onDragEnd, onDragCancel } = useKanbanDnd<any>({
+    items: demandas,
+    setItems: setDemandas,
+    containerIds: columns.map((c) => c.id),
+    getContainer: (d) => d.status,
+    setContainer: (d, status) => ({ ...d, status }),
+    // Cards recorrentes (mãe) ficam travados e nada entra na coluna deles via drag
+    isItemLocked: (d) => d.status === "recorrentes",
+    isContainerLocked: (id) => id === "recorrentes",
+    onStart: (d) => setActiveDemanda(d),
+    onCancel: () => setActiveDemanda(null),
+    onDrop: async (finalList, _activeId, origin, target) => {
+      setActiveDemanda(null);
+      const affected = new Set([origin, target]);
+      try {
+        // Persiste status + ordem das colunas envolvidas (origem e destino)
+        const results = await Promise.all(
+          finalList
+            .filter((d) => affected.has(d.status))
+            .map((d) => supabase.from("demandas").update({ status: d.status as any, ordem: d.ordem ?? 0 }).eq("id", d.id))
         );
-      const results = await Promise.all(updates);
-      const failed = results.find((r) => r.error);
-      if (failed?.error) throw failed.error;
-      fetchDemandas();
-    } catch (error: any) {
-      toast.error("Erro ao sincronizar movimento");
-      fetchDemandas();
-    }
-  };
+        const failed = results.find((r) => r.error);
+        if (failed?.error) throw failed.error;
+      } catch {
+        toast.error("Erro ao sincronizar movimento");
+        fetchDemandas();
+      }
+    },
+  });
 
   return (
     <div className="space-y-4 flex flex-col h-[calc(100vh-8rem)]">
@@ -682,9 +588,11 @@ function DemandasPage() {
             <DndContext
               sensors={sensors}
               collisionDetection={collisionDetection}
+              measuring={measuring}
               onDragStart={onDragStart}
               onDragOver={onDragOver}
               onDragEnd={onDragEnd}
+              onDragCancel={onDragCancel}
             >
               <div className="flex gap-4 h-full min-w-max pb-4">
                 {columns.map((col) => (
@@ -753,7 +661,7 @@ function DemandasPage() {
                   }),
                 }}>
                 {activeDemanda ? (
-                  <KanbanCard
+                  <KanbanCardView
                     demanda={activeDemanda}
                     onEdit={() => {}}
                     onDelete={() => {}}

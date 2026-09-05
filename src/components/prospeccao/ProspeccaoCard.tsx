@@ -43,28 +43,35 @@ interface ProspeccaoCardProps {
   onDuplicate: (lead: Lead) => void;
 }
 
-export function ProspeccaoCard({ lead, onEdit, onDelete, onDuplicate }: ProspeccaoCardProps) {
-  const { label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: lead.id });
+interface SortableBindings {
+  setNodeRef: (el: HTMLElement | null) => void;
+  style: React.CSSProperties;
+  attributes: Record<string, any>;
+  listeners: Record<string, any> | undefined;
+  isDragging: boolean;
+}
 
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-  };
+export function ProspeccaoCard(props: ProspeccaoCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.lead.id });
+  return (
+    <ProspeccaoCardView
+      {...props}
+      sortable={{ setNodeRef, attributes, listeners, isDragging, style: { transform: CSS.Translate.toString(transform), transition } }}
+    />
+  );
+}
+
+/** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
+export function ProspeccaoCardView({ lead, onEdit, onDelete, onDuplicate, sortable }: ProspeccaoCardProps & { sortable?: SortableBindings }) {
+  const { label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
+  const isDragging = sortable?.isDragging ?? false;
 
   return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes}
-      {...listeners}
+    <div
+      ref={sortable?.setNodeRef}
+      style={sortable?.style}
+      {...(sortable?.attributes ?? {})}
+      {...(sortable?.listeners ?? {})}
       className={cn(
         "group relative outline-none rounded-md mb-2 cursor-grab active:cursor-grabbing",
         isDragging && "opacity-50 z-50"
