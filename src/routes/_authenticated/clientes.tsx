@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { supabase } from "@/integrations/supabase/client";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadClientesView } from "@/lib/data";
 import { toast } from "sonner";
 import {
   formatBRL, tempoDeCasa,
@@ -92,8 +94,8 @@ function ClientesPage() {
   const navigate = Route.useNavigate();
   const { agencias, meta: agenciaMetaOf, label: agenciaLabelOf } = useAgencias();
 
-  const [clientes, setClientes] = useState<ClienteView[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [clientes, setClientes] = useCachedState<ClienteView[]>(CACHE_KEYS.clientesView, []);
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.clientesView));
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -126,48 +128,15 @@ function ClientesPage() {
   useEffect(() => { fetchClientes(); }, []);
 
   const fetchClientes = async () => {
-    setLoading(true);
+    // Com cache, atualiza em segundo plano sem esconder o conteúdo
+    if (!hasCached(CACHE_KEYS.clientesView)) setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("clientes_view" as any)
-        .select("*")
-        .eq("arquivado", false)
-        .order("nome");
-      
-      if (error) {
-        console.error("Erro detalhado fetchClientes:", error);
-        setFetchError(error.message);
-        toast.error(`Erro ao carregar clientes: ${error.message}`);
-        return;
-      }
+      setClientes((await loadClientesView()) as ClienteView[]);
       setFetchError(null);
-
-      // Fetch platform summary for each client
-      const { data: saldos, error: saldosError } = await supabase
-        .from("saldo_ads_view")
-        .select("cliente_id, plataformas, verba_diaria_calc");
-      
-      if (saldosError) {
-        console.warn("Erro ao buscar saldos para enriquecimento:", saldosError);
-      }
-      
-      const enrichedData = (data as any[] || []).map(cli => {
-        const cliSaldos = (saldos || []).filter(s => s.cliente_id === cli.id);
-        const summary = cliSaldos.map(s => {
-          const platNames = s.plataformas && s.plataformas.length > 0 ? s.plataformas.join(", ") : "Outras";
-          // We use verba_diaria_calc for consistent calculation
-          const verba = (s.verba_diaria_calc || 0) * 30;
-          return `${platNames} ${formatBRL(verba)}`;
-        }).join(" / ");
-        const allPlats = cliSaldos.flatMap(s => s.plataformas || []);
-        const uniquePlats = Array.from(new Set(allPlats));
-        return { ...cli, saldo_ads_summary: summary, plataformas_ativas: uniquePlats };
-      });
-      
-      setClientes(enrichedData);
     } catch (err: any) {
-      console.error("Erro inesperado em fetchClientes:", err);
-      toast.error("Ocorreu um erro inesperado ao carregar a lista de clientes.");
+      console.error("Erro ao carregar clientes:", err);
+      setFetchError(err?.message || "Erro inesperado");
+      toast.error(`Erro ao carregar clientes: ${err?.message || ""}`);
     } finally {
       setLoading(false);
     }

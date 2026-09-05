@@ -4,12 +4,14 @@ import * as React from "react";
 
 import appCss from "../styles.css?url";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { Toaster } from "@/components/ui/sonner";
 
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: 60 * 1000,
+        gcTime: 30 * 60 * 1000,
         refetchOnWindowFocus: false,
       },
     },
@@ -102,6 +104,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <Toaster richColors closeButton position="top-right" />
     </QueryClientProvider>
   );
 }

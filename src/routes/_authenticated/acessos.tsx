@@ -42,6 +42,8 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadAcessos } from "@/lib/data";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAgencias, agenciaBorderStyle } from "@/lib/agencias";
@@ -114,8 +116,8 @@ async function copyToClipboard(value: string, label: string) {
 
 function AcessosPage() {
   const { agencias } = useAgencias();
-  const [acessos, setAcessos] = useState<Acesso[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [acessos, setAcessos] = useCachedState<Acesso[]>(CACHE_KEYS.acessos, []);
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.acessos));
   const [searchQuery, setSearchQuery] = useState("");
   const [agenciaFilter, setAgenciaFilter] = useState<string>("todos");
 
@@ -131,14 +133,9 @@ function AcessosPage() {
   }, []);
 
   const fetchAcessos = async () => {
-    setLoading(true);
+    if (!hasCached(CACHE_KEYS.acessos)) setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("acessos_clientes")
-        .select("*")
-        .order("nome");
-      if (error) throw error;
-      setAcessos((data || []) as Acesso[]);
+      setAcessos((await loadAcessos()) as Acesso[]);
     } catch (error: any) {
       console.error("Erro ao carregar acessos:", error);
       toast.error("Erro ao carregar acessos");

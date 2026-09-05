@@ -33,6 +33,8 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadCursos } from "@/lib/data";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CourseForm } from "@/components/cursos/CourseForm";
@@ -78,9 +80,9 @@ function CursosPage() {
   const searchParams = Route.useSearch() as { tema?: string };
   const currentTema = (searchParams.tema as string) || "todos";
 
-  const [cursos, setCursos] = useState<Curso[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [cursos, setCursos] = useCachedState<Curso[]>(CACHE_KEYS.cursos, []);
+  const [categorias, setCategorias] = useCachedState<Categoria[]>(CACHE_KEYS.cursoCategorias, []);
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.cursos));
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Curso | null>(null);
@@ -100,29 +102,11 @@ function CursosPage() {
   }, []);
 
   const fetchData = async () => {
-    setLoading(true);
+    if (!hasCached(CACHE_KEYS.cursos)) setLoading(true);
     try {
-      const [cursosRes, catsRes] = await Promise.all([
-        supabase
-          .from("cursos")
-          .select("*, curso_categorias(id, nome)")
-          .order("nome", { ascending: true }),
-        supabase
-          .from("curso_categorias")
-          .select("id, nome")
-          .order("nome")
-      ]);
-
-      if (cursosRes.error) throw cursosRes.error;
-      if (catsRes.error) throw catsRes.error;
-
-      const formattedData = (cursosRes.data || []).map(c => ({
-        ...c,
-        em_andamento: !!c.em_andamento
-      })) as Curso[];
-      
-      setCursos(formattedData);
-      setCategorias(catsRes.data || []);
+      const { cursos: lista, categorias: cats } = await loadCursos();
+      setCursos(lista as Curso[]);
+      setCategorias(cats as Categoria[]);
     } catch (error: any) {
       toast.error("Erro ao carregar cursos");
     } finally {

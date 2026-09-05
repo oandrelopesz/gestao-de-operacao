@@ -52,6 +52,8 @@ interface KanbanColumnProps {
   isSystem?: boolean;
 }
 
+const VISIBLE_BATCH = 40;
+
 const emptyMessages: Record<string, string> = {
   recorrentes: "Sem tarefas recorrentes",
   fazer_hoje: "Nada pra hoje",
@@ -80,6 +82,11 @@ export function KanbanColumn({
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const [isAdding, setIsAdding] = useState(false);
+  // Colunas muito longas (ex.: Feito com centenas de cards) travavam a troca de aba:
+  // renderiza um lote por vez e o restante sob demanda.
+  const [visibleLimit, setVisibleLimit] = useState(VISIBLE_BATCH);
+  const visibleDemandas = demandas.length > visibleLimit ? demandas.slice(0, visibleLimit) : demandas;
+  const hiddenCount = demandas.length - visibleDemandas.length;
   const [quickTitle, setQuickTitle] = useState("");
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -185,10 +192,10 @@ export function KanbanColumn({
       >
         <SortableContext
           id={id}
-          items={demandas.map((d) => d.id)}
+          items={visibleDemandas.map((d) => d.id)}
           strategy={verticalListSortingStrategy}
         >
-          {demandas.map((demanda) => (
+          {visibleDemandas.map((demanda) => (
             <KanbanCard
               key={demanda.id}
               demanda={demanda}
@@ -204,6 +211,16 @@ export function KanbanColumn({
             </div>
           )}
         </SortableContext>
+
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setVisibleLimit((l) => l + VISIBLE_BATCH)}
+            className="w-full mb-2 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-md transition-colors"
+          >
+            Mostrar mais {Math.min(VISIBLE_BATCH, hiddenCount)} de {hiddenCount}
+          </button>
+        )}
 
         {isAdding && (
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md p-2 mb-2 shadow-sm animate-in fade-in zoom-in duration-200">

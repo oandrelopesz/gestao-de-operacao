@@ -28,6 +28,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadSaldo } from "@/lib/data";
 import { formatBRL } from "@/lib/clientes";
 import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
 import { saveCliente, loadClienteFormValues, getUserId } from "@/lib/clientesService";
@@ -140,8 +142,8 @@ const statusEfetivo = (row: SaldoRow) =>
 
 function SaldoPage() {
   const { agencias, label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
-  const [data, setData] = useState<SaldoRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useCachedState<SaldoRow[]>(CACHE_KEYS.saldo, []);
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.saldo));
   const [filterAgencia, setFilterAgencia] = useState<string>("all");
   const [filterPlataforma, setFilterPlataforma] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -200,17 +202,12 @@ function SaldoPage() {
   }, []);
 
   const fetchSaldo = async (silent = false) => {
-    if (!silent) setLoading(true);
-    const { data, error } = await supabase
-      .from("saldo_ads_view")
-      .select("*, clientes!inner(status_operacional, verba_ads)")
-      .order("dias_restantes", { ascending: true, nullsFirst: false });
-
-    if (error) {
+    if (!silent && !hasCached(CACHE_KEYS.saldo)) setLoading(true);
+    try {
+      setData((await loadSaldo()) as unknown as SaldoRow[]);
+    } catch (error) {
       toast.error("Erro ao carregar saldos de mídia");
       console.error(error);
-    } else {
-      setData((data || []) as unknown as SaldoRow[]);
     }
     setLoading(false);
   };

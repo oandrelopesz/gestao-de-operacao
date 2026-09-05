@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Link, useNavigate, useRouterState, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
@@ -25,6 +25,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 import { AgenciasProvider } from "@/lib/agencias";
 import { useTheme } from "@/lib/theme";
+import { warmAllCaches } from "@/lib/data";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -85,6 +86,19 @@ function AuthenticatedLayout() {
     return window.localStorage.getItem("sidebar-collapsed") === "1";
   });
   const { theme, toggle: toggleTheme } = useTheme();
+  const router = useRouter();
+
+  // Logo após abrir o app: pré-carrega o código de todas as rotas e aquece o
+  // cache de dados de cada aba, para a troca de aba ser instantânea.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      ALL_LINKS.forEach((l) => {
+        router.preloadRoute({ to: l.to as any }).catch(() => {});
+      });
+      warmAllCaches();
+    }, 300);
+    return () => clearTimeout(t);
+  }, [router]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {

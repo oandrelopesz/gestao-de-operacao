@@ -50,6 +50,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadLivros } from "@/lib/data";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays } from "date-fns";
@@ -73,8 +75,8 @@ type Livro = {
 
 function LivrosPage() {
   const [aba, setAba] = useState<string>("estante");
-  const [livros, setLivros] = useState<Livro[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [livros, setLivros] = useCachedState<Livro[]>(CACHE_KEYS.livros, []);
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.livros));
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLivro, setEditingLivro] = useState<Partial<Livro> | null>(null);
@@ -85,14 +87,9 @@ function LivrosPage() {
   const [fadeId, setFadeId] = useState<string | null>(null);
 
   const fetchLivros = async () => {
-    setLoading(true);
+    if (!hasCached(CACHE_KEYS.livros)) setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("livros")
-        .select("*")
-        .order("nome");
-      if (error) throw error;
-      setLivros((data as any[]) || []);
+      setLivros((await loadLivros()) as Livro[]);
     } catch (error: any) {
       toast.error("Erro ao carregar livros: " + error.message);
     } finally {

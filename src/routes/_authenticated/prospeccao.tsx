@@ -50,6 +50,8 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { supabase } from "@/integrations/supabase/client";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadLeads } from "@/lib/data";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Lead, ProspeccaoCard } from "@/components/prospeccao/ProspeccaoCard";
@@ -88,7 +90,7 @@ export const Route = createFileRoute("/_authenticated/prospeccao")({
 function ProspeccaoPage() {
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [loading, setLoading] = useState(false);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [leads, setLeads] = useCachedState<Lead[]>(CACHE_KEYS.leads, []);
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterAgencia, setFilterAgencia] = useState("all");
@@ -111,15 +113,9 @@ function ProspeccaoPage() {
   );
 
   const fetchLeads = async () => {
-    setLoading(true);
+    if (!hasCached(CACHE_KEYS.leads)) setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("prospeccao")
-        .select("*")
-        .order("ordem", { ascending: true })
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      setLeads((data as any[]) || []);
+      setLeads((await loadLeads()) as Lead[]);
     } catch (error: any) {
       toast.error("Erro ao buscar leads: " + error.message);
     } finally {

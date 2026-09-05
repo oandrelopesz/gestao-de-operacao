@@ -60,6 +60,8 @@ import {
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadFinanceiro } from "@/lib/data";
 import { formatBRL, parseBRLInput, maskBRLInput } from "@/lib/clientes";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -96,8 +98,8 @@ type FinanceiroView = {
 };
 
 function FinanceiroPage() {
-  const [data, setData] = useState<FinanceiroView[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useCachedState<FinanceiroView[]>(CACHE_KEYS.financeiro, []);
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.financeiro));
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [filterTipo, setFilterTipo] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -112,15 +114,9 @@ function FinanceiroPage() {
   const [historyData, setHistoryData] = useState<any[]>([]);
 
   const fetchFinanceiro = async () => {
-    setLoading(true);
+    if (!hasCached(CACHE_KEYS.financeiro)) setLoading(true);
     try {
-      const { data: viewData, error } = await supabase
-        .from("financeiro_view" as any)
-        .select("*")
-        .order("nome");
-
-      if (error) throw error;
-      setData((viewData as any[]) || []);
+      setData((await loadFinanceiro()) as FinanceiroView[]);
     } catch (error: any) {
       toast.error("Erro ao carregar financeiro: " + error.message);
     } finally {

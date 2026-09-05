@@ -33,6 +33,8 @@ import { DemandaForm, DemandaFormValues } from "@/components/DemandaForm";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { DemandaDrawer } from "@/components/demandas/DemandaDrawer";
 import { supabase } from "@/integrations/supabase/client";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadDemandas, loadClientesLite, loadColunas } from "@/lib/data";
 import { toast } from "sonner";
 import { useAgencias } from "@/lib/agencias";
 import {
@@ -54,7 +56,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { KanbanCard } from "@/components/KanbanCard";
 import { cn } from "@/lib/utils";
-import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId, fetchDemandaColunas } from "@/lib/demandaColunas";
+import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId } from "@/lib/demandaColunas";
 
 type ColumnDialogState =
   | { mode: "create"; title: string; hex: string }
@@ -71,11 +73,11 @@ function DemandasPage() {
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: string }[]>([]);
-  const [demandas, setDemandas] = useState<any[]>([]);
+  const [clientes, setClientes] = useCachedState<{ id: string; nome: string; agencia: string }[]>(CACHE_KEYS.clientesLite, []);
+  const [demandas, setDemandas] = useCachedState<any[]>(CACHE_KEYS.demandas, []);
   const [activeDemanda, setActiveDemanda] = useState<any | null>(null);
   const [editingDemanda, setEditingDemanda] = useState<any | null>(null);
-  const [columns, setColumns] = useState<KanbanColumnDef[]>([]);
+  const [columns, setColumns] = useCachedState<KanbanColumnDef[]>(CACHE_KEYS.colunas, []);
   const [columnDialog, setColumnDialog] = useState<ColumnDialogState | null>(null);
   const [columnConfirm, setColumnConfirm] = useState<ColumnConfirmState | null>(null);
   const [columnSaving, setColumnSaving] = useState(false);
@@ -127,15 +129,17 @@ function DemandasPage() {
   }, []);
 
   const fetchClientes = async () => {
-    const { data, error } = await supabase.from("clientes").select("id, nome, agencia").order("nome");
-    if (error) console.error("Erro ao buscar clientes:", error);
-    else setClientes((data as any) || []);
+    try {
+      setClientes(await loadClientesLite());
+    } catch (error) {
+      console.error("Erro ao buscar clientes:", error);
+    }
   };
 
   // Removido catchUpRecorrentes para evitar materialização automática em Fazer Hoje
 
   const fetchColumns = async () => {
-    setColumns(await fetchDemandaColunas());
+    setColumns(await loadColunas());
   };
 
   const handleSaveColumn = async () => {
@@ -208,14 +212,11 @@ function DemandasPage() {
   };
 
   const fetchDemandas = async () => {
-    const { data, error } = await supabase
-      .from("demandas")
-      .select("*, clientes(nome, agencia)")
-      .order("ordem", { ascending: true })
-      .order("created_at", { ascending: false });
-    
-    if (error) console.error("Erro ao buscar demandas:", error);
-    else setDemandas(data || []);
+    try {
+      setDemandas(await loadDemandas());
+    } catch (error) {
+      console.error("Erro ao buscar demandas:", error);
+    }
   };
 
   const openNewDemanda = (status?: string) => {
