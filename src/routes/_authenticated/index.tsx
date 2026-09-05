@@ -34,7 +34,7 @@ import { KanbanColumn } from "@/components/KanbanColumn";
 import { DemandaDrawer } from "@/components/demandas/DemandaDrawer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { AGENCIAS, AgenciaId } from "@/lib/clientes";
+import { useAgencias } from "@/lib/agencias";
 import {
   DndContext,
   DragOverlay,
@@ -67,10 +67,11 @@ export const Route = createFileRoute("/_authenticated/")({
 });
 
 function DemandasPage() {
+  const { label: agenciaLabelOf } = useAgencias();
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: AgenciaId }[]>([]);
+  const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: string }[]>([]);
   const [demandas, setDemandas] = useState<any[]>([]);
   const [activeDemanda, setActiveDemanda] = useState<any | null>(null);
   const [editingDemanda, setEditingDemanda] = useState<any | null>(null);
@@ -750,7 +751,7 @@ function DemandasPage() {
                                         {d.titulo}
                                     </h4>
                                     <p className="text-xs text-muted-foreground">
-                                        {d.clientes?.nome} — {AGENCIAS.find(a => a.id === d.clientes?.agencia)?.label} • {columns.find(c => c.id === d.status)?.title}
+                                        {d.clientes?.nome} — {agenciaLabelOf(d.clientes?.agencia)} • {columns.find(c => c.id === d.status)?.title}
                                     </p>
                                 </div>
                             </div>

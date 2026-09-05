@@ -13,6 +13,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAcessosRouteImport } from './routes/_authenticated/acessos'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
@@ -39,6 +40,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedAcessosRoute = AuthenticatedAcessosRouteImport.update({
   id: '/acessos',
   path: '/acessos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
   '/acessos': typeof AuthenticatedAcessosRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/cursos': typeof AuthenticatedCursosRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/acessos': typeof AuthenticatedAcessosRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/cursos': typeof AuthenticatedCursosRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/acessos': typeof AuthenticatedAcessosRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/cursos': typeof AuthenticatedCursosRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
@@ -129,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/acessos'
+    | '/admin'
     | '/clientes'
     | '/cursos'
     | '/financeiro'
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/acessos'
+    | '/admin'
     | '/clientes'
     | '/cursos'
     | '/financeiro'
@@ -155,6 +166,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/acessos'
+    | '/_authenticated/admin'
     | '/_authenticated/clientes'
     | '/_authenticated/cursos'
     | '/_authenticated/financeiro'
@@ -199,6 +211,13 @@ declare module '@tanstack/react-router' {
       path: '/acessos'
       fullPath: '/acessos'
       preLoaderRoute: typeof AuthenticatedAcessosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/clientes': {
@@ -262,6 +281,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAcessosRoute: typeof AuthenticatedAcessosRoute
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedCursosRoute: typeof AuthenticatedCursosRoute
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
@@ -275,6 +295,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAcessosRoute: AuthenticatedAcessosRoute,
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedCursosRoute: AuthenticatedCursosRoute,
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,

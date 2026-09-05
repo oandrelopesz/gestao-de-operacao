@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL } from "@/lib/clientes";
 
@@ -42,6 +43,7 @@ interface ProspeccaoCardProps {
 }
 
 export function ProspeccaoCard({ lead, onEdit, onDelete, onDuplicate }: ProspeccaoCardProps) {
+  const { label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
   const {
     attributes,
     listeners,
@@ -130,14 +132,12 @@ export function ProspeccaoCard({ lead, onEdit, onDelete, onDuplicate }: Prospecc
             </div>
             
             {lead.agencia_destino && (
-              <Badge variant="outline" className={cn(
-                "text-[9px] px-1 py-0 h-4 font-normal uppercase border-zinc-200 dark:border-zinc-700",
-                lead.agencia_destino === 'effect' && "text-blue-500",
-                lead.agencia_destino === 'spike' && "text-violet-500",
-                lead.agencia_destino === 'alt' && "text-amber-500",
-                lead.agencia_destino === 'pessoais' && "text-emerald-500"
-              )}>
-                {lead.agencia_destino}
+              <Badge
+                variant="outline"
+                className="text-[9px] px-1 py-0 h-4 font-normal uppercase border-zinc-200 dark:border-zinc-700"
+                style={agenciaBadgeStyle(agenciaMetaOf(lead.agencia_destino)?.hex)}
+              >
+                {agenciaLabelOf(lead.agencia_destino)}
               </Badge>
             )}
           </div>

@@ -1,16 +1,4 @@
-export const AGENCIAS = [
-  { id: "effect", label: "Effect", accent: "from-blue-500/15 to-blue-500/0", border: "border-l-blue-500" },
-  { id: "spike", label: "Spike", accent: "from-violet-500/15 to-violet-500/0", border: "border-l-violet-500" },
-  { id: "alt", label: "Alt", accent: "from-amber-500/15 to-amber-500/0", border: "border-l-amber-500" },
-  { id: "pessoais", label: "Pessoais", accent: "from-emerald-500/15 to-emerald-500/0", border: "border-l-emerald-500" },
-] as const;
-
-export type AgenciaId = typeof AGENCIAS[number]["id"] | "todos";
-
-export function agenciaLabel(id: string | null | undefined): string {
-  if (id === "todos") return "Todos os Clientes";
-  return AGENCIAS.find((a) => a.id === id)?.label ?? "—";
-}
+// As agências agora vêm do banco (tabela agencias) — ver src/lib/agencias.tsx
 
 export function formatBRL(value: number | string | null | undefined): string {
   const n = typeof value === "string" ? Number(value) : value ?? 0;

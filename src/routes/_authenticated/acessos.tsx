@@ -44,7 +44,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { AGENCIAS } from "@/lib/clientes";
+import { useAgencias, agenciaBorderStyle } from "@/lib/agencias";
 
 export const Route = createFileRoute("/_authenticated/acessos")({
   component: AcessosPage,
@@ -113,6 +113,7 @@ async function copyToClipboard(value: string, label: string) {
 }
 
 function AcessosPage() {
+  const { agencias } = useAgencias();
   const [acessos, setAcessos] = useState<Acesso[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -274,7 +275,7 @@ function AcessosPage() {
             Todos
             <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{acessos.length}</Badge>
           </TabsTrigger>
-          {AGENCIAS.map((a) => (
+          {agencias.map((a) => (
             <TabsTrigger key={a.id} value={a.id} className="gap-2">
               {a.label}
               <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{counts[a.id] || 0}</Badge>
@@ -341,7 +342,7 @@ function AcessosPage() {
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {AGENCIAS.map((a) => (
+                    {agencias.map((a) => (
                       <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -456,11 +457,12 @@ interface AcessoCardProps {
 
 function AcessoCard({ acesso, onEdit, onDelete }: AcessoCardProps) {
   const [showSenha, setShowSenha] = useState(false);
-  const agenciaMeta = AGENCIAS.find((a) => a.id === acesso.agencia);
+  const { meta } = useAgencias();
+  const agenciaMeta = meta(acesso.agencia);
   const tipoMeta = TIPO_META[acesso.tipo] ?? TIPO_META.planilha;
 
   return (
-    <Card className={cn("border-l-4 p-4 flex flex-col gap-3", agenciaMeta?.border || "border-l-primary")}>
+    <Card className={cn("border-l-4 p-4 flex flex-col gap-3", !agenciaMeta && "border-l-primary")} style={agenciaBorderStyle(agenciaMeta?.hex)}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="font-semibold leading-tight truncate">{acesso.nome}</h3>

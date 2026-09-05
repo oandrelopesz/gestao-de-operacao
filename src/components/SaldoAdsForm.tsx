@@ -22,6 +22,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
+import { useAgencias } from "@/lib/agencias";
 import { Badge } from "@/components/ui/badge";
 import { X, Plus } from "lucide-react";
 import {
@@ -65,6 +66,7 @@ interface SaldoAdsFormProps {
 }
 
 export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormProps) {
+  const { label: agenciaLabelOf } = useAgencias();
   const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: string; verba_ads: number; tipo_verba: string; verba_total_contratada: number; data_inicio: string; data_limite_verba: string }[]>([]);
 
   const form = useForm<SaldoAdsFormValues>({
@@ -140,7 +142,7 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
                 <SelectContent>
                   {clientes.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.nome} — <span>{c.agencia && c.agencia.charAt(0).toUpperCase() + c.agencia.slice(1)}</span>
+                      {c.nome} — <span>{agenciaLabelOf(c.agencia)}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>

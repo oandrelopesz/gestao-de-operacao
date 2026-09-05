@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as React from "react";
 
 import appCss from "../styles.css?url";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -68,6 +69,7 @@ export const Route = createRootRoute({
         href: appCss,
       },
     ],
+    headScripts: [{ children: THEME_INIT_SCRIPT }],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -76,7 +78,7 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

@@ -16,13 +16,18 @@ import {
   Target,
   BookOpen,
   Book,
-  KeyRound
+  KeyRound,
+  Settings,
+  Sun,
+  Moon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
+import { AgenciasProvider } from "@/lib/agencias";
+import { useTheme } from "@/lib/theme";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -48,6 +53,7 @@ function AuthenticatedLayout() {
     }
   }, [isDesktopCollapsed]);
   const [topAlert, setTopAlert] = useState<{ status: string, id: string, cliente_id: string } | null>(null);
+  const { theme, toggle: toggleTheme } = useTheme();
 
   useEffect(() => {
     const fetchTopAlert = async () => {
@@ -113,6 +119,7 @@ function AuthenticatedLayout() {
     { label: "Financeiro", icon: <DollarSign size={18} />, to: "/financeiro" },
     { label: "Cursos", icon: <BookOpen size={18} />, to: "/cursos" },
     { label: "Livros", icon: <Book size={18} />, to: "/livros" },
+    { label: "Admin", icon: <Settings size={18} />, to: "/admin" },
   ];
 
   const getAlertColor = (status: string) => {
@@ -122,6 +129,7 @@ function AuthenticatedLayout() {
   };
 
   return (
+    <AgenciasProvider>
     <div className="flex min-h-screen bg-background text-foreground">
       {/* Top indicator bar */}
       {topAlert && (
@@ -223,6 +231,14 @@ function AuthenticatedLayout() {
             </h2>
           </div>
           <div className="flex items-center gap-4">
+             <Button
+               variant="ghost"
+               size="icon"
+               onClick={toggleTheme}
+               title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+             >
+               {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+             </Button>
              <NotificationBell />
              <div className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">Beta</div>
           </div>
@@ -232,5 +248,6 @@ function AuthenticatedLayout() {
         </div>
       </main>
     </div>
+    </AgenciasProvider>
   );
 }

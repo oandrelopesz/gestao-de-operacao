@@ -36,7 +36,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
-import { AGENCIAS, formatBRL } from "@/lib/clientes";
+import { formatBRL } from "@/lib/clientes";
+import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
+import { saveCliente, loadClienteFormValues } from "@/lib/clientesService";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -101,6 +103,7 @@ const STATUS_ALERTA = [
 ];
 
 function SaldoPage() {
+  const { agencias, label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterAgencia, setFilterAgencia] = useState<string>("all");
@@ -219,19 +222,8 @@ function SaldoPage() {
     if (!editingClient) return;
     setSaving(true);
     try {
-      const payload: any = { ...values };
-      if (typeof payload.verba_total_contratada === "string") {
-        payload.verba_total_contratada = payload.verba_total_contratada === "" ? null : Number(payload.verba_total_contratada);
-      }
-      if (payload.data_limite_verba === "") {
-        payload.data_limite_verba = null;
-      }
-
-      const { error } = await supabase
-        .from("clientes")
-        .update(payload)
-        .eq("id", editingClient.id);
-      if (error) throw error;
+      // Mesmo fluxo da aba Clientes: atualiza cliente e sincroniza saldo_ads
+      await saveCliente(values, editingClient.id);
       toast.success("Dados do cliente atualizados");
       setClientModalOpen(false);
       setEditingClient(null);
@@ -565,7 +557,7 @@ function SaldoPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas</SelectItem>
-            {AGENCIAS.map(a => (
+            {agencias.map(a => (
               <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
             ))}
           </SelectContent>
@@ -653,14 +645,12 @@ function SaldoPage() {
                     <div className="space-y-1">
                       <CardTitle className="text-lg font-bold">{group.cliente_nome}</CardTitle>
                       <div className="flex flex-wrap gap-1.5">
-                        <Badge variant="outline" className={cn(
-                          "text-[10px] font-semibold uppercase py-0",
-                          group.cliente_agencia === "alt" ? "text-amber-600 border-amber-200 bg-amber-50" : "",
-                          group.cliente_agencia === "spike" ? "text-purple-600 border-purple-200 bg-purple-50" : "",
-                          group.cliente_agencia === "effect" ? "text-blue-600 border-blue-200 bg-blue-50" : "",
-                          group.cliente_agencia === "pessoais" ? "text-emerald-600 border-emerald-200 bg-emerald-50" : ""
-                        )}>
-                          {AGENCIAS.find(a => a.id === group.cliente_agencia)?.label || group.cliente_agencia}
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-semibold uppercase py-0"
+                          style={agenciaBadgeStyle(agenciaMetaOf(group.cliente_agencia)?.hex)}
+                        >
+                          {agenciaLabelOf(group.cliente_agencia)}
                         </Badge>
                         {isPausado && (
                           <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0">
@@ -680,8 +670,12 @@ function SaldoPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-[200px]">
                         <DropdownMenuItem onClick={() => {
-                          setEditingClient({ id: group.cliente_id, nome: group.cliente_nome, agencia: group.cliente_agencia });
+                          // Carrega o cadastro completo antes de abrir, para não sobrescrever dados com defaults
+                          setEditingClient(null);
                           setClientModalOpen(true);
+                          loadClienteFormValues(group.cliente_id)
+                            .then(setEditingClient)
+                            .catch(() => { toast.error("Erro ao carregar cliente"); setClientModalOpen(false); });
                         }}>
                           <UserCog size={14} className="mr-2" /> Editar Cliente
                         </DropdownMenuItem>
@@ -888,11 +882,15 @@ function SaldoPage() {
               Atualize as informações cadastrais do cliente.
             </DialogDescription>
           </DialogHeader>
-          <ClientForm
-            loading={saving}
-            onSubmit={handleUpdateClient}
-            initialValues={editingClient}
-          />
+          {editingClient ? (
+            <ClientForm
+              loading={saving}
+              onSubmit={handleUpdateClient}
+              initialValues={editingClient}
+            />
+          ) : (
+            <p className="py-8 text-center text-sm text-muted-foreground">Carregando cliente...</p>
+          )}
         </DialogContent>
       </Dialog>
 

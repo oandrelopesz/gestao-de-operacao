@@ -1,18 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { Plus, Search, Building2, Filter, AlertTriangle, TrendingUp, Users, Target, AlertCircle, Calendar, MoreVertical, Edit2, Trash2 } from "lucide-react";
+import { Plus, Search, Building2, Filter, AlertTriangle, TrendingUp, Users, Target, AlertCircle, MoreVertical, Edit2, Trash2, ClipboardCheck, History, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getScoreCategory } from "@/lib/nps";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { getScoreCategory, NPS_SCORE_CATEGORIES } from "@/lib/nps";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { AGENCIAS } from "@/lib/clientes";
+import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { NPSCard } from "@/components/NPSCard";
 import { NPSForm } from "@/components/NPSForm";
 import { NPSHistoryDrawer } from "@/components/NPSHistoryDrawer";
 import { Dialog } from "@/components/ui/dialog";
@@ -27,45 +26,76 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { NPS_SCORE_CATEGORIES, isFridayToday, getDiasAteProximaSexta, getProximaSextaFormatada } from "@/lib/nps";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/_authenticated/nps")({
   component: NPSPage,
 });
 
+interface ClienteRow {
+  id: string;
+  nome: string;
+  agencia: string;
+  status_operacional: string | null;
+  em_onboarding: boolean | null;
+  nicho: string | null;
+}
+
+/** Linha da lista: todo cliente ativo aparece, com ou sem avaliação */
+interface NPSRow {
+  cliente: ClienteRow;
+  ultima: any | null;
+  categoria: string; // id de NPS_SCORE_CATEGORIES ou "sem_avaliacao"
+}
+
+const CATEGORIA_ORDEM: Record<string, number> = { critico: 0, em_risco: 1, saudavel: 2, ancora: 3, sem_avaliacao: 4 };
+
 function NPSPage() {
   const queryClient = useQueryClient();
+  const { agencias, label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
   const [filterAgencia, setFilterAgencia] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAvaliacao, setEditingAvaliacao] = useState<any>(null);
+  const [formClienteId, setFormClienteId] = useState<string | undefined>(undefined);
   const [selectedCliente, setSelectedCliente] = useState<any>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingName, setDeletingName] = useState<string>("");
 
-  const isFriday = isFridayToday();
-  const nextFriday = getProximaSextaFormatada();
-  const daysUntilFriday = getDiasAteProximaSexta();
+  // Todos os clientes ativos entram na lista, mesmo sem avaliação
+  const { data: clientes, isLoading: loadingClientes, error: clientesError } = useQuery({
+    queryKey: ["clientes-ativos-nps"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("id, nome, agencia, status_operacional, em_onboarding, nicho")
+        .eq("arquivado", false)
+        .order("nome");
+      if (error) throw error;
+      return (data || []) as ClienteRow[];
+    },
+  });
 
-  const { data: avaliacoes, isLoading, error: queryError } = useQuery({
+  const { data: avaliacoes, isLoading: loadingAvaliacoes, error: queryError } = useQuery({
     queryKey: ["nps-avaliacoes"],
     queryFn: async () => {
-      console.log("Fetching NPS avaliacoes...");
       const { data, error } = await supabase
         .from("nps_avaliacoes_view")
         .select("*")
-        .order("data_avaliacao", { ascending: false });
-
-      if (error) {
-        console.error("NPS error:", error);
-        throw error;
-      }
-
+        .order("data_avaliacao", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (error) throw error;
       return data || [];
     },
   });
+
+  const isLoading = loadingClientes || loadingAvaliacoes;
+  const loadError = clientesError || queryError;
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["nps-avaliacoes"] });
+    queryClient.invalidateQueries({ queryKey: ["clientes-ativos-nps"] });
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -73,80 +103,75 @@ function NPSPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["nps-avaliacoes"] });
+      invalidate();
       toast.success("Avaliação removida");
     },
     onError: (err: any) => {
       toast.error(`Erro ao remover avaliação: ${err.message}`);
-      console.error(err);
     },
   });
 
-  const filteredData = useMemo(() => {
-    if (!avaliacoes) return [];
-    const filtered = avaliacoes.filter(item => {
-      const matchesAgencia = filterAgencia === "all" || item.cliente_agencia === filterAgencia;
-      const matchesCategory = filterCategory === "all" || item.categoria === filterCategory;
-      const matchesSearch = item.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesAgencia && matchesSearch && matchesCategory;
+  const rows = useMemo<NPSRow[]>(() => {
+    if (!clientes) return [];
+    return clientes.map((cliente) => {
+      // A view já vem ordenada da mais recente para a mais antiga
+      const ultima = (avaliacoes || []).find((a: any) => a.cliente_id === cliente.id) || null;
+      const categoria = ultima ? getScoreCategory(ultima.score_total ?? 0).id : "sem_avaliacao";
+      return { cliente, ultima, categoria };
     });
-    // Ordena por categoria: crítico → em risco → saudável → âncora; secundariamente por score crescente
-    const categoriaOrdem: Record<string, number> = { critico: 0, em_risco: 1, saudavel: 2, ancora: 3 };
+  }, [clientes, avaliacoes]);
+
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    const filtered = rows.filter((r) => {
+      const matchesAgencia = filterAgencia === "all" || r.cliente.agencia === filterAgencia;
+      const matchesCategory = filterCategory === "all" || r.categoria === filterCategory;
+      const matchesSearch = !q || r.cliente.nome.toLowerCase().includes(q);
+      return matchesAgencia && matchesCategory && matchesSearch;
+    });
+    // Crítico → em risco → saudável → âncora → sem avaliação; depois por score crescente
     return [...filtered].sort((a, b) => {
-      const ca = categoriaOrdem[a.categoria as string] ?? 99;
-      const cb = categoriaOrdem[b.categoria as string] ?? 99;
+      const ca = CATEGORIA_ORDEM[a.categoria] ?? 99;
+      const cb = CATEGORIA_ORDEM[b.categoria] ?? 99;
       if (ca !== cb) return ca - cb;
-      return (a.score_total || 0) - (b.score_total || 0);
+      if (a.ultima && b.ultima) return (a.ultima.score_total || 0) - (b.ultima.score_total || 0);
+      return a.cliente.nome.localeCompare(b.cliente.nome);
     });
-  }, [avaliacoes, filterAgencia, filterCategory, searchQuery]);
+  }, [rows, filterAgencia, filterCategory, searchQuery]);
 
   const stats = useMemo(() => {
-    if (!filteredData.length) return { avgScore: 0, criticalCount: 0, total: 0, distribution: [] };
-    const total = filteredData.length;
-    const avgScore = Math.round(filteredData.reduce((acc, curr) => acc + (curr.score_total || 0), 0) / total);
-    const criticalCount = filteredData.filter(i => i.categoria === "critico" || i.categoria === "em_risco").length;
-    
-    const distribution = NPS_SCORE_CATEGORIES.map(cat => ({
+    const avaliados = filteredRows.filter((r) => r.ultima);
+    const semAvaliacao = filteredRows.length - avaliados.length;
+    const avgScore = avaliados.length
+      ? Math.round(avaliados.reduce((acc, r) => acc + (r.ultima.score_total || 0), 0) / avaliados.length)
+      : 0;
+    const criticalCount = avaliados.filter((r) => r.categoria === "critico" || r.categoria === "em_risco").length;
+    const distribution = NPS_SCORE_CATEGORIES.map((cat) => ({
       ...cat,
-      count: filteredData.filter(i => i.categoria === cat.id).length
+      count: avaliados.filter((r) => r.categoria === cat.id).length,
     }));
+    return { avaliados: avaliados.length, semAvaliacao, avgScore, criticalCount, distribution };
+  }, [filteredRows]);
 
-    return { avgScore, criticalCount, total, distribution };
-  }, [filteredData]);
+  const openNewForClient = (clienteId?: string) => {
+    setEditingAvaliacao(null);
+    setFormClienteId(clienteId);
+    setIsFormOpen(true);
+  };
 
   return (
     <div className="space-y-6">
-      {isFriday ? (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-lg flex items-center gap-3 text-emerald-700 dark:text-emerald-400 text-sm font-medium animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-            <Calendar size={18} />
-          </div>
-          <p>✓ Janela de avaliação aberta. Preencha o NPS dos clientes hoje.</p>
-        </div>
-      ) : (
-        <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg flex items-center gap-3 text-amber-700 dark:text-amber-400 text-sm font-medium">
-          <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
-            <AlertTriangle size={18} />
-          </div>
-          <p>⚠️ Modo somente visualização. Próxima janela de avaliação: sexta-feira {nextFriday} (em {daysUntilFriday} {daysUntilFriday === 1 ? 'dia' : 'dias'}).</p>
-        </div>
-      )}
-
-      {queryError && (
-        <Card className="border-red-500 bg-red-50 dark:bg-red-950">
-          <CardHeader>
-            <CardTitle className="text-red-700 flex items-center gap-2">
-              <AlertCircle size={20} />
-              Erro ao carregar NPS
-            </CardTitle>
+      {loadError && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardHeader className="flex flex-row items-center gap-2">
+            <AlertCircle className="text-destructive" size={20} />
+            <CardTitle className="text-destructive">Erro ao carregar NPS</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <pre className="text-xs bg-white dark:bg-black/30 p-3 rounded overflow-auto max-h-40">
-              {JSON.stringify(queryError, null, 2)}
+              {(loadError as any)?.message || JSON.stringify(loadError, null, 2)}
             </pre>
-            <Button variant="destructive" onClick={() => queryClient.invalidateQueries({ queryKey: ["nps-avaliacoes"] })}>
-              Tentar novamente
-            </Button>
+            <Button variant="outline" size="sm" onClick={invalidate}>Tentar novamente</Button>
           </CardContent>
         </Card>
       )}
@@ -156,34 +181,15 @@ function NPSPage() {
           <h1 className="text-2xl font-bold tracking-tight">NPS Multidimensional</h1>
           <p className="text-muted-foreground">Gestão estratégica de saúde e satisfação da carteira.</p>
         </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="inline-block">
-                <Button 
-                  className={cn("gap-2 relative", !isFriday && "opacity-60 cursor-not-allowed")} 
-                  onClick={() => isFriday && setIsFormOpen(true)}
-                  disabled={!isFriday}
-                >
-                  <Plus size={16} />
-                  Nova avaliação
-                  {isFriday && (
-                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                    </span>
-                  )}
-                </Button>
-              </div>
-            </TooltipTrigger>
-            {!isFriday && (
-              <TooltipContent>
-                <p>Avaliações NPS só podem ser registradas às sextas-feiras.</p>
-                <p className="text-xs opacity-70">Próxima janela: {nextFriday} (em {daysUntilFriday} dias).</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
-        </TooltipProvider>
+        <Button className="gap-2" onClick={() => openNewForClient()}>
+          <Plus size={16} />
+          Nova avaliação
+        </Button>
+      </div>
+
+      <div className="bg-muted/40 border rounded-lg p-3 flex items-center gap-3 text-sm text-muted-foreground">
+        <Info size={16} className="shrink-0" />
+        <p>Todos os clientes ativos aparecem aqui. Avalie quando quiser — os critérios são sempre os mesmos: 5 métricas de 0 a 10, score de 0 a 50.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -193,8 +199,11 @@ function NPSPage() {
               <Users size={20} />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase opacity-60">Clientes Avaliados</p>
-              <p className="text-xl font-black">{stats.total}</p>
+              <p className="text-[10px] font-bold uppercase opacity-60">Clientes avaliados</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-black">{stats.avaliados}</span>
+                <span className="text-[10px] font-bold opacity-60">/ {filteredRows.length}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -205,7 +214,7 @@ function NPSPage() {
               <TrendingUp size={20} />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase opacity-60">Score Médio</p>
+              <p className="text-[10px] font-bold uppercase opacity-60">Score médio</p>
               <div className="flex items-baseline gap-1">
                 <span className="text-xl font-black">{stats.avgScore}</span>
                 <span className="text-[10px] font-bold opacity-60">/50</span>
@@ -218,11 +227,12 @@ function NPSPage() {
           <CardContent className="p-4 flex flex-col justify-center h-full">
             <p className="text-[10px] font-bold uppercase opacity-60 mb-2">Distribuição</p>
             <div className="flex gap-1 h-3 w-full rounded-full overflow-hidden bg-muted">
-              {stats.distribution?.map((cat) => (
-                <div 
-                  key={cat.id} 
-                  className={cn("h-full", cat.color.split(' ')[0])} 
-                  style={{ width: `${(cat.count / stats.total) * 100}%` }}
+              {stats.avaliados > 0 && stats.distribution.map((cat) => (
+                <div
+                  key={cat.id}
+                  className={cn("h-full", cat.color.split(" ")[0])}
+                  style={{ width: `${(cat.count / stats.avaliados) * 100}%` }}
+                  title={`${cat.label}: ${cat.count}`}
                 />
               ))}
             </div>
@@ -235,8 +245,11 @@ function NPSPage() {
               <AlertTriangle size={20} />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase opacity-60">Ação Imediata</p>
+              <p className="text-[10px] font-bold uppercase opacity-60">Ação imediata</p>
               <p className="text-xl font-black">{stats.criticalCount}</p>
+              {stats.semAvaliacao > 0 && (
+                <p className="text-[10px] text-muted-foreground">{stats.semAvaliacao} sem avaliação</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -259,7 +272,7 @@ function NPSPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as agências</SelectItem>
-            {AGENCIAS.map(a => (
+            {agencias.map((a) => (
               <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
             ))}
           </SelectContent>
@@ -271,105 +284,103 @@ function NPSPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as categorias</SelectItem>
-            {NPS_SCORE_CATEGORIES.map(c => (
+            {NPS_SCORE_CATEGORIES.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
             ))}
+            <SelectItem value="sem_avaliacao">Sem avaliação</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <div className="space-y-4">
         {isLoading ? (
-          <div className="flex justify-center py-20">Carregando...</div>
-        ) : avaliacoes === undefined || (avaliacoes.length === 0 && !isLoading) ? (
-          <div className="space-y-4">
-            {queryError ? (
-              <Card className="border-destructive/50 bg-destructive/5">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <AlertCircle className="text-destructive" size={20} />
-                  <CardTitle className="text-destructive">Erro ao carregar NPS</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-destructive/80">
-                    Falha na comunicação com a view de avaliações NPS.
-                  </p>
-                  {queryError instanceof Error && (
-                    <pre className="p-2 bg-black/5 rounded text-[10px] font-mono text-destructive/70 overflow-auto max-h-32">
-                      {queryError.message}
-                    </pre>
-                  )}
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["nps-avaliacoes"] })} className="border-destructive/30 text-destructive hover:bg-destructive/10">
-                      Tentar novamente
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="border-muted-foreground/30 text-muted-foreground">
-                      Recarregar página
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/30 text-center">
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                  <Target size={24} className="opacity-20" />
-                </div>
-                <h3 className="text-lg font-semibold">Nenhuma avaliação encontrada</h3>
-                <p className="text-muted-foreground max-w-xs">Use filtros diferentes ou registre uma nova avaliação de saúde para este cliente.</p>
-                <Button variant="outline" className="mt-4" onClick={() => setIsFormOpen(true)}>
-                  Criar primeira avaliação
-                </Button>
-              </div>
-            )}
-          </div>
-        ) : filteredData.length === 0 ? (
+          <div className="flex justify-center py-20 text-muted-foreground">Carregando...</div>
+        ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/30 text-center">
-             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Target size={24} className="opacity-20" />
+            </div>
+            <h3 className="text-lg font-semibold">Nenhum cliente ativo</h3>
+            <p className="text-muted-foreground max-w-xs">Cadastre clientes na aba Clientes Ativos — eles aparecem aqui automaticamente.</p>
+          </div>
+        ) : filteredRows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/30 text-center">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
               <Target size={24} className="opacity-20" />
             </div>
             <h3 className="text-lg font-semibold">Nenhum resultado para os filtros</h3>
-            <p className="text-muted-foreground">Tente ajustar seus critérios de busca ou agência.</p>
+            <p className="text-muted-foreground">Tente ajustar seus critérios de busca, agência ou categoria.</p>
           </div>
         ) : (
           <div className="rounded-lg border bg-card divide-y">
-            {filteredData.map((item) => {
-              const cat = getScoreCategory(item.score_total ?? 0);
-              const isPausado = item.cliente_status_operacional === "pausado";
+            {filteredRows.map(({ cliente, ultima, categoria }) => {
+              const cat = ultima ? getScoreCategory(ultima.score_total ?? 0) : null;
+              const isPausado = cliente.status_operacional === "pausado";
               return (
                 <div
-                  key={item.id}
+                  key={cliente.id}
                   className={cn(
                     "flex items-center gap-4 p-3 hover:bg-muted/40 transition-colors cursor-pointer",
                     isPausado && "opacity-70"
                   )}
-                  onClick={() => setSelectedCliente({ id: item.cliente_id, nome: item.cliente_nome, agencia: item.cliente_agencia })}
+                  onClick={() => setSelectedCliente({ id: cliente.id, nome: cliente.nome, agencia: cliente.agencia })}
                 >
-                  <div className={cn(
-                    "flex flex-col items-center justify-center w-14 h-14 rounded-md font-black text-lg shrink-0",
-                    cat.color
-                  )}>
-                    {item.score_total}
-                    <span className="text-[9px] font-bold opacity-80">/50</span>
-                  </div>
+                  {cat ? (
+                    <div className={cn(
+                      "flex flex-col items-center justify-center w-14 h-14 rounded-md font-black text-lg shrink-0",
+                      cat.color
+                    )}>
+                      {ultima.score_total}
+                      <span className="text-[9px] font-bold opacity-80">/50</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center w-14 h-14 rounded-md border border-dashed text-muted-foreground shrink-0">
+                      <ClipboardCheck size={18} className="opacity-50" />
+                    </div>
+                  )}
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold truncate">{item.cliente_nome}</h3>
-                      <Badge variant="outline" className="text-[10px] uppercase">{item.cliente_agencia}</Badge>
+                      <h3 className="font-semibold truncate">{cliente.nome}</h3>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase"
+                        style={agenciaBadgeStyle(agenciaMetaOf(cliente.agencia)?.hex)}
+                      >
+                        {agenciaLabelOf(cliente.agencia)}
+                      </Badge>
                       {isPausado && <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50">Pausado</Badge>}
-                      {item.cliente_em_onboarding && <Badge className="bg-emerald-500 text-[10px]">Onboarding</Badge>}
+                      {cliente.em_onboarding && <Badge className="bg-emerald-500 text-[10px]">Onboarding</Badge>}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                        cat.color
-                      )}>{cat.label}</span>
-                      <span className="truncate">{cat.action}</span>
+                      {cat ? (
+                        <>
+                          <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase", cat.color)}>{cat.label}</span>
+                          <span className="truncate">{cat.action}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-muted text-muted-foreground">Sem avaliação</span>
+                          <span className="truncate">Ainda não avaliado — clique em Avaliar.</span>
+                        </>
+                      )}
                     </div>
                   </div>
 
                   <div className="text-right hidden md:block text-xs text-muted-foreground shrink-0">
-                    {item.data_avaliacao ? new Date(item.data_avaliacao).toLocaleDateString("pt-BR") : "—"}
+                    {ultima?.data_avaliacao ? new Date(ultima.data_avaliacao).toLocaleDateString("pt-BR") : "—"}
                   </div>
+
+                  {!ultima && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 shrink-0"
+                      onClick={(e) => { e.stopPropagation(); openNewForClient(cliente.id); }}
+                    >
+                      <Plus size={14} /> Avaliar
+                    </Button>
+                  )}
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -377,20 +388,27 @@ function NPSPage() {
                         <MoreVertical size={16} />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-[140px]">
-                      <DropdownMenuItem
-                        disabled={!isFriday}
-                        onClick={(e) => { e.stopPropagation(); if (isFriday) { setEditingAvaliacao(item); setIsFormOpen(true); } }}
-                      >
-                        <Edit2 size={14} className="mr-2" /> Editar
+                    <DropdownMenuContent align="end" className="w-[190px]">
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openNewForClient(cliente.id); }}>
+                        <Plus size={14} className="mr-2" /> Nova avaliação
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        disabled={!isFriday}
-                        className="text-destructive focus:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); if (isFriday) { setDeletingId(item.id); setDeletingName(item.cliente_nome || "esta avaliação"); } }}
-                      >
-                        <Trash2 size={14} className="mr-2" /> Remover
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedCliente({ id: cliente.id, nome: cliente.nome, agencia: cliente.agencia }); }}>
+                        <History size={14} className="mr-2" /> Histórico
                       </DropdownMenuItem>
+                      {ultima && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingAvaliacao(ultima); setFormClienteId(undefined); setIsFormOpen(true); }}>
+                            <Edit2 size={14} className="mr-2" /> Editar última
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); setDeletingId(ultima.id); setDeletingName(cliente.nome); }}
+                          >
+                            <Trash2 size={14} className="mr-2" /> Remover última
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -400,24 +418,27 @@ function NPSPage() {
         )}
       </div>
 
-      <Dialog 
-        open={isFormOpen} 
+      <Dialog
+        open={isFormOpen}
         onOpenChange={(open) => {
           setIsFormOpen(open);
-          if (!open) setEditingAvaliacao(null);
+          if (!open) { setEditingAvaliacao(null); setFormClienteId(undefined); }
         }}
       >
-        <NPSForm 
-          onClose={() => setIsFormOpen(false)} 
-          onSuccess={() => queryClient.invalidateQueries({ queryKey: ["nps-avaliacoes"] })} 
-          initialData={editingAvaliacao}
-        />
+        {isFormOpen && (
+          <NPSForm
+            onClose={() => setIsFormOpen(false)}
+            onSuccess={invalidate}
+            initialData={editingAvaliacao}
+            defaultClienteId={formClienteId}
+          />
+        )}
       </Dialog>
 
       {selectedCliente && (
-        <NPSHistoryDrawer 
-          cliente={selectedCliente} 
-          onClose={() => setSelectedCliente(null)} 
+        <NPSHistoryDrawer
+          cliente={selectedCliente}
+          onClose={() => setSelectedCliente(null)}
         />
       )}
 
@@ -426,16 +447,16 @@ function NPSPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Tem certeza que deseja remover?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. A avaliação de {deletingName} será permanentemente deletada.
+              Esta ação não pode ser desfeita. A última avaliação de {deletingName} será permanentemente deletada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => {
                 if (deletingId) deleteMutation.mutate(deletingId);
                 setDeletingId(null);
-              }} 
+              }}
               className="bg-destructive hover:bg-destructive/90"
             >
               Remover

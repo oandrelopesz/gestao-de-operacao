@@ -29,7 +29,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AGENCIAS, maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
+import { maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
+import { useAgencias } from "@/lib/agencias";
 
 const PLATAFORMAS_DISPONIVEIS = [
   "Meta",
@@ -44,7 +45,7 @@ const PLATAFORMAS_DISPONIVEIS = [
 
 const clientSchema = z.object({
   nome: z.string().min(2, "Nome é obrigatório"),
-  agencia: z.enum(["effect", "spike", "alt", "pessoais"]),
+  agencia: z.string().min(1, "Selecione a agência"),
   nicho: z.string().optional(),
   data_inicio: z.string().min(1, "Informe a data de início"),
   verba_ads: z.number().min(0),
@@ -67,11 +68,12 @@ interface ClientFormProps {
 }
 
 export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps) {
+  const { agencias } = useAgencias();
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
       nome: initialValues?.nome || "",
-      agencia: (initialValues?.agencia as any) || "effect",
+      agencia: initialValues?.agencia || agencias[0]?.id || "",
       nicho: initialValues?.nicho || "",
       data_inicio: initialValues?.data_inicio || new Date().toISOString().slice(0, 10),
       verba_ads: initialValues?.verba_ads ?? 0,
@@ -129,11 +131,11 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {AGENCIAS.map((a) => (
+                    {agencias.map((a) => (
                       <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
                     ))}
                   </SelectContent>

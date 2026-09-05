@@ -1,9 +1,9 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import {
   Plus, Search, Users as UsersIcon, DollarSign, TrendingUp, Smile,
   MoreVertical, Pencil, Archive, Trash2, LayoutGrid, Table as TableIcon, Calendar,
-  AlertCircle
+  AlertCircle, Settings2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,18 +46,18 @@ import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  AGENCIAS, AgenciaId, formatBRL, tempoDeCasa,
+  formatBRL, tempoDeCasa,
   NPS_STATUS_META, PAGAMENTO_META,
 } from "@/lib/clientes";
+import { useAgencias, agenciaBadgeStyle, agenciaBorderStyle } from "@/lib/agencias";
+import { saveCliente } from "@/lib/clientesService";
 import { cn } from "@/lib/utils";
 
-type SearchParams = { agencia?: AgenciaId; view?: "cards" | "tabela"; subAgencia?: string };
+type SearchParams = { agencia?: string; view?: "cards" | "tabela"; subAgencia?: string };
 
 export const Route = createFileRoute("/_authenticated/clientes")({
   validateSearch: (search: Record<string, unknown>): SearchParams => ({
-    agencia: (["effect", "spike", "alt", "pessoais", "todos"].includes(search.agencia as string)
-      ? (search.agencia as AgenciaId)
-      : "todos"),
+    agencia: typeof search.agencia === "string" && search.agencia ? search.agencia : "todos",
     view: search.view === "tabela" ? "tabela" : "cards",
     subAgencia: typeof search.subAgencia === "string" ? search.subAgencia : undefined,
   }),
@@ -67,7 +67,7 @@ export const Route = createFileRoute("/_authenticated/clientes")({
 interface ClienteView {
   id: string;
   nome: string;
-  agencia: AgenciaId;
+  agencia: string;
   nicho: string | null;
   data_inicio: string;
   verba_ads: number;
@@ -90,9 +90,11 @@ interface ClienteView {
 function ClientesPage() {
   const { agencia, view, subAgencia } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const { agencias, meta: agenciaMetaOf, label: agenciaLabelOf } = useAgencias();
 
   const [clientes, setClientes] = useState<ClienteView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [operacionalFilter, setOperacionalFilter] = useState<string>("all_active");
@@ -134,9 +136,11 @@ function ClientesPage() {
       
       if (error) {
         console.error("Erro detalhado fetchClientes:", error);
+        setFetchError(error.message);
         toast.error(`Erro ao carregar clientes: ${error.message}`);
         return;
       }
+      setFetchError(null);
 
       // Fetch platform summary for each client
       const { data: saldos, error: saldosError } = await supabase
@@ -170,7 +174,7 @@ function ClientesPage() {
   };
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { effect: 0, spike: 0, alt: 0, pessoais: 0 };
+    const c: Record<string, number> = {};
     clientes.forEach((cli) => { c[cli.agencia] = (c[cli.agencia] || 0) + 1; });
     return c;
   }, [clientes]);
@@ -214,107 +218,16 @@ function ClientesPage() {
     return { total, ativos, pausados, churn, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
   }, [clientes, agencia]);
 
-  const agenciaMeta = agencia === "todos" 
-    ? { id: "todos", label: "Todos", border: "border-l-primary" }
-    : AGENCIAS.find((a) => a.id === agencia)!;
+  const agenciaMeta = agencia === "todos"
+    ? { id: "todos", label: "Todos", hex: undefined as string | undefined }
+    : (agenciaMetaOf(agencia) ?? { id: agencia, label: agencia, hex: undefined as string | undefined });
 
   const handleSave = async (values: ClientFormValues) => {
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
-      // if (!user) throw new Error("Não autenticado");
-
-      // Sanitiza campos opcionais para evitar erros no banco
-      const payload: any = { ...values };
-      
-      // Converte verba_total_contratada para number se for string
-      if (typeof payload.verba_total_contratada === "string") {
-        if (payload.verba_total_contratada === "") {
-          payload.verba_total_contratada = null;
-        } else {
-          payload.verba_total_contratada = Number(payload.verba_total_contratada);
-        }
-      }
-
-      // Garante que campos opcionais sejam nulos se vazios ou não aplicáveis
-      if (payload.tipo_verba === "mensal") {
-        payload.verba_total_contratada = null;
-        payload.data_limite_verba = null;
-      } else {
-        if (!payload.data_limite_verba) payload.data_limite_verba = null;
-        if (payload.verba_total_contratada === undefined) {
-          payload.verba_total_contratada = null;
-        }
-      }
-
-      // Separa campos do cliente dos campos do saldo_ads
-      const { metodo_pagamento, plataformas, ...clientePayload } = payload;
-
-      // Calcula a verba diária estimada para sincronizar saldo_ads
-      const computeVerbaDiaria = (cli: any) => {
-        if (cli.tipo_verba === "total_periodo" && cli.verba_total_contratada && cli.data_inicio && cli.data_limite_verba) {
-          const inicio = new Date(cli.data_inicio);
-          const fim = new Date(cli.data_limite_verba);
-          const dias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
-          return Number(cli.verba_total_contratada) / dias;
-        }
-        return Number(cli.verba_ads || 0) / 30;
-      };
-
-      let clienteId: string;
-      if (editing) {
-        const { error } = await supabase.from("clientes")
-          .update(clientePayload).eq("id", editing.id);
-        if (error) {
-          console.error("Erro ao atualizar cliente:", error);
-          throw error;
-        }
-        clienteId = editing.id;
-        toast.success("Cliente atualizado");
-      } else {
-        const { data: novoCliente, error } = await supabase.from("clientes").insert([{
-          ...clientePayload,
-          user_id: userId,
-        }]).select().single();
-        if (error) {
-          console.error("Erro ao inserir cliente:", error);
-          throw error;
-        }
-        clienteId = novoCliente.id;
-        toast.success("Cliente criado");
-      }
-
-      // Sincroniza saldo_ads (forma de pagamento + plataformas)
-      if (plataformas && plataformas.length > 0 && metodo_pagamento) {
-        const verbaDiaria = computeVerbaDiaria(payload);
-
-        // Verifica se já existe registro saldo_ads para esse cliente
-        const { data: existente } = await supabase
-          .from("saldo_ads")
-          .select("id")
-          .eq("cliente_id", clienteId)
-          .maybeSingle();
-
-        if (existente) {
-          await supabase.from("saldo_ads")
-            .update({
-              plataformas,
-              metodo_pagamento,
-              verba_diaria: verbaDiaria,
-            })
-            .eq("id", existente.id);
-        } else {
-          await supabase.from("saldo_ads").insert([{
-            cliente_id: clienteId,
-            user_id: userId,
-            plataformas,
-            metodo_pagamento,
-            verba_diaria: verbaDiaria,
-            ativo: true,
-          }]);
-        }
-      }
+      // Fluxo único de gravação (usado também por Saldo e Prospecção)
+      await saveCliente(values, editing?.id ?? null);
+      toast.success(editing ? "Cliente atualizado" : "Cliente criado");
       setModalOpen(false);
       setEditing(null);
       fetchClientes();
@@ -404,7 +317,7 @@ function ClientesPage() {
               </div>
 
               <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {AGENCIAS.map(a => {
+                {agencias.map(a => {
                   const agAtivos = clientes.filter(c => c.agencia === a.id && c.status_operacional === "ativo");
                   const agVerba = agAtivos.reduce((acc, c) => {
                     if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
@@ -473,13 +386,14 @@ function ClientesPage() {
       </div>
 
       {/* Sub-tabs por agência */}
-      <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v as AgenciaId, subAgencia: undefined } })}>
+      <div className="flex items-center gap-2 flex-wrap">
+      <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v, subAgencia: undefined } })}>
         <TabsList>
           <TabsTrigger value="todos" className="gap-2">
             Todos
             <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{clientes.length}</Badge>
           </TabsTrigger>
-          {AGENCIAS.map((a) => (
+          {agencias.map((a) => (
             <TabsTrigger key={a.id} value={a.id} className="gap-2">
               {a.label}
               <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{counts[a.id] || 0}</Badge>
@@ -487,6 +401,10 @@ function ClientesPage() {
           ))}
         </TabsList>
       </Tabs>
+      <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
+        <Link to="/admin"><Settings2 size={14} /> Gerenciar agências</Link>
+      </Button>
+      </div>
 
       {/* Banner de fim de campanha próximo */}
       {(() => {
@@ -542,7 +460,7 @@ function ClientesPage() {
       {/* Breakdown por agência (mini-cards) */}
       {agencia === "todos" && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {AGENCIAS.map(a => {
+          {agencias.map(a => {
             const agAtivos = clientes.filter(c => c.agencia === a.id && c.status_operacional === "ativo");
             const agVerba = agAtivos.reduce((acc, c) => {
               if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
@@ -633,7 +551,7 @@ function ClientesPage() {
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por agência" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as agências</SelectItem>
-              {AGENCIAS.map(a => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
+              {agencias.map(a => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
             </SelectContent>
           </Select>
         )}
@@ -659,7 +577,7 @@ function ClientesPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[1, 2, 3, 4].map((i) => <div key={i} className="h-56 rounded-lg bg-muted/40 animate-pulse" />)}
         </div>
-      ) : clientes.length === 0 ? (
+      ) : fetchError ? (
         <Card className="border-destructive/50 bg-destructive/5">
           <CardHeader className="flex flex-row items-center gap-2">
             <AlertCircle className="text-destructive" size={20} />
@@ -677,8 +595,12 @@ function ClientesPage() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/20">
           <UsersIcon size={36} className="text-muted-foreground mb-3 opacity-50" />
-          <h3 className="text-lg font-semibold">Nenhum cliente em {agencia === "todos" ? "Todos os Clientes" : agenciaMeta.label}</h3>
-          <p className="text-muted-foreground mb-4 text-sm">Cadastre o primeiro cliente desta agência ou ajuste os filtros.</p>
+          <h3 className="text-lg font-semibold">
+            {clientes.length === 0 ? "Nenhum cliente cadastrado ainda" : `Nenhum cliente em ${agencia === "todos" ? "Todos os Clientes" : agenciaMeta.label}`}
+          </h3>
+          <p className="text-muted-foreground mb-4 text-sm">
+            {clientes.length === 0 ? "Cadastre o primeiro cliente — ele aparece automaticamente em Saldo, NPS e Demandas." : "Cadastre o primeiro cliente desta agência ou ajuste os filtros."}
+          </p>
           <Button className="gap-2" onClick={() => { setEditing(null); setEditingSaldo(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
           </Button>
@@ -689,7 +611,7 @@ function ClientesPage() {
             <ClienteCard
               key={c.id}
               cliente={c}
-              borderClass={agencia === "todos" ? (AGENCIAS.find(a => a.id === c.agencia)?.border || "border-l-primary") : agenciaMeta.border}
+              borderColor={agencia === "todos" ? agenciaMetaOf(c.agencia)?.hex : agenciaMeta.hex}
               showAgenciaBadge={agencia === "todos"}
               onEdit={() => openEdit(c)}
               onArchive={() => handleArchive(c.id)}
@@ -732,13 +654,8 @@ function ClientesPage() {
                     <TableCell className="font-medium">{c.nome}</TableCell>
                     {agencia === "todos" && (
                       <TableCell>
-                        <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5 font-bold uppercase", 
-                          c.agencia === 'effect' && "border-blue-500 text-blue-500 bg-blue-500/5",
-                          c.agencia === 'spike' && "border-violet-500 text-violet-500 bg-violet-500/5",
-                          c.agencia === 'alt' && "border-amber-500 text-amber-500 bg-amber-500/5",
-                          c.agencia === 'pessoais' && "border-emerald-500 text-emerald-500 bg-emerald-500/5",
-                        )}>
-                          {AGENCIAS.find(a => a.id === c.agencia)?.label}
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-bold uppercase" style={agenciaBadgeStyle(agenciaMetaOf(c.agencia)?.hex)}>
+                          {agenciaLabelOf(c.agencia)}
                         </Badge>
                       </TableCell>
                     )}
@@ -811,7 +728,7 @@ function ClientesPage() {
               data_limite_verba: editing.data_limite_verba || "",
               metodo_pagamento: editingSaldo?.metodo_pagamento || "pix",
               plataformas: editingSaldo?.plataformas || [],
-            } : { agencia: agencia === "todos" ? "effect" : agencia, metodo_pagamento: "pix", plataformas: [] } as any}
+            } : { agencia: agencia === "todos" ? (agencias[0]?.id ?? "") : agencia, metodo_pagamento: "pix", plataformas: [] } as any}
           />
         </DialogContent>
       </Dialog>
@@ -852,15 +769,16 @@ function MetricCard({ icon, label, value, hint }: { icon: React.ReactNode; label
 }
 
 function ClienteCard({
-  cliente, borderClass, showAgenciaBadge, onEdit, onArchive, onDelete,
+  cliente, borderColor, showAgenciaBadge, onEdit, onArchive, onDelete,
 }: {
   cliente: ClienteView;
-  borderClass: string;
+  borderColor?: string;
   showAgenciaBadge?: boolean;
   onEdit: () => void;
   onArchive: () => void;
   onDelete: () => void;
 }) {
+  const { meta: agenciaMetaOf, label: agenciaLabelOf } = useAgencias();
   const nps = NPS_STATUS_META[cliente.nps_status];
   const pag = cliente.status_pagamento_mes ? PAGAMENTO_META[cliente.status_pagamento_mes] : null;
   const obsTrim = cliente.observacoes && cliente.observacoes.length > 110
@@ -869,7 +787,8 @@ function ClienteCard({
 
   return (
     <Card 
-      className={cn("border-l-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default flex flex-col group relative outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2", borderClass)}
+      className={cn("border-l-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default flex flex-col group relative outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2", !borderColor && "border-l-primary")}
+      style={agenciaBorderStyle(borderColor)}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Delete" || e.key === "Backspace") onDelete();
@@ -904,13 +823,8 @@ function ClienteCard({
           <div className="min-w-0 pr-6">
             <div className="flex items-center gap-2 flex-wrap mb-1">
               {showAgenciaBadge && (
-                <Badge variant="outline" className={cn("text-[9px] h-4 px-1 font-bold uppercase tracking-tight", 
-                  cliente.agencia === 'effect' && "border-blue-500 text-blue-500 bg-blue-500/5",
-                  cliente.agencia === 'spike' && "border-violet-500 text-violet-500 bg-violet-500/5",
-                  cliente.agencia === 'alt' && "border-amber-500 text-amber-500 bg-amber-500/5",
-                  cliente.agencia === 'pessoais' && "border-emerald-500 text-emerald-500 bg-emerald-500/5",
-                )}>
-                  {AGENCIAS.find(a => a.id === cliente.agencia)?.label}
+                <Badge variant="outline" className="text-[9px] h-4 px-1 font-bold uppercase tracking-tight" style={agenciaBadgeStyle(agenciaMetaOf(cliente.agencia)?.hex)}>
+                  {agenciaLabelOf(cliente.agencia)}
                 </Badge>
               )}
               <CardTitle className="text-base font-semibold truncate">{cliente.nome}</CardTitle>

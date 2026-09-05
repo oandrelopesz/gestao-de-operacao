@@ -56,9 +56,39 @@ export type Database = {
         }
         Relationships: []
       }
+      agencias: {
+        Row: {
+          ativa: boolean
+          created_at: string
+          hex: string
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          created_at?: string
+          hex?: string
+          id: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          created_at?: string
+          hex?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
-          agencia: Database["public"]["Enums"]["agencia_enum"]
+          agencia: string
           arquivado: boolean
           created_at: string
           data_inicio: string
@@ -78,7 +108,7 @@ export type Database = {
           verba_total_contratada: number | null
         }
         Insert: {
-          agencia?: Database["public"]["Enums"]["agencia_enum"]
+          agencia?: string
           arquivado?: boolean
           created_at?: string
           data_inicio?: string
@@ -98,7 +128,7 @@ export type Database = {
           verba_total_contratada?: number | null
         }
         Update: {
-          agencia?: Database["public"]["Enums"]["agencia_enum"]
+          agencia?: string
           arquivado?: boolean
           created_at?: string
           data_inicio?: string
@@ -117,7 +147,15 @@ export type Database = {
           verba_ads?: number
           verba_total_contratada?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clientes_agencia_fkey"
+            columns: ["agencia"]
+            isOneToOne: false
+            referencedRelation: "agencias"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       curso_categorias: {
         Row: {
@@ -927,7 +965,7 @@ export type Database = {
     Views: {
       clientes_view: {
         Row: {
-          agencia: Database["public"]["Enums"]["agencia_enum"] | null
+          agencia: string | null
           arquivado: boolean | null
           data_inicio: string | null
           data_limite_verba: string | null
@@ -949,7 +987,7 @@ export type Database = {
           verba_total_contratada: number | null
         }
         Insert: {
-          agencia?: Database["public"]["Enums"]["agencia_enum"] | null
+          agencia?: string | null
           arquivado?: boolean | null
           data_inicio?: string | null
           data_limite_verba?: string | null
@@ -971,7 +1009,7 @@ export type Database = {
           verba_total_contratada?: number | null
         }
         Update: {
-          agencia?: Database["public"]["Enums"]["agencia_enum"] | null
+          agencia?: string | null
           arquivado?: boolean | null
           data_inicio?: string | null
           data_limite_verba?: string | null
@@ -1016,7 +1054,7 @@ export type Database = {
       nps_avaliacoes_view: {
         Row: {
           categoria: string | null
-          cliente_agencia: Database["public"]["Enums"]["agencia_enum"] | null
+          cliente_agencia: string | null
           cliente_em_onboarding: boolean | null
           cliente_id: string | null
           cliente_nicho: string | null
@@ -1056,7 +1094,7 @@ export type Database = {
       saldo_ads_view: {
         Row: {
           ativo: boolean | null
-          cliente_agencia: Database["public"]["Enums"]["agencia_enum"] | null
+          cliente_agencia: string | null
           cliente_id: string | null
           cliente_nome: string | null
           cliente_status_operacional:
@@ -1113,7 +1151,6 @@ export type Database = {
       get_nps_categoria: { Args: { score: number }; Returns: string }
     }
     Enums: {
-      agencia_enum: "effect" | "spike" | "alt" | "pessoais"
       cliente_nps_status:
         | "ancora"
         | "saudavel"
@@ -1294,7 +1331,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      agencia_enum: ["effect", "spike", "alt", "pessoais"],
       cliente_nps_status: [
         "ancora",
         "saudavel",

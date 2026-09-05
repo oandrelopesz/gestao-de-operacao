@@ -13,7 +13,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { NPS_METRICS, getScoreCategory, getMetricColor, isFridayToday } from "@/lib/nps";
+import { NPS_METRICS, getScoreCategory, getMetricColor } from "@/lib/nps";
+import { useAgencias } from "@/lib/agencias";
+import { getUserId } from "@/lib/clientesService";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 
@@ -21,11 +23,14 @@ interface NPSFormProps {
   onSuccess: () => void;
   onClose: () => void;
   initialData?: any;
+  /** Cliente pré-selecionado ao abrir a partir da lista */
+  defaultClienteId?: string;
 }
 
-export function NPSForm({ onSuccess, onClose, initialData }: NPSFormProps) {
+export function NPSForm({ onSuccess, onClose, initialData, defaultClienteId }: NPSFormProps) {
+  const { label: agenciaLabelOf } = useAgencias();
   const [loading, setLoading] = useState(false);
-  const [clienteId, setClienteId] = useState(initialData?.cliente_id || "");
+  const [clienteId, setClienteId] = useState(initialData?.cliente_id || defaultClienteId || "");
   const [dataAvaliacao, setDataAvaliacao] = useState<Date>(initialData ? new Date(initialData.data_avaliacao) : new Date());
   const [observacoes, setObservacoes] = useState(initialData?.observacoes || "");
   
@@ -54,11 +59,6 @@ export function NPSForm({ onSuccess, onClose, initialData }: NPSFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!isFridayToday()) {
-      toast.error("Hoje não é sexta-feira. A gravação de NPS está bloqueada.");
-      return;
-    }
 
     if (!clienteId) {
       toast.error("Selecione um cliente");
@@ -66,12 +66,10 @@ export function NPSForm({ onSuccess, onClose, initialData }: NPSFormProps) {
     }
 
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) return;
+    const userId = await getUserId();
 
     const payload = {
-      user_id: user.id,
+      user_id: userId,
       cliente_id: clienteId,
       data_avaliacao: format(dataAvaliacao, "yyyy-MM-dd"),
       engajamento: metrics.engajamento,
@@ -128,7 +126,7 @@ export function NPSForm({ onSuccess, onClose, initialData }: NPSFormProps) {
               <SelectContent>
                 {clientes?.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.nome} — <span className="opacity-60">{c.agencia && c.agencia.charAt(0).toUpperCase() + c.agencia.slice(1)}</span>
+                    {c.nome} — <span className="opacity-60">{agenciaLabelOf(c.agencia)}</span>
                   </SelectItem>
                 ))}
               </SelectContent>

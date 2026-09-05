@@ -56,7 +56,9 @@ import { Lead, ProspeccaoCard } from "@/components/prospeccao/ProspeccaoCard";
 import { ProspeccaoColumn } from "@/components/prospeccao/ProspeccaoColumn";
 import { ProspeccaoDrawer } from "@/components/prospeccao/ProspeccaoDrawer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatBRL, maskBRLInput, parseBRLInput, AGENCIAS } from "@/lib/clientes";
+import { formatBRL, maskBRLInput, parseBRLInput } from "@/lib/clientes";
+import { useAgencias } from "@/lib/agencias";
+import { saveCliente } from "@/lib/clientesService";
 import { 
   Tooltip,
   TooltipContent,
@@ -314,32 +316,23 @@ function ProspeccaoPage() {
 
   const handleCreateClient = async (values: ClientFormValues) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
+      // Mesmo fluxo da aba Clientes: cria o cliente e o registro de saldo junto
+      const newClientId = await saveCliente(values, null);
 
-      
-      const payload: any = {
-        ...values,
-        user_id: userId
-      };
-      
-      const { data: newClient, error } = await supabase.from("clientes").insert([payload]).select().single();
-      
-      if (error) throw error;
-      
       if (selectedLead) {
-        await supabase.from("prospeccao").update({ cliente_id: newClient.id } as any).eq("id", selectedLead.id);
+        await supabase.from("prospeccao").update({ cliente_id: newClientId } as any).eq("id", selectedLead.id);
         fetchLeads();
       }
-      
+
       toast.success("Cliente cadastrado e vinculado!");
       setIsClientModalOpen(false);
     } catch (error: any) {
-      toast.error("Erro ao cadastrar cliente");
+      toast.error(error.message || "Erro ao cadastrar cliente");
     }
   };
 
   const { colunas: demandaColunas } = useDemandaColunas();
+  const { agencias } = useAgencias();
 
   const handleCreateDemanda = (lead: Lead) => {
     setLeadForDemanda(lead);
@@ -493,7 +486,7 @@ function ProspeccaoPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Agência</SelectItem>
-            {AGENCIAS.map(a => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
+            {agencias.map(a => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

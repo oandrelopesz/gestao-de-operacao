@@ -42,7 +42,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatBRL, parseBRLInput, maskBRLInput, AGENCIAS } from "@/lib/clientes";
+import { formatBRL, parseBRLInput, maskBRLInput } from "@/lib/clientes";
+import { useAgencias } from "@/lib/agencias";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -101,6 +102,7 @@ export function ProspeccaoDrawer({
   onCreateDemanda,
   onConvert
 }: ProspeccaoDrawerProps) {
+  const { agencias } = useAgencias();
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [loadingInteractions, setLoadingInteractions] = useState(false);
   const [isAddingInteraction, setIsAddingInteraction] = useState(false);
@@ -278,7 +280,7 @@ export function ProspeccaoDrawer({
                       <SelectValue placeholder="Selecionar..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {AGENCIAS.map(a => (
+                      {agencias.map(a => (
                         <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
                       ))}
                     </SelectContent>
