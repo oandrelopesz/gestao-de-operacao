@@ -41,11 +41,12 @@ export async function fetchDemandaColunas(): Promise<KanbanColumnDef[]> {
     .from("demanda_colunas")
     .select("id, titulo, hex, ordem, sistema")
     .order("ordem", { ascending: true });
-  if (error || !data || data.length === 0) {
-    if (error) console.error("Erro ao buscar colunas:", error);
+  // Só cai no padrão se a tabela não existir; tabela vazia (colunas apagadas no Admin) = board vazio
+  if (error) {
+    console.error("Erro ao buscar colunas:", error);
     return DEFAULT_COLUMNS;
   }
-  return data.map((c) => ({ id: c.id, title: c.titulo, color: "", hex: c.hex, sistema: c.sistema }));
+  return (data || []).map((c) => ({ id: c.id, title: c.titulo, color: "", hex: c.hex, sistema: c.sistema }));
 }
 
 export function useDemandaColunas() {

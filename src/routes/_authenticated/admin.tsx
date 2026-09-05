@@ -33,6 +33,14 @@ type AgenciaDialog =
 
 type ColunaDialog = { id: string; titulo: string; hex: string };
 
+type WipeTarget = "clientes" | "demandas" | "colunas";
+
+const WIPE_META: Record<WipeTarget, { titulo: string; botao: string }> = {
+  clientes: { titulo: "Apagar todos os clientes?", botao: "Apagar todos os clientes" },
+  demandas: { titulo: "Apagar todas as demandas?", botao: "Apagar todas as demandas" },
+  colunas: { titulo: "Apagar todas as colunas do Kanban?", botao: "Apagar colunas e demandas" },
+};
+
 function AdminPage() {
   const { todasAgencias, reload: reloadAgencias } = useAgencias();
   const { colunas, reload: reloadColunas } = useDemandaColunas();
@@ -48,7 +56,7 @@ function AdminPage() {
   const [colunaDialog, setColunaDialog] = useState<ColunaDialog | null>(null);
   const [colunaToDelete, setColunaToDelete] = useState<KanbanColumnDef | null>(null);
 
-  const [wipeOpen, setWipeOpen] = useState(false);
+  const [wipeTarget, setWipeTarget] = useState<WipeTarget | null>(null);
   const [wipeConfirm, setWipeConfirm] = useState("");
 
   const loadCounts = async () => {
@@ -215,27 +223,62 @@ function AdminPage() {
   };
 
   // ---------- Zona de perigo ----------
-  const handleWipeClientes = async () => {
+  const wipeAllDemandas = async () => {
+    // Execuções de recorrentes caem em cascata junto com as demandas
+    const { error } = await supabase.from("demandas").delete().not("id", "is", null);
+    if (error) throw error;
+  };
+
+  const handleWipe = async () => {
+    if (!wipeTarget) return;
     setSaving(true);
     try {
-      // Demandas ficam (só perdem o vínculo com o cliente); NPS, saldo, recargas e
-      // pendências caem em cascata. Agências, colunas e acessos não são afetados.
-      const { error: unlinkError } = await supabase
-        .from("demandas")
-        .update({ cliente_id: null })
-        .not("cliente_id", "is", null);
-      if (unlinkError) throw unlinkError;
-      const { error } = await supabase.from("clientes").delete().not("id", "is", null);
-      if (error) throw error;
-      toast.success("Todos os clientes foram apagados");
-      setWipeOpen(false);
+      if (wipeTarget === "clientes") {
+        // Demandas ficam (só perdem o vínculo com o cliente); NPS, saldo, recargas e
+        // pendências caem em cascata. Agências, colunas e acessos não são afetados.
+        const { error: unlinkError } = await supabase
+          .from("demandas")
+          .update({ cliente_id: null })
+          .not("cliente_id", "is", null);
+        if (unlinkError) throw unlinkError;
+        const { error } = await supabase.from("clientes").delete().not("id", "is", null);
+        if (error) throw error;
+        toast.success("Todos os clientes foram apagados");
+      } else if (wipeTarget === "demandas") {
+        await wipeAllDemandas();
+        toast.success("Todas as demandas foram apagadas");
+      } else {
+        // Colunas só podem sair depois das demandas (FK demandas.status -> demanda_colunas)
+        await wipeAllDemandas();
+        const { error } = await supabase.from("demanda_colunas").delete().not("id", "is", null);
+        if (error) throw error;
+        toast.success("Colunas e demandas do Kanban foram apagadas");
+        await reloadColunas();
+      }
+      setWipeTarget(null);
       setWipeConfirm("");
       await loadCounts();
     } catch (e: any) {
-      toast.error(e.message || "Erro ao apagar clientes");
+      toast.error(e.message || "Erro ao apagar");
     } finally {
       setSaving(false);
     }
+  };
+
+  const wipeDescription = (target: WipeTarget) => {
+    if (target === "clientes") {
+      return (
+        <>Isso remove <strong>{counts.clientes ?? "todos os"}</strong> clientes e o que depende deles (NPS, saldos, recargas, pendências). As demandas do Kanban ficam, sem cliente vinculado. Não há como desfazer.</>
+      );
+    }
+    if (target === "demandas") {
+      return (
+        <>Isso remove <strong>{counts.demandas ?? "todas as"}</strong> demandas de todas as colunas, incluindo recorrentes e o histórico de execuções. As colunas continuam. Não há como desfazer.</>
+      );
+    }
+    return (
+      <>Isso remove <strong>todas as {colunas.length} colunas</strong> do Kanban e as <strong>{counts.demandas ?? ""}</strong> demandas dentro delas. A aba Demandas fica vazia até você criar colunas novas. Não há como desfazer.</>
+    );
   };
 
   const agenciasOrdenadas = [...todasAgencias].sort((a, b) => a.ordem - b.ordem);
@@ -404,16 +447,34 @@ function AdminPage() {
       <Card className="border-destructive/40">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive"><AlertTriangle size={18} /> Zona de perigo</CardTitle>
-          <CardDescription>Ações irreversíveis. Agências, colunas do Kanban e acessos (Planilha/CRM) não são afetados.</CardDescription>
+          <CardDescription>Ações irreversíveis, sempre com confirmação digitada. Agências e acessos (Planilha/CRM) nunca são afetados.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3">
             <div>
               <p className="font-medium">Apagar todos os clientes</p>
               <p className="text-xs text-muted-foreground">Remove os {counts.clientes ?? "…"} clientes e, com eles, avaliações NPS, saldos/recargas e pendências. Demandas e leads ficam, apenas desvinculados do cliente.</p>
             </div>
-            <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeOpen(true); }}>
+            <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeTarget("clientes"); }}>
               Apagar clientes
+            </Button>
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3">
+            <div>
+              <p className="font-medium">Apagar todas as demandas</p>
+              <p className="text-xs text-muted-foreground">Esvazia todas as colunas do Kanban ({counts.demandas ?? "…"} demandas, incluindo recorrentes). As colunas continuam.</p>
+            </div>
+            <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeTarget("demandas"); }}>
+              Apagar demandas
+            </Button>
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3">
+            <div>
+              <p className="font-medium">Apagar todas as colunas do Kanban</p>
+              <p className="text-xs text-muted-foreground">Remove as {colunas.length} colunas da aba Demandas e as demandas dentro delas. Depois, crie colunas novas pelo botão "Nova coluna".</p>
+            </div>
+            <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeTarget("colunas"); }}>
+              Apagar colunas
             </Button>
           </div>
         </CardContent>
@@ -507,16 +568,14 @@ function AdminPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Apagar todos os clientes */}
-      <AlertDialog open={wipeOpen} onOpenChange={(o) => { if (!o) { setWipeOpen(false); setWipeConfirm(""); } }}>
+      {/* Confirmação das ações da zona de perigo */}
+      <AlertDialog open={!!wipeTarget} onOpenChange={(o) => { if (!o) { setWipeTarget(null); setWipeConfirm(""); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Apagar todos os clientes?</AlertDialogTitle>
+            <AlertDialogTitle>{wipeTarget ? WIPE_META[wipeTarget].titulo : ""}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>
-                  Isso remove <strong>{counts.clientes ?? "todos os"}</strong> clientes e o que depende deles (NPS, saldos, recargas, pendências). As demandas do Kanban ficam, sem cliente vinculado. Não há como desfazer.
-                </p>
+                <p>{wipeTarget && wipeDescription(wipeTarget)}</p>
                 <p>Digite <span className="font-mono font-bold">APAGAR</span> para confirmar:</p>
                 <Input value={wipeConfirm} onChange={(e) => setWipeConfirm(e.target.value)} placeholder="APAGAR" autoComplete="off" />
               </div>
@@ -525,11 +584,11 @@ function AdminPage() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleWipeClientes(); }}
+              onClick={(e) => { e.preventDefault(); handleWipe(); }}
               disabled={saving || wipeConfirm.trim().toUpperCase() !== "APAGAR"}
               className="bg-destructive hover:bg-destructive/90"
             >
-              {saving ? "Apagando..." : "Apagar todos os clientes"}
+              {saving ? "Apagando..." : wipeTarget ? WIPE_META[wipeTarget].botao : ""}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -127,6 +127,7 @@ function AcessosPage() {
   const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<Acesso | null>(null);
+  const [unavailable, setUnavailable] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAcessos();
@@ -136,9 +137,15 @@ function AcessosPage() {
     if (!hasCached(CACHE_KEYS.acessos)) setLoading(true);
     try {
       setAcessos((await loadAcessos()) as Acesso[]);
+      setUnavailable(null);
     } catch (error: any) {
       console.error("Erro ao carregar acessos:", error);
-      toast.error("Erro ao carregar acessos");
+      // Tabela ainda não criada no banco (migration pendente): aviso na tela, sem toast a cada troca de aba
+      const msg = String(error?.message || "");
+      const missingTable = error?.code === "PGRST205" || error?.code === "42P01" || /acessos_clientes/.test(msg) && /not find|does not exist|schema cache/i.test(msg);
+      setUnavailable(missingTable
+        ? "A tabela de acessos ainda não existe no banco. Aplique a migration 20260904120000_acessos_clientes no Supabase para ativar esta aba."
+        : `Erro ao carregar acessos: ${msg || "tente novamente"}`);
     } finally {
       setLoading(false);
     }
@@ -293,6 +300,12 @@ function AcessosPage() {
 
       {loading ? (
         <div className="h-24 flex items-center justify-center text-muted-foreground">Carregando...</div>
+      ) : unavailable ? (
+        <Card className="p-6 border-amber-500/40 bg-amber-500/5 text-sm space-y-3">
+          <p className="font-medium text-amber-800 dark:text-amber-300">Aba indisponível no momento</p>
+          <p className="text-muted-foreground">{unavailable}</p>
+          <Button variant="outline" size="sm" onClick={fetchAcessos}>Tentar novamente</Button>
+        </Card>
       ) : filteredAcessos.length === 0 ? (
         <Card className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-2 border-dashed">
           <span>Nenhum acesso cadastrado{agenciaFilter !== "todos" ? " nesta agência" : ""}.</span>

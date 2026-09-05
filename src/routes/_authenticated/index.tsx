@@ -78,6 +78,9 @@ function DemandasPage() {
   const [activeDemanda, setActiveDemanda] = useState<any | null>(null);
   const [editingDemanda, setEditingDemanda] = useState<any | null>(null);
   const [columns, setColumns] = useCachedState<KanbanColumnDef[]>(CACHE_KEYS.colunas, []);
+  // Ref para handlers registrados uma vez (atalho "n") enxergarem as colunas atuais
+  const columnsRef = useRef(columns);
+  columnsRef.current = columns;
   const [columnDialog, setColumnDialog] = useState<ColumnDialogState | null>(null);
   const [columnConfirm, setColumnConfirm] = useState<ColumnConfirmState | null>(null);
   const [columnSaving, setColumnSaving] = useState(false);
@@ -120,7 +123,7 @@ function DemandasPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "n" && !isModalOpen && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
         e.preventDefault();
-        openNewDemanda("fazer_hoje");
+        openNewDemanda();
       }
     };
 
@@ -220,7 +223,10 @@ function DemandasPage() {
   };
 
   const openNewDemanda = (status?: string) => {
-    setEditingDemanda({ status: status || "fazer_hoje" });
+    // Coluna padrão: "fazer_hoje" se existir; senão a primeira coluna não fixa (ou a primeira)
+    const cols = columnsRef.current;
+    const fallback = cols.find((c) => c.id === "fazer_hoje")?.id ?? cols.find((c) => !c.sistema)?.id ?? cols[0]?.id ?? "fazer_hoje";
+    setEditingDemanda({ status: status || fallback });
     setIsModalOpen(true);
   };
 
