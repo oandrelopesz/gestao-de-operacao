@@ -75,7 +75,6 @@ export const Route = createRootRoute({
         href: appCss,
       },
     ],
-    headScripts: [{ children: THEME_INIT_SCRIPT }],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -86,6 +85,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        {/* Aplica o tema salvo antes do primeiro paint, evitando flash de tema claro */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>
