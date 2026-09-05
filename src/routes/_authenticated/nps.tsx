@@ -201,7 +201,7 @@ function NPSPage() {
             <div>
               <p className="text-[10px] font-bold uppercase opacity-60">Clientes avaliados</p>
               <div className="flex items-baseline gap-1">
-                <span className="text-xl font-black">{stats.avaliados}</span>
+                <span className="numeric text-xl font-semibold">{stats.avaliados}</span>
                 <span className="text-[10px] font-bold opacity-60">/ {filteredRows.length}</span>
               </div>
             </div>
@@ -216,7 +216,7 @@ function NPSPage() {
             <div>
               <p className="text-[10px] font-bold uppercase opacity-60">Score médio</p>
               <div className="flex items-baseline gap-1">
-                <span className="text-xl font-black">{stats.avgScore}</span>
+                <span className="numeric text-xl font-semibold">{stats.avgScore}</span>
                 <span className="text-[10px] font-bold opacity-60">/50</span>
               </div>
             </div>
@@ -246,7 +246,7 @@ function NPSPage() {
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase opacity-60">Ação imediata</p>
-              <p className="text-xl font-black">{stats.criticalCount}</p>
+              <p className="numeric text-xl font-semibold">{stats.criticalCount}</p>
               {stats.semAvaliacao > 0 && (
                 <p className="text-[10px] text-muted-foreground">{stats.semAvaliacao} sem avaliação</p>
               )}

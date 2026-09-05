@@ -169,9 +169,12 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
           {(demanda.descricao || isRecorrenteMae) && (
             <div className="flex items-center gap-2 pt-0.5">
               {demanda.descricao && (
-                <div title="Tem descrição">
-                  <FileText size={12} className="text-zinc-400" />
-                </div>
+                <span
+                  title="Esta tarefa tem observação"
+                  className="inline-flex items-center gap-1 rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-700/70"
+                >
+                  <FileText size={9} /> observação
+                </span>
               )}
               
               {isRecorrenteMae && (

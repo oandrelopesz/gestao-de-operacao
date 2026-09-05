@@ -218,8 +218,13 @@ function AdminPage() {
   const handleWipeClientes = async () => {
     setSaving(true);
     try {
-      // Apaga todos os clientes; demandas, NPS, saldo e pendências vinculados caem em cascata.
-      // Agências, colunas do Kanban e acessos (Planilha/CRM) não são afetados.
+      // Demandas ficam (só perdem o vínculo com o cliente); NPS, saldo, recargas e
+      // pendências caem em cascata. Agências, colunas e acessos não são afetados.
+      const { error: unlinkError } = await supabase
+        .from("demandas")
+        .update({ cliente_id: null })
+        .not("cliente_id", "is", null);
+      if (unlinkError) throw unlinkError;
       const { error } = await supabase.from("clientes").delete().not("id", "is", null);
       if (error) throw error;
       toast.success("Todos os clientes foram apagados");
@@ -385,7 +390,7 @@ function AdminPage() {
             ].map(([key, label]) => (
               <div key={key} className="rounded-md border p-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-                <p className="text-xl font-bold">{counts[key] === undefined ? "…" : counts[key] === null ? "—" : counts[key]}</p>
+                <p className="numeric text-xl font-semibold">{counts[key] === undefined ? "…" : counts[key] === null ? "—" : counts[key]}</p>
               </div>
             ))}
           </div>
@@ -405,7 +410,7 @@ function AdminPage() {
           <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3">
             <div>
               <p className="font-medium">Apagar todos os clientes</p>
-              <p className="text-xs text-muted-foreground">Remove os {counts.clientes ?? "…"} clientes e, com eles, demandas, avaliações NPS, saldos/recargas e pendências vinculados. Leads de prospecção ficam, apenas desvinculados.</p>
+              <p className="text-xs text-muted-foreground">Remove os {counts.clientes ?? "…"} clientes e, com eles, avaliações NPS, saldos/recargas e pendências. Demandas e leads ficam, apenas desvinculados do cliente.</p>
             </div>
             <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeOpen(true); }}>
               Apagar clientes
@@ -510,7 +515,7 @@ function AdminPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>
-                  Isso remove <strong>{counts.clientes ?? "todos os"}</strong> clientes e tudo que depende deles (demandas, NPS, saldos, recargas, pendências). Não há como desfazer.
+                  Isso remove <strong>{counts.clientes ?? "todos os"}</strong> clientes e o que depende deles (NPS, saldos, recargas, pendências). As demandas do Kanban ficam, sem cliente vinculado. Não há como desfazer.
                 </p>
                 <p>Digite <span className="font-mono font-bold">APAGAR</span> para confirmar:</p>
                 <Input value={wipeConfirm} onChange={(e) => setWipeConfirm(e.target.value)} placeholder="APAGAR" autoComplete="off" />

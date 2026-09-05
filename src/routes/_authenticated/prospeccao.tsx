@@ -468,7 +468,7 @@ function ProspeccaoPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 pt-1">
-            <div className="text-xl font-bold">{formatBRL(metrics.pipelineTotal)}</div>
+            <div className="numeric text-xl font-semibold">{formatBRL(metrics.pipelineTotal)}</div>
             <p className="text-[10px] text-muted-foreground">{metrics.activeLeadsCount} leads ativos</p>
           </CardContent>
         </Card>
@@ -495,7 +495,7 @@ function ProspeccaoPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 pt-1">
-            <div className="text-xl font-bold text-emerald-600">{formatBRL(metrics.fechadoMes)}</div>
+            <div className="numeric text-xl font-semibold text-emerald-600">{formatBRL(metrics.fechadoMes)}</div>
           </CardContent>
         </Card>
         <Card className="bg-muted/20 border-none shadow-none">
@@ -505,7 +505,7 @@ function ProspeccaoPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 pt-1">
-            <div className="text-xl font-bold">{metrics.conversao.toFixed(1)}%</div>
+            <div className="numeric text-xl font-semibold">{metrics.conversao.toFixed(1)}%</div>
           </CardContent>
         </Card>
       </div>

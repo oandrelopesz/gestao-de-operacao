@@ -74,7 +74,7 @@ export function ProspeccaoColumn({
 
       <div
         ref={setNodeRef}
-        className="flex-1 min-h-0 bg-muted/40 border border-border/60 rounded-xl p-2 overflow-y-auto"
+        className="flex-1 min-h-0 bg-card/60 backdrop-blur-sm border border-border/60 rounded-xl p-2 overflow-y-auto"
       >
         <SortableContext id={id} items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
           {leads.map((lead) => (

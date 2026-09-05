@@ -299,7 +299,7 @@ function ClientesPage() {
                   </TooltipProvider>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-4xl font-extrabold tracking-tight text-primary">
+                  <h2 className="numeric text-4xl font-bold tracking-tight text-brand">
                     {formatBRL(clientes.filter(c => c.status_operacional === "ativo").reduce((acc, c) => {
                       if (c.tipo_verba === "total_periodo" && c.verba_total_contratada !== null && c.data_inicio && c.data_limite_verba) {
                         const inicio = new Date(c.data_inicio);
@@ -761,7 +761,7 @@ function MetricCard({ icon, label, value, hint }: { icon: React.ReactNode; label
         <span className="text-muted-foreground">{icon}</span>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className="numeric text-2xl font-semibold">{value}</div>
         <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>
       </CardContent>
     </Card>

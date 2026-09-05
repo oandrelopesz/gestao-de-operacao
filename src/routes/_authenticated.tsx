@@ -180,19 +180,20 @@ function AuthenticatedLayout() {
         {/* Sidebar */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300",
+            "dark fixed inset-y-0 left-0 z-50 w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300",
             isSidebarOpen ? "translate-x-0" : "-translate-x-full",
             isDesktopCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"
           )}
         >
           <div className="h-16 px-5 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2.5 group" onClick={() => setIsSidebarOpen(false)}>
-              <span className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-[oklch(0.62_0.2_300)] text-primary-foreground flex items-center justify-center shadow-sm shadow-primary/30 group-hover:scale-105 transition-transform">
-                <Sparkles size={15} />
+              <span className="relative h-9 w-9 rounded-xl btn-glow text-primary-foreground flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Sparkles size={16} />
+                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar animate-glow" title="Online" />
               </span>
               <span className="leading-tight">
-                <span className="block text-[15px] font-semibold tracking-tight">Gestor Pro</span>
-                <span className="block text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Operação</span>
+                <span className="block font-display text-[15px] font-semibold tracking-tight">Gestor Pro</span>
+                <span className="block font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">command center</span>
               </span>
             </Link>
             <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setIsSidebarOpen(false)}>
@@ -212,14 +213,14 @@ function AuthenticatedLayout() {
           <nav className="flex-1 px-3 pb-4 space-y-5 overflow-y-auto">
             {NAV_GROUPS.map((group) => (
               <div key={group.title}>
-                <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">{group.title}</p>
+                <p className="px-3 mb-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-muted-foreground/70">{group.title}</p>
                 <div className="space-y-0.5">
                   {group.links.map((link) => (
                     <Link
                       key={link.to}
                       to={link.to}
                       activeOptions={{ exact: link.to === "/" }}
-                      className="group/nav flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground data-[status=active]:shadow-[inset_2px_0_0_var(--color-primary)]"
+                      className="group/nav relative flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium rounded-lg text-muted-foreground transition-all hover:bg-sidebar-accent/70 hover:text-foreground hover:translate-x-px data-[status=active]:bg-gradient-to-r data-[status=active]:from-primary/20 data-[status=active]:to-transparent data-[status=active]:text-foreground data-[status=active]:shadow-[inset_2px_0_0_var(--color-primary),0_0_24px_-8px_var(--color-primary)]"
                       onClick={() => setIsSidebarOpen(false)}
                     >
                       <span className="text-muted-foreground group-hover/nav:text-foreground group-data-[status=active]/nav:text-primary transition-colors">
@@ -242,7 +243,7 @@ function AuthenticatedLayout() {
               </Avatar>
               <div className="flex flex-col overflow-hidden">
                 <span className="text-sm font-medium truncate capitalize">{userName}</span>
-                <span className="text-[11px] text-muted-foreground">Gestor de tráfego</span>
+                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">gestor de tráfego</span>
               </div>
             </div>
           </div>
@@ -250,7 +251,7 @@ function AuthenticatedLayout() {
 
         {/* Conteúdo */}
         <main className={cn("flex-1 flex flex-col min-w-0 transition-[padding] duration-300", isDesktopCollapsed ? "lg:pl-0" : "lg:pl-64")}>
-          <header className="h-14 border-b border-border/60 flex items-center justify-between px-4 lg:px-8 sticky top-0 glass z-30">
+          <header className="h-14 border-b border-border/60 flex items-center justify-between px-4 lg:px-8 sticky top-0 glass glow-line z-30">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setIsSidebarOpen(true)}>
                 <ChevronRight size={16} />
@@ -267,9 +268,9 @@ function AuthenticatedLayout() {
                 </Button>
               )}
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground hidden sm:inline">Gestor Pro</span>
-                <ChevronRight size={14} className="text-muted-foreground/50 hidden sm:inline" />
-                <span className="font-medium flex items-center gap-1.5">
+                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground hidden sm:inline">Gestor Pro</span>
+                <ChevronRight size={14} className="text-muted-foreground/40 hidden sm:inline" />
+                <span className="font-display font-semibold flex items-center gap-1.5">
                   {currentPage?.icon && <span className="text-primary">{currentPage.icon}</span>}
                   {currentPage?.label ?? "Dashboard"}
                 </span>
@@ -286,7 +287,7 @@ function AuthenticatedLayout() {
                 {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
               </Button>
               <NotificationBell />
-              <span className="ml-1 text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-2 py-1 rounded-full">Beta</span>
+              <span className="ml-1 font-mono text-[10px] uppercase tracking-[0.16em] text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-full">beta</span>
             </div>
           </header>
           <div key={pathname} className="p-4 lg:p-8 page-enter">

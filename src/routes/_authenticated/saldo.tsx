@@ -497,7 +497,7 @@ function SaldoPage() {
                   <LayoutGrid className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{metrics.totalContas}</div>
+                  <div className="numeric text-2xl font-semibold">{metrics.totalContas}</div>
                   <p className="text-xs text-muted-foreground">{metrics.uniqueClients} clientes</p>
                 </CardContent>
               </Card>
@@ -513,7 +513,7 @@ function SaldoPage() {
                   <Wallet className="h-4 w-4 text-emerald-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{formatBRL(metrics.saldoTotal)}</div>
+                  <div className="numeric text-2xl font-semibold">{formatBRL(metrics.saldoTotal)}</div>
                   <p className="text-xs text-muted-foreground">Soma dos registros Pix/Boleto</p>
                 </CardContent>
               </Card>
@@ -529,7 +529,7 @@ function SaldoPage() {
                   <AlertCircle className="h-4 w-4 text-destructive" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{metrics.criticos + metrics.emAlerta}</div>
+                  <div className="numeric text-2xl font-semibold">{metrics.criticos + metrics.emAlerta}</div>
                   <p className="text-xs text-muted-foreground">
                     {metrics.criticos} críticos, {metrics.emAlerta} em alerta
                     {metrics.dispensados > 0 && ` · ${metrics.dispensados} dispensados`}
@@ -566,7 +566,7 @@ function SaldoPage() {
               <Building2 className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{metrics.totalCartao}</div>
+              <div className="numeric text-2xl font-semibold">{metrics.totalCartao}</div>
               <p className="text-xs text-muted-foreground">Pagamento direto, sem monitoramento</p>
             </CardContent>
           </Card>
