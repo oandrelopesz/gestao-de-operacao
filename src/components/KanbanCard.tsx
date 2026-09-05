@@ -91,7 +91,7 @@ export function KanbanCard({ demanda, onEdit, onDelete, onComplete, onMoveToDone
     >
       <Card
         className={cn(
-          "hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden",
+          "transition-[transform,box-shadow,border-color] duration-150 bg-card border border-border/70 shadow-xs hover:shadow-md hover:-translate-y-px hover:border-primary/30 overflow-hidden rounded-lg",
           isDone && "opacity-60",
           isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20",
           isDoneForNow && "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50"

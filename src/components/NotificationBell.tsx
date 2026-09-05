@@ -26,6 +26,8 @@ interface SaldoAlerta {
   status_alerta: 'alerta' | 'critico' | 'zerado' | 'ok' | 'pausado' | 'cartao' | 'inativo' | 'sem_recarga' | 'sem_verba';
   data_ultima_recarga?: string;
   saldo_total_acumulado?: number;
+  data_prevista_fim?: string | null;
+  alerta_dispensado?: boolean | null;
 }
 
 interface FinanceiroAlerta {
@@ -60,7 +62,8 @@ export function NotificationBell() {
 
       if (finError) throw finError;
 
-      setAlertas(saldoData as any[] || []);
+      // Alertas dispensados pelo usuário não notificam até a próxima recarga
+      setAlertas(((saldoData as any[]) || []).filter((a) => !a.alerta_dispensado));
       setFinanceiroAlertas(finData as any[] || []);
     } catch (error) {
       console.error("Erro ao buscar alertas:", error);
@@ -312,7 +315,7 @@ function NotificationItem({ alerta, onClick, formatDate }: { alerta: SaldoAlerta
             {isZerado ? (
               `🚨 Saldo zerado desde ${formatDate(alerta.data_ultima_recarga)}`
             ) : (
-              `⏱ Acaba em ${Math.floor(alerta.dias_restantes)} ${Math.floor(alerta.dias_restantes) === 1 ? 'dia' : 'dias'} (${formatDate(new Date(Date.now() + (alerta.dias_restantes * 24 * 60 * 60 * 1000)).toISOString().split('T')[0])})`
+              `⏱ Acaba em ${Math.floor(alerta.dias_restantes)} ${Math.floor(alerta.dias_restantes) === 1 ? 'dia' : 'dias'} (${formatDate(alerta.data_prevista_fim || new Date(Date.now() + (alerta.dias_restantes * 24 * 60 * 60 * 1000)).toISOString().split('T')[0])})`
             )}
           </span>
           <span className="text-[11px] font-bold">

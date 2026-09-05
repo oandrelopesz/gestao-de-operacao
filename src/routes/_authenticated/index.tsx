@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Plus, List, Kanban as KanbanIcon, Search, MoreVertical, Pencil, Trash2, Repeat, Calendar as CalendarIcon, ChevronDown, ChevronUp, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,7 +102,7 @@ function DemandasPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5,
+        distance: 3,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -461,77 +461,99 @@ function DemandasPage() {
     setActiveDemanda(demanda);
   };
 
-  const onDragOver = (_event: DragOverEvent) => {
-    // Sem reordenação otimista durante o drag - tudo é resolvido no onDragEnd
+  // Reordenação otimista durante o arrasto: os cards abrem espaço e a posição
+  // final é exatamente a que o usuário vê. A persistência acontece no onDragEnd.
+  const dragOriginStatus = useRef<string | null>(null);
+
+  const byOrdem = (a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0);
+
+  // Card ativo abaixo do centro do card de destino => entra depois dele
+  const isActiveBelowOver = (active: DragOverEvent["active"], over: NonNullable<DragOverEvent["over"]>) => {
+    const activeRect = active.rect.current.translated;
+    if (!activeRect) return false;
+    return activeRect.top + activeRect.height / 2 > over.rect.top + over.rect.height / 2;
+  };
+
+  // Calcula a nova lista com o card ativo na posição indicada. Retorna null se nada muda.
+  const computeMove = (list: any[], activeId: string, overId: string, overIsColumn: boolean, insertAfter: boolean) => {
+    const active = list.find((d) => d.id === activeId);
+    if (!active) return null;
+    const targetStatus = overIsColumn ? overId : list.find((d) => d.id === overId)?.status;
+    if (!targetStatus || targetStatus === "recorrentes") return null;
+
+    const targetList = list.filter((d) => d.status === targetStatus && d.id !== activeId).sort(byOrdem);
+    let insertAt = targetList.length;
+    if (!overIsColumn) {
+      const overIdx = targetList.findIndex((d) => d.id === overId);
+      if (overIdx >= 0) insertAt = insertAfter ? overIdx + 1 : overIdx;
+    }
+
+    const currentList = list.filter((d) => d.status === targetStatus).sort(byOrdem);
+    if (active.status === targetStatus && currentList[insertAt]?.id === activeId) return null;
+
+    targetList.splice(insertAt, 0, { ...active, status: targetStatus });
+    const nextOrdem = new Map(targetList.map((d, i) => [d.id, i]));
+    return list.map((d) => (nextOrdem.has(d.id) ? { ...d, status: targetStatus, ordem: nextOrdem.get(d.id) } : d));
+  };
+
+  const resolveOver = (over: NonNullable<DragOverEvent["over"]>) => {
+    const overId = String(over.id);
+    const overIsColumn = columns.some((c) => c.id === overId);
+    return { overId, overIsColumn };
+  };
+
+  const onDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const activeId = String(active.id);
+    const activeTask = demandas.find((d) => d.id === activeId);
+    if (!activeTask || activeTask.status === "recorrentes") return;
+    if (dragOriginStatus.current === null) dragOriginStatus.current = activeTask.status;
+
+    const { overId, overIsColumn } = resolveOver(over);
+    const next = computeMove(demandas, activeId, overId, overIsColumn, !overIsColumn && isActiveBelowOver(active, over));
+    if (next) setDemandas(next);
   };
 
   const onDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveDemanda(null);
-
-    if (!over) return;
+    const origin = dragOriginStatus.current;
+    dragOriginStatus.current = null;
 
     const activeId = String(active.id);
-    const overId = String(over.id);
-
-    const activeTask = demandas.find(d => d.id === activeId);
-    if (!activeTask) return;
-
+    const activeTask = demandas.find((d) => d.id === activeId);
     // Cards recorrentes (mãe) ficam travados - única coluna bloqueada
-    if (activeTask.status === "recorrentes") return;
+    if (!activeTask || activeTask.status === "recorrentes") return;
 
-    const overTask = demandas.find(d => d.id === overId);
-    let overStatus: string;
-    if (overTask) overStatus = overTask.status;
-    else if (columns.some(c => c.id === overId)) overStatus = overId;
-    else return;
-
-    // Não permite mover nada PARA recorrentes via drag
-    if (overStatus === "recorrentes") return;
-
-    if (activeTask.status === overStatus && activeId === overId) return;
-
-    // Build new ordered list for target column
-    const otherDemandas = demandas.filter(d => d.id !== activeId);
-    const targetCol = otherDemandas
-      .filter(d => d.status === overStatus)
-      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-
-    let insertIndex = targetCol.length;
-    if (overTask && overTask.id !== activeId && overTask.status === overStatus) {
-      insertIndex = targetCol.findIndex(d => d.id === overTask.id);
-      if (insertIndex < 0) insertIndex = targetCol.length;
+    let finalList = demandas;
+    if (over && over.id !== active.id) {
+      const { overId, overIsColumn } = resolveOver(over);
+      const next = computeMove(demandas, activeId, overId, overIsColumn, !overIsColumn && isActiveBelowOver(active, over));
+      if (next) {
+        finalList = next;
+        setDemandas(next);
+      }
     }
 
-    const movedTask = { ...activeTask, status: overStatus };
-    targetCol.splice(insertIndex, 0, movedTask);
-
-    // Optimistic local update
-    setDemandas(prev => {
-      const map = new Map(prev.map(d => [d.id, d]));
-      targetCol.forEach((d, idx) => {
-        const existing = map.get(d.id);
-        if (existing) map.set(d.id, { ...existing, status: overStatus, ordem: idx });
-      });
-      return Array.from(map.values());
-    });
+    const finalTask = finalList.find((d) => d.id === activeId);
+    if (!finalTask) return;
+    const affected = new Set<string>([finalTask.status]);
+    if (origin) affected.add(origin);
 
     try {
-      const movedIdx = targetCol.findIndex(d => d.id === activeId);
-      const { error: movedError } = await supabase
-        .from("demandas")
-        .update({
-          status: overStatus as any,
-          ordem: movedIdx >= 0 ? movedIdx : 0,
-        })
-        .eq("id", activeId);
-      if (movedError) throw movedError;
-
-      targetCol.forEach((d, idx) => {
-        if (d.id === activeId) return;
-        supabase.from("demandas").update({ ordem: idx }).eq("id", d.id).then(() => {});
-      });
-
+      // Persiste status + ordem de todas as colunas envolvidas (origem e destino)
+      const updates = finalList
+        .filter((d) => affected.has(d.status))
+        .map((d) =>
+          supabase
+            .from("demandas")
+            .update({ status: d.status as any, ordem: d.ordem ?? 0 })
+            .eq("id", d.id)
+        );
+      const results = await Promise.all(updates);
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
       fetchDemandas();
     } catch (error: any) {
       toast.error("Erro ao sincronizar movimento");
@@ -669,7 +691,7 @@ function DemandasPage() {
                     onRenameColumn={() => setColumnDialog({ mode: "rename", id: col.id, title: col.title, hex: col.hex })}
                     onClearColumn={() => setColumnConfirm({ type: "clear", column: col })}
                     onDeleteColumn={() => setColumnConfirm({ type: "delete", column: col })}
-                    demandas={filteredDemandas.filter((d) => d.status === col.id)}
+                    demandas={filteredDemandas.filter((d) => d.status === col.id).sort(byOrdem)}
                     onQuickAdd={handleQuickAdd}
                     onFullAdd={(status) => {
                       setEditingDemanda({ status });
@@ -714,6 +736,7 @@ function DemandasPage() {
               </div>
 
               <DragOverlay dropAnimation={{
+                  duration: 150,
                   sideEffects: defaultDropAnimationSideEffects({
                     styles: {
                       active: {

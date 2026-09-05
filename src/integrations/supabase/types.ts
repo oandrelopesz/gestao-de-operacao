@@ -903,6 +903,7 @@ export type Database = {
       }
       saldo_ads: {
         Row: {
+          alerta_dispensado_em: string | null
           ativo: boolean
           cliente_id: string
           created_at: string
@@ -917,6 +918,7 @@ export type Database = {
           verba_diaria: number | null
         }
         Insert: {
+          alerta_dispensado_em?: string | null
           ativo?: boolean
           cliente_id: string
           created_at?: string
@@ -931,6 +933,7 @@ export type Database = {
           verba_diaria?: number | null
         }
         Update: {
+          alerta_dispensado_em?: string | null
           ativo?: boolean
           cliente_id?: string
           created_at?: string
@@ -1093,6 +1096,8 @@ export type Database = {
       }
       saldo_ads_view: {
         Row: {
+          alerta_dispensado: boolean | null
+          alerta_dispensado_em: string | null
           ativo: boolean | null
           cliente_agencia: string | null
           cliente_id: string | null
@@ -1101,6 +1106,7 @@ export type Database = {
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
           created_at: string | null
+          data_prevista_fim: string | null
           data_ultima_recarga: string | null
           dias_restantes: number | null
           id: string | null
@@ -1115,6 +1121,7 @@ export type Database = {
           status_alerta: string | null
           updated_at: string | null
           user_id: string | null
+          valor_ultima_recarga: number | null
           verba_diaria: number | null
           verba_diaria_calc: number | null
         }

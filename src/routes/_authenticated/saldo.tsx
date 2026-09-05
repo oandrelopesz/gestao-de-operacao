@@ -1,44 +1,36 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
-import { 
-  DollarSign, 
-  Receipt, 
-  Clock, 
-  AlertCircle, 
-  Plus, 
-  Search, 
-  Building2, 
-  MoreVertical, 
-  Pencil, 
-  Trash2, 
-  Wallet, 
-  Calendar, 
-  TrendingUp, 
+import {
+  AlertCircle,
+  Plus,
+  Search,
+  Building2,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Wallet,
+  TrendingUp,
   ArrowUpCircle,
   Filter,
   RefreshCw,
   History,
-  Check,
   UserCog,
   LayoutGrid,
-  Archive,
-  ArrowRight
+  ArrowRight,
+  BellOff,
+  BellRing,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL } from "@/lib/clientes";
 import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
-import { saveCliente, loadClienteFormValues } from "@/lib/clientesService";
+import { saveCliente, loadClienteFormValues, getUserId } from "@/lib/clientesService";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -57,27 +49,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SaldoAdsForm, SaldoAdsFormValues } from "@/components/SaldoAdsForm";
 import { RecargaForm, RecargaFormValues } from "@/components/RecargaForm";
 import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
 
 export const Route = createFileRoute("/_authenticated/saldo")({
   component: SaldoPage,
@@ -95,16 +74,73 @@ const PLATAFORMAS = [
 ];
 
 const STATUS_ALERTA = [
-  { id: "ok", label: "OK", color: "bg-emerald-500", weight: 0 },
-  { id: "alerta", label: "Alerta", color: "bg-amber-500", weight: 1 },
-  { id: "critico", label: "Crítico", color: "bg-red-500", weight: 2 },
-  { id: "zerado", label: "Zerado", color: "bg-gray-500", weight: 3 },
-  { id: "cartao", label: "Cartão (sem monitoramento)", color: "bg-blue-400", weight: -1 },
+  { id: "ok", label: "OK", weight: 0 },
+  { id: "alerta", label: "Alerta (até 3 dias)", weight: 1 },
+  { id: "critico", label: "Crítico (1 dia)", weight: 2 },
+  { id: "zerado", label: "Zerado", weight: 3 },
+  { id: "sem_recarga", label: "Sem recarga", weight: -1 },
+  { id: "cartao", label: "Cartão (sem monitoramento)", weight: -1 },
 ];
+
+const ALERTING = ["alerta", "critico", "zerado"];
+
+/** Registro da saldo_ads_view (campos usados aqui) */
+interface SaldoRow {
+  id: string;
+  cliente_id: string;
+  cliente_nome: string;
+  cliente_agencia: string;
+  cliente_status_operacional: string | null;
+  metodo_pagamento: string | null;
+  plataformas: string[];
+  verba_diaria: number | null;
+  verba_diaria_calc: number | null;
+  saldo_total_acumulado: number;
+  qtd_recargas: number;
+  data_ultima_recarga: string | null;
+  valor_ultima_recarga: number | null;
+  saldo_atual_estimado: number;
+  dias_restantes: number | null;
+  data_prevista_fim: string | null;
+  alerta_dispensado: boolean;
+  status_alerta: string;
+  observacoes: string | null;
+  clientes?: { status_operacional: string | null; verba_ads: number | null };
+}
+
+interface ClienteGroup {
+  cliente_id: string;
+  cliente_nome: string;
+  cliente_agencia: string;
+  status_operacional: string | null;
+  metodo_pagamento_principal: string;
+  plataformas: SaldoRow[];
+  saldo_total_consolidado: number;
+  verba_diaria_total: number;
+  pior_status_alerta: string;
+  data_prevista_fim_proxima: string | null;
+  plataforma_mais_proxima: string;
+}
+
+const formatDate = (iso?: string | null) => {
+  if (!iso) return "—";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}/${y}`;
+};
+
+const formatDias = (dias?: number | null) => {
+  if (dias === null || dias === undefined) return "—";
+  const d = Math.floor(dias);
+  return `${d} ${d === 1 ? "dia" : "dias"}`;
+};
+
+// Status efetivo: um alerta dispensado é tratado como "ok" até a próxima recarga
+const statusEfetivo = (row: SaldoRow) =>
+  ALERTING.includes(row.status_alerta) && row.alerta_dispensado ? "dispensado" : row.status_alerta;
 
 function SaldoPage() {
   const { agencias, label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<SaldoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterAgencia, setFilterAgencia] = useState<string>("all");
   const [filterPlataforma, setFilterPlataforma] = useState<string>("all");
@@ -114,20 +150,21 @@ function SaldoPage() {
   const [showCartao, setShowCartao] = useState(true);
   const [sortBy, setSortBy] = useState<string>("dias_restantes");
   const { cliente_id: searchClientId, highlight: searchHighlight } = Route.useSearch() as any;
-  
+
   const [modalOpen, setModalOpen] = useState(false);
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [recargaModalOpen, setRecargaModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<SaldoRow | null>(null);
   const [editingClient, setEditingClient] = useState<any>(null);
-  const [selectedForRecarga, setSelectedForRecarga] = useState<any>(null);
-  const [selectedForHistory, setSelectedForHistory] = useState<any>(null);
+  const [selectedForRecarga, setSelectedForRecarga] = useState<SaldoRow | null>(null);
+  const [selectedForHistory, setSelectedForHistory] = useState<SaldoRow | null>(null);
   const [historyIsConsolidated, setHistoryIsConsolidated] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [confirmDismissAll, setConfirmDismissAll] = useState(false);
 
   useEffect(() => {
     if (searchClientId) {
@@ -140,12 +177,9 @@ function SaldoPage() {
     if (searchHighlight) {
       setHighlightedId(searchHighlight);
       setTimeout(() => {
-        const el = document.getElementById(`card-${searchHighlight}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
+        const el = document.getElementById(`card-${searchClientId || searchHighlight}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 500);
-      
       const timer = setTimeout(() => setHighlightedId(null), 3000);
       return () => clearTimeout(timer);
     }
@@ -153,47 +187,47 @@ function SaldoPage() {
 
   useEffect(() => {
     fetchSaldo();
+    // Recargas e registros alterados em outras abas refletem aqui na hora
+    const channel = supabase
+      .channel("saldo-page")
+      .on("postgres_changes", { event: "*", schema: "public", table: "saldo_ads" }, () => fetchSaldo(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "recargas" }, () => fetchSaldo(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "clientes" }, () => fetchSaldo(true))
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const fetchSaldo = async () => {
-    setLoading(true);
+  const fetchSaldo = async (silent = false) => {
+    if (!silent) setLoading(true);
     const { data, error } = await supabase
       .from("saldo_ads_view")
       .select("*, clientes!inner(status_operacional, verba_ads)")
-      .order("dias_restantes", { ascending: true });
+      .order("dias_restantes", { ascending: true, nullsFirst: false });
 
     if (error) {
       toast.error("Erro ao carregar saldos de mídia");
       console.error(error);
     } else {
-      setData(data || []);
+      setData((data || []) as unknown as SaldoRow[]);
     }
     setLoading(false);
   };
 
+  // ---------- Ações ----------
   const handleSave = async (values: SaldoAdsFormValues) => {
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
-      // if (!user) throw new Error("Não autenticado");
-
+      const userId = await getUserId();
       if (editing) {
-        const { error } = await supabase
-          .from("saldo_ads")
-          .update({ ...values })
-          .eq("id", editing.id);
+        const { error } = await supabase.from("saldo_ads").update({ ...values }).eq("id", editing.id);
         if (error) throw error;
-        
-        if (editing.metodo_pagamento !== values.metodo_pagamento) {
-          if (values.metodo_pagamento === 'cartao') {
-            toast.success("Migrado para Cartão: Monitoramento desativado");
-          } else {
-            toast.success(`Alterado para ${values.metodo_pagamento.toUpperCase()}: Monitoramento ativado`);
-          }
-        } else {
-          toast.success("Registro atualizado");
-        }
+        toast.success(
+          editing.metodo_pagamento !== values.metodo_pagamento && values.metodo_pagamento === "cartao"
+            ? "Migrado para cartão: monitoramento desativado"
+            : "Registro atualizado"
+        );
       } else {
         const { data: newRecord, error } = await supabase
           .from("saldo_ads")
@@ -202,15 +236,14 @@ function SaldoPage() {
           .single();
         if (error) throw error;
         toast.success("Registro criado");
-        // Automatically open first reload modal if not cartao
-        if (values.metodo_pagamento !== 'cartao') {
-          setSelectedForRecarga(newRecord);
+        if (values.metodo_pagamento !== "cartao") {
+          setSelectedForRecarga({ ...(newRecord as any), cliente_nome: "" });
           setRecargaModalOpen(true);
         }
       }
       setModalOpen(false);
       setEditing(null);
-      fetchSaldo();
+      fetchSaldo(true);
     } catch (e: any) {
       toast.error(e.message || "Erro ao salvar");
     } finally {
@@ -227,7 +260,7 @@ function SaldoPage() {
       toast.success("Dados do cliente atualizados");
       setClientModalOpen(false);
       setEditingClient(null);
-      fetchSaldo();
+      fetchSaldo(true);
     } catch (e: any) {
       toast.error(e.message || "Erro ao atualizar cliente");
     } finally {
@@ -241,15 +274,12 @@ function SaldoPage() {
     try {
       const { error } = await supabase
         .from("recargas")
-        .insert([{ 
-          ...values, 
-          saldo_ads_id: selectedForRecarga.id 
-        }]);
+        .insert([{ ...values, saldo_ads_id: selectedForRecarga.id }]);
       if (error) throw error;
-      toast.success("Recarga adicionada com sucesso");
+      toast.success("Recarga registrada — previsão recalculada");
       setRecargaModalOpen(false);
       setSelectedForRecarga(null);
-      fetchSaldo();
+      fetchSaldo(true);
     } catch (e: any) {
       toast.error(e.message || "Erro ao salvar recarga");
     } finally {
@@ -263,50 +293,62 @@ function SaldoPage() {
       const { error } = await supabase.from("saldo_ads").delete().eq("id", deletingId);
       if (error) throw error;
       toast.success("Registro removido");
-      fetchSaldo();
-    } catch (e: any) {
+      fetchSaldo(true);
+    } catch {
       toast.error("Erro ao remover registro");
     } finally {
       setDeletingId(null);
     }
   };
 
-  const fetchHistory = async (record: any, consolidated: boolean = false) => {
+  const setDismissed = async (ids: string[], dismissed: boolean) => {
+    if (ids.length === 0) return;
+    const { error } = await supabase
+      .from("saldo_ads")
+      .update({ alerta_dispensado_em: dismissed ? new Date().toISOString() : null })
+      .in("id", ids);
+    if (error) {
+      toast.error(error.message.includes("alerta_dispensado_em")
+        ? "Aplique a migration do Saldo para habilitar a dispensa de alertas"
+        : "Erro ao atualizar alerta");
+      return;
+    }
+    toast.success(dismissed
+      ? (ids.length === 1 ? "Alerta dispensado até a próxima recarga" : `${ids.length} alertas dispensados`)
+      : "Alerta reativado");
+    fetchSaldo(true);
+  };
+
+  const fetchHistory = async (record: SaldoRow, consolidated = false) => {
     setSelectedForHistory(record);
     setHistoryIsConsolidated(consolidated);
     setHistoryOpen(true);
-    
-    let query = supabase
-      .from("recargas")
-      .select("*, saldo_ads!inner(plataformas)");
-      
-    if (consolidated) {
-      query = query.eq("saldo_ads.cliente_id", record.cliente_id);
-    } else {
-      query = query.eq("saldo_ads_id", record.id);
-    }
-    
+
+    let query = supabase.from("recargas").select("*, saldo_ads!inner(plataformas)");
+    query = consolidated ? query.eq("saldo_ads.cliente_id", record.cliente_id) : query.eq("saldo_ads_id", record.id);
     const { data, error } = await query.order("data_recarga", { ascending: false });
-    
-    if (error) {
-      toast.error("Erro ao carregar histórico");
-    } else {
-      setHistoryData(data || []);
-    }
+    if (error) toast.error("Erro ao carregar histórico");
+    else setHistoryData(data || []);
   };
 
-  const groupedData = useMemo(() => {
-    const groups: Record<string, any> = {};
-    
-    data.forEach(item => {
+  // ---------- Derivados ----------
+  const activeAlerts = useMemo(
+    () => data.filter((r) => ALERTING.includes(r.status_alerta) && !r.alerta_dispensado),
+    [data]
+  );
+
+  const groupedData = useMemo<ClienteGroup[]>(() => {
+    const groups: Record<string, ClienteGroup> = {};
+
+    data.forEach((item) => {
       const clientId = item.cliente_id;
       if (!groups[clientId]) {
         groups[clientId] = {
           cliente_id: clientId,
           cliente_nome: item.cliente_nome,
           cliente_agencia: item.cliente_agencia,
-          status_operacional: item.clientes?.status_operacional,
-          metodo_pagamento_principal: item.metodo_pagamento,
+          status_operacional: item.clientes?.status_operacional ?? item.cliente_status_operacional,
+          metodo_pagamento_principal: item.metodo_pagamento || "pix",
           plataformas: [],
           saldo_total_consolidado: 0,
           verba_diaria_total: 0,
@@ -315,29 +357,22 @@ function SaldoPage() {
           plataforma_mais_proxima: "",
         };
       }
-      
       const group = groups[clientId];
       group.plataformas.push(item);
-      
-      if (item.metodo_pagamento !== group.metodo_pagamento_principal) {
-        group.metodo_pagamento_principal = "misto";
-      }
-      
+
+      if (item.metodo_pagamento !== group.metodo_pagamento_principal) group.metodo_pagamento_principal = "misto";
+
       if (item.metodo_pagamento !== "cartao") {
-        group.saldo_total_consolidado += (item.saldo_atual_estimado || 0);
-        group.verba_diaria_total += (item.verba_diaria_calc || 0);
-        
-        // Update worst status alert
-        const currentWeight = STATUS_ALERTA.find(s => s.id === item.status_alerta)?.weight || 0;
-        const worstWeight = STATUS_ALERTA.find(s => s.id === group.pior_status_alerta)?.weight || 0;
-        if (currentWeight > worstWeight) {
-          group.pior_status_alerta = item.status_alerta;
-        }
-        
-        // Update next end date
+        group.saldo_total_consolidado += item.saldo_atual_estimado || 0;
+        group.verba_diaria_total += item.verba_diaria_calc || 0;
+
+        const status = statusEfetivo(item);
+        const currentWeight = STATUS_ALERTA.find((s) => s.id === status)?.weight ?? 0;
+        const worstWeight = STATUS_ALERTA.find((s) => s.id === group.pior_status_alerta)?.weight ?? 0;
+        if (currentWeight > worstWeight) group.pior_status_alerta = status;
+
         if (item.data_prevista_fim) {
-          const currentEnd = new Date(item.data_prevista_fim);
-          if (!group.data_prevista_fim_proxima || currentEnd < new Date(group.data_prevista_fim_proxima)) {
+          if (!group.data_prevista_fim_proxima || item.data_prevista_fim < group.data_prevista_fim_proxima) {
             group.data_prevista_fim_proxima = item.data_prevista_fim;
             group.plataforma_mais_proxima = item.plataformas?.[0] || "";
           }
@@ -346,21 +381,20 @@ function SaldoPage() {
         group.pior_status_alerta = "cartao";
       }
     });
-    
+
     return Object.values(groups);
   }, [data]);
 
   const filteredData = useMemo(() => {
-    let result = groupedData.filter(group => {
+    const q = searchQuery.toLowerCase();
+    const result = groupedData.filter((group) => {
       const matchesAgencia = filterAgencia === "all" || group.cliente_agencia === filterAgencia;
-      const matchesSearch = group.cliente_nome?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = !q || group.cliente_nome?.toLowerCase().includes(q);
       const isPausado = group.status_operacional === "pausado";
       const matchesPausados = showPausados || !isPausado;
-      
-      const hasPlataforma = filterPlataforma === "all" || group.plataformas.some((p: any) => p.plataformas?.includes(filterPlataforma));
-      const hasStatus = filterStatus === "all" || group.plataformas.some((p: any) => p.status_alerta === filterStatus);
-      const hasCartao = showCartao || group.plataformas.some((p: any) => p.metodo_pagamento !== "cartao");
-
+      const hasPlataforma = filterPlataforma === "all" || group.plataformas.some((p) => p.plataformas?.includes(filterPlataforma));
+      const hasStatus = filterStatus === "all" || group.plataformas.some((p) => statusEfetivo(p) === filterStatus || p.status_alerta === filterStatus);
+      const hasCartao = showCartao || group.plataformas.some((p) => p.metodo_pagamento !== "cartao");
       return matchesAgencia && matchesSearch && matchesPausados && hasPlataforma && hasStatus && hasCartao;
     });
 
@@ -368,7 +402,7 @@ function SaldoPage() {
       if (sortBy === "dias_restantes") {
         if (!a.data_prevista_fim_proxima) return 1;
         if (!b.data_prevista_fim_proxima) return -1;
-        return new Date(a.data_prevista_fim_proxima).getTime() - new Date(b.data_prevista_fim_proxima).getTime();
+        return a.data_prevista_fim_proxima.localeCompare(b.data_prevista_fim_proxima);
       }
       if (sortBy === "nome") return (a.cliente_nome || "").localeCompare(b.cliente_nome || "");
       if (sortBy === "valor") return (b.saldo_total_consolidado || 0) - (a.saldo_total_consolidado || 0);
@@ -379,33 +413,35 @@ function SaldoPage() {
   }, [groupedData, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy, showPausados, showCartao]);
 
   const metrics = useMemo(() => {
-    const monitored = data.filter(i => i.metodo_pagamento !== "cartao");
-    const onCartao = data.filter(i => i.metodo_pagamento === "cartao");
-    const uniqueClients = new Set(data.map(i => i.cliente_id)).size;
-    
-    const criticalClient = [...data]
-      .filter(i => i.metodo_pagamento !== "cartao" && i.data_prevista_fim)
-      .sort((a, b) => new Date(a.data_prevista_fim).getTime() - new Date(b.data_prevista_fim).getTime())[0];
+    const monitored = data.filter((i) => i.metodo_pagamento !== "cartao");
+    const onCartao = data.filter((i) => i.metodo_pagamento === "cartao");
+    const uniqueClients = new Set(data.map((i) => i.cliente_id)).size;
+    const criticalClient = [...monitored]
+      .filter((i) => i.data_prevista_fim && !i.alerta_dispensado && ALERTING.includes(i.status_alerta))
+      .sort((a, b) => (a.data_prevista_fim || "").localeCompare(b.data_prevista_fim || ""))[0];
 
     return {
       totalContas: data.length,
       uniqueClients,
       saldoTotal: monitored.reduce((acc, curr) => acc + (curr.saldo_atual_estimado || 0), 0),
-      emAlerta: monitored.filter(i => i.status_alerta === "alerta").length,
-      criticos: monitored.filter(i => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
+      emAlerta: activeAlerts.filter((i) => i.status_alerta === "alerta").length,
+      criticos: activeAlerts.filter((i) => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
+      dispensados: data.filter((i) => ALERTING.includes(i.status_alerta) && i.alerta_dispensado).length,
       totalCartao: onCartao.length,
-      criticalClientName: criticalClient?.cliente_nome
+      criticalClientName: criticalClient?.cliente_nome,
+      criticalClientDate: criticalClient?.data_prevista_fim,
     };
-  }, [data]);
+  }, [data, activeAlerts]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "ok": return "border-emerald-500";
-      case "alerta": return "border-amber-500";
-      case "critico": return "border-red-500";
-      case "zerado": return "border-gray-400";
-      case "cartao": return "border-blue-300";
-      default: return "border-border";
+      case "ok": return "border-l-emerald-500";
+      case "alerta": return "border-l-amber-500";
+      case "critico": return "border-l-red-500";
+      case "zerado": return "border-l-red-700";
+      case "dispensado": return "border-l-zinc-400";
+      case "cartao": return "border-l-blue-300";
+      default: return "border-l-border";
     }
   };
 
@@ -414,9 +450,19 @@ function SaldoPage() {
       case "ok": return "bg-emerald-500";
       case "alerta": return "bg-amber-500";
       case "critico": return "bg-red-500";
-      case "zerado": return "bg-gray-400";
+      case "zerado": return "bg-red-700";
+      case "dispensado": return "bg-zinc-400";
       default: return "bg-primary";
     }
+  };
+
+  const openClientEditor = (clienteId: string) => {
+    // Carrega o cadastro completo antes de abrir, para não sobrescrever dados com defaults
+    setEditingClient(null);
+    setClientModalOpen(true);
+    loadClienteFormValues(clienteId)
+      .then(setEditingClient)
+      .catch(() => { toast.error("Erro ao carregar cliente"); setClientModalOpen(false); });
   };
 
   return (
@@ -424,10 +470,18 @@ function SaldoPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Monitor de Saldo de Mídia</h1>
-          <p className="text-muted-foreground">Acompanhe verba e recargas de anúncios em tempo real.</p>
+          <p className="text-muted-foreground">Cada recarga recalcula o saldo e a data prevista de término; você é avisado 3 dias antes.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={fetchSaldo} disabled={loading}>
+          {activeAlerts.length > 0 && (
+            <Button variant="outline" className="gap-2" onClick={() => setConfirmDismissAll(true)}>
+              <BellOff size={16} /> Zerar alertas ({activeAlerts.length})
+            </Button>
+          )}
+          <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
+            <Plus size={16} /> Novo registro
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => fetchSaldo()} disabled={loading} title="Atualizar">
             <RefreshCw size={16} className={cn(loading && "animate-spin")} />
           </Button>
         </div>
@@ -439,102 +493,81 @@ function SaldoPage() {
             <TooltipTrigger asChild>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Contas Monitoradas</CardTitle>
+                  <CardTitle className="text-sm font-medium">Contas monitoradas</CardTitle>
                   <LayoutGrid className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{metrics.totalContas}</div>
-                  <p className="text-xs text-muted-foreground">Registros saldo_ads</p>
+                  <p className="text-xs text-muted-foreground">{metrics.uniqueClients} clientes</p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
-            <TooltipContent>
-              <p>Total de registros individuais por plataforma</p>
-            </TooltipContent>
+            <TooltipContent><p>Registros por plataforma / clientes distintos</p></TooltipContent>
           </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Clientes Únicos</CardTitle>
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{metrics.uniqueClients}</div>
-                  <p className="text-xs text-muted-foreground">Clientes monitorados</p>
-                </CardContent>
-              </Card>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Contagem distinta de clientes na aba Saldo</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
+                  <CardTitle className="text-sm font-medium">Saldo total</CardTitle>
                   <Wallet className="h-4 w-4 text-emerald-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{formatBRL(metrics.saldoTotal)}</div>
-                  <p className="text-xs text-muted-foreground">Soma de todas as plataformas</p>
+                  <p className="text-xs text-muted-foreground">Soma dos registros Pix/Boleto</p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
-            <TooltipContent>
-              <p>Soma apenas dos registros Pix/Boleto</p>
-            </TooltipContent>
+            <TooltipContent><p>Saldo estimado hoje, recarga a recarga</p></TooltipContent>
           </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Em Alerta / Críticos</CardTitle>
+                  <CardTitle className="text-sm font-medium">Em alerta / críticos</CardTitle>
                   <AlertCircle className="h-4 w-4 text-destructive" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{metrics.criticos + metrics.emAlerta}</div>
-                  <p className="text-xs text-muted-foreground">{metrics.criticos} críticos, {metrics.emAlerta} em alerta</p>
+                  <p className="text-xs text-muted-foreground">
+                    {metrics.criticos} críticos, {metrics.emAlerta} em alerta
+                    {metrics.dispensados > 0 && ` · ${metrics.dispensados} dispensados`}
+                  </p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
-            <TooltipContent>
-              <p>Ignora clientes no cartão</p>
-            </TooltipContent>
+            <TooltipContent><p>Alerta: acaba em até 3 dias · Crítico: 1 dia ou zerado</p></TooltipContent>
           </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card className="bg-red-50/50 border-red-100">
+              <Card className={cn(metrics.criticalClientName && "bg-red-50/50 border-red-100 dark:bg-red-950/20 dark:border-red-900/40")}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-red-800">Mais Crítico</CardTitle>
-                  <ArrowRight className="h-4 w-4 text-red-600" />
+                  <CardTitle className={cn("text-sm font-medium", metrics.criticalClientName && "text-red-800 dark:text-red-300")}>Mais urgente</CardTitle>
+                  <ArrowRight className={cn("h-4 w-4", metrics.criticalClientName ? "text-red-600" : "text-muted-foreground")} />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-base font-bold text-red-700 line-clamp-1">
+                  <div className={cn("text-base font-bold line-clamp-1", metrics.criticalClientName && "text-red-700 dark:text-red-300")}>
                     {metrics.criticalClientName || "Nenhum"}
                   </div>
-                  <p className="text-xs text-red-600/80">Zera em breve</p>
+                  <p className="text-xs text-muted-foreground">
+                    {metrics.criticalClientDate ? `Zera em ${formatDate(metrics.criticalClientDate)}` : "Nenhum saldo perto de acabar"}
+                  </p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
-            <TooltipContent>
-              <p>Cliente com plataforma que vai zerar primeiro</p>
-            </TooltipContent>
+            <TooltipContent><p>Cliente cujo saldo termina primeiro</p></TooltipContent>
           </Tooltip>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
-          <Card className="bg-blue-50/50 border-blue-100 py-2">
-            <CardContent className="py-0 flex items-center gap-3">
-              <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
-                {metrics.totalCartao}
-              </Badge>
-              <span className="text-xs font-medium text-blue-700">clientes no cartão (pagamento direto)</span>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">No cartão</CardTitle>
+              <Building2 className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{metrics.totalCartao}</div>
+              <p className="text-xs text-muted-foreground">Pagamento direto, sem monitoramento</p>
             </CardContent>
           </Card>
         </div>
@@ -543,47 +576,43 @@ function SaldoPage() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cliente..."
-            className="pl-9"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <Input placeholder="Buscar cliente..." className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
         <Select value={filterAgencia} onValueChange={setFilterAgencia}>
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[150px]">
             <Building2 className="w-4 h-4 mr-2" />
             <SelectValue placeholder="Agência" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas</SelectItem>
-            {agencias.map(a => (
+            {agencias.map((a) => (
               <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={filterPlataforma} onValueChange={setFilterPlataforma}>
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[150px]">
             <Filter className="w-4 h-4 mr-2" />
             <SelectValue placeholder="Plataforma" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Plataformas</SelectItem>
-            {PLATAFORMAS.map(p => (
+            {PLATAFORMAS.map((p) => (
               <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[130px]">
+          <SelectTrigger className="w-[190px]">
             <AlertCircle className="w-4 h-4 mr-2" />
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos Status</SelectItem>
-            {STATUS_ALERTA.map(s => (
+            <SelectItem value="all">Todos os status</SelectItem>
+            {STATUS_ALERTA.map((s) => (
               <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
             ))}
+            <SelectItem value="dispensado">Alerta dispensado</SelectItem>
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs h-10">
@@ -597,11 +626,9 @@ function SaldoPage() {
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Ordenar por:</span>
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[140px] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="dias_restantes">Dias restantes</SelectItem>
+              <SelectItem value="dias_restantes">Acaba primeiro</SelectItem>
               <SelectItem value="nome">Nome do cliente</SelectItem>
               <SelectItem value="valor">Maior saldo</SelectItem>
             </SelectContent>
@@ -611,33 +638,32 @@ function SaldoPage() {
 
       <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
         {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-[300px] rounded-xl border bg-card animate-pulse" />
-          ))
+          Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-[300px] rounded-xl border bg-card animate-pulse" />)
         ) : filteredData.length === 0 ? (
           <div className="col-span-full h-64 flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/30 text-muted-foreground">
             <Wallet size={48} className="mb-4 opacity-20" />
-            <p>Nenhum registro encontrado.</p>
-            <Button variant="link" onClick={() => { setFilterAgencia("all"); setFilterPlataforma("all"); setFilterStatus("all"); setSearchQuery(""); }}>
-              Limpar filtros
-            </Button>
+            <p>{data.length === 0 ? "Nenhum cliente monitorado ainda. Cadastre um cliente com Pix/Boleto em Clientes Ativos." : "Nenhum registro encontrado."}</p>
+            {data.length > 0 && (
+              <Button variant="link" onClick={() => { setFilterAgencia("all"); setFilterPlataforma("all"); setFilterStatus("all"); setSearchQuery(""); }}>
+                Limpar filtros
+              </Button>
+            )}
           </div>
         ) : (
           filteredData.map((group) => {
             const hasMultiple = group.plataformas.length > 1;
             const isPausado = group.status_operacional === "pausado";
-            const mainPlataforma = group.plataformas[0];
-            const isCartaoOnly = group.plataformas.every((p: any) => p.metodo_pagamento === "cartao");
+            const isCartaoOnly = group.plataformas.every((p) => p.metodo_pagamento === "cartao");
 
             return (
-              <Card 
-                key={group.cliente_id} 
+              <Card
+                key={group.cliente_id}
                 id={`card-${group.cliente_id}`}
                 className={cn(
                   "group relative border-l-4 transition-all hover:shadow-md flex flex-col",
                   getStatusColor(group.pior_status_alerta),
                   isPausado && "opacity-75",
-                  highlightedId === group.cliente_id && "ring-2 ring-primary animate-pulse shadow-lg"
+                  highlightedId && (highlightedId === group.cliente_id || group.plataformas.some((p) => p.id === highlightedId)) && "ring-2 ring-primary animate-pulse shadow-lg"
                 )}
               >
                 <CardHeader className="pb-3">
@@ -645,17 +671,11 @@ function SaldoPage() {
                     <div className="space-y-1">
                       <CardTitle className="text-lg font-bold">{group.cliente_nome}</CardTitle>
                       <div className="flex flex-wrap gap-1.5">
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] font-semibold uppercase py-0"
-                          style={agenciaBadgeStyle(agenciaMetaOf(group.cliente_agencia)?.hex)}
-                        >
+                        <Badge variant="outline" className="text-[10px] font-semibold uppercase py-0" style={agenciaBadgeStyle(agenciaMetaOf(group.cliente_agencia)?.hex)}>
                           {agenciaLabelOf(group.cliente_agencia)}
                         </Badge>
                         {isPausado && (
-                          <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0">
-                            Pausado
-                          </Badge>
+                          <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] uppercase py-0">Pausado</Badge>
                         )}
                         <Badge variant="secondary" className="text-[10px] uppercase py-0">
                           {group.metodo_pagamento_principal === "misto" ? "Misto" : group.metodo_pagamento_principal}
@@ -664,63 +684,46 @@ function SaldoPage() {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
-                          <MoreVertical size={16} />
-                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2"><MoreVertical size={16} /></Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-[200px]">
-                        <DropdownMenuItem onClick={() => {
-                          // Carrega o cadastro completo antes de abrir, para não sobrescrever dados com defaults
-                          setEditingClient(null);
-                          setClientModalOpen(true);
-                          loadClienteFormValues(group.cliente_id)
-                            .then(setEditingClient)
-                            .catch(() => { toast.error("Erro ao carregar cliente"); setClientModalOpen(false); });
-                        }}>
-                          <UserCog size={14} className="mr-2" /> Editar Cliente
+                      <DropdownMenuContent align="end" className="w-[220px]">
+                        <DropdownMenuItem onClick={() => openClientEditor(group.cliente_id)}>
+                          <UserCog size={14} className="mr-2" /> Editar cliente
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setEditing(null); setModalOpen(true); }}>
+                          <Plus size={14} className="mr-2" /> Nova plataforma
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => fetchHistory(group, true)}>
-                          <History size={14} className="mr-2" /> Ver Histórico Consolidado
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-amber-600">
-                          <Archive size={14} className="mr-2" /> Arquivar Cliente
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive">
-                          <Trash2 size={14} className="mr-2" /> Remover Cliente
+                        <DropdownMenuItem onClick={() => fetchHistory(group.plataformas[0], true)}>
+                          <History size={14} className="mr-2" /> Histórico consolidado
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                 </CardHeader>
-                
+
                 <CardContent className="flex-1 space-y-4 pb-4">
-                  {/* Bloco Consolidado se houver múltiplas plataformas */}
                   {hasMultiple && (
                     <div className="bg-muted/30 rounded-lg p-3 border space-y-3">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-0.5">
-                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Saldo Total</p>
-                          <p className="text-xl font-bold tracking-tight text-primary">
-                            {formatBRL(group.saldo_total_consolidado)}
-                          </p>
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Saldo total</p>
+                          <p className="text-xl font-bold tracking-tight text-primary">{formatBRL(group.saldo_total_consolidado)}</p>
                         </div>
                         <div className="space-y-0.5 text-right">
-                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Verba Diária Total</p>
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Verba diária total</p>
                           <p className="text-sm font-bold">
                             {formatBRL(group.verba_diaria_total)}<span className="text-[10px] text-muted-foreground font-normal">/dia</span>
                           </p>
                         </div>
                       </div>
-                      
                       {!isCartaoOnly && group.data_prevista_fim_proxima && (
                         <div className="flex items-center justify-between text-[11px] bg-background/50 p-2 rounded border border-dashed">
                           <span className="flex items-center gap-1.5 text-muted-foreground">
-                            <Clock size={12} className="text-amber-500" /> Próximo fim previsto:
+                            <CalendarClock size={12} className="text-amber-500" /> Próximo fim previsto:
                           </span>
-                          <span className="font-bold text-amber-700">
-                            {new Date(group.data_prevista_fim_proxima).toLocaleDateString("pt-BR")} 
+                          <span className="font-bold text-amber-700 dark:text-amber-400">
+                            {formatDate(group.data_prevista_fim_proxima)}
                             <span className="ml-1 text-[10px] font-normal opacity-70">({group.plataforma_mais_proxima})</span>
                           </span>
                         </div>
@@ -728,16 +731,18 @@ function SaldoPage() {
                     </div>
                   )}
 
-                  {/* Lista de Plataformas */}
                   <div className="space-y-2">
-                    {group.plataformas.map((plat: any, idx: number) => {
+                    {group.plataformas.map((plat) => {
                       const isFilteringThis = filterPlataforma !== "all" && plat.plataformas?.includes(filterPlataforma);
                       const isFilteringOther = filterPlataforma !== "all" && !isFilteringThis;
                       const isCartao = plat.metodo_pagamento === "cartao";
-                      
+                      const status = statusEfetivo(plat);
+                      const isAlerting = ALERTING.includes(plat.status_alerta);
+                      const dias = plat.dias_restantes;
+
                       return (
-                        <div 
-                          key={plat.id} 
+                        <div
+                          key={plat.id}
                           className={cn(
                             "relative group/row rounded-md border p-2.5 transition-all",
                             isFilteringThis ? "bg-primary/5 border-primary/20" : "bg-card",
@@ -746,45 +751,59 @@ function SaldoPage() {
                           )}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              {plat.plataformas?.map((p: string) => (
-                                <Badge key={p} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find(plt => plt.id === p)?.color)}>
-                                  {p}
-                                </Badge>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {plat.plataformas?.map((p) => (
+                                <Badge key={p} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find((plt) => plt.id === p)?.color)}>{p}</Badge>
                               ))}
                               {isCartao && <Badge variant="outline" className="text-[9px] h-4 py-0 text-blue-600 border-blue-200">Cartão</Badge>}
+                              {status === "dispensado" && (
+                                <Badge variant="outline" className="text-[9px] h-4 py-0 text-zinc-500 gap-1"><BellOff size={9} /> Alerta dispensado</Badge>
+                              )}
+                              {status === "zerado" && <Badge className="text-[9px] h-4 py-0 bg-red-700">Zerado</Badge>}
+                              {status === "critico" && <Badge className="text-[9px] h-4 py-0 bg-red-500">Crítico</Badge>}
+                              {status === "alerta" && <Badge className="text-[9px] h-4 py-0 bg-amber-500">Alerta</Badge>}
                             </div>
-                            
+
                             <div className="flex items-center gap-3">
                               {isCartao ? (
                                 <span className="text-xs font-semibold text-blue-600 uppercase">Cartão</span>
                               ) : (
                                 <span className="text-sm font-bold">{formatBRL(plat.saldo_atual_estimado)}</span>
                               )}
-                              
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/row:opacity-100 transition-opacity">
                                     <MoreVertical size={12} />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-[180px]">
+                                <DropdownMenuContent align="end" className="w-[210px]">
                                   <DropdownMenuItem onClick={() => { setEditing(plat); setModalOpen(true); }}>
-                                    <Pencil size={12} className="mr-2" /> Editar Registro
+                                    <Pencil size={12} className="mr-2" /> Editar registro
                                   </DropdownMenuItem>
                                   {!isCartao && (
                                     <>
                                       <DropdownMenuItem onClick={() => { setSelectedForRecarga(plat); setRecargaModalOpen(true); }}>
-                                        <Plus size={12} className="mr-2" /> Adicionar Recarga
+                                        <Plus size={12} className="mr-2" /> Adicionar recarga
                                       </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => fetchHistory(plat)}>
-                                        <History size={12} className="mr-2" /> Ver Histórico
+                                        <History size={12} className="mr-2" /> Ver histórico
                                       </DropdownMenuItem>
+                                      {isAlerting && (
+                                        plat.alerta_dispensado ? (
+                                          <DropdownMenuItem onClick={() => setDismissed([plat.id], false)}>
+                                            <BellRing size={12} className="mr-2" /> Reativar alerta
+                                          </DropdownMenuItem>
+                                        ) : (
+                                          <DropdownMenuItem onClick={() => setDismissed([plat.id], true)}>
+                                            <BellOff size={12} className="mr-2" /> Dispensar alerta
+                                          </DropdownMenuItem>
+                                        )
+                                      )}
                                     </>
                                   )}
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(plat.id)}>
-                                    <Trash2 size={12} className="mr-2" /> Remover Plataforma
+                                    <Trash2 size={12} className="mr-2" /> Remover plataforma
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -794,13 +813,23 @@ function SaldoPage() {
                           {!isCartao ? (
                             <div className="space-y-1.5">
                               <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
-                                <span>{plat.dias_restantes ? Math.floor(plat.dias_restantes) : 0} dias restantes</span>
-                                <span>Última: {formatBRL(plat.saldo_total_acumulado > 0 ? plat.saldo_total_acumulado / 5 : 0)} em 12/04</span>
+                                <span>
+                                  {plat.qtd_recargas === 0
+                                    ? "Sem recarga registrada"
+                                    : dias !== null && dias !== undefined
+                                      ? `${formatDias(dias)} restantes · acaba em ${formatDate(plat.data_prevista_fim)}`
+                                      : "Sem verba diária definida"}
+                                </span>
+                                <span>
+                                  {plat.data_ultima_recarga
+                                    ? `Última: ${formatBRL(plat.valor_ultima_recarga)} em ${formatDate(plat.data_ultima_recarga)}`
+                                    : "—"}
+                                </span>
                               </div>
-                              <Progress 
-                                value={Math.min(100, (plat.dias_restantes || 0) * 10)} 
+                              <Progress
+                                value={Math.min(100, ((dias ?? 0) / 30) * 100)}
                                 className="h-1.5"
-                                indicatorClassName={getProgressColor(plat.status_alerta)}
+                                indicatorClassName={getProgressColor(status)}
                               />
                             </div>
                           ) : !hasMultiple && (
@@ -810,34 +839,29 @@ function SaldoPage() {
                           )}
 
                           {!hasMultiple && (
-                            <div className="grid grid-cols-2 gap-2 text-[11px] pt-3 mt-3 border-t">
+                            <div className="grid grid-cols-3 gap-2 text-[11px] pt-3 mt-3 border-t">
                               <div className="space-y-0.5">
-                                <p className="text-muted-foreground">Verba Diária</p>
+                                <p className="text-muted-foreground">Verba diária</p>
                                 <p className="font-semibold">{formatBRL(plat.verba_diaria_calc)}</p>
                               </div>
+                              <div className="space-y-0.5 text-center">
+                                <p className="text-muted-foreground">Verba mensal</p>
+                                <p className="font-semibold">{formatBRL((plat.verba_diaria_calc || 0) * 30)}</p>
+                              </div>
                               <div className="space-y-0.5 text-right">
-                                <p className="text-muted-foreground">{isCartao ? "Verba Mensal" : "Total Investido"}</p>
-                                <p className="font-semibold">
-                                  {isCartao 
-                                    ? formatBRL(plat.clientes?.verba_ads || (plat.verba_diaria_calc * 30)) 
-                                    : formatBRL(plat.saldo_total_acumulado)}
-                                </p>
+                                <p className="text-muted-foreground">{isCartao ? "Recargas" : "Total investido"}</p>
+                                <p className="font-semibold">{isCartao ? plat.qtd_recargas : formatBRL(plat.saldo_total_acumulado)}</p>
                               </div>
                             </div>
                           )}
 
                           {!isCartao && !hasMultiple && (
-                            <Button 
-                              className="w-full h-8 text-xs gap-2 mt-4" 
+                            <Button
+                              className="w-full h-8 text-xs gap-2 mt-4"
                               variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedForRecarga(plat);
-                                setRecargaModalOpen(true);
-                              }}
+                              onClick={(e) => { e.stopPropagation(); setSelectedForRecarga(plat); setRecargaModalOpen(true); }}
                             >
-                              <ArrowUpCircle size={14} />
-                              Adicionar recarga
+                              <ArrowUpCircle size={14} /> Adicionar recarga
                             </Button>
                           )}
                         </div>
@@ -851,14 +875,12 @@ function SaldoPage() {
         )}
       </div>
 
-      {/* Modals and Sheets */}
+      {/* Modais */}
       <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) setEditing(null); }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{editing?.id ? "Editar Registro" : "Novo Registro de Saldo"}</DialogTitle>
-            <DialogDescription>
-              Configure o monitoramento de verba para uma plataforma de anúncios.
-            </DialogDescription>
+            <DialogTitle>{editing?.id ? "Editar registro" : "Novo registro de saldo"}</DialogTitle>
+            <DialogDescription>Configure o monitoramento de verba para uma plataforma de anúncios.</DialogDescription>
           </DialogHeader>
           <SaldoAdsForm
             loading={saving}
@@ -866,28 +888,22 @@ function SaldoPage() {
             initialValues={editing ? {
               cliente_id: editing.cliente_id,
               plataformas: editing.plataformas || [],
-              metodo_pagamento: editing.metodo_pagamento,
+              metodo_pagamento: (editing.metodo_pagamento || "pix") as SaldoAdsFormValues["metodo_pagamento"],
               verba_diaria: editing.verba_diaria,
-              observacoes: editing.observacoes,
+              observacoes: editing.observacoes || "",
             } : {}}
           />
         </DialogContent>
       </Dialog>
 
       <Dialog open={clientModalOpen} onOpenChange={(o) => { setClientModalOpen(o); if (!o) setEditingClient(null); }}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Cliente</DialogTitle>
-            <DialogDescription>
-              Atualize as informações cadastrais do cliente.
-            </DialogDescription>
+            <DialogTitle>Editar cliente</DialogTitle>
+            <DialogDescription>Verba e forma de pagamento aqui refletem no monitoramento.</DialogDescription>
           </DialogHeader>
           {editingClient ? (
-            <ClientForm
-              loading={saving}
-              onSubmit={handleUpdateClient}
-              initialValues={editingClient}
-            />
+            <ClientForm loading={saving} onSubmit={handleUpdateClient} initialValues={editingClient} />
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground">Carregando cliente...</p>
           )}
@@ -897,16 +913,13 @@ function SaldoPage() {
       <Dialog open={recargaModalOpen} onOpenChange={(o) => { setRecargaModalOpen(o); if (!o) setSelectedForRecarga(null); }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Adicionar Recarga</DialogTitle>
+            <DialogTitle>Adicionar recarga</DialogTitle>
             <DialogDescription>
-              Lance um novo aporte de verba para <strong>{selectedForRecarga?.cliente_nome}</strong>.
+              Novo aporte para <strong>{selectedForRecarga?.cliente_nome}</strong>
+              {selectedForRecarga?.verba_diaria_calc ? ` — consumo de ${formatBRL(selectedForRecarga.verba_diaria_calc)}/dia` : ""}.
             </DialogDescription>
           </DialogHeader>
-          <RecargaForm
-            loading={saving}
-            defaultMetodo={selectedForRecarga?.metodo_pagamento}
-            onSubmit={handleRecarga}
-          />
+          <RecargaForm loading={saving} defaultMetodo={selectedForRecarga?.metodo_pagamento || undefined} onSubmit={handleRecarga} />
         </DialogContent>
       </Dialog>
 
@@ -915,55 +928,43 @@ function SaldoPage() {
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
-              {historyIsConsolidated ? "Histórico Consolidado" : "Histórico de Recargas"}
+              {historyIsConsolidated ? "Histórico consolidado" : "Histórico de recargas"}
             </SheetTitle>
             <SheetDescription>
-              {selectedForHistory?.cliente_nome} {historyIsConsolidated ? "— Todas plataformas" : `— ${selectedForHistory?.plataformas?.join(", ")}`}
+              {selectedForHistory?.cliente_nome} {historyIsConsolidated ? "— todas as plataformas" : `— ${selectedForHistory?.plataformas?.join(", ")}`}
             </SheetDescription>
           </SheetHeader>
-          
+
           <div className="mt-8 space-y-6">
-            {!historyIsConsolidated && (
+            {!historyIsConsolidated && selectedForHistory && (
               <div className="p-4 rounded-xl bg-muted/50 border space-y-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status Atual</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status atual</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-[10px] text-muted-foreground">
-                      {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Método' : 'Saldo'}
-                    </p>
+                    <p className="text-[10px] text-muted-foreground">{selectedForHistory.metodo_pagamento === "cartao" ? "Método" : "Saldo"}</p>
                     <p className="text-lg font-bold">
-                      {selectedForHistory?.metodo_pagamento === 'cartao' 
-                        ? 'Cartão' 
-                        : formatBRL(selectedForHistory?.saldo_atual)}
+                      {selectedForHistory.metodo_pagamento === "cartao" ? "Cartão" : formatBRL(selectedForHistory.saldo_atual_estimado)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-muted-foreground">
-                      {selectedForHistory?.metodo_pagamento === 'cartao' ? 'Monitoramento' : 'Previsão'}
-                    </p>
+                    <p className="text-[10px] text-muted-foreground">{selectedForHistory.metodo_pagamento === "cartao" ? "Monitoramento" : "Previsão"}</p>
                     <p className="text-lg font-bold">
-                      {selectedForHistory?.metodo_pagamento === 'cartao' 
-                        ? 'Desativado' 
-                        : `${selectedForHistory?.dias_restantes ? Math.floor(selectedForHistory.dias_restantes) : 0} dias`}
+                      {selectedForHistory.metodo_pagamento === "cartao"
+                        ? "Desativado"
+                        : `${formatDias(selectedForHistory.dias_restantes)} · ${formatDate(selectedForHistory.data_prevista_fim)}`}
                     </p>
                   </div>
                 </div>
               </div>
             )}
 
-            {selectedForHistory?.metodo_pagamento === 'cartao' && historyData.length > 0 && (
-              <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-700">
-                Cliente migrou para cartão. Histórico de recargas anteriores arquivado apenas para referência.
-              </div>
-            )}
-
             <div className="space-y-4">
-              <h4 className="text-sm font-semibold">Todas as Recargas</h4>
+              <h4 className="text-sm font-semibold">Todas as recargas</h4>
               {historyData.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma recarga registrada.</p>
               ) : (
                 <div className="relative space-y-4 before:absolute before:left-3.5 before:top-2 before:bottom-2 before:w-px before:bg-border">
-                  {historyData.map((recarga, i) => (
+                  {historyData.map((recarga) => (
                     <div key={recarga.id} className="relative pl-8">
                       <div className="absolute left-0 top-1 h-7 w-7 rounded-full bg-background border flex items-center justify-center">
                         <TrendingUp size={14} className="text-emerald-500" />
@@ -976,13 +977,9 @@ function SaldoPage() {
                               <Badge key={p} variant="outline" className="text-[9px] h-4 py-0">{p}</Badge>
                             ))}
                           </div>
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            {new Date(recarga.data_recarga).toLocaleDateString("pt-BR")}
-                          </span>
+                          <span className="text-[10px] text-muted-foreground font-mono">{formatDate(recarga.data_recarga)}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {recarga.metodo_pagamento?.replace("_", " ")}
-                        </p>
+                        <p className="text-xs text-muted-foreground capitalize">{recarga.metodo_pagamento?.replace("_", " ")}</p>
                         {recarga.observacoes && (
                           <p className="text-[10px] bg-muted/50 p-1.5 rounded italic">"{recarga.observacoes}"</p>
                         )}
@@ -1000,14 +997,27 @@ function SaldoPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Tem certeza que deseja remover?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação remove o monitoramento desta conta de mídia e todo o histórico de recargas.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Remover</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDismissAll} onOpenChange={setConfirmDismissAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Zerar alertas ativos?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação removerá o monitoramento desta conta de mídia e todo seu histórico de recargas.
+              {activeAlerts.length} {activeAlerts.length === 1 ? "alerta será dispensado" : "alertas serão dispensados"}. Eles voltam automaticamente quando houver uma nova recarga com saldo perto de acabar, e você pode reativar cada um no menu da plataforma.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-              Remover
+            <AlertDialogAction onClick={() => { setDismissed(activeAlerts.map((a) => a.id), true); setConfirmDismissAll(false); }}>
+              Zerar alertas
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

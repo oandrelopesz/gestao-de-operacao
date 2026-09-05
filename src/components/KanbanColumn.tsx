@@ -117,13 +117,13 @@ export function KanbanColumn({
 
   return (
     <div className={cn(
-      "flex flex-col w-[280px] shrink-0 rounded-lg p-0 h-full transition-colors",
-      "bg-zinc-50/50 dark:bg-zinc-900/50",
-      isOver && "bg-zinc-100 dark:bg-zinc-800"
+      "flex flex-col w-[280px] shrink-0 rounded-xl p-0 h-full transition-colors border border-border/60",
+      "bg-muted/40",
+      isOver && "bg-accent/50 border-primary/30"
     )}>
       {/* Top indicator line */}
       <div 
-        className="h-[3px] w-full rounded-t-lg mb-0" 
+        className="h-[3px] w-full rounded-t-xl mb-0" 
         style={{ backgroundColor: hex }}
       />
       

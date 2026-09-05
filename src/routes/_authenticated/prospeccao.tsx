@@ -58,6 +58,8 @@ import { ProspeccaoDrawer } from "@/components/prospeccao/ProspeccaoDrawer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatBRL, maskBRLInput, parseBRLInput } from "@/lib/clientes";
 import { useAgencias } from "@/lib/agencias";
+import { CalendarRange } from "lucide-react";
+import { useRef } from "react";
 import { saveCliente } from "@/lib/clientesService";
 import { 
   Tooltip,
@@ -90,6 +92,7 @@ function ProspeccaoPage() {
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterAgencia, setFilterAgencia] = useState("all");
+  const [filterPeriodo, setFilterPeriodo] = useState<string>("all");
   const [filterOrigem, setFilterOrigem] = useState("all");
   const [filterProbabilidade, setFilterProbabilidade] = useState([0, 100]);
   
@@ -103,7 +106,7 @@ function ProspeccaoPage() {
   const [motivoPerda, setMotivoPerda] = useState("");
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -135,9 +138,23 @@ function ProspeccaoPage() {
       const matchesAgencia = filterAgencia === "all" || l.agencia_destino === filterAgencia;
       const matchesOrigem = filterOrigem === "all" || l.origem === filterOrigem;
       const matchesProb = (l.probabilidade || 0) >= filterProbabilidade[0] && (l.probabilidade || 0) <= filterProbabilidade[1];
-      return matchesSearch && matchesAgencia && matchesOrigem && matchesProb;
+      const matchesPeriodo = (() => {
+        if (filterPeriodo === "all") return true;
+        const ref = (l.data_lead || l.created_at || "").slice(0, 10);
+        if (!ref) return false;
+        if (filterPeriodo === "mes") {
+          const now = new Date();
+          const inicioMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+          return ref >= inicioMes;
+        }
+        const dias = Number(filterPeriodo);
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - dias);
+        return ref >= cutoff.toISOString().slice(0, 10);
+      })();
+      return matchesSearch && matchesAgencia && matchesOrigem && matchesProb && matchesPeriodo;
     });
-  }, [leads, searchQuery, filterAgencia, filterOrigem, filterProbabilidade]);
+  }, [leads, searchQuery, filterAgencia, filterOrigem, filterProbabilidade, filterPeriodo]);
 
   const metrics = useMemo(() => {
     const activePipeline = leads.filter(l => l.etapa !== 'perdido');
@@ -188,51 +205,91 @@ function ProspeccaoPage() {
     setActiveLead(leads.find(l => l.id === active.id) || null);
   };
 
+  // Reordenação otimista durante o arrasto (mesma lógica da aba Demandas)
+  const dragOriginEtapa = useRef<string | null>(null);
+  const byOrdem = (a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0);
+
+  const isActiveBelowOver = (active: DragOverEvent["active"], over: NonNullable<DragOverEvent["over"]>) => {
+    const activeRect = active.rect.current.translated;
+    if (!activeRect) return false;
+    return activeRect.top + activeRect.height / 2 > over.rect.top + over.rect.height / 2;
+  };
+
+  const computeMove = (list: Lead[], activeId: string, overId: string, overIsColumn: boolean, insertAfter: boolean): Lead[] | null => {
+    const active = list.find((l) => l.id === activeId);
+    if (!active) return null;
+    const targetEtapa = overIsColumn ? overId : list.find((l) => l.id === overId)?.etapa;
+    if (!targetEtapa) return null;
+
+    const targetList = list.filter((l) => l.etapa === targetEtapa && l.id !== activeId).sort(byOrdem);
+    let insertAt = targetList.length;
+    if (!overIsColumn) {
+      const overIdx = targetList.findIndex((l) => l.id === overId);
+      if (overIdx >= 0) insertAt = insertAfter ? overIdx + 1 : overIdx;
+    }
+
+    const currentList = list.filter((l) => l.etapa === targetEtapa).sort(byOrdem);
+    if (active.etapa === targetEtapa && currentList[insertAt]?.id === activeId) return null;
+
+    targetList.splice(insertAt, 0, { ...active, etapa: targetEtapa });
+    const nextOrdem = new Map(targetList.map((l, i) => [l.id, i]));
+    return list.map((l) => (nextOrdem.has(l.id) ? { ...l, etapa: targetEtapa, ordem: nextOrdem.get(l.id) } : l));
+  };
+
+  const resolveOver = (over: NonNullable<DragOverEvent["over"]>) => {
+    const overId = String(over.id);
+    return { overId, overIsColumn: COLUMNS.some((c) => c.id === overId) };
+  };
+
   const onDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    if (!over) return;
-    const activeId = active.id;
-    const overId = over.id;
-    if (activeId === overId) return;
-
-    const isActiveTask = active.data.current?.type !== "Column";
-    const isOverTask = over.data.current?.type !== "Column";
-    if (!isActiveTask) return;
-
-    const activeLeadItem = leads.find(l => l.id === activeId);
+    if (!over || active.id === over.id) return;
+    const activeId = String(active.id);
+    const activeLeadItem = leads.find((l) => l.id === activeId);
     if (!activeLeadItem) return;
+    if (dragOriginEtapa.current === null) dragOriginEtapa.current = activeLeadItem.etapa;
 
-    let overStatus = overId as string;
-    if (isOverTask) {
-      const overLeadItem = leads.find(l => l.id === overId);
-      if (overLeadItem) overStatus = overLeadItem.etapa;
-    }
+    const { overId, overIsColumn } = resolveOver(over);
+    const next = computeMove(leads, activeId, overId, overIsColumn, !overIsColumn && isActiveBelowOver(active, over));
+    if (next) setLeads(next);
+  };
 
-    if (activeLeadItem.etapa !== overStatus) {
-      setLeads((prev) => {
-        const activeIndex = prev.findIndex((l) => l.id === activeId);
-        const overIndex = isOverTask ? prev.findIndex((l) => l.id === overId) : prev.length;
-        const updated = [...prev];
-        updated[activeIndex] = { ...updated[activeIndex], etapa: overStatus };
-        return arrayMove(updated, activeIndex, overIndex);
-      });
-    }
+  const persistLeadOrder = async (list: Lead[], etapas: string[]) => {
+    const updates = list
+      .filter((l) => etapas.includes(l.etapa))
+      .map((l) => supabase.from("prospeccao").update({ ordem: l.ordem ?? 0 } as any).eq("id", l.id));
+    await Promise.all(updates);
   };
 
   const onDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveLead(null);
-    if (!over) return;
+    const origin = dragOriginEtapa.current;
+    dragOriginEtapa.current = null;
 
-    const activeId = active.id;
-    const overId = over.id;
-    const activeLeadItem = leads.find(l => l.id === activeId);
+    const activeId = String(active.id);
+    const activeLeadItem = leads.find((l) => l.id === activeId);
     if (!activeLeadItem) return;
 
-    let overStatus = overId as string;
-    const overTask = leads.find(l => l.id === overId);
-    if (overTask) overStatus = overTask.etapa;
-    else if (!COLUMNS.some(c => c.id === overId)) return;
+    let finalList = leads;
+    if (over && over.id !== active.id) {
+      const { overId, overIsColumn } = resolveOver(over);
+      const next = computeMove(leads, activeId, overId, overIsColumn, !overIsColumn && isActiveBelowOver(active, over));
+      if (next) {
+        finalList = next;
+        setLeads(next);
+      }
+    }
+
+    const finalLead = finalList.find((l) => l.id === activeId);
+    if (!finalLead) return;
+    const overStatus = finalLead.etapa;
+    const affected = Array.from(new Set([overStatus, origin].filter(Boolean))) as string[];
+
+    // Ordem das colunas envolvidas é sempre persistida
+    await persistLeadOrder(finalList, affected);
+
+    if (overStatus === activeLeadItem.etapa && origin === overStatus) return;
 
     if (overStatus === 'fechado') {
       await handleMoveToFechado(activeLeadItem);
@@ -489,6 +546,19 @@ function ProspeccaoPage() {
             {agencias.map(a => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={filterPeriodo} onValueChange={setFilterPeriodo}>
+          <SelectTrigger className="w-[150px] h-9 text-xs">
+            <CalendarRange className="w-3.5 h-3.5 mr-1.5 text-zinc-400" />
+            <SelectValue placeholder="Período" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todo o período</SelectItem>
+            <SelectItem value="7">Últimos 7 dias</SelectItem>
+            <SelectItem value="30">Últimos 30 dias</SelectItem>
+            <SelectItem value="90">Últimos 90 dias</SelectItem>
+            <SelectItem value="mes">Este mês</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Kanban / List Board */}
@@ -510,7 +580,7 @@ function ProspeccaoPage() {
                     title={col.title}
                     color={col.color}
                     hex={col.hex}
-                    leads={filteredLeads.filter((l) => l.etapa === col.id)}
+                    leads={filteredLeads.filter((l) => l.etapa === col.id).sort(byOrdem)}
                     onEdit={handleOpenDrawer}
                     onDelete={async (id) => {
                       if (confirm("Remover este lead?")) {
@@ -531,6 +601,7 @@ function ProspeccaoPage() {
               </div>
 
               <DragOverlay dropAnimation={{
+                  duration: 150,
                   sideEffects: defaultDropAnimationSideEffects({
                     styles: { active: { opacity: "0.5" } },
                   }),

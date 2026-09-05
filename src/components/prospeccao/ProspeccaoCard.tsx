@@ -33,6 +33,7 @@ export interface Lead {
   motivo_perda?: string;
   cliente_id?: string | null;
   created_at?: string;
+  ordem?: number | null;
 }
 
 interface ProspeccaoCardProps {

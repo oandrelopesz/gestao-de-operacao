@@ -57,6 +57,8 @@ const clientSchema = z.object({
   data_limite_verba: z.string().optional().nullable().or(z.literal("")),
   metodo_pagamento: z.enum(["cartao", "pix", "boleto"]),
   plataformas: z.array(z.string()).min(1, "Selecione pelo menos uma plataforma"),
+  /** Investimento diário em ads; se vazio, usa verba mensal ÷ 30 */
+  verba_diaria: z.number().min(0).optional().nullable(),
 });
 
 export type ClientFormValues = z.infer<typeof clientSchema>;
@@ -85,11 +87,15 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       data_limite_verba: initialValues?.data_limite_verba || "",
       metodo_pagamento: initialValues?.metodo_pagamento || "pix",
       plataformas: initialValues?.plataformas || [],
+      verba_diaria: initialValues?.verba_diaria ?? null,
     },
   });
 
   const [verbaDisplay, setVerbaDisplay] = useState(
     initialValues?.verba_ads ? maskBRLInput(String(Math.round((initialValues.verba_ads || 0) * 100))) : ""
+  );
+  const [verbaDiariaDisplay, setVerbaDiariaDisplay] = useState(
+    initialValues?.verba_diaria ? maskBRLInput(String(Math.round((initialValues.verba_diaria || 0) * 100))) : ""
   );
 
   const removePlataforma = (plat: string) => {
@@ -335,6 +341,34 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="verba_diaria"
+            render={({ field }) => (
+              <FormItem className="md:col-span-2">
+                <FormLabel>Investimento diário em ads <span className="text-muted-foreground font-normal">(opcional)</span></FormLabel>
+                <FormControl>
+                  <Input
+                    inputMode="numeric"
+                    placeholder="R$ 0,00 por dia"
+                    value={verbaDiariaDisplay}
+                    onChange={(e) => {
+                      const masked = maskBRLInput(e.target.value);
+                      setVerbaDiariaDisplay(masked);
+                      const parsed = parseBRLInput(e.target.value);
+                      field.onChange(parsed > 0 ? parsed : null);
+                    }}
+                  />
+                </FormControl>
+                <p className="text-[11px] text-muted-foreground">
+                  Usado para calcular quando o saldo acaba. Se ficar vazio, considera a verba mensal ÷ 30
+                  {form.watch("tipo_verba") === "mensal" && form.watch("verba_ads") > 0 && ` (${formatBRL(form.watch("verba_ads") / 30)}/dia)`}.
+                </p>
                 <FormMessage />
               </FormItem>
             )}

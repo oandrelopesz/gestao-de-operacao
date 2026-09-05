@@ -36,7 +36,7 @@ export type ClienteFormInitial = Partial<ClientFormValues> & { id: string };
 export async function loadClienteFormValues(clienteId: string): Promise<ClienteFormInitial> {
   const [{ data: cliente, error }, { data: saldo }] = await Promise.all([
     supabase.from("clientes").select("*").eq("id", clienteId).single(),
-    supabase.from("saldo_ads").select("plataformas, metodo_pagamento").eq("cliente_id", clienteId).maybeSingle(),
+    supabase.from("saldo_ads").select("plataformas, metodo_pagamento, verba_diaria").eq("cliente_id", clienteId).maybeSingle(),
   ]);
   if (error || !cliente) throw error || new Error("Cliente não encontrado");
 
@@ -55,6 +55,7 @@ export async function loadClienteFormValues(clienteId: string): Promise<ClienteF
     data_limite_verba: cliente.data_limite_verba || "",
     metodo_pagamento: ((saldo?.metodo_pagamento || "pix") as ClientFormValues["metodo_pagamento"]),
     plataformas: saldo?.plataformas || [],
+    verba_diaria: saldo?.verba_diaria ?? null,
   };
 }
 
@@ -81,7 +82,7 @@ export async function saveCliente(values: ClientFormValues, editingId?: string |
   }
 
   // Campos que pertencem ao saldo_ads, não à tabela clientes
-  const { metodo_pagamento, plataformas, ...clientePayload } = payload;
+  const { metodo_pagamento, plataformas, verba_diaria, ...clientePayload } = payload;
 
   let clienteId: string;
   if (editingId) {
@@ -100,7 +101,8 @@ export async function saveCliente(values: ClientFormValues, editingId?: string |
 
   // Sincroniza saldo_ads: assim o cliente aparece na aba Saldo assim que é cadastrado
   if (metodo_pagamento) {
-    const verbaDiaria = computeVerbaDiaria(payload);
+    // Investimento diário informado manualmente tem prioridade sobre o cálculo (mensal ÷ 30)
+    const verbaDiaria = verba_diaria && Number(verba_diaria) > 0 ? Number(verba_diaria) : computeVerbaDiaria(payload);
     const { data: existente } = await supabase
       .from("saldo_ads")
       .select("id")
