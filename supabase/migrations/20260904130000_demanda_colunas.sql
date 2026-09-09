@@ -115,7 +115,7 @@ CREATE OR REPLACE VIEW public.clientes_view AS
    FROM clientes c;
 ALTER VIEW public.clientes_view OWNER TO postgres;
 
-DO $
+DO $$
 DECLARE
     o TEXT;
 BEGIN
@@ -123,6 +123,6 @@ BEGIN
     IF o IS NOT NULL AND o <> '' THEN
         EXECUTE format('ALTER VIEW public.clientes_view SET (%s)', o);
     END IF;
-END $;
+END $$;
 
 DROP TABLE IF EXISTS _clientes_view_opts;
