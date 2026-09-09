@@ -26,6 +26,18 @@ export function computeVerbaDiaria(cli: {
   return Number(cli.verba_ads || 0) / 30;
 }
 
+// Traduz erros do Postgres em mensagens acionáveis para o usuário
+function traduzErroCliente(error: any, agencia?: string): Error {
+  const msg: string = error?.message || "";
+  // Enum antigo (agencia_enum) ou FK para agencias: a migration de agências não foi aplicada no banco
+  if (/agencia_enum/i.test(msg) || (error?.code === "23503" && /agencia/i.test(msg))) {
+    return new Error(
+      `A agência "${agencia || ""}" ainda não existe no banco de dados. ` +
+      "Rode a migration supabase/migrations/20260904140000_agencias.sql no SQL Editor do Supabase e tente de novo.",
+    );
+  }
+  return error instanceof Error ? error : new Error(msg || "Erro ao salvar cliente");
+}
 export type ClienteFormInitial = Partial<ClientFormValues> & { id: string };
 
 /**
@@ -87,7 +99,7 @@ export async function saveCliente(values: ClientFormValues, editingId?: string |
   let clienteId: string;
   if (editingId) {
     const { error } = await supabase.from("clientes").update(clientePayload).eq("id", editingId);
-    if (error) throw error;
+    if (error) throw traduzErroCliente(error, clientePayload.agencia);
     clienteId = editingId;
   } else {
     const { data, error } = await supabase
@@ -95,7 +107,7 @@ export async function saveCliente(values: ClientFormValues, editingId?: string |
       .insert([{ ...clientePayload, user_id: userId }])
       .select("id")
       .single();
-    if (error) throw error;
+    if (error) throw traduzErroCliente(error, clientePayload.agencia);
     clienteId = data.id;
   }
 
