@@ -51,6 +51,13 @@ BEGIN
 END $$;
 
 -- 2) demandas.status: enum -> texto (a view clientes_view depende da coluna, então é recriada)
+-- Guarda as opções atuais da view (ex.: security_invoker) para reaplicar depois de recriar
+CREATE TEMP TABLE IF NOT EXISTS _clientes_view_opts AS
+SELECT array_to_string(c.reloptions, ', ') AS opts
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public' AND c.relname = 'clientes_view' AND c.relkind = 'v';
+
 DROP VIEW IF EXISTS public.clientes_view;
 
 ALTER TABLE public.demandas ALTER COLUMN status DROP DEFAULT;
@@ -107,3 +114,15 @@ CREATE OR REPLACE VIEW public.clientes_view AS
     'em_dia'::text AS status_pagamento_mes
    FROM clientes c;
 ALTER VIEW public.clientes_view OWNER TO postgres;
+
+DO $
+DECLARE
+    o TEXT;
+BEGIN
+    SELECT opts INTO o FROM _clientes_view_opts LIMIT 1;
+    IF o IS NOT NULL AND o <> '' THEN
+        EXECUTE format('ALTER VIEW public.clientes_view SET (%s)', o);
+    END IF;
+END $;
+
+DROP TABLE IF EXISTS _clientes_view_opts;

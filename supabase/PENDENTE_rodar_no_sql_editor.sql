@@ -1,7 +1,10 @@
 -- Migrations que AINDA NAO foram aplicadas no Supabase (4 de 04/09 + plataformas de 09/09; verificado em 09/09/2026).
 -- Como usar: abra o SQL Editor do projeto bnpvzguapunsztsdvmrs, cole este arquivo inteiro e clique em Run.
--- Sem isso: nao da para cadastrar clientes da AZO (enum antigo), a aba Acessos e as colunas do Kanban falham.
+-- Roda tudo em uma transacao: se qualquer passo falhar, nada e alterado.
+-- Sem isso: nao da para cadastrar clientes da AZO (enum antigo), a aba Acessos, as colunas do Kanban e as plataformas falham.
 -- Depois de rodar com sucesso, este arquivo pode ser apagado.
+
+BEGIN;
 
 -- ============================================================
 -- 20260904120000_acessos_clientes.sql
@@ -112,6 +115,13 @@ BEGIN
 END $$;
 
 -- 2) demandas.status: enum -> texto (a view clientes_view depende da coluna, então é recriada)
+-- Guarda as opções atuais da view (ex.: security_invoker) para reaplicar depois de recriar
+CREATE TEMP TABLE IF NOT EXISTS _clientes_view_opts AS
+SELECT array_to_string(c.reloptions, ', ') AS opts
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public' AND c.relname = 'clientes_view' AND c.relkind = 'v';
+
 DROP VIEW IF EXISTS public.clientes_view;
 
 ALTER TABLE public.demandas ALTER COLUMN status DROP DEFAULT;
@@ -168,6 +178,18 @@ CREATE OR REPLACE VIEW public.clientes_view AS
     'em_dia'::text AS status_pagamento_mes
    FROM clientes c;
 ALTER VIEW public.clientes_view OWNER TO postgres;
+
+DO $
+DECLARE
+    o TEXT;
+BEGIN
+    SELECT opts INTO o FROM _clientes_view_opts LIMIT 1;
+    IF o IS NOT NULL AND o <> '' THEN
+        EXECUTE format('ALTER VIEW public.clientes_view SET (%s)', o);
+    END IF;
+END $;
+
+DROP TABLE IF EXISTS _clientes_view_opts;
 
 -- ============================================================
 -- 20260904140000_agencias.sql
@@ -230,15 +252,31 @@ DECLARE
     defs JSONB := '[]'::jsonb;
     opts TEXT;
 BEGIN
-    -- Views do schema public que dependem da tabela clientes
+    -- Views do schema public que dependem da tabela clientes, direta ou indiretamente
+    -- (uma view que usa outra view que usa clientes também cairia no CASCADE).
+    -- Ordenadas por nível de dependência para a recriação respeitar a ordem.
     FOR v IN
-        SELECT DISTINCT c.oid, c.relname, pg_get_viewdef(c.oid, true) AS def, c.reloptions
-        FROM pg_class c
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        JOIN pg_rewrite r ON r.ev_class = c.oid
-        JOIN pg_depend d ON d.objid = r.oid AND d.refobjid = 'public.clientes'::regclass
-        WHERE n.nspname = 'public' AND c.relkind = 'v'
-        ORDER BY c.oid
+        WITH RECURSIVE deps AS (
+            SELECT c.oid, 0 AS nivel
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            JOIN pg_rewrite r ON r.ev_class = c.oid
+            JOIN pg_depend d ON d.objid = r.oid AND d.refobjid = 'public.clientes'::regclass
+            WHERE n.nspname = 'public' AND c.relkind = 'v'
+            UNION
+            SELECT c.oid, deps.nivel + 1
+            FROM deps
+            JOIN pg_depend d ON d.refobjid = deps.oid
+            JOIN pg_rewrite r ON r.oid = d.objid
+            JOIN pg_class c ON c.oid = r.ev_class AND c.oid <> deps.oid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relkind = 'v'
+        )
+        SELECT c.oid, c.relname, pg_get_viewdef(c.oid, true) AS def, c.reloptions, max(deps.nivel) AS nivel
+        FROM deps
+        JOIN pg_class c ON c.oid = deps.oid
+        GROUP BY c.oid, c.relname, c.reloptions
+        ORDER BY max(deps.nivel), c.oid
     LOOP
         defs := defs || jsonb_build_object('name', v.relname, 'def', v.def, 'opts', to_jsonb(v.reloptions));
     END LOOP;
@@ -418,7 +456,6 @@ SELECT
     END AS status_alerta
 FROM calc2 c2;
 
-
 -- ============================================================
 -- 20260909120000_plataformas_ads.sql
 -- ============================================================
@@ -484,3 +521,5 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     NULL; -- publicação pode não existir em ambientes locais
 END $$;
+
+COMMIT;

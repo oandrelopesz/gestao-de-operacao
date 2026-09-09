@@ -56,15 +56,31 @@ DECLARE
     defs JSONB := '[]'::jsonb;
     opts TEXT;
 BEGIN
-    -- Views do schema public que dependem da tabela clientes
+    -- Views do schema public que dependem da tabela clientes, direta ou indiretamente
+    -- (uma view que usa outra view que usa clientes também cairia no CASCADE).
+    -- Ordenadas por nível de dependência para a recriação respeitar a ordem.
     FOR v IN
-        SELECT DISTINCT c.oid, c.relname, pg_get_viewdef(c.oid, true) AS def, c.reloptions
-        FROM pg_class c
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        JOIN pg_rewrite r ON r.ev_class = c.oid
-        JOIN pg_depend d ON d.objid = r.oid AND d.refobjid = 'public.clientes'::regclass
-        WHERE n.nspname = 'public' AND c.relkind = 'v'
-        ORDER BY c.oid
+        WITH RECURSIVE deps AS (
+            SELECT c.oid, 0 AS nivel
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            JOIN pg_rewrite r ON r.ev_class = c.oid
+            JOIN pg_depend d ON d.objid = r.oid AND d.refobjid = 'public.clientes'::regclass
+            WHERE n.nspname = 'public' AND c.relkind = 'v'
+            UNION
+            SELECT c.oid, deps.nivel + 1
+            FROM deps
+            JOIN pg_depend d ON d.refobjid = deps.oid
+            JOIN pg_rewrite r ON r.oid = d.objid
+            JOIN pg_class c ON c.oid = r.ev_class AND c.oid <> deps.oid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relkind = 'v'
+        )
+        SELECT c.oid, c.relname, pg_get_viewdef(c.oid, true) AS def, c.reloptions, max(deps.nivel) AS nivel
+        FROM deps
+        JOIN pg_class c ON c.oid = deps.oid
+        GROUP BY c.oid, c.relname, c.reloptions
+        ORDER BY max(deps.nivel), c.oid
     LOOP
         defs := defs || jsonb_build_object('name', v.relname, 'def', v.def, 'opts', to_jsonb(v.reloptions));
     END LOOP;
