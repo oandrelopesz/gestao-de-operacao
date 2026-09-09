@@ -86,6 +86,33 @@ export type Database = {
         }
         Relationships: []
       }
+      plataformas_ads: {
+        Row: {
+          ativa: boolean
+          created_at: string
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          created_at?: string
+          id: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           agencia: string

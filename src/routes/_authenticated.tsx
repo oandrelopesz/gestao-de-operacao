@@ -24,6 +24,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 import { AgenciasProvider } from "@/lib/agencias";
+import { PlataformasProvider } from "@/lib/plataformas";
 import { useTheme } from "@/lib/theme";
 import { warmAllCaches } from "@/lib/data";
 
@@ -168,6 +169,7 @@ function AuthenticatedLayout() {
 
   return (
     <AgenciasProvider>
+    <PlataformasProvider>
       <div className="flex min-h-screen bg-background text-foreground">
         {/* Barra de alerta de saldo */}
         {topAlert && (
@@ -309,6 +311,7 @@ function AuthenticatedLayout() {
           </div>
         </main>
       </div>
+    </PlataformasProvider>
     </AgenciasProvider>
   );
 }

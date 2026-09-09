@@ -31,17 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
 import { useAgencias } from "@/lib/agencias";
-
-const PLATAFORMAS_DISPONIVEIS = [
-  "Meta",
-  "Google",
-  "Pinterest",
-  "X Ads",
-  "LinkedIn",
-  "TikTok",
-  "Taboola",
-  "Outbrain",
-];
+import { usePlataformas } from "@/lib/plataformas";
 
 const clientSchema = z.object({
   nome: z.string().min(2, "Nome é obrigatório"),
@@ -71,6 +61,7 @@ interface ClientFormProps {
 
 export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps) {
   const { agencias } = useAgencias();
+  const { nomes: plataformasDisponiveis } = usePlataformas();
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
@@ -333,7 +324,7 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
-                      {PLATAFORMAS_DISPONIVEIS.filter((p) => !field.value.includes(p)).map((plat) => (
+                      {plataformasDisponiveis.filter((p) => !field.value.includes(p)).map((plat) => (
                         <DropdownMenuItem key={plat} onClick={() => addPlataforma(plat)}>
                           {plat}
                         </DropdownMenuItem>

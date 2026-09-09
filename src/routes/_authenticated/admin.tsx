@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Building2, Plus, Pencil, Trash2, ArrowUp, ArrowDown, Check, Sun, Moon,
   Columns3, Database, Download, AlertTriangle, EyeOff, Eye, RefreshCw,
+  Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAgencias, AGENCIA_COLORS, slugifyAgenciaId, type AgenciaDef } from "@/lib/agencias";
 import { useDemandaColunas, COLUMN_COLORS, slugifyColumnId, type KanbanColumnDef } from "@/lib/demandaColunas";
+import { usePlataformas, slugifyPlataformaId, type PlataformaDef } from "@/lib/plataformas";
 import { useTheme } from "@/lib/theme";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -35,6 +37,10 @@ type ColunaDialog =
   | { mode: "create"; titulo: string; hex: string }
   | { mode: "edit"; id: string; titulo: string; hex: string };
 
+type PlataformaDialog =
+  | { mode: "create"; nome: string }
+  | { mode: "edit"; id: string; nome: string; nomeOriginal: string };
+
 type WipeTarget = "clientes" | "demandas" | "colunas";
 
 const WIPE_META: Record<WipeTarget, { titulo: string; botao: string }> = {
@@ -43,9 +49,19 @@ const WIPE_META: Record<WipeTarget, { titulo: string; botao: string }> = {
   colunas: { titulo: "Apagar todas as colunas do Kanban?", botao: "Apagar colunas e demandas" },
 };
 
+// Erro típico quando a migration de plataformas ainda não foi aplicada no banco
+function traduzErroPlataforma(e: any): string {
+  const msg: string = e?.message || "";
+  if (/plataformas_ads/i.test(msg) && /schema cache|does not exist|not find/i.test(msg)) {
+    return "A tabela de plataformas ainda não existe no banco. Rode supabase/migrations/20260909120000_plataformas_ads.sql no SQL Editor do Supabase.";
+  }
+  return msg || "Erro ao salvar plataforma";
+}
+
 function AdminPage() {
   const { todasAgencias, reload: reloadAgencias } = useAgencias();
   const { colunas, reload: reloadColunas } = useDemandaColunas();
+  const { todasPlataformas, reload: reloadPlataformas } = usePlataformas();
   const { theme, setTheme } = useTheme();
 
   const [clientesPorAgencia, setClientesPorAgencia] = useState<Record<string, number>>({});
@@ -57,6 +73,10 @@ function AdminPage() {
 
   const [colunaDialog, setColunaDialog] = useState<ColunaDialog | null>(null);
   const [colunaToDelete, setColunaToDelete] = useState<KanbanColumnDef | null>(null);
+
+  const [plataformaDialog, setPlataformaDialog] = useState<PlataformaDialog | null>(null);
+  const [plataformaToDelete, setPlataformaToDelete] = useState<PlataformaDef | null>(null);
+  const [clientesPorPlataforma, setClientesPorPlataforma] = useState<Record<string, number>>({});
 
   const [wipeTarget, setWipeTarget] = useState<WipeTarget | null>(null);
   const [wipeConfirm, setWipeConfirm] = useState("");
@@ -157,6 +177,97 @@ function AdminPage() {
       toast.error(e.message?.includes("violates foreign key")
         ? "Há clientes nesta agência. Mova-os antes de excluir."
         : e.message || "Erro ao excluir agência");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ---------- Plataformas de ads ----------
+  const loadClientesPorPlataforma = async () => {
+    const { data } = await supabase.from("saldo_ads").select("plataformas");
+    const porPlataforma: Record<string, number> = {};
+    (data || []).forEach((s) => (s.plataformas || []).forEach((p: string) => { porPlataforma[p] = (porPlataforma[p] || 0) + 1; }));
+    setClientesPorPlataforma(porPlataforma);
+  };
+
+  useEffect(() => {
+    loadClientesPorPlataforma();
+  }, []);
+
+  const handleSavePlataforma = async () => {
+    if (!plataformaDialog) return;
+    const nome = plataformaDialog.nome.trim();
+    if (!nome) {
+      toast.error("Informe o nome da plataforma");
+      return;
+    }
+    const duplicada = todasPlataformas.some((p) => p.nome.toLowerCase() === nome.toLowerCase() && (plataformaDialog.mode === "create" || p.id !== plataformaDialog.id));
+    if (duplicada) {
+      toast.error("Já existe uma plataforma com esse nome");
+      return;
+    }
+    setSaving(true);
+    try {
+      if (plataformaDialog.mode === "edit") {
+        const { error } = await supabase.from("plataformas_ads").update({ nome }).eq("id", plataformaDialog.id);
+        if (error) throw error;
+        // O nome é o valor gravado nos clientes: renomear propaga para o saldo de cada um
+        if (nome !== plataformaDialog.nomeOriginal) {
+          const { data: rows } = await supabase.from("saldo_ads").select("id, plataformas").contains("plataformas", [plataformaDialog.nomeOriginal]);
+          await Promise.all((rows || []).map((r) =>
+            supabase.from("saldo_ads").update({ plataformas: (r.plataformas || []).map((p: string) => (p === plataformaDialog.nomeOriginal ? nome : p)) }).eq("id", r.id)
+          ));
+        }
+        toast.success("Plataforma atualizada");
+      } else {
+        let id = slugifyPlataformaId(nome);
+        if (todasPlataformas.some((p) => p.id === id)) id = `${id}_${Math.random().toString(36).slice(2, 5)}`;
+        const ordem = todasPlataformas.length ? Math.max(...todasPlataformas.map((p) => p.ordem)) + 1 : 0;
+        const { error } = await supabase.from("plataformas_ads").insert([{ id, nome, ordem }]);
+        if (error) throw error;
+        toast.success("Plataforma criada");
+      }
+      setPlataformaDialog(null);
+      await Promise.all([reloadPlataformas(), loadClientesPorPlataforma()]);
+    } catch (e: any) {
+      toast.error(traduzErroPlataforma(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const movePlataforma = async (plataforma: PlataformaDef, direction: -1 | 1) => {
+    const sorted = [...todasPlataformas].sort((a, b) => a.ordem - b.ordem);
+    const idx = sorted.findIndex((p) => p.id === plataforma.id);
+    const target = idx + direction;
+    if (idx < 0 || target < 0 || target >= sorted.length) return;
+    const reordered = [...sorted];
+    reordered[idx] = sorted[target];
+    reordered[target] = plataforma;
+    await Promise.all(reordered.map((p, i) => supabase.from("plataformas_ads").update({ ordem: i }).eq("id", p.id)));
+    await reloadPlataformas();
+  };
+
+  const togglePlataforma = async (plataforma: PlataformaDef) => {
+    const { error } = await supabase.from("plataformas_ads").update({ ativa: !plataforma.ativa }).eq("id", plataforma.id);
+    if (error) toast.error(traduzErroPlataforma(error));
+    else {
+      toast.success(plataforma.ativa ? "Plataforma ocultada dos formulários" : "Plataforma reativada");
+      await reloadPlataformas();
+    }
+  };
+
+  const handleDeletePlataforma = async () => {
+    if (!plataformaToDelete) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("plataformas_ads").delete().eq("id", plataformaToDelete.id);
+      if (error) throw error;
+      toast.success(`Plataforma "${plataformaToDelete.nome}" excluída`);
+      setPlataformaToDelete(null);
+      await reloadPlataformas();
+    } catch (e: any) {
+      toast.error(traduzErroPlataforma(e));
     } finally {
       setSaving(false);
     }
@@ -301,6 +412,7 @@ function AdminPage() {
   };
 
   const agenciasOrdenadas = [...todasAgencias].sort((a, b) => a.ordem - b.ordem);
+  const plataformasOrdenadas = [...todasPlataformas].sort((a, b) => a.ordem - b.ordem);
 
   return (
     <div className="space-y-8 max-w-4xl">
@@ -365,6 +477,57 @@ function AdminPage() {
             })}
             {agenciasOrdenadas.length === 0 && (
               <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma agência cadastrada.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Plataformas de ads */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2"><Megaphone size={18} /> Plataformas de ads</CardTitle>
+            <CardDescription>Opções do campo "Plataformas de mídia" nos cadastros de cliente e saldo. Renomear atualiza os clientes que já usam a plataforma.</CardDescription>
+          </div>
+          <Button size="sm" className="gap-2 shrink-0" onClick={() => setPlataformaDialog({ mode: "create", nome: "" })}>
+            <Plus size={14} /> Nova plataforma
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="divide-y rounded-md border">
+            {plataformasOrdenadas.map((p, idx) => {
+              const qtd = clientesPorPlataforma[p.nome] || 0;
+              return (
+                <div key={p.id} className={cn("flex items-center gap-3 px-3 py-2", !p.ativa && "opacity-50")}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{p.nome}</span>
+                      {!p.ativa && <Badge variant="outline" className="text-[10px]">Oculta</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{qtd} {qtd === 1 ? "cliente usa" : "clientes usam"}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => movePlataforma(p, -1)} title="Subir">
+                      <ArrowUp size={14} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === plataformasOrdenadas.length - 1} onClick={() => movePlataforma(p, 1)} title="Descer">
+                      <ArrowDown size={14} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => togglePlataforma(p)} title={p.ativa ? "Ocultar dos formulários" : "Reativar"}>
+                      {p.ativa ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPlataformaDialog({ mode: "edit", id: p.id, nome: p.nome, nomeOriginal: p.nome })} title="Renomear">
+                      <Pencil size={14} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPlataformaToDelete(p)} title="Excluir">
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+            {plataformasOrdenadas.length === 0 && (
+              <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma plataforma. Clique em "Nova plataforma" para criar a primeira.</p>
             )}
           </div>
         </CardContent>
@@ -548,6 +711,56 @@ function AdminPage() {
             <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDeleteAgencia(); }} disabled={saving} className="bg-destructive hover:bg-destructive/90">
               {saving ? "Aguarde..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog plataforma */}
+      <Dialog open={!!plataformaDialog} onOpenChange={(o) => { if (!o) setPlataformaDialog(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>{plataformaDialog?.mode === "edit" ? "Renomear plataforma" : "Nova plataforma"}</DialogTitle>
+          </DialogHeader>
+          {plataformaDialog && (
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSavePlataforma(); }}>
+              <div className="space-y-2">
+                <Label htmlFor="plataforma-nome">Nome</Label>
+                <Input
+                  id="plataforma-nome"
+                  autoFocus
+                  placeholder="Ex.: ChatGPT Ads"
+                  value={plataformaDialog.nome}
+                  onChange={(e) => setPlataformaDialog({ ...plataformaDialog, nome: e.target.value })}
+                />
+                {plataformaDialog.mode === "edit" && (
+                  <p className="text-xs text-muted-foreground">Os clientes que usam "{plataformaDialog.nomeOriginal}" passam a mostrar o novo nome.</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setPlataformaDialog(null)} disabled={saving}>Cancelar</Button>
+                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : plataformaDialog.mode === "edit" ? "Salvar" : "Criar plataforma"}</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!plataformaToDelete} onOpenChange={(o) => { if (!o) setPlataformaToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir plataforma "{plataformaToDelete?.nome}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ela deixa de aparecer como opção nos formulários.
+              {plataformaToDelete && (clientesPorPlataforma[plataformaToDelete.nome] || 0) > 0 && (
+                <> {clientesPorPlataforma[plataformaToDelete.nome]} {clientesPorPlataforma[plataformaToDelete.nome] === 1 ? "cliente continua" : "clientes continuam"} com ela no cadastro até você editar. Se quiser só tirar da lista sem excluir, use "Ocultar".</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDeletePlataforma(); }} disabled={saving} className="bg-destructive hover:bg-destructive/90">
+              {saving ? "Aguarde..." : "Excluir plataforma"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

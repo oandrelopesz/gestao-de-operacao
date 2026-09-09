@@ -31,17 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const PLATAFORMAS_DISPONIVEIS = [
-  "Meta",
-  "Google",
-  "Pinterest",
-  "X Ads",
-  "LinkedIn",
-  "TikTok",
-  "Taboola",
-  "Outbrain"
-];
+import { usePlataformas } from "@/lib/plataformas";
 
 const METODOS_PAGAMENTO = [
   { value: "cartao", label: "Cartão" },
@@ -66,6 +56,7 @@ interface SaldoAdsFormProps {
 }
 
 export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormProps) {
+  const { nomes: plataformasDisponiveis } = usePlataformas();
   const { label: agenciaLabelOf } = useAgencias();
   const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: string; verba_ads: number; tipo_verba: string; verba_total_contratada: number; data_inicio: string; data_limite_verba: string }[]>([]);
 
@@ -179,7 +170,7 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
-                      {PLATAFORMAS_DISPONIVEIS.filter(p => !field.value.includes(p)).map((plat) => (
+                      {plataformasDisponiveis.filter(p => !field.value.includes(p)).map((plat) => (
                         <DropdownMenuItem key={plat} onClick={() => addPlataforma(plat)}>
                           {plat}
                         </DropdownMenuItem>
