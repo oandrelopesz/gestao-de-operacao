@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAgencias, AGENCIA_COLORS, slugifyAgenciaId, type AgenciaDef } from "@/lib/agencias";
-import { useDemandaColunas, COLUMN_COLORS, type KanbanColumnDef } from "@/lib/demandaColunas";
+import { useDemandaColunas, COLUMN_COLORS, slugifyColumnId, type KanbanColumnDef } from "@/lib/demandaColunas";
 import { useTheme } from "@/lib/theme";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -31,7 +31,9 @@ type AgenciaDialog =
   | { mode: "create"; nome: string; hex: string }
   | { mode: "edit"; id: string; nome: string; hex: string };
 
-type ColunaDialog = { id: string; titulo: string; hex: string };
+type ColunaDialog =
+  | { mode: "create"; titulo: string; hex: string }
+  | { mode: "edit"; id: string; titulo: string; hex: string };
 
 type WipeTarget = "clientes" | "demandas" | "colunas";
 
@@ -170,12 +172,29 @@ function AdminPage() {
     }
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("demanda_colunas")
-        .update({ titulo, hex: colunaDialog.hex })
-        .eq("id", colunaDialog.id);
-      if (error) throw error;
-      toast.success("Coluna atualizada");
+      if (colunaDialog.mode === "edit") {
+        const { error } = await supabase
+          .from("demanda_colunas")
+          .update({ titulo, hex: colunaDialog.hex })
+          .eq("id", colunaDialog.id);
+        if (error) throw error;
+        toast.success("Coluna atualizada");
+      } else {
+        // Mesma regra da aba Demandas: nova coluna entra antes de "Feito", se existir
+        const feitoIdx = colunas.findIndex((c) => c.id === "feito");
+        const ordem = feitoIdx >= 0 ? feitoIdx : colunas.length;
+        const { error } = await supabase
+          .from("demanda_colunas")
+          .insert([{ id: slugifyColumnId(titulo), titulo, hex: colunaDialog.hex, ordem }]);
+        if (error) throw error;
+        // Empurra as colunas seguintes para manter a ordem consistente
+        await Promise.all(
+          colunas.slice(ordem).map((c, i) =>
+            supabase.from("demanda_colunas").update({ ordem: ordem + 1 + i }).eq("id", c.id)
+          )
+        );
+        toast.success("Coluna criada");
+      }
       setColunaDialog(null);
       await reloadColunas();
     } catch (e: any) {
@@ -353,9 +372,14 @@ function AdminPage() {
 
       {/* Colunas do Kanban */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Columns3 size={18} /> Colunas do Kanban (Demandas)</CardTitle>
-          <CardDescription>Nome e cor das colunas. Para criar colunas e mover demandas, use a própria aba Demandas.</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2"><Columns3 size={18} /> Colunas do Kanban (Demandas)</CardTitle>
+            <CardDescription>Crie, renomeie e escolha a cor das colunas. Para mover demandas entre colunas, use a aba Demandas.</CardDescription>
+          </div>
+          <Button size="sm" className="gap-2 shrink-0" onClick={() => setColunaDialog({ mode: "create", titulo: "", hex: COLUMN_COLORS[colunas.length % COLUMN_COLORS.length] })}>
+            <Plus size={14} /> Nova coluna
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="divide-y rounded-md border">
@@ -369,7 +393,7 @@ function AdminPage() {
                   </div>
                   <p className="text-xs text-muted-foreground font-mono">{c.id}</p>
                 </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setColunaDialog({ id: c.id, titulo: c.title, hex: c.hex })} title="Editar">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setColunaDialog({ mode: "edit", id: c.id, titulo: c.title, hex: c.hex })} title="Editar">
                   <Pencil size={14} />
                 </Button>
                 <Button
@@ -384,6 +408,9 @@ function AdminPage() {
                 </Button>
               </div>
             ))}
+            {colunas.length === 0 && (
+              <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma coluna. Clique em "Nova coluna" para criar a primeira.</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -530,7 +557,7 @@ function AdminPage() {
       <Dialog open={!!colunaDialog} onOpenChange={(o) => { if (!o) setColunaDialog(null); }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Editar coluna</DialogTitle>
+            <DialogTitle>{colunaDialog?.mode === "edit" ? "Editar coluna" : "Nova coluna"}</DialogTitle>
           </DialogHeader>
           {colunaDialog && (
             <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveColuna(); }}>
@@ -546,7 +573,7 @@ function AdminPage() {
               <ColorPicker colors={COLUMN_COLORS} value={colunaDialog.hex} onChange={(hex) => setColunaDialog({ ...colunaDialog, hex })} />
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setColunaDialog(null)} disabled={saving}>Cancelar</Button>
-                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : colunaDialog.mode === "edit" ? "Salvar" : "Criar coluna"}</Button>
               </DialogFooter>
             </form>
           )}
