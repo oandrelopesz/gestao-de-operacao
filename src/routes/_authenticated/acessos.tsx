@@ -42,6 +42,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserId } from "@/lib/clientesService";
 import { useCachedState, hasCached } from "@/lib/pageCache";
 import { CACHE_KEYS, loadAcessos } from "@/lib/data";
 import { toast } from "sonner";
@@ -187,8 +188,8 @@ function AcessosPage() {
 
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
+      // Mesmo padrão das outras abas: sem sessão (preview/Lovable) usa o usuário padrão
+      const userId = await getUserId();
 
       const isCrm = form.tipo === "crm";
       const payload = {
@@ -211,7 +212,7 @@ function AcessosPage() {
       } else {
         const { error } = await supabase
           .from("acessos_clientes")
-          .insert([{ ...payload, user_id: user.id }]);
+          .insert([{ ...payload, user_id: userId }]);
         if (error) throw error;
         toast.success("Acesso adicionado");
       }
