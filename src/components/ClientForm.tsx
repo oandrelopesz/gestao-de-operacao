@@ -33,35 +33,76 @@ import { maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
 import { useAgencias } from "@/lib/agencias";
 import { usePlataformas } from "@/lib/plataformas";
 
+export const METODOS_PAGAMENTO = [
+  { value: "pix", label: "Pix" },
+  { value: "boleto", label: "Boleto" },
+  { value: "cartao", label: "Cartão (sem monitoramento)" },
+] as const;
+
+const metodoPagamentoSchema = z.enum(["cartao", "pix", "boleto"]);
+
+/** Forma de pagamento e verba de UMA plataforma (verba mensal ou total do período, conforme tipo_verba) */
+const plataformaConfigSchema = z.object({
+  verba: z.number().min(0),
+  metodo_pagamento: metodoPagamentoSchema,
+});
+
+export type PlataformaConfig = z.infer<typeof plataformaConfigSchema>;
+
 const clientSchema = z.object({
   nome: z.string().min(2, "Nome é obrigatório"),
   agencia: z.string().min(1, "Selecione a agência"),
   nicho: z.string().optional(),
   data_inicio: z.string().min(1, "Informe a data de início"),
+  /** Soma das verbas mensais das plataformas (preenchido automaticamente) */
   verba_ads: z.number().min(0),
   observacoes: z.string().optional(),
   em_onboarding: z.boolean(),
   status_operacional: z.enum(["ativo", "pausado", "churn"]),
   tipo_verba: z.enum(["mensal", "total_periodo"]),
+  /** Soma das verbas totais das plataformas (preenchido automaticamente) */
   verba_total_contratada: z.union([z.number(), z.string().length(0)]).optional().nullable(),
   data_limite_verba: z.string().optional().nullable().or(z.literal("")),
-  metodo_pagamento: z.enum(["cartao", "pix", "boleto"]),
   plataformas: z.array(z.string()).min(1, "Selecione pelo menos uma plataforma"),
-  /** Investimento diário em ads; se vazio, usa verba mensal ÷ 30 */
+  /** Forma de pagamento e verba de cada plataforma selecionada (chave = nome da plataforma) */
+  plataformas_config: z.record(z.string(), plataformaConfigSchema),
+  /** Investimento diário total em ads; se vazio, usa a verba de cada plataforma ÷ dias */
   verba_diaria: z.number().min(0).optional().nullable(),
 });
 
 export type ClientFormValues = z.infer<typeof clientSchema>;
 
 interface ClientFormProps {
-  initialValues?: Partial<ClientFormValues>;
+  initialValues?: Partial<ClientFormValues> & {
+    /** Forma de pagamento legada (registro único de saldo); usada como padrão das plataformas */
+    metodo_pagamento?: PlataformaConfig["metodo_pagamento"];
+  };
   onSubmit: (values: ClientFormValues) => void;
   loading?: boolean;
+}
+
+const toDisplay = (value: number | null | undefined) =>
+  value ? maskBRLInput(String(Math.round(value * 100))) : "";
+
+/** Dias do período contratado (mínimo 1) — mesmo cálculo usado no monitor de saldo */
+export function diasDoPeriodo(dataInicio?: string | null, dataLimite?: string | null): number | null {
+  if (!dataInicio || !dataLimite) return null;
+  const inicio = new Date(dataInicio);
+  const fim = new Date(dataLimite);
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) return null;
+  return Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
 }
 
 export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps) {
   const { agencias } = useAgencias();
   const { nomes: plataformasDisponiveis } = usePlataformas();
+
+  const initialConfig: Record<string, PlataformaConfig> = { ...(initialValues?.plataformas_config || {}) };
+  // Garante uma entrada para cada plataforma já selecionada
+  (initialValues?.plataformas || []).forEach((p) => {
+    if (!initialConfig[p]) initialConfig[p] = { verba: 0, metodo_pagamento: initialValues?.metodo_pagamento || "pix" };
+  });
+
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
@@ -76,34 +117,85 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       tipo_verba: initialValues?.tipo_verba || "mensal",
       verba_total_contratada: initialValues?.verba_total_contratada ?? null,
       data_limite_verba: initialValues?.data_limite_verba || "",
-      metodo_pagamento: initialValues?.metodo_pagamento || "pix",
       plataformas: initialValues?.plataformas || [],
+      plataformas_config: initialConfig,
       verba_diaria: initialValues?.verba_diaria ?? null,
     },
   });
 
-  const [verbaDisplay, setVerbaDisplay] = useState(
-    initialValues?.verba_ads ? maskBRLInput(String(Math.round((initialValues.verba_ads || 0) * 100))) : ""
+  // Texto mascarado (R$) de cada campo de verba por plataforma
+  const [verbaDisplay, setVerbaDisplay] = useState<Record<string, string>>(() =>
+    Object.fromEntries(Object.entries(initialConfig).map(([p, cfg]) => [p, toDisplay(cfg.verba)]))
   );
-  const [verbaDiariaDisplay, setVerbaDiariaDisplay] = useState(
-    initialValues?.verba_diaria ? maskBRLInput(String(Math.round((initialValues.verba_diaria || 0) * 100))) : ""
-  );
+  const [verbaDiariaDisplay, setVerbaDiariaDisplay] = useState(toDisplay(initialValues?.verba_diaria));
+
+  const plataformas = form.watch("plataformas");
+  const config = form.watch("plataformas_config");
+  const tipoVerba = form.watch("tipo_verba");
+  const dataInicio = form.watch("data_inicio");
+  const dataLimite = form.watch("data_limite_verba");
+
+  const totalVerba = plataformas.reduce((acc, p) => acc + (config[p]?.verba || 0), 0);
+  const dias = tipoVerba === "total_periodo" ? diasDoPeriodo(dataInicio, dataLimite) : 30;
+  const verbaDiariaCalculada = dias ? totalVerba / dias : 0;
 
   const removePlataforma = (plat: string) => {
     const current = form.getValues("plataformas");
     form.setValue("plataformas", current.filter((p) => p !== plat), { shouldValidate: true });
+    const { [plat]: _removida, ...rest } = form.getValues("plataformas_config");
+    form.setValue("plataformas_config", rest);
   };
 
   const addPlataforma = (plat: string) => {
     const current = form.getValues("plataformas");
-    if (!current.includes(plat)) {
-      form.setValue("plataformas", [...current, plat], { shouldValidate: true });
+    if (current.includes(plat)) return;
+    const cfg = { ...form.getValues("plataformas_config") };
+    if (!cfg[plat]) {
+      // Primeira plataforma de um cadastro que já tinha verba total (ex.: lead convertido): herda o valor
+      const legado = current.length === 0
+        ? (form.getValues("tipo_verba") === "mensal"
+          ? form.getValues("verba_ads")
+          : Number(form.getValues("verba_total_contratada") || 0))
+        : 0;
+      const ultima = current.length > 0 ? cfg[current[current.length - 1]] : undefined;
+      cfg[plat] = {
+        verba: legado > 0 ? legado : 0,
+        metodo_pagamento: ultima?.metodo_pagamento || initialValues?.metodo_pagamento || "pix",
+      };
+      setVerbaDisplay((d) => ({ ...d, [plat]: toDisplay(cfg[plat].verba) }));
     }
+    form.setValue("plataformas_config", cfg);
+    form.setValue("plataformas", [...current, plat], { shouldValidate: true });
+  };
+
+  const setPlataformaConfig = (plat: string, patch: Partial<PlataformaConfig>) => {
+    const cfg = form.getValues("plataformas_config");
+    form.setValue(
+      "plataformas_config",
+      { ...cfg, [plat]: { ...(cfg[plat] || { verba: 0, metodo_pagamento: "pix" }), ...patch } },
+      { shouldValidate: true },
+    );
+  };
+
+  // Os totais do cliente são sempre a soma das plataformas selecionadas
+  const handleSubmit = (values: ClientFormValues) => {
+    const selecionadas = values.plataformas;
+    const cfg: Record<string, PlataformaConfig> = {};
+    selecionadas.forEach((p) => {
+      cfg[p] = values.plataformas_config[p] || { verba: 0, metodo_pagamento: "pix" };
+    });
+    const soma = selecionadas.reduce((acc, p) => acc + (cfg[p].verba || 0), 0);
+    onSubmit({
+      ...values,
+      plataformas_config: cfg,
+      verba_ads: values.tipo_verba === "mensal" ? soma : values.verba_ads,
+      verba_total_contratada: values.tipo_verba === "total_periodo" ? soma : values.verba_total_contratada,
+    });
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="nome"
@@ -170,6 +262,78 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
               </FormItem>
             )}
           />
+          <FormField
+            control={form.control}
+            name="status_operacional"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status Operacional</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="pausado">Pausado</SelectItem>
+                    <SelectItem value="churn">Churn</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* 1) Plataformas: escolhidas primeiro; cada uma abre forma de pagamento + verba abaixo */}
+        <FormField
+          control={form.control}
+          name="plataformas"
+          render={({ field }) => (
+            <FormItem className="flex flex-col rounded-md border p-4 bg-muted/20">
+              <FormLabel>Plataformas de mídia</FormLabel>
+              <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md items-center bg-background">
+                {field.value.map((plat) => (
+                  <Badge key={plat} variant="secondary" className="gap-1 pr-1">
+                    {plat}
+                    <button
+                      type="button"
+                      onClick={() => removePlataforma(plat)}
+                      className="hover:text-destructive"
+                      aria-label={`Remover ${plat}`}
+                    >
+                      <X size={12} />
+                    </button>
+                  </Badge>
+                ))}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" type="button" aria-label="Adicionar plataforma">
+                      <Plus size={14} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {plataformasDisponiveis.filter((p) => !field.value.includes(p)).map((plat) => (
+                      <DropdownMenuItem key={plat} onClick={() => addPlataforma(plat)}>
+                        {plat}
+                      </DropdownMenuItem>
+                    ))}
+                    {plataformasDisponiveis.filter((p) => !field.value.includes(p)).length === 0 && (
+                      <DropdownMenuItem disabled>Todas as plataformas já foram adicionadas</DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Adicione cada plataforma em que o cliente investe. Para cada uma você informa a forma de pagamento e a verba.
+              </p>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* 2) Verba: tipo + um bloco por plataforma */}
         <div className="space-y-4 rounded-md border p-4 bg-muted/20">
           <FormField
             control={form.control}
@@ -206,142 +370,86 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
             )}
           />
 
-          {form.watch("tipo_verba") === "mensal" ? (
-            <FormField
-              control={form.control}
-              name="verba_ads"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Verba de ads / mês</FormLabel>
-                  <FormControl>
+          {plataformas.length === 0 ? (
+            <p className="text-sm text-muted-foreground rounded-md border border-dashed p-3 text-center">
+              Selecione as plataformas acima para informar a forma de pagamento e a verba de cada uma.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <div className="hidden sm:grid sm:grid-cols-[1fr_1.1fr_1.1fr] gap-2 px-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <span>Plataforma</span>
+                <span>Forma de pagamento</span>
+                <span>{tipoVerba === "mensal" ? "Verba / mês" : "Verba total"}</span>
+              </div>
+              {plataformas.map((plat) => {
+                const cfg = config[plat] || { verba: 0, metodo_pagamento: "pix" as const };
+                return (
+                  <div key={plat} className="grid grid-cols-1 sm:grid-cols-[1fr_1.1fr_1.1fr] gap-2 items-center rounded-md border bg-background p-2">
+                    <Badge variant="secondary" className="justify-self-start">{plat}</Badge>
+                    <Select
+                      value={cfg.metodo_pagamento}
+                      onValueChange={(v) => setPlataformaConfig(plat, { metodo_pagamento: v as PlataformaConfig["metodo_pagamento"] })}
+                    >
+                      <SelectTrigger aria-label={`Forma de pagamento — ${plat}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {METODOS_PAGAMENTO.map((m) => (
+                          <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Input
                       inputMode="numeric"
                       placeholder="R$ 0,00"
-                      value={verbaDisplay}
+                      aria-label={`${tipoVerba === "mensal" ? "Verba mensal" : "Verba total"} — ${plat}`}
+                      value={verbaDisplay[plat] ?? ""}
                       onChange={(e) => {
-                        const masked = maskBRLInput(e.target.value);
-                        setVerbaDisplay(masked);
-                        field.onChange(parseBRLInput(e.target.value));
+                        setVerbaDisplay((d) => ({ ...d, [plat]: maskBRLInput(e.target.value) }));
+                        setPlataformaConfig(plat, { verba: parseBRLInput(e.target.value) });
                       }}
                     />
+                  </div>
+                );
+              })}
+
+              <div className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">
+                  {tipoVerba === "mensal" ? "Total mensal" : "Total contratado"}
+                  {plataformas.length > 1 && <span className="text-[11px]"> ({plataformas.length} plataformas)</span>}
+                </span>
+                <span className="font-semibold">
+                  {formatBRL(totalVerba)}{tipoVerba === "mensal" && <span className="text-[11px] font-normal text-muted-foreground">/mês</span>}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {tipoVerba === "total_periodo" && (
+            <FormField
+              control={form.control}
+              name="data_limite_verba"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Data Limite</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} value={field.value || ""} />
                   </FormControl>
-                  <p className="text-xs text-muted-foreground">{formatBRL(field.value)}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {dias ? `${dias} dias de período` : "Informe a data limite para calcular o consumo diário"}
+                    {dias && totalVerba > 0 ? ` · ${formatBRL(verbaDiariaCalculada)}/dia no total` : ""}.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
             />
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="verba_total_contratada"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Verba Total Contratada</FormLabel>
-                    <FormControl>
-                      <Input
-                        inputMode="numeric"
-                        placeholder="R$ 0,00"
-                        value={field.value ? formatBRL(field.value) : ""}
-                        onChange={(e) => {
-                          field.onChange(parseBRLInput(e.target.value));
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="data_limite_verba"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data Limite</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} value={field.value || ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
           )}
-        </div>
-        </div>
-
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-md border p-4 bg-muted/20">
-          <FormField
-            control={form.control}
-            name="metodo_pagamento"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Forma de pagamento</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="pix">Pix</SelectItem>
-                    <SelectItem value="boleto">Boleto</SelectItem>
-                    <SelectItem value="cartao">Cartão (sem monitoramento)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground">
-                  Define como o saldo de mídia será monitorado.
-                </p>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="plataformas"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Plataformas de mídia</FormLabel>
-                <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md items-center bg-background">
-                  {field.value.map((plat) => (
-                    <Badge key={plat} variant="secondary" className="gap-1 pr-1">
-                      {plat}
-                      <button
-                        type="button"
-                        onClick={() => removePlataforma(plat)}
-                        className="hover:text-destructive"
-                      >
-                        <X size={12} />
-                      </button>
-                    </Badge>
-                  ))}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" type="button">
-                        <Plus size={14} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      {plataformasDisponiveis.filter((p) => !field.value.includes(p)).map((plat) => (
-                        <DropdownMenuItem key={plat} onClick={() => addPlataforma(plat)}>
-                          {plat}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
 
           <FormField
             control={form.control}
             name="verba_diaria"
             render={({ field }) => (
-              <FormItem className="md:col-span-2">
+              <FormItem>
                 <FormLabel>Investimento diário em ads <span className="text-muted-foreground font-normal">(opcional)</span></FormLabel>
                 <FormControl>
                   <Input
@@ -349,16 +457,16 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
                     placeholder="R$ 0,00 por dia"
                     value={verbaDiariaDisplay}
                     onChange={(e) => {
-                      const masked = maskBRLInput(e.target.value);
-                      setVerbaDiariaDisplay(masked);
+                      setVerbaDiariaDisplay(maskBRLInput(e.target.value));
                       const parsed = parseBRLInput(e.target.value);
                       field.onChange(parsed > 0 ? parsed : null);
                     }}
                   />
                 </FormControl>
                 <p className="text-[11px] text-muted-foreground">
-                  Usado para calcular quando o saldo acaba. Se ficar vazio, considera a verba mensal ÷ 30
-                  {form.watch("tipo_verba") === "mensal" && form.watch("verba_ads") > 0 && ` (${formatBRL(form.watch("verba_ads") / 30)}/dia)`}.
+                  Usado para calcular quando o saldo acaba. Se ficar vazio, considera a verba de cada plataforma ÷ {tipoVerba === "mensal" ? "30" : "dias do período"}
+                  {totalVerba > 0 && dias ? ` (${formatBRL(verbaDiariaCalculada)}/dia no total)` : ""}.
+                  {plataformas.length > 1 && " Se informado, é distribuído entre as plataformas na proporção da verba."}
                 </p>
                 <FormMessage />
               </FormItem>
@@ -375,29 +483,6 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
               <FormControl>
                 <Textarea rows={3} placeholder="Notas, contexto, links..." {...field} />
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="status_operacional"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Status Operacional</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="ativo">Ativo</SelectItem>
-                  <SelectItem value="pausado">Pausado</SelectItem>
-                  <SelectItem value="churn">Churn</SelectItem>
-                </SelectContent>
-              </Select>
               <FormMessage />
             </FormItem>
           )}

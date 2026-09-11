@@ -52,7 +52,7 @@ import {
   NPS_STATUS_META, PAGAMENTO_META,
 } from "@/lib/clientes";
 import { useAgencias, agenciaBadgeStyle, agenciaBorderStyle } from "@/lib/agencias";
-import { saveCliente } from "@/lib/clientesService";
+import { saveCliente, loadClienteFormValues, type ClienteFormInitial } from "@/lib/clientesService";
 import { cn } from "@/lib/utils";
 
 type SearchParams = { agencia?: string; view?: "cards" | "tabela"; subAgencia?: string };
@@ -103,26 +103,22 @@ function ClientesPage() {
   const [showPausados, setShowPausados] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ClienteView | null>(null);
-  const [editingSaldo, setEditingSaldo] = useState<{ plataformas: string[]; metodo_pagamento: "cartao" | "pix" | "boleto" } | null>(null);
+  /** Cadastro completo (cliente + forma de pagamento e verba de cada plataforma) do cliente em edição */
+  const [editingValues, setEditingValues] = useState<ClienteFormInitial | null>(null);
   const [saving, setSaving] = useState(false);
 
   const openEdit = async (cliente: ClienteView) => {
     setEditing(cliente);
-    // Busca saldo_ads existente para preencher plataformas/forma de pagamento
-    const { data } = await supabase
-      .from("saldo_ads")
-      .select("plataformas, metodo_pagamento")
-      .eq("cliente_id", cliente.id)
-      .maybeSingle();
-    if (data) {
-      setEditingSaldo({
-        plataformas: data.plataformas || [],
-        metodo_pagamento: (data.metodo_pagamento || "pix") as any,
-      });
-    } else {
-      setEditingSaldo(null);
-    }
+    setEditingValues(null);
     setModalOpen(true);
+    try {
+      setEditingValues(await loadClienteFormValues(cliente.id));
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao carregar cliente");
+      setModalOpen(false);
+      setEditing(null);
+    }
   };
 
   useEffect(() => { fetchClientes(); }, []);
@@ -239,7 +235,7 @@ function ClientesPage() {
               <TabsTrigger value="tabela" className="gap-1.5"><TableIcon size={14} />Tabela</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button className="gap-2" onClick={() => { setEditing(null); setEditingSaldo(null); setModalOpen(true); }}>
+          <Button className="gap-2" onClick={() => { setEditing(null); setEditingValues(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
           </Button>
         </div>
@@ -570,7 +566,7 @@ function ClientesPage() {
           <p className="text-muted-foreground mb-4 text-sm">
             {clientes.length === 0 ? "Cadastre o primeiro cliente — ele aparece automaticamente em Saldo, NPS e Demandas." : "Cadastre o primeiro cliente desta agência ou ajuste os filtros."}
           </p>
-          <Button className="gap-2" onClick={() => { setEditing(null); setEditingSaldo(null); setModalOpen(true); }}>
+          <Button className="gap-2" onClick={() => { setEditing(null); setEditingValues(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
           </Button>
         </div>
@@ -674,31 +670,23 @@ function ClientesPage() {
         </div>
       )}
 
-      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) { setEditing(null); setEditingSaldo(null); } }}>
+      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) { setEditing(null); setEditingValues(null); } }}>
         <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar cliente" : "Novo cliente"}</DialogTitle>
             <DialogDescription>Preencha os dados do cliente. O status é calculado a partir do NPS.</DialogDescription>
           </DialogHeader>
-          <ClientForm
-            loading={saving}
-            onSubmit={handleSave}
-            initialValues={editing ? {
-              nome: editing.nome,
-              agencia: editing.agencia as any,
-              nicho: editing.nicho || "",
-              data_inicio: editing.data_inicio,
-              verba_ads: Number(editing.verba_ads || 0),
-              observacoes: editing.observacoes || "",
-              em_onboarding: editing.em_onboarding || false,
-              status_operacional: editing.status_operacional || "ativo",
-              tipo_verba: editing.tipo_verba || "mensal",
-              verba_total_contratada: editing.verba_total_contratada ?? null,
-              data_limite_verba: editing.data_limite_verba || "",
-              metodo_pagamento: editingSaldo?.metodo_pagamento || "pix",
-              plataformas: editingSaldo?.plataformas || [],
-            } : { agencia: agencia === "todos" ? (agencias[0]?.id ?? "") : agencia, metodo_pagamento: "pix", plataformas: [] } as any}
-          />
+          {editing && !editingValues ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Carregando cliente...</p>
+          ) : (
+            <ClientForm
+              loading={saving}
+              onSubmit={handleSave}
+              initialValues={editing && editingValues
+                ? editingValues
+                : { agencia: agencia === "todos" ? (agencias[0]?.id ?? "") : agencia, plataformas: [], plataformas_config: {} }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

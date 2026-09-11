@@ -133,6 +133,8 @@ export type Database = {
           user_id: string
           verba_ads: number
           verba_total_contratada: number | null
+          plataformas_config: Json | null
+          verba_diaria_manual: number | null
         }
         Insert: {
           agencia?: string
@@ -153,6 +155,8 @@ export type Database = {
           user_id: string
           verba_ads?: number
           verba_total_contratada?: number | null
+          plataformas_config?: Json | null
+          verba_diaria_manual?: number | null
         }
         Update: {
           agencia?: string
@@ -173,6 +177,8 @@ export type Database = {
           user_id?: string
           verba_ads?: number
           verba_total_contratada?: number | null
+          plataformas_config?: Json | null
+          verba_diaria_manual?: number | null
         }
         Relationships: [
           {

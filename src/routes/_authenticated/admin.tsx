@@ -217,6 +217,14 @@ function AdminPage() {
           await Promise.all((rows || []).map((r) =>
             supabase.from("saldo_ads").update({ plataformas: (r.plataformas || []).map((p: string) => (p === plataformaDialog.nomeOriginal ? nome : p)) }).eq("id", r.id)
           ));
+          // ...e para a verba/forma de pagamento por plataforma guardada no cadastro do cliente
+          const { data: clis } = await supabase.from("clientes").select("id, plataformas_config").not("plataformas_config", "is", null);
+          await Promise.all(((clis || []) as any[])
+            .filter((c) => c.plataformas_config && c.plataformas_config[plataformaDialog.nomeOriginal] !== undefined)
+            .map((c) => {
+              const { [plataformaDialog.nomeOriginal]: cfg, ...rest } = c.plataformas_config;
+              return supabase.from("clientes").update({ plataformas_config: { ...rest, [nome]: cfg } }).eq("id", c.id);
+            }));
         }
         toast.success("Plataforma atualizada");
       } else {

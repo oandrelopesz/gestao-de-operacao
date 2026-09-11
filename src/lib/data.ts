@@ -52,11 +52,11 @@ export async function loadClientesView() {
 
   const { data: saldos, error: saldosError } = await supabase
     .from("saldo_ads_view")
-    .select("cliente_id, plataformas, verba_diaria_calc");
+    .select("cliente_id, plataformas, verba_diaria_calc, ativo");
   if (saldosError) console.warn("Erro ao buscar saldos para enriquecimento:", saldosError);
 
   return ((data as any[]) || []).map((cli) => {
-    const cliSaldos = (saldos || []).filter((s) => s.cliente_id === cli.id);
+    const cliSaldos = (saldos || []).filter((s) => s.cliente_id === cli.id && s.ativo !== false);
     const summary = cliSaldos
       .map((s) => {
         const platNames = s.plataformas && s.plataformas.length > 0 ? s.plataformas.join(", ") : "Outras";

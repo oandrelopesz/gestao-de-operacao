@@ -54,7 +54,8 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SaldoAdsForm, SaldoAdsFormValues } from "@/components/SaldoAdsForm";
-import { RecargaForm, RecargaFormValues } from "@/components/RecargaForm";
+import { RecargaForm, RecargaFormValues, RecargaConta } from "@/components/RecargaForm";
+import { usePlataformas } from "@/lib/plataformas";
 import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
@@ -64,16 +65,18 @@ export const Route = createFileRoute("/_authenticated/saldo")({
   component: SaldoPage,
 });
 
-const PLATAFORMAS = [
-  { id: "Meta", label: "Meta", color: "bg-blue-500" },
-  { id: "Google", label: "Google", color: "bg-red-500" },
-  { id: "Pinterest", label: "Pinterest", color: "bg-rose-500" },
-  { id: "X Ads", label: "X Ads", color: "bg-black" },
-  { id: "LinkedIn", label: "LinkedIn", color: "bg-blue-700" },
-  { id: "TikTok", label: "TikTok", color: "bg-zinc-800" },
-  { id: "Taboola", label: "Taboola", color: "bg-blue-400" },
-  { id: "Outbrain", label: "Outbrain", color: "bg-orange-500" },
-];
+// Cores dos badges por plataforma (a lista em si vem do Admin, via usePlataformas)
+const PLATAFORMA_CORES: Record<string, string> = {
+  Meta: "bg-blue-500",
+  Google: "bg-red-500",
+  Pinterest: "bg-rose-500",
+  "X Ads": "bg-black",
+  LinkedIn: "bg-blue-700",
+  TikTok: "bg-zinc-800",
+  Taboola: "bg-blue-400",
+  Outbrain: "bg-orange-500",
+};
+const corPlataforma = (nome: string) => PLATAFORMA_CORES[nome] || "bg-slate-500";
 
 const STATUS_ALERTA = [
   { id: "ok", label: "OK", weight: 0 },
@@ -95,6 +98,7 @@ interface SaldoRow {
   cliente_status_operacional: string | null;
   metodo_pagamento: string | null;
   plataformas: string[];
+  ativo: boolean;
   verba_diaria: number | null;
   verba_diaria_calc: number | null;
   saldo_total_acumulado: number;
@@ -124,6 +128,14 @@ interface ClienteGroup {
   plataforma_mais_proxima: string;
 }
 
+/** Plataforma(s) de um registro de saldo, para o seletor de recarga */
+const contaDeRecarga = (row: SaldoRow): RecargaConta => ({
+  id: row.id,
+  label: (row.plataformas || []).join(", ") || "Sem plataforma",
+  metodo_pagamento: row.metodo_pagamento,
+  verba_diaria: row.verba_diaria_calc,
+});
+
 const formatDate = (iso?: string | null) => {
   if (!iso) return "—";
   const [y, m, d] = iso.slice(0, 10).split("-");
@@ -142,6 +154,7 @@ const statusEfetivo = (row: SaldoRow) =>
 
 function SaldoPage() {
   const { agencias, label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
+  const { nomes: plataformasDisponiveis } = usePlataformas();
   const [data, setData] = useCachedState<SaldoRow[]>(CACHE_KEYS.saldo, []);
   const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.saldo));
   const [filterAgencia, setFilterAgencia] = useState<string>("all");
@@ -159,7 +172,9 @@ function SaldoPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editing, setEditing] = useState<SaldoRow | null>(null);
   const [editingClient, setEditingClient] = useState<any>(null);
-  const [selectedForRecarga, setSelectedForRecarga] = useState<SaldoRow | null>(null);
+  /** Recarga em andamento: plataformas do cliente (o usuário escolhe em qual foi) e a sugerida */
+  const [recargaTarget, setRecargaTarget] = useState<{ cliente_nome: string; contas: SaldoRow[]; defaultId?: string } | null>(null);
+  const [novoRegistroClienteId, setNovoRegistroClienteId] = useState<string | null>(null);
   const [selectedForHistory, setSelectedForHistory] = useState<SaldoRow | null>(null);
   const [historyIsConsolidated, setHistoryIsConsolidated] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -204,7 +219,8 @@ function SaldoPage() {
   const fetchSaldo = async (silent = false) => {
     if (!silent && !hasCached(CACHE_KEYS.saldo)) setLoading(true);
     try {
-      setData((await loadSaldo()) as unknown as SaldoRow[]);
+      // Plataformas desativadas no cadastro do cliente ficam fora do monitor (histórico preservado)
+      setData(((await loadSaldo()) as unknown as SaldoRow[]).filter((r) => r.ativo !== false));
     } catch (error) {
       toast.error("Erro ao carregar saldos de mídia");
       console.error(error);
@@ -234,8 +250,7 @@ function SaldoPage() {
         if (error) throw error;
         toast.success("Registro criado");
         if (values.metodo_pagamento !== "cartao") {
-          setSelectedForRecarga({ ...(newRecord as any), cliente_nome: "" });
-          setRecargaModalOpen(true);
+          openRecarga([newRecord as any], newRecord as any, "");
         }
       }
       setModalOpen(false);
@@ -265,17 +280,31 @@ function SaldoPage() {
     }
   };
 
+  /** Abre o modal de recarga: o usuário escolhe a plataforma entre as que o cliente roda (Pix/Boleto) */
+  const openRecarga = (contas: SaldoRow[], sugerida?: SaldoRow, clienteNome?: string) => {
+    const monitoradas = contas.filter((c) => c.metodo_pagamento !== "cartao");
+    setRecargaTarget({
+      cliente_nome: clienteNome ?? (sugerida?.cliente_nome || monitoradas[0]?.cliente_nome || ""),
+      contas: monitoradas.length > 0 ? monitoradas : contas,
+      defaultId: sugerida?.id,
+    });
+    setRecargaModalOpen(true);
+  };
+
   const handleRecarga = async (values: RecargaFormValues) => {
-    if (!selectedForRecarga) return;
+    const { saldo_ads_id, ...recarga } = values;
+    const alvo = saldo_ads_id || recargaTarget?.defaultId;
+    if (!alvo) return;
     setSaving(true);
     try {
       const { error } = await supabase
         .from("recargas")
-        .insert([{ ...values, saldo_ads_id: selectedForRecarga.id }]);
+        .insert([{ ...recarga, saldo_ads_id: alvo }]);
       if (error) throw error;
-      toast.success("Recarga registrada — previsão recalculada");
+      const plataforma = recargaTarget?.contas.find((c) => c.id === alvo)?.plataformas?.join(", ");
+      toast.success(plataforma ? `Recarga registrada em ${plataforma} — previsão recalculada` : "Recarga registrada — previsão recalculada");
       setRecargaModalOpen(false);
-      setSelectedForRecarga(null);
+      setRecargaTarget(null);
       fetchSaldo(true);
     } catch (e: any) {
       toast.error(e.message || "Erro ao salvar recarga");
@@ -475,7 +504,7 @@ function SaldoPage() {
               <BellOff size={16} /> Zerar alertas ({activeAlerts.length})
             </Button>
           )}
-          <Button className="gap-2" onClick={() => { setEditing(null); setModalOpen(true); }}>
+          <Button className="gap-2" onClick={() => { setEditing(null); setNovoRegistroClienteId(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo registro
           </Button>
           <Button variant="outline" size="icon" onClick={() => fetchSaldo()} disabled={loading} title="Atualizar">
@@ -594,8 +623,8 @@ function SaldoPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Plataformas</SelectItem>
-            {PLATAFORMAS.map((p) => (
-              <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+            {plataformasDisponiveis.map((p) => (
+              <SelectItem key={p} value={p}>{p}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -687,9 +716,14 @@ function SaldoPage() {
                         <DropdownMenuItem onClick={() => openClientEditor(group.cliente_id)}>
                           <UserCog size={14} className="mr-2" /> Editar cliente
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setEditing(null); setModalOpen(true); }}>
+                        <DropdownMenuItem onClick={() => { setEditing(null); setNovoRegistroClienteId(group.cliente_id); setModalOpen(true); }}>
                           <Plus size={14} className="mr-2" /> Nova plataforma
                         </DropdownMenuItem>
+                        {!isCartaoOnly && (
+                          <DropdownMenuItem onClick={() => openRecarga(group.plataformas, undefined, group.cliente_nome)}>
+                            <ArrowUpCircle size={14} className="mr-2" /> Adicionar recarga
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => fetchHistory(group.plataformas[0], true)}>
                           <History size={14} className="mr-2" /> Histórico consolidado
@@ -750,7 +784,7 @@ function SaldoPage() {
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2 flex-wrap">
                               {plat.plataformas?.map((p) => (
-                                <Badge key={p} className={cn("text-[10px] px-1.5 py-0", PLATAFORMAS.find((plt) => plt.id === p)?.color)}>{p}</Badge>
+                                <Badge key={p} className={cn("text-[10px] px-1.5 py-0", corPlataforma(p))}>{p}</Badge>
                               ))}
                               {isCartao && <Badge variant="outline" className="text-[9px] h-4 py-0 text-blue-600 border-blue-200">Cartão</Badge>}
                               {status === "dispensado" && (
@@ -779,7 +813,7 @@ function SaldoPage() {
                                   </DropdownMenuItem>
                                   {!isCartao && (
                                     <>
-                                      <DropdownMenuItem onClick={() => { setSelectedForRecarga(plat); setRecargaModalOpen(true); }}>
+                                      <DropdownMenuItem onClick={() => openRecarga(group.plataformas, plat)}>
                                         <Plus size={12} className="mr-2" /> Adicionar recarga
                                       </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => fetchHistory(plat)}>
@@ -856,7 +890,7 @@ function SaldoPage() {
                             <Button
                               className="w-full h-8 text-xs gap-2 mt-4"
                               variant="outline"
-                              onClick={(e) => { e.stopPropagation(); setSelectedForRecarga(plat); setRecargaModalOpen(true); }}
+                              onClick={(e) => { e.stopPropagation(); openRecarga(group.plataformas, plat); }}
                             >
                               <ArrowUpCircle size={14} /> Adicionar recarga
                             </Button>
@@ -873,7 +907,7 @@ function SaldoPage() {
       </div>
 
       {/* Modais */}
-      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) setEditing(null); }}>
+      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) { setEditing(null); setNovoRegistroClienteId(null); } }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>{editing?.id ? "Editar registro" : "Novo registro de saldo"}</DialogTitle>
@@ -888,7 +922,7 @@ function SaldoPage() {
               metodo_pagamento: (editing.metodo_pagamento || "pix") as SaldoAdsFormValues["metodo_pagamento"],
               verba_diaria: editing.verba_diaria,
               observacoes: editing.observacoes || "",
-            } : {}}
+            } : novoRegistroClienteId ? { cliente_id: novoRegistroClienteId } : {}}
           />
         </DialogContent>
       </Dialog>
@@ -907,16 +941,24 @@ function SaldoPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={recargaModalOpen} onOpenChange={(o) => { setRecargaModalOpen(o); if (!o) setSelectedForRecarga(null); }}>
+      <Dialog open={recargaModalOpen} onOpenChange={(o) => { setRecargaModalOpen(o); if (!o) setRecargaTarget(null); }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Adicionar recarga</DialogTitle>
             <DialogDescription>
-              Novo aporte para <strong>{selectedForRecarga?.cliente_nome}</strong>
-              {selectedForRecarga?.verba_diaria_calc ? ` — consumo de ${formatBRL(selectedForRecarga.verba_diaria_calc)}/dia` : ""}.
+              Novo aporte para <strong>{recargaTarget?.cliente_nome || "o cliente"}</strong>
+              {recargaTarget && recargaTarget.contas.length > 1 ? " — escolha em qual plataforma a recarga foi feita" : ""}.
             </DialogDescription>
           </DialogHeader>
-          <RecargaForm loading={saving} defaultMetodo={selectedForRecarga?.metodo_pagamento || undefined} onSubmit={handleRecarga} />
+          {recargaTarget && (
+            <RecargaForm
+              loading={saving}
+              contas={recargaTarget.contas.map(contaDeRecarga)}
+              defaultContaId={recargaTarget.defaultId}
+              defaultMetodo={recargaTarget.contas.find((c) => c.id === recargaTarget.defaultId)?.metodo_pagamento || undefined}
+              onSubmit={handleRecarga}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
