@@ -86,98 +86,6 @@ export type Database = {
         }
         Relationships: []
       }
-      operacoes: {
-        Row: {
-          ativa: boolean
-          cliente_id: string
-          created_at: string
-          data_inicio_verba: string | null
-          data_limite_verba: string | null
-          id: string
-          moeda: string
-          nome: string
-          objetivo: string | null
-          ordem: number
-          plataformas_config: Json | null
-          tipo_verba: Database["public"]["Enums"]["tipo_verba_enum"]
-          updated_at: string
-          verba_ads: number
-          verba_diaria_manual: number | null
-          verba_total_contratada: number | null
-        }
-        Insert: {
-          ativa?: boolean
-          cliente_id: string
-          created_at?: string
-          data_inicio_verba?: string | null
-          data_limite_verba?: string | null
-          id?: string
-          moeda?: string
-          nome?: string
-          objetivo?: string | null
-          ordem?: number
-          plataformas_config?: Json | null
-          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"]
-          updated_at?: string
-          verba_ads?: number
-          verba_diaria_manual?: number | null
-          verba_total_contratada?: number | null
-        }
-        Update: {
-          ativa?: boolean
-          cliente_id?: string
-          created_at?: string
-          data_inicio_verba?: string | null
-          data_limite_verba?: string | null
-          id?: string
-          moeda?: string
-          nome?: string
-          objetivo?: string | null
-          ordem?: number
-          plataformas_config?: Json | null
-          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"]
-          updated_at?: string
-          verba_ads?: number
-          verba_diaria_manual?: number | null
-          verba_total_contratada?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "operacoes_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      plataformas_ads: {
-        Row: {
-          ativa: boolean
-          created_at: string
-          id: string
-          nome: string
-          ordem: number
-          updated_at: string
-        }
-        Insert: {
-          ativa?: boolean
-          created_at?: string
-          id: string
-          nome: string
-          ordem?: number
-          updated_at?: string
-        }
-        Update: {
-          ativa?: boolean
-          created_at?: string
-          id?: string
-          nome?: string
-          ordem?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
       clientes: {
         Row: {
           agencia: string
@@ -190,6 +98,7 @@ export type Database = {
           nicho: string | null
           nome: string
           observacoes: string | null
+          plataformas_config: Json | null
           status_operacional:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
@@ -198,9 +107,8 @@ export type Database = {
           updated_at: string
           user_id: string
           verba_ads: number
-          verba_total_contratada: number | null
-          plataformas_config: Json | null
           verba_diaria_manual: number | null
+          verba_total_contratada: number | null
         }
         Insert: {
           agencia?: string
@@ -213,6 +121,7 @@ export type Database = {
           nicho?: string | null
           nome: string
           observacoes?: string | null
+          plataformas_config?: Json | null
           status_operacional?:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
@@ -221,9 +130,8 @@ export type Database = {
           updated_at?: string
           user_id: string
           verba_ads?: number
-          verba_total_contratada?: number | null
-          plataformas_config?: Json | null
           verba_diaria_manual?: number | null
+          verba_total_contratada?: number | null
         }
         Update: {
           agencia?: string
@@ -236,6 +144,7 @@ export type Database = {
           nicho?: string | null
           nome?: string
           observacoes?: string | null
+          plataformas_config?: Json | null
           status_operacional?:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
@@ -244,9 +153,8 @@ export type Database = {
           updated_at?: string
           user_id?: string
           verba_ads?: number
-          verba_total_contratada?: number | null
-          plataformas_config?: Json | null
           verba_diaria_manual?: number | null
+          verba_total_contratada?: number | null
         }
         Relationships: [
           {
@@ -311,6 +219,7 @@ export type Database = {
       }
       cursos: {
         Row: {
+          aulas: Json
           categoria_id: string | null
           created_at: string | null
           em_andamento: boolean | null
@@ -322,12 +231,12 @@ export type Database = {
           ordem: number | null
           senha: string | null
           tema: Database["public"]["Enums"]["curso_tema"]
+          tipo_acesso: string
           updated_at: string | null
           user_id: string
-          aulas: Json
-          tipo_acesso: string
         }
         Insert: {
+          aulas?: Json
           categoria_id?: string | null
           created_at?: string | null
           em_andamento?: boolean | null
@@ -339,12 +248,12 @@ export type Database = {
           ordem?: number | null
           senha?: string | null
           tema?: Database["public"]["Enums"]["curso_tema"]
+          tipo_acesso?: string
           updated_at?: string | null
           user_id?: string
-          aulas?: Json
-          tipo_acesso?: string
         }
         Update: {
+          aulas?: Json
           categoria_id?: string | null
           created_at?: string | null
           em_andamento?: boolean | null
@@ -356,10 +265,9 @@ export type Database = {
           ordem?: number | null
           senha?: string | null
           tema?: Database["public"]["Enums"]["curso_tema"]
+          tipo_acesso?: string
           updated_at?: string | null
           user_id?: string
-          aulas?: Json
-          tipo_acesso?: string
         }
         Relationships: [
           {
@@ -367,38 +275,6 @@ export type Database = {
             columns: ["categoria_id"]
             isOneToOne: false
             referencedRelation: "curso_categorias"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      demanda_execucoes: {
-        Row: {
-          concluida: boolean | null
-          created_at: string | null
-          data_execucao: string
-          demanda_id: string
-          id: string
-        }
-        Insert: {
-          concluida?: boolean | null
-          created_at?: string | null
-          data_execucao?: string
-          demanda_id: string
-          id?: string
-        }
-        Update: {
-          concluida?: boolean | null
-          created_at?: string | null
-          data_execucao?: string
-          demanda_id?: string
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "demanda_execucoes_demanda_id_fkey"
-            columns: ["demanda_id"]
-            isOneToOne: false
-            referencedRelation: "demandas"
             referencedColumns: ["id"]
           },
         ]
@@ -432,6 +308,38 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      demanda_execucoes: {
+        Row: {
+          concluida: boolean | null
+          created_at: string | null
+          data_execucao: string
+          demanda_id: string
+          id: string
+        }
+        Insert: {
+          concluida?: boolean | null
+          created_at?: string | null
+          data_execucao?: string
+          demanda_id: string
+          id?: string
+        }
+        Update: {
+          concluida?: boolean | null
+          created_at?: string | null
+          data_execucao?: string
+          demanda_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demanda_execucoes_demanda_id_fkey"
+            columns: ["demanda_id"]
+            isOneToOne: false
+            referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       demandas: {
         Row: {
@@ -508,13 +416,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "demandas_status_fkey"
-            columns: ["status"]
-            isOneToOne: false
-            referencedRelation: "demanda_colunas"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "demandas_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -540,6 +441,13 @@ export type Database = {
             columns: ["recorrente_pai_id"]
             isOneToOne: false
             referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demandas_status_fkey"
+            columns: ["status"]
+            isOneToOne: false
+            referencedRelation: "demanda_colunas"
             referencedColumns: ["id"]
           },
         ]
@@ -845,15 +753,15 @@ export type Database = {
         }
         Insert: {
           cliente_id: string
-          conversao_vendas: number | null
+          conversao_vendas?: number | null
           created_at?: string
           data_avaliacao?: string
-          engajamento: number | null
+          engajamento?: number | null
           id?: string
           observacoes?: string | null
-          potencial_crescimento: number | null
-          relacionamento: number | null
-          resultados_campanha: number | null
+          potencial_crescimento?: number | null
+          relacionamento?: number | null
+          resultados_campanha?: number | null
           score_total: number
           user_id: string
         }
@@ -881,6 +789,78 @@ export type Database = {
           },
           {
             foreignKeyName: "nps_avaliacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operacoes: {
+        Row: {
+          ativa: boolean
+          cliente_id: string
+          created_at: string
+          data_inicio_verba: string | null
+          data_limite_verba: string | null
+          id: string
+          moeda: string
+          nome: string
+          objetivo: string | null
+          ordem: number
+          plataformas_config: Json | null
+          tipo_verba: Database["public"]["Enums"]["tipo_verba_enum"]
+          updated_at: string
+          verba_ads: number
+          verba_diaria_manual: number | null
+          verba_total_contratada: number | null
+        }
+        Insert: {
+          ativa?: boolean
+          cliente_id: string
+          created_at?: string
+          data_inicio_verba?: string | null
+          data_limite_verba?: string | null
+          id?: string
+          moeda?: string
+          nome?: string
+          objetivo?: string | null
+          ordem?: number
+          plataformas_config?: Json | null
+          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"]
+          updated_at?: string
+          verba_ads?: number
+          verba_diaria_manual?: number | null
+          verba_total_contratada?: number | null
+        }
+        Update: {
+          ativa?: boolean
+          cliente_id?: string
+          created_at?: string
+          data_inicio_verba?: string | null
+          data_limite_verba?: string | null
+          id?: string
+          moeda?: string
+          nome?: string
+          objetivo?: string | null
+          ordem?: number
+          plataformas_config?: Json | null
+          tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"]
+          updated_at?: string
+          verba_ads?: number
+          verba_diaria_manual?: number | null
+          verba_total_contratada?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operacoes_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes_view"
@@ -935,6 +915,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plataformas_ads: {
+        Row: {
+          ativa: boolean
+          created_at: string
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          created_at?: string
+          id: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       prospeccao: {
         Row: {
@@ -1004,6 +1011,13 @@ export type Database = {
           valor_estimado?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "prospeccao_agencia_destino_fkey"
+            columns: ["agencia_destino"]
+            isOneToOne: false
+            referencedRelation: "agencias"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "prospeccao_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -1171,6 +1185,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_ads_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes"
             referencedColumns: ["id"]
           },
         ]
@@ -1472,19 +1493,19 @@ export type Database = {
           nome: string | null
           nps_status: string | null
           observacoes: string | null
+          operacoes: Json | null
+          qtd_operacoes: number | null
           status_operacional:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
           status_pagamento_mes: string | null
           tipo_verba: Database["public"]["Enums"]["tipo_verba_enum"] | null
+          trafego_ativo: boolean | null
           ultima_nps_data: string | null
           ultima_nps_score: number | null
           verba_ads: number | null
-          verba_total_contratada: number | null
-          operacoes: Json | null
-          qtd_operacoes: number | null
-          trafego_ativo: boolean | null
           verba_mensal_brl: number | null
+          verba_total_contratada: number | null
         }
         Insert: {
           agencia?: string | null
@@ -1498,14 +1519,18 @@ export type Database = {
           nome?: string | null
           nps_status?: never
           observacoes?: string | null
+          operacoes?: never
+          qtd_operacoes?: never
           status_operacional?:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
           status_pagamento_mes?: never
           tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"] | null
+          trafego_ativo?: boolean | null
           ultima_nps_data?: never
           ultima_nps_score?: never
           verba_ads?: number | null
+          verba_mensal_brl?: never
           verba_total_contratada?: number | null
         }
         Update: {
@@ -1520,17 +1545,29 @@ export type Database = {
           nome?: string | null
           nps_status?: never
           observacoes?: string | null
+          operacoes?: never
+          qtd_operacoes?: never
           status_operacional?:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
           status_pagamento_mes?: never
           tipo_verba?: Database["public"]["Enums"]["tipo_verba_enum"] | null
+          trafego_ativo?: boolean | null
           ultima_nps_data?: never
           ultima_nps_score?: never
           verba_ads?: number | null
+          verba_mensal_brl?: never
           verba_total_contratada?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clientes_agencia_fkey"
+            columns: ["agencia"]
+            isOneToOne: false
+            referencedRelation: "agencias"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       financeiro_view: {
         Row: {
@@ -1576,6 +1613,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "clientes_agencia_fkey"
+            columns: ["cliente_agencia"]
+            isOneToOne: false
+            referencedRelation: "agencias"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "nps_avaliacoes_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -1602,6 +1646,8 @@ export type Database = {
           cliente_status_operacional:
             | Database["public"]["Enums"]["status_operacional_type"]
             | null
+          cliente_trafego_ativo: boolean | null
+          cotacao_brl: number | null
           created_at: string | null
           data_prevista_fim: string | null
           data_ultima_recarga: string | null
@@ -1610,7 +1656,11 @@ export type Database = {
           metodo_pagamento:
             | Database["public"]["Enums"]["metodo_pagamento_simplificado"]
             | null
+          moeda: string | null
           observacoes: string | null
+          operacao_id: string | null
+          operacao_nome: string | null
+          operacao_ordem: number | null
           plataformas: string[] | null
           qtd_recargas: number | null
           saldo_atual_estimado: number | null
@@ -1621,14 +1671,15 @@ export type Database = {
           valor_ultima_recarga: number | null
           verba_diaria: number | null
           verba_diaria_calc: number | null
-          cliente_trafego_ativo: boolean | null
-          cotacao_brl: number | null
-          moeda: string | null
-          operacao_id: string | null
-          operacao_nome: string | null
-          operacao_ordem: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "clientes_agencia_fkey"
+            columns: ["cliente_agencia"]
+            isOneToOne: false
+            referencedRelation: "agencias"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "saldo_ads_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -1641,6 +1692,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_ads_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes"
             referencedColumns: ["id"]
           },
         ]
@@ -1658,7 +1716,16 @@ export type Database = {
         }
         Returns: string
       }
+      calcular_saldo_atual: {
+        Args: { p_saldo_ads_id: string; p_verba_diaria: number }
+        Returns: number
+      }
+      cotacao_brl: { Args: { p_moeda: string }; Returns: number }
       get_nps_categoria: { Args: { score: number }; Returns: string }
+      operacao_verba_mensal: {
+        Args: { o: Database["public"]["Tables"]["operacoes"]["Row"] }
+        Returns: number
+      }
     }
     Enums: {
       cliente_nps_status:
