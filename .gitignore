@@ -30,3 +30,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Workspace do subagent-driven-development (scratch, não versionado)
+.superpowers/
