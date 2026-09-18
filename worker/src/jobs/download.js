@@ -45,9 +45,7 @@ export async function baixar({ link, rede, dir }, deps = {}) {
 
   let arquivos = await listarMidias(dir);
 
-  // Cai para o gallery-dl também quando o yt-dlp falhou de cara (não só quando
-  // ele "terminou bem" mas não achou mídia) — ex.: link que o yt-dlp não reconhece.
-  if (arquivos.length === 0 || erros.length > 0) {
+  if (arquivos.length === 0) {
     const argsGal = ["--dest", dir, "--retries", "3", "--quiet", link];
     if (cookies) argsGal.splice(0, 0, "--cookies", cookies);
     try {

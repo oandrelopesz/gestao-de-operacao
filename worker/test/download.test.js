@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import { baixar, cookiesDe } from "../src/jobs/download.js";
 import { ComandoFalhou } from "../src/exec.js";
 
-function deps({ ytdlp, gallery, midias }) {
+function deps({ ytdlp, gallery, midias, midiasAposYtdlp = null }) {
   const chamadas = [];
+  let vezes = 0;
   return {
     chamadas,
     rodar: async (cmd, args) => {
@@ -13,7 +14,12 @@ function deps({ ytdlp, gallery, midias }) {
       if (r instanceof Error) throw r;
       return { stdout: "", stderr: "" };
     },
-    listarMidias: async () => midias,
+    // `midiasAposYtdlp` é o que a pasta tem na 1ª varredura (logo após o yt-dlp);
+    // as varreduras seguintes devolvem `midias`, o estado após o gallery-dl.
+    listarMidias: async () => {
+      vezes += 1;
+      return vezes === 1 && midiasAposYtdlp !== null ? midiasAposYtdlp : midias;
+    },
     existeArquivo: () => true,
   };
 }
@@ -35,11 +41,29 @@ test("vários arquivos viram carrossel", async () => {
 });
 
 test("yt-dlp falhando cai para gallery-dl", async () => {
-  const d = deps({ ytdlp: new ComandoFalhou("yt-dlp", 1, "Unsupported URL"), gallery: {}, midias: ["/tmp/j/a.jpg"] });
+  const d = deps({
+    ytdlp: new ComandoFalhou("yt-dlp", 1, "Unsupported URL"),
+    gallery: {},
+    midiasAposYtdlp: [],
+    midias: ["/tmp/j/a.jpg"],
+  });
   const r = await baixar({ link: "https://instagram.com/p/x", rede: "instagram", dir: "/tmp/j" }, d);
   assert.equal(r.modo, "unico");
   assert.equal(d.chamadas.length, 2);
   assert.ok(d.chamadas[1].cmd.includes("gallery-dl"));
+});
+
+test("yt-dlp que falha mas deixou arquivo NÃO chama gallery-dl", async () => {
+  // Falha de pós-processamento depois do download: rodar o gallery-dl por cima duplicaria a mídia
+  // e transformaria um vídeo único em "carrossel".
+  const d = deps({
+    ytdlp: new ComandoFalhou("yt-dlp", 1, "ERROR: postprocessing"),
+    gallery: {},
+    midias: ["/tmp/j/video.mp4"],
+  });
+  const r = await baixar({ link: "https://youtu.be/abc", rede: "youtube", dir: "/tmp/j" }, d);
+  assert.equal(r.modo, "unico");
+  assert.equal(d.chamadas.length, 1, "só o yt-dlp devia ter rodado");
 });
 
 test("os dois falhando lança erro com o motivo do yt-dlp", async () => {
