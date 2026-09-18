@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Baixa links do swipe file e sobe no Google Drive",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test",
     "start": "node src/server.js"
   },
   "dependencies": {
