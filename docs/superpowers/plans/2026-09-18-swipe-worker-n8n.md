@@ -1287,13 +1287,26 @@ function daPasta(pasta, base, tamanho) {
 }
 
 export async function publicarDownload(drive, { arquivos, modo, base, paiId }) {
+  if (modo !== "carrossel" && modo !== "unico") {
+    throw new Error(`Modo de publicação desconhecido: ${modo}`);
+  }
+
   if (modo === "carrossel") {
     const pasta = await drive.garantirPasta(limitar(base), paiId);
+    // Retry de job reaproveita a pasta: subir de novo o que já está lá deixaria cards duplicados,
+    // porque o Drive aceita nomes repetidos. O upload resumível só finaliza arquivo completo,
+    // então um nome presente significa um card íntegro.
+    const jaTem = new Set(await drive.nomesEm(pasta.id));
     let total = 0;
     for (let i = 0; i < arquivos.length; i++) {
       const caminho = arquivos[i];
       const ext = extensaoDe(caminho) || "jpg";
-      const enviado = await drive.subirArquivo(caminho, { nome: nomeCard(base, i + 1, ext), paiId: pasta.id, mime: mimeDe(ext) });
+      const nome = nomeCard(base, i + 1, ext);
+      if (jaTem.has(nome)) {
+        total += await tamanhoDe(caminho);
+        continue;
+      }
+      const enviado = await drive.subirArquivo(caminho, { nome, paiId: pasta.id, mime: mimeDe(ext) });
       total += Number(enviado.size || 0) || (await tamanhoDe(caminho));
     }
     return daPasta(pasta, base, total);
@@ -1317,8 +1330,13 @@ export async function publicarDownload(drive, { arquivos, modo, base, paiId }) {
 
 export async function publicarLp(drive, { arquivos, base, paiId }) {
   const pasta = await drive.garantirPasta(limitar(base), paiId);
+  const jaTem = new Set(await drive.nomesEm(pasta.id));
   let total = 0;
   for (const a of arquivos) {
+    if (jaTem.has(a.nome)) {
+      total += await tamanhoDe(a.caminho);
+      continue;
+    }
     const enviado = await drive.subirArquivo(a.caminho, { nome: a.nome, paiId: pasta.id, mime: a.mime });
     total += Number(enviado.size || 0) || (await tamanhoDe(a.caminho));
   }
