@@ -1,5 +1,5 @@
 # worker/Dockerfile
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
     NODE_ENV=production \

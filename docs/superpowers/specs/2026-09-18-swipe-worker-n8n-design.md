@@ -122,7 +122,7 @@ de mídia, vira carrossel automaticamente — mesmo que a categoria escolhida n�
 
 **`lp`** — Playwright/Chromium abre a página, rola até o fim (lazy loading), espera a rede
 ficar ociosa e então:
-1. `single-file-cli` gera o `.html` embutido;
+1. `single-file-cli` gera o `.html` embutido (exige Node 22: usa as globais `WebSocket`/`CloseEvent`);
 2. `wget --mirror --convert-links --page-requisites --no-parent` (profundidade 1) gera a pasta
    espelhada, que é zipada;
 3. screenshot `fullPage`;
@@ -157,7 +157,7 @@ o n8n manda uma mensagem no WhatsApp pela Evolution API.
 - A imagem no GHCR é pública, mas não contém nenhum segredo (só binários e código).
 
 ## Entregáveis
-- `worker/` — imagem Node 20 com yt-dlp, gallery-dl, ffmpeg, wget, single-file-cli e Chromium.
+- `worker/` — imagem Node 22 com yt-dlp, gallery-dl, ffmpeg, wget, single-file-cli e Chromium.
 - `.github/workflows/swipe-worker.yml` — build e push para `ghcr.io/oandrelopesz/swipe-worker`.
 - `infra/swipe-worker/stack.yml` — stack Swarm para colar no Portainer.
 - `infra/swipe-worker/n8n-workflow.json` — workflow `[SWIPE] Fila de downloads`.
