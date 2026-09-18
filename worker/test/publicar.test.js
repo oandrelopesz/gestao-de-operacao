@@ -61,3 +61,24 @@ test("nome repetido na pasta ganha sufixo", async () => {
   await publicarDownload(d, { arquivos: ["/tmp/j/x.mp4"], modo: "unico", base: "Vídeo - N - P", paiId: "cat1" });
   assert.equal(d.acoes[0].nome, "Vídeo - N - P (2).mp4");
 });
+
+test("retry não duplica: card que já está na pasta é pulado", async () => {
+  const d = driveFake();
+  d.nomesEm = async (paiId) => (paiId === "pasta:Carrossel - N - P" ? ["Carrossel - N - P - 01.jpg"] : []);
+  const r = await publicarDownload(d, {
+    arquivos: ["/tmp/j/a.jpg", "/tmp/j/b.jpg"], modo: "carrossel", base: "Carrossel - N - P", paiId: "cat1",
+  });
+  const enviados = d.acoes.filter((a) => a.tipo === "upload").map((a) => a.nome);
+  assert.deepEqual(enviados, ["Carrossel - N - P - 02.jpg"], "só o card que faltava devia subir");
+  assert.equal(r.drive_file_id, "pasta:Carrossel - N - P");
+});
+
+test("carrossel respeita a extensão de cada card", async () => {
+  const d = driveFake();
+  await publicarDownload(d, {
+    arquivos: ["/tmp/j/a.jpg", "/tmp/j/b.png"], modo: "carrossel", base: "C - N - P", paiId: "cat1",
+  });
+  const enviados = d.acoes.filter((a) => a.tipo === "upload");
+  assert.deepEqual(enviados.map((a) => a.nome), ["C - N - P - 01.jpg", "C - N - P - 02.png"]);
+  assert.deepEqual(enviados.map((a) => a.mime), ["image/jpeg", "image/png"]);
+});
