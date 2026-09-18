@@ -188,6 +188,26 @@
     {
       "parameters": {
         "method": "PATCH",
+        "url": "=https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_itens?id=eq.{{ $('Decidir').item.json.item_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Content-Type", "value": "application/json" }, { "name": "Prefer", "value": "return=minimal" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'pendente', erro: $('Decidir').item.json.erro }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000015",
+      "name": "Item de volta para a fila",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1620, -100],
+      "credentials": { "httpHeaderAuth": { "id": "FM9KesEpqvc3xK4e", "name": "Supabase - Gestão de Operação (anon)" } }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
         "url": "=https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_itens?id=eq.{{ $json.item_id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
@@ -260,6 +280,7 @@
       [{ "node": "Item falhou", "type": "main", "index": 0 }]
     ] },
     "Item pronto": { "main": [[{ "node": "Job ok", "type": "main", "index": 0 }]] },
+    "Devolver para a fila": { "main": [[{ "node": "Item de volta para a fila", "type": "main", "index": 0 }]] },
     "Item falhou": { "main": [[{ "node": "Job erro", "type": "main", "index": 0 }]] },
     "Job erro": { "main": [[{ "node": "Avisar no WhatsApp", "type": "main", "index": 0 }]] }
   }
