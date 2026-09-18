@@ -11,7 +11,9 @@ export async function comPastaTemp(prefixo, fn) {
   try {
     return await fn(dir);
   } finally {
-    await rm(dir, { recursive: true, force: true }).catch(() => {});
+    await rm(dir, { recursive: true, force: true }).catch((e) => {
+      console.error(JSON.stringify({ evento: "tmp.limpeza_falhou", dir, erro: String(e?.message || e) }));
+    });
   }
 }
 
