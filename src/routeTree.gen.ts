@@ -22,6 +22,7 @@ import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
 import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
 import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
+import { Route as AuthenticatedSwipeRouteImport } from './routes/_authenticated/swipe'
 import { Route as AuthenticatedVerDepoisRouteImport } from './routes/_authenticated/ver-depois'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -89,6 +90,11 @@ const AuthenticatedSaldoRoute = AuthenticatedSaldoRouteImport.update({
   path: '/saldo',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSwipeRoute = AuthenticatedSwipeRouteImport.update({
+  id: '/swipe',
+  path: '/swipe',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedVerDepoisRoute = AuthenticatedVerDepoisRouteImport.update({
   id: '/ver-depois',
   path: '/ver-depois',
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/nps': typeof AuthenticatedNpsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/saldo': typeof AuthenticatedSaldoRoute
+  '/swipe': typeof AuthenticatedSwipeRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
 }
 export interface FileRoutesByTo {
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/nps': typeof AuthenticatedNpsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/saldo': typeof AuthenticatedSaldoRoute
+  '/swipe': typeof AuthenticatedSwipeRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/': typeof AuthenticatedIndexRoute
 }
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/_authenticated/nps': typeof AuthenticatedNpsRoute
   '/_authenticated/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
+  '/_authenticated/swipe': typeof AuthenticatedSwipeRoute
   '/_authenticated/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/nps'
     | '/prospeccao'
     | '/saldo'
+    | '/swipe'
     | '/ver-depois'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/nps'
     | '/prospeccao'
     | '/saldo'
+    | '/swipe'
     | '/ver-depois'
     | '/'
   id:
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/_authenticated/nps'
     | '/_authenticated/prospeccao'
     | '/_authenticated/saldo'
+    | '/_authenticated/swipe'
     | '/_authenticated/ver-depois'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
@@ -289,6 +301,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSaldoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/swipe': {
+      id: '/_authenticated/swipe'
+      path: '/swipe'
+      fullPath: '/swipe'
+      preLoaderRoute: typeof AuthenticatedSwipeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/ver-depois': {
       id: '/_authenticated/ver-depois'
       path: '/ver-depois'
@@ -310,6 +329,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedNpsRoute: typeof AuthenticatedNpsRoute
   AuthenticatedProspeccaoRoute: typeof AuthenticatedProspeccaoRoute
   AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
+  AuthenticatedSwipeRoute: typeof AuthenticatedSwipeRoute
   AuthenticatedVerDepoisRoute: typeof AuthenticatedVerDepoisRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
@@ -325,6 +345,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedNpsRoute: AuthenticatedNpsRoute,
   AuthenticatedProspeccaoRoute: AuthenticatedProspeccaoRoute,
   AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,
+  AuthenticatedSwipeRoute: AuthenticatedSwipeRoute,
   AuthenticatedVerDepoisRoute: AuthenticatedVerDepoisRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }

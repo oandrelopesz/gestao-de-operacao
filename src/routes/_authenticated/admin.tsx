@@ -26,6 +26,7 @@ import { usePlataformas, slugifyPlataformaId, type PlataformaDef } from "@/lib/p
 import { useTheme } from "@/lib/theme";
 import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, CATEGORIA_COLORS, type CursoCategoriaDef } from "@/lib/cursoCategorias";
 import { HabilidadesAdminCard } from "@/components/habilidades/HabilidadesAdminCard";
+import { SwipeAdminCard } from "@/components/swipe/SwipeAdminCard";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
@@ -691,6 +692,8 @@ function AdminPage() {
       </Card>
 
       <HabilidadesAdminCard />
+
+      <SwipeAdminCard />
 
       {/* Colunas do Kanban */}
       <Card>

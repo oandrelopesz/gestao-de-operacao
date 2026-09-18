@@ -1219,6 +1219,205 @@ export type Database = {
           },
         ]
       }
+      swipe_config: {
+        Row: {
+          conectado_em: string | null
+          conta_google: string | null
+          id: number
+          root_folder_id: string | null
+          root_folder_link: string | null
+          updated_at: string
+        }
+        Insert: {
+          conectado_em?: string | null
+          conta_google?: string | null
+          id?: number
+          root_folder_id?: string | null
+          root_folder_link?: string | null
+          updated_at?: string
+        }
+        Update: {
+          conectado_em?: string | null
+          conta_google?: string | null
+          id?: number
+          root_folder_id?: string | null
+          root_folder_link?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      swipe_itens: {
+        Row: {
+          categoria: string
+          created_at: string
+          drive_file_id: string | null
+          drive_folder_id: string | null
+          drive_web_link: string | null
+          erro: string | null
+          id: string
+          link: string | null
+          mime: string | null
+          nicho_id: string
+          nome_arquivo: string | null
+          nota: string | null
+          player: string
+          rede: string
+          status: string
+          subnicho_id: string | null
+          tags: string[]
+          tamanho: number | null
+          thumbnail_link: string | null
+          updated_at: string
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          drive_file_id?: string | null
+          drive_folder_id?: string | null
+          drive_web_link?: string | null
+          erro?: string | null
+          id?: string
+          link?: string | null
+          mime?: string | null
+          nicho_id: string
+          nome_arquivo?: string | null
+          nota?: string | null
+          player: string
+          rede?: string
+          status?: string
+          subnicho_id?: string | null
+          tags?: string[]
+          tamanho?: number | null
+          thumbnail_link?: string | null
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          drive_file_id?: string | null
+          drive_folder_id?: string | null
+          drive_web_link?: string | null
+          erro?: string | null
+          id?: string
+          link?: string | null
+          mime?: string | null
+          nicho_id?: string
+          nome_arquivo?: string | null
+          nota?: string | null
+          player?: string
+          rede?: string
+          status?: string
+          subnicho_id?: string | null
+          tags?: string[]
+          tamanho?: number | null
+          thumbnail_link?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swipe_itens_nicho_id_fkey"
+            columns: ["nicho_id"]
+            isOneToOne: false
+            referencedRelation: "swipe_nichos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swipe_itens_subnicho_id_fkey"
+            columns: ["subnicho_id"]
+            isOneToOne: false
+            referencedRelation: "swipe_nichos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      swipe_jobs: {
+        Row: {
+          concluido_em: string | null
+          created_at: string
+          erro: string | null
+          id: string
+          iniciado_em: string | null
+          item_id: string
+          payload: Json
+          status: string
+          tentativas: number
+          tipo: string
+        }
+        Insert: {
+          concluido_em?: string | null
+          created_at?: string
+          erro?: string | null
+          id?: string
+          iniciado_em?: string | null
+          item_id: string
+          payload?: Json
+          status?: string
+          tentativas?: number
+          tipo: string
+        }
+        Update: {
+          concluido_em?: string | null
+          created_at?: string
+          erro?: string | null
+          id?: string
+          iniciado_em?: string | null
+          item_id?: string
+          payload?: Json
+          status?: string
+          tentativas?: number
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swipe_jobs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "swipe_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      swipe_nichos: {
+        Row: {
+          created_at: string
+          drive_folder_id: string | null
+          drive_folder_link: string | null
+          id: string
+          nome: string
+          nome_normalizado: string
+          ordem: number
+          pai_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          drive_folder_id?: string | null
+          drive_folder_link?: string | null
+          id?: string
+          nome: string
+          nome_normalizado: string
+          ordem?: number
+          pai_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          drive_folder_id?: string | null
+          drive_folder_link?: string | null
+          id?: string
+          nome?: string
+          nome_normalizado?: string
+          ordem?: number
+          pai_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swipe_nichos_pai_id_fkey"
+            columns: ["pai_id"]
+            isOneToOne: false
+            referencedRelation: "swipe_nichos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ver_depois: {
         Row: {
           created_at: string

@@ -1,2 +1,5 @@
 [functions.google-oauth-exchange]
 verify_jwt = false
+
+[functions.google-token]
+verify_jwt = false
