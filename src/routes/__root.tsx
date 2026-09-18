@@ -5,6 +5,7 @@ import * as React from "react";
 import appCss from "../styles.css?url";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import { Toaster } from "@/components/ui/sonner";
+import { DialogSafety } from "@/components/DialogSafety";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -105,6 +106,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <Outlet />
       <Toaster richColors closeButton position="top-right" />
+      <DialogSafety />
     </QueryClientProvider>
   );
 }

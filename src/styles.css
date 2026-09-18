@@ -328,3 +328,8 @@
     pointer-events: none;
   }
 }
+
+/* Aba em segundo plano: sem animação de saída, senão o Radix nunca desmonta o diálogo (ver DialogSafety). */
+html[data-hidden] [data-state="closed"] {
+  animation: none !important;
+}
