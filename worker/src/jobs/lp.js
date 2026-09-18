@@ -10,7 +10,7 @@ import { rodar as rodarReal } from "../exec.js";
 import { limitar, nomeVsl } from "../nomes.js";
 
 /** Orçamento total de uma captura de LP, com folga sobre o timeout da chamada HTTP do n8n. */
-const ORCAMENTO_MS = 12 * 60 * 1000;
+const ORCAMENTO_MS = 20 * 60 * 1000;
 
 const EXT_VIDEO = /\.(mp4|m3u8|webm|mov|mpd)(\?|$)/i;
 const PLAYERS = /(converteai\.net|vturb|pandavideo|player\.vimeo\.com|youtube\.com\/embed|youtu\.be|wistia\.(net|com)|vidyard|jwplayer)/i;
@@ -25,8 +25,9 @@ export async function capturar({ link, dir, base }, deps = {}) {
   const rodar = deps.rodar || rodarReal;
   const abrir = deps.abrirNavegador || abrirNavegadorReal;
   const existe = deps.existeArquivo || existsSync;
-  // Orçamento total da captura. O n8n corta a chamada HTTP bem depois disso, então a resposta
-  // sempre sai daqui antes de ele desistir — senão o job seria retentado com o worker ocupado.
+  // Orçamento total da captura (20 min). O n8n corta a chamada HTTP bem depois disso (30 min),
+  // então a resposta sempre sai daqui antes de ele desistir — senão o job seria retentado com o
+  // worker ocupado.
   const prazo = Date.now() + (deps.orcamentoMs ?? ORCAMENTO_MS);
 
   const arquivos = [];
@@ -50,9 +51,12 @@ export async function capturar({ link, dir, base }, deps = {}) {
     link, htmlLocal,
     "--browser-executable-path=/usr/bin/chromium",
     "--browser-args=[\"--no-sandbox\",\"--disable-dev-shm-usage\"]",
-    "--browser-wait-until=networkidle0",
-    "--browser-load-max-time=120000",
-  ], { cwd: dir, timeout: 4 * 60 * 1000 });
+    // Página de VSL nunca atinge networkidle0: o player baixa segmentos sem parar. `load` já
+    // garante o DOM e os recursos principais, e o `wait-delay` cobre o lazy loading.
+    "--browser-wait-until=load",
+    "--browser-wait-delay=5000",
+    "--browser-load-max-time=90000",
+  ], { cwd: dir, timeout: 7 * 60 * 1000 });
   arquivos.push({ caminho: htmlLocal, nome: limitar(base, "html"), mime: "text/html" });
 
   // 3) Espelho completo, zipado. Os dois passos são acessórios: sem espelho a captura continua
@@ -121,7 +125,7 @@ async function abrirNavegadorReal(link) {
     pagina.on("request", (r) => { if (ehUrlDeVideo(r.url())) urlsDeVideo.push(r.url()); });
 
     await pagina.goto(link, { waitUntil: "domcontentloaded", timeout: 90_000 });
-    await pagina.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
+    await pagina.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
     // Rola até o fim para disparar lazy loading e o player da VSL
     await pagina.evaluate(async () => {
       await new Promise((pronto) => {

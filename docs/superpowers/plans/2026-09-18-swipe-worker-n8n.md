@@ -22,7 +22,7 @@
 - **Imagem:** `ghcr.io/oandrelopesz/swipe-worker:latest`, pública.
 - **Repositório GitHub:** `oandrelopesz/gestao-de-operacao`, branch `main`.
 - **Orçamento de tempo:** o worker sempre responde antes de o n8n desistir. Captura de LP tem
-  orçamento de 12 min (`ORCAMENTO_MS`), download tem 13 min, e a chamada HTTP do n8n espera
+  orçamento de 20 min (`ORCAMENTO_MS`), download tem 13 min, e a chamada HTTP do n8n espera
   1800000 ms (30 min). Quem limita o tempo é o worker, nunca o cliente.
 - **Limite de nome no Drive:** 180 caracteres antes da extensão; caracteres `\ / : * ? " < > |` viram `-`.
 - **Idioma:** código, comentários, mensagens de erro e commits em português, como o resto do repositório.
@@ -894,7 +894,7 @@ EOF
 - Produces: `capturar({ link, dir, base }, deps?) -> Promise<{ arquivos: Array<{ caminho, nome, mime }> }>` e `ehUrlDeVideo(url) -> boolean`.
   - `deps` (para teste): `{ rodar, abrirNavegador, existeArquivo, orcamentoMs }`.
   - `abrirNavegador(link) -> { urlsDeVideo: string[], screenshot(caminho): Promise<void>, fechar(): Promise<void> }`
-  - **Orçamento:** a captura tem 12 min no total (`ORCAMENTO_MS`). Antes de cada VSL a função
+  - **Orçamento:** a captura tem 20 min no total (`ORCAMENTO_MS`). Antes de cada VSL a função
     confere se ainda há tempo; sem tempo, devolve a LP com html/zip/print e para. Isso garante
     que a resposta sai antes do timeout da chamada HTTP do n8n, que é de 30 min.
 
@@ -1014,7 +1014,7 @@ import { rodar as rodarReal } from "../exec.js";
 import { limitar, nomeVsl } from "../nomes.js";
 
 /** Orçamento total de uma captura de LP, com folga sobre o timeout da chamada HTTP do n8n. */
-const ORCAMENTO_MS = 12 * 60 * 1000;
+const ORCAMENTO_MS = 20 * 60 * 1000;
 
 const EXT_VIDEO = /\.(mp4|m3u8|webm|mov|mpd)(\?|$)/i;
 const PLAYERS = /(converteai\.net|vturb|pandavideo|player\.vimeo\.com|youtube\.com\/embed|youtu\.be|wistia\.(net|com)|vidyard|jwplayer)/i;
@@ -1029,8 +1029,9 @@ export async function capturar({ link, dir, base }, deps = {}) {
   const rodar = deps.rodar || rodarReal;
   const abrir = deps.abrirNavegador || abrirNavegadorReal;
   const existe = deps.existeArquivo || existsSync;
-  // Orçamento total da captura. O n8n corta a chamada HTTP bem depois disso, então a resposta
-  // sempre sai daqui antes de ele desistir — senão o job seria retentado com o worker ocupado.
+  // Orçamento total da captura (20 min). O n8n corta a chamada HTTP bem depois disso (30 min),
+  // então a resposta sempre sai daqui antes de ele desistir — senão o job seria retentado com o
+  // worker ocupado.
   const prazo = Date.now() + (deps.orcamentoMs ?? ORCAMENTO_MS);
 
   const arquivos = [];
@@ -1054,9 +1055,12 @@ export async function capturar({ link, dir, base }, deps = {}) {
     link, htmlLocal,
     "--browser-executable-path=/usr/bin/chromium",
     "--browser-args=[\"--no-sandbox\",\"--disable-dev-shm-usage\"]",
-    "--browser-wait-until=networkidle0",
-    "--browser-load-max-time=120000",
-  ], { cwd: dir, timeout: 4 * 60 * 1000 });
+    // Página de VSL nunca atinge networkidle0: o player baixa segmentos sem parar. `load` já
+    // garante o DOM e os recursos principais, e o `wait-delay` cobre o lazy loading.
+    "--browser-wait-until=load",
+    "--browser-wait-delay=5000",
+    "--browser-load-max-time=90000",
+  ], { cwd: dir, timeout: 7 * 60 * 1000 });
   arquivos.push({ caminho: htmlLocal, nome: limitar(base, "html"), mime: "text/html" });
 
   // 3) Espelho completo, zipado. Os dois passos são acessórios: sem espelho a captura continua
@@ -1126,7 +1130,7 @@ async function abrirNavegadorReal(link) {
     pagina.on("request", (r) => { if (ehUrlDeVideo(r.url())) urlsDeVideo.push(r.url()); });
 
     await pagina.goto(link, { waitUntil: "domcontentloaded", timeout: 90_000 });
-    await pagina.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
+    await pagina.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
     // Rola até o fim para disparar lazy loading e o player da VSL
     await pagina.evaluate(async () => {
       await new Promise((pronto) => {
@@ -1609,7 +1613,7 @@ export function criarServidor({ config, executarJob: executar = executarJob }) {
     // Um job por vez. A liberação acontece só no `finally`: soltar `ocupado` por relógio
     // deixaria um segundo job entrar com o primeiro ainda rodando, e os dois disputariam
     // a mesma pasta temporária e o mesmo disco. Quem limita o tempo são os timeouts de cada
-    // comando (a captura de LP tem orçamento de 12 min, o download 13).
+    // comando (a captura de LP tem orçamento de 20 min, o download 13).
     ocupado = true;
     try {
       console.log(JSON.stringify({ evento: "job.inicio", id: corpo.id, tipo: corpo.tipo, link: corpo.payload.link }));
