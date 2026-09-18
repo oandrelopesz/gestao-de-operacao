@@ -87,3 +87,65 @@ test("criarDoc manda multipart com o mime do Google Docs", async () => {
   assert.match(f.chamadas[1].init.body, /vnd\.google-apps\.document/);
   assert.match(f.chamadas[1].init.body, /Motivo: bloqueado/);
 });
+
+test("token vencido é renovado", async () => {
+  const tokenVencido = { status: 200, body: { access_token: "tok_vencido", expires_at: new Date(Date.now() - 3600e3).toISOString() } };
+  const tokenNovo = { status: 200, body: { access_token: "tok_novo", expires_at: new Date(Date.now() + 3600e3).toISOString() } };
+  const f = fakeFetch([
+    tokenVencido,
+    { status: 200, body: { files: [{ id: "p1" }] } },
+    tokenNovo,
+    { status: 200, body: { files: [{ id: "p2" }] } },
+  ]);
+  const drive = criarDrive({ supabaseUrl: "https://sb.test", swipeKey: "k", fetch: f });
+  await drive.garantirPasta("A", "pai");
+  await drive.garantirPasta("B", "pai");
+  const tokenCalls = f.chamadas.filter((c) => c.url.includes("google-token"));
+  assert.equal(tokenCalls.length, 2, "deve pedir token duas vezes quando o primeiro venceu");
+});
+
+test("403 do google-token continua sendo DriveIndisponivel", async () => {
+  // 403 (chave errada) ou 409 (Drive desconectado) são erros de configuração que afetam
+  // TODOS os jobs. Se consumissem tentativa, cada item da fila viraria "falhou" com um Docs
+  // inútil. Tratados como DriveIndisponivel, os jobs ficam na fila e andam sozinhos quando
+  // a chave/conexão for corrigida.
+  const f = fakeFetch([{ status: 403, body: { error: "Chave inválida" } }]);
+  const drive = criarDrive({ supabaseUrl: "https://sb.test", swipeKey: "k", fetch: f });
+  await assert.rejects(() => drive.garantirPasta("A", "pai"), DriveIndisponivel);
+});
+
+test("erro 404 no upload vira Error comum, não DriveIndisponivel", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "swipe-"));
+  const caminho = join(dir, "v.mp4");
+  await writeFile(caminho, Buffer.alloc(100, 7));
+  const f = fakeFetch([
+    TOKEN_OK,
+    { status: 404, body: { error: { message: "Pasta pai não encontrada" } } },
+  ]);
+  const drive = criarDrive({ supabaseUrl: "https://sb.test", swipeKey: "k", fetch: f });
+  await assert.rejects(() => drive.subirArquivo(caminho, { nome: "v.mp4", paiId: "pai1", mime: "video/mp4" }), (err) => {
+    return !(err instanceof DriveIndisponivel);
+  });
+  await rm(dir, { recursive: true, force: true });
+});
+
+test("falha de rede vira DriveIndisponivel", async () => {
+  const fetchComFalha = async () => {
+    throw new Error("ECONNREFUSED");
+  };
+  const drive = criarDrive({ supabaseUrl: "https://sb.test", swipeKey: "k", fetch: fetchComFalha });
+  await assert.rejects(() => drive.garantirPasta("A", "pai"), DriveIndisponivel);
+});
+
+test("arquivo de 0 byte vira Error comum", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "swipe-"));
+  const caminho = join(dir, "empty.mp4");
+  await writeFile(caminho, Buffer.alloc(0));
+  const f = fakeFetch([TOKEN_OK]);
+  const drive = criarDrive({ supabaseUrl: "https://sb.test", swipeKey: "k", fetch: f });
+  await assert.rejects(
+    () => drive.subirArquivo(caminho, { nome: "empty.mp4", paiId: "pai1", mime: "video/mp4" }),
+    { message: "O arquivo baixado está vazio (0 bytes)" }
+  );
+  await rm(dir, { recursive: true, force: true });
+});

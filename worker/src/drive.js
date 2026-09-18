@@ -10,16 +10,35 @@ const CAMPOS = "id,name,mimeType,webViewLink,thumbnailLink,size";
 const PEDACO = 8 * 1024 * 1024; // múltiplo de 256 KB exigido pelo Drive
 
 /** Falha de infraestrutura: o n8n reagenda sem consumir tentativa. */
-export class DriveIndisponivel extends Error {}
+export class DriveIndisponivel extends Error {
+  constructor(mensagem) {
+    super(mensagem);
+    this.name = "DriveIndisponivel";
+  }
+}
 
 const escapar = (s) => String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+
+/** 401/429/5xx são falha de infraestrutura (o n8n reagenda); o resto consome tentativa. */
+function erroDeStatus(status, mensagem) {
+  if (status === 401 || status === 429 || status >= 500) return new DriveIndisponivel(mensagem);
+  return new Error(mensagem);
+}
 
 export function criarDrive({ supabaseUrl, swipeKey, fetch: _fetch = fetch }) {
   let cache = null; // { token, validoAte }
 
+  async function buscar(url, init) {
+    try {
+      return await _fetch(url, init);
+    } catch (e) {
+      throw new DriveIndisponivel(`Não consegui falar com o Google (${e?.message || e})`);
+    }
+  }
+
   async function token() {
     if (cache && cache.validoAte - Date.now() > 60_000) return cache.token;
-    const r = await _fetch(`${supabaseUrl}/functions/v1/google-token`, {
+    const r = await buscar(`${supabaseUrl}/functions/v1/google-token`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-swipe-key": swipeKey },
       body: "{}",
@@ -34,7 +53,7 @@ export function criarDrive({ supabaseUrl, swipeKey, fetch: _fetch = fetch }) {
 
   async function api(caminho, init = {}, base = DRIVE) {
     const t = await token();
-    const r = await _fetch(`${base}${caminho}`, {
+    const r = await buscar(`${base}${caminho}`, {
       ...init,
       headers: { ...(init.headers || {}), Authorization: `Bearer ${t}` },
     });
@@ -45,8 +64,7 @@ export function criarDrive({ supabaseUrl, swipeKey, fetch: _fetch = fetch }) {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
       const msg = data?.error?.message || `Drive respondeu ${r.status}`;
-      if (r.status >= 500 || r.status === 429) throw new DriveIndisponivel(msg);
-      throw new Error(msg);
+      throw erroDeStatus(r.status, msg);
     }
     return data;
   }
@@ -70,8 +88,9 @@ export function criarDrive({ supabaseUrl, swipeKey, fetch: _fetch = fetch }) {
 
   async function subirArquivo(caminho, { nome, paiId, mime }) {
     const { size } = await stat(caminho);
+    if (size === 0) throw new Error("O arquivo baixado está vazio (0 bytes)");
     const t = await token();
-    const inicio = await _fetch(`${UPLOAD}/files?uploadType=resumable&fields=${CAMPOS}`, {
+    const inicio = await buscar(`${UPLOAD}/files?uploadType=resumable&fields=${CAMPOS}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${t}`,
@@ -83,7 +102,8 @@ export function criarDrive({ supabaseUrl, swipeKey, fetch: _fetch = fetch }) {
     });
     if (!inicio.ok) {
       const txt = await inicio.text().catch(() => "");
-      throw new DriveIndisponivel(`Drive recusou iniciar o upload (${inicio.status}): ${txt.slice(0, 200)}`);
+      const msg = `Drive recusou iniciar o upload (${inicio.status}): ${txt.slice(0, 200)}`;
+      throw erroDeStatus(inicio.status, msg);
     }
     const sessao = inicio.headers.get("location");
     if (!sessao) throw new DriveIndisponivel("Drive não devolveu a URL da sessão de upload");
@@ -96,7 +116,7 @@ export function criarDrive({ supabaseUrl, swipeKey, fetch: _fetch = fetch }) {
         const buf = Buffer.alloc(tamanho);
         await fh.read(buf, 0, tamanho, enviado);
         const fim = enviado + tamanho - 1;
-        const r = await _fetch(sessao, {
+        const r = await buscar(sessao, {
           method: "PUT",
           headers: { "Content-Range": `bytes ${enviado}-${fim}/${size}`, "Content-Length": String(tamanho) },
           body: buf,
@@ -107,7 +127,8 @@ export function criarDrive({ supabaseUrl, swipeKey, fetch: _fetch = fetch }) {
         }
         if (!r.ok) {
           const txt = await r.text().catch(() => "");
-          throw new DriveIndisponivel(`Upload falhou (${r.status}): ${txt.slice(0, 200)}`);
+          const msg = `Upload falhou (${r.status}): ${txt.slice(0, 200)}`;
+          throw erroDeStatus(r.status, msg);
         }
         return await r.json();
       }
