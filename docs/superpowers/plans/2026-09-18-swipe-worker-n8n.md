@@ -793,7 +793,9 @@ export async function baixar({ link, rede, dir }, deps = {}) {
     "--retries", "3",
     "--socket-timeout", "30",
     "--merge-output-format", "mp4",
-    "-f", "bv*+ba/b",
+    // Prefere até 1080p (referência de swipe file não precisa de mais e limita o disco da VPS),
+    // mas cai para o melhor disponível se o vídeo só existir acima disso.
+    "-f", "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b",
     "-o", `${dir}/%(title).120s.%(ext)s`,
     "--restrict-filenames",
   ];
