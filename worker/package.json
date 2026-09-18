@@ -1,0 +1,15 @@
+{
+  "name": "swipe-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Baixa links do swipe file e sobe no Google Drive",
+  "scripts": {
+    "test": "node --test test/",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "playwright-core": "1.47.2",
+    "single-file-cli": "2.0.73"
+  }
+}
