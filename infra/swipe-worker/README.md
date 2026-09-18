@@ -68,3 +68,17 @@ segurança que importa; ele também publica a imagem no GHCR, mas esse pacote fi
 usado pela VPS. Se um dia o repositório virar público, ou se você cadastrar um token
 `read:packages` em Portainer → Registries, basta trocar o `image:` da stack de volta para
 `ghcr.io/oandrelopesz/swipe-worker:latest` e a atualização volta a ser automática.
+
+## Importar o workflow no n8n
+
+`n8n-workflow.json` é um **template**: o header `x-worker-key` do nó "Executar no worker" vem com
+o placeholder `SUBSTITUIR_PELA_WORKER_KEY`. A chave de verdade é a mesma `WORKER_KEY` da stack
+`swipe` (Portainer → Stacks → swipe → Environment variables) e nunca deve ser commitada aqui.
+
+1. n8n → Workflows → *Import from File* → `n8n-workflow.json`
+2. Abrir o nó **Executar no worker** e substituir `SUBSTITUIR_PELA_WORKER_KEY` pelo valor real
+3. Conferir que as duas credenciais foram reconhecidas (Supabase anon e Evolution)
+4. *Execute workflow* uma vez para testar
+5. Botão **Publish** para ativar (o `PATCH active:true` pela API REST não ativa; tem que ser o botão)
+
+Se um dia a `WORKER_KEY` for trocada, ela muda em dois lugares: na stack e nesse nó do workflow.
