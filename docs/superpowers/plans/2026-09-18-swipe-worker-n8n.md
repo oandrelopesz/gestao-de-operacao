@@ -6,15 +6,16 @@
 
 **Architecture:** Um serviço HTTP stateless (`worker/`) roda em container no Docker Swarm da VPS e sabe apenas executar um job: baixar, empacotar e subir no Drive. O n8n é o dono do estado — um workflow agendado lê `swipe_jobs` no Supabase via PostgREST, chama `POST http://swipe_worker:8080/job` pela rede overlay interna, grava o resultado e trata retentativa e aviso de falha. A imagem é construída no GitHub Actions e publicada no GHCR, porque Swarm não aceita `build:` em stack.
 
-**Tech Stack:** Node 22 (ESM, `node:test`, `node:http` — sem framework), yt-dlp, gallery-dl, ffmpeg, wget, single-file-cli, Playwright/Chromium, Docker Swarm, Portainer CE 2.45, n8n 1.x, Supabase PostgREST, Evolution API.
+**Tech Stack:** Node 24 (ESM, `node:test`, `node:http` — sem framework), yt-dlp, gallery-dl, ffmpeg, wget, single-file-cli, Playwright/Chromium, Docker Swarm, Portainer CE 2.45, n8n 1.x, Supabase PostgREST, Evolution API.
 
 **Spec:** `docs/superpowers/specs/2026-09-18-swipe-worker-n8n-design.md` (e a fase 1–2 em `docs/superpowers/specs/2026-09-18-swipe-file-design.md`)
 
 ## Global Constraints
 
 - **Supabase do swipe:** `https://bnpvzguapunsztsdvmrs.supabase.co`. O projeto `ckjvebnhdepcwjqkmnar` é o banco de leads e **não** deve ser tocado.
-- **Node 22**, ESM (`"type": "module"`), testes com `node --test`. Node 20 **não serve**: o
-  `single-file-cli` usa as globais `WebSocket` e `CloseEvent`, que só existem a partir do Node 22.
+- **Node 24**, ESM (`"type": "module"`), testes com `node --test`. Node 20 e 22 **não servem**: o
+  `single-file-cli` (via `simple-cdp`) usa a global `CloseEvent`, que só existe a partir do Node 24
+  (o Node 22 já tem `WebSocket`, mas não `CloseEvent` — verificado dentro do container).
 - Nenhuma dependência de teste externa.
 - **Dependências npm do worker:** somente `playwright-core` e `single-file-cli`. Tudo mais vem do sistema (apt) ou da lib padrão.
 - **Rede Docker:** `ALDigitalNet`, overlay, externa. O serviço recebe o alias `swipe_worker` e escuta na porta `8080`. Nunca é publicado no Traefik.
@@ -42,7 +43,7 @@
 | `worker/src/publicar.js` | Pega o resultado de um job e sobe tudo no Drive na estrutura certa |
 | `worker/src/config.js` | Lê e valida env no boot |
 | `worker/src/server.js` | HTTP, autenticação, concorrência 1, roteamento dos jobs |
-| `worker/Dockerfile` | Debian slim + Node 22 + binários + Chromium |
+| `worker/Dockerfile` | Debian slim + Node 24 + binários + Chromium |
 | `.github/workflows/swipe-worker.yml` | Build e push para o GHCR |
 | `infra/swipe-worker/stack.yml` | Stack Swarm para o Portainer |
 | `infra/swipe-worker/n8n-workflow.json` | Workflow `[SWIPE] Fila de downloads` |
