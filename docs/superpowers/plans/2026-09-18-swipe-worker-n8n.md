@@ -69,7 +69,7 @@
   "type": "module",
   "description": "Baixa links do swipe file e sobe no Google Drive",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test",
     "start": "node src/server.js"
   },
   "dependencies": {
@@ -1628,7 +1628,7 @@ jobs:
 
       - name: Testes
         working-directory: worker
-        run: node --test test/
+        run: node --test
 
       - uses: docker/setup-buildx-action@v3
 
