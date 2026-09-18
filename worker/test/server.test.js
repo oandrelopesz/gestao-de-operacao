@@ -111,3 +111,32 @@ test("falha que não é a última não cria Docs", async () => {
   assert.equal(r.ok, false);
   assert.equal(r.docs, null);
 });
+
+test("Drive fora do ar ao criar o Docs vira falha de infraestrutura", async () => {
+  await assert.rejects(
+    () => executarJob({ ...JOB, ultima_tentativa: true }, {
+      criarDrive: () => ({ criarDoc: async () => { throw new DriveIndisponivel("Drive não conectado"); } }),
+      comPastaTemp: async (_p, fn) => fn("/tmp/j"),
+      baixar: async () => { throw new Error("Instagram bloqueou"); },
+      publicarDownload: async () => ({}),
+      config: CONFIG,
+    }),
+    DriveIndisponivel,
+  );
+});
+
+test("corpo inválido responde 400", async () => {
+  const s = await subir(async () => ({ ok: true }));
+  const r = await fetch(`${s.base}/job`, { method: "POST", headers: { "x-worker-key": "segredo" }, body: "{isso não é json" });
+  assert.equal(r.status, 400);
+  await s.fechar();
+});
+
+test("corpo inválido libera a trava para o próximo job", async () => {
+  const s = await subir(async () => ({ ok: true, resultado: { drive_file_id: "f1" } }));
+  const ruim = await fetch(`${s.base}/job`, { method: "POST", headers: { "x-worker-key": "segredo" }, body: "{" });
+  assert.equal(ruim.status, 400);
+  const bom = await fetch(`${s.base}/job`, { method: "POST", headers: { "x-worker-key": "segredo" }, body: JSON.stringify(JOB) });
+  assert.equal(bom.status, 200, "a trava não podia ter ficado presa depois do 400");
+  await s.fechar();
+});

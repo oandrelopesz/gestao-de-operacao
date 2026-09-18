@@ -4,8 +4,10 @@ export function lerConfig(env = process.env) {
     if (!v) throw new Error(`Falta a variável de ambiente ${nome}`);
     return v;
   };
+  const porta = Number(env.PORTA || 8080);
+  if (!Number.isFinite(porta) || porta <= 0) throw new Error(`PORTA inválida: ${env.PORTA}`);
   return {
-    porta: Number(env.PORTA || 8080),
+    porta,
     workerKey: obrigatoria("WORKER_KEY"),
     swipeKey: obrigatoria("SWIPE_KEY"),
     supabaseUrl: obrigatoria("SUPABASE_URL").replace(/\/+$/, ""),

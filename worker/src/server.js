@@ -46,7 +46,12 @@ export async function executarJob(corpo, deps = {}) {
       ].join("\n");
       docs = await drive.criarDoc(paiId, base, texto)
         .then((d) => ({ drive_file_id: d.id, drive_web_link: d.webViewLink || null }))
-        .catch(() => null);
+        .catch((docErr) => {
+          // Drive fora do ar agora: melhor 503 e tentar tudo de novo depois do que gastar a
+          // última tentativa e deixar o usuário sem o Docs com o link.
+          if (docErr instanceof DriveIndisponivel) throw docErr;
+          return null;
+        });
     }
     return { ok: false, erro, docs };
   }
@@ -65,32 +70,33 @@ export function criarServidor({ config, executarJob: executar = executarJob }) {
     if (req.url !== "/job" || req.method !== "POST") return responder(404, { ok: false, erro: "rota desconhecida" });
     if (req.headers["x-worker-key"] !== config.workerKey) return responder(401, { ok: false, erro: "chave inválida" });
     if (ocupado) return responder(409, { ok: false, erro: "ocupado" });
-
-    let corpo;
-    try {
-      const pedacos = [];
-      for await (const p of req) pedacos.push(p);
-      corpo = JSON.parse(Buffer.concat(pedacos).toString("utf8") || "{}");
-    } catch {
-      return responder(400, { ok: false, erro: "corpo inválido" });
-    }
-    if (!corpo?.payload?.link || !corpo?.payload?.drive_folder_id) {
-      return responder(400, { ok: false, erro: "payload precisa de link e drive_folder_id" });
-    }
-
-    // Um job por vez. A liberação acontece só no `finally`: soltar `ocupado` por relógio
-    // deixaria um segundo job entrar com o primeiro ainda rodando, e os dois disputariam
-    // a mesma pasta temporária e o mesmo disco. Quem limita o tempo são os timeouts de cada
-    // comando (a captura de LP tem orçamento de 12 min, o download 13).
+    // Trava antes de ler o corpo: a leitura é assíncrona, e checar aqui mas só travar depois
+    // deixaria duas requisições próximas passarem as duas pela checagem. A liberação acontece
+    // só no `finally`: soltar `ocupado` por relógio deixaria um segundo job entrar com o
+    // primeiro ainda rodando, e os dois disputariam a mesma pasta temporária e o mesmo disco.
+    // Quem limita o tempo são os timeouts de cada comando (a captura de LP tem orçamento de
+    // 12 min, o download 13).
     ocupado = true;
     try {
+      let corpo;
+      try {
+        const pedacos = [];
+        for await (const p of req) pedacos.push(p);
+        corpo = JSON.parse(Buffer.concat(pedacos).toString("utf8") || "{}");
+      } catch {
+        return responder(400, { ok: false, erro: "corpo inválido" });
+      }
+      if (!corpo?.payload?.link || !corpo?.payload?.drive_folder_id) {
+        return responder(400, { ok: false, erro: "payload precisa de link e drive_folder_id" });
+      }
+
       console.log(JSON.stringify({ evento: "job.inicio", id: corpo.id, tipo: corpo.tipo, link: corpo.payload.link }));
       const r = await executar(corpo, { config });
       console.log(JSON.stringify({ evento: "job.fim", id: corpo.id, ok: r.ok, erro: r.erro || null }));
       responder(200, r);
     } catch (e) {
       const infra = e instanceof DriveIndisponivel;
-      console.error(JSON.stringify({ evento: "job.erro", id: corpo.id, infra, erro: String(e?.message || e) }));
+      console.error(JSON.stringify({ evento: "job.erro", infra, erro: String(e?.message || e) }));
       responder(infra ? 503 : 500, { ok: false, erro: String(e?.message || e).slice(0, 500) });
     } finally {
       ocupado = false;
