@@ -20,13 +20,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -38,9 +31,10 @@ import {
   CommandItem, 
   CommandList 
 } from "@/components/ui/command";
-import { Eye, EyeOff, Plus, Check, ChevronsUpDown, Search } from "lucide-react";
+import { Eye, EyeOff, Plus, Check, ChevronsUpDown, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, type CursoCategoriaDef } from "@/lib/cursoCategorias";
 
 const courseSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
@@ -65,16 +59,7 @@ interface CourseFormProps {
 export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: CourseFormProps) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [categorias, setCategorias] = useState<{ id: string; nome: string }[]>([]);
-  const [fixedTemas] = useState([
-    { id: "ia", nome: "IA" },
-    { id: "trafego_pago", nome: "Tráfego Pago" },
-    { id: "vendas", nome: "Vendas" },
-    { id: "copywriting", nome: "Copywriting" },
-    { id: "trackeamento", nome: "Trackeamento" },
-    { id: "multiplos_temas", nome: "Múltiplos Temas" },
-    { id: "outros", nome: "Outros" }
-  ]);
+  const [categorias, setCategorias] = useState<CursoCategoriaDef[]>([]);
   const [openCombobox, setOpenCombobox] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const creatingCategoryRef = useRef(false);
@@ -92,7 +77,6 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       observacoes: "",
     },
   });
-  const selectedCategoriaId = form.watch("categoria_id");
 
   useEffect(() => {
     if (open) {
@@ -102,63 +86,36 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
   const fetchCategorias = async () => {
     try {
-      const { data, error } = await supabase
-        .from("curso_categorias")
-        .select("id, nome")
-        .order("nome");
-      
-      if (error) throw error;
-      setCategorias(data || []);
+      setCategorias(await fetchCursoCategorias());
     } catch (error) {
       console.error("Erro ao buscar categorias:", error);
     }
   };
 
+  const selecionarCategoria = (id: string | null) => {
+    form.setValue("categoria_id", id, { shouldDirty: true, shouldValidate: true });
+    setSearchQuery("");
+    setOpenCombobox(false);
+  };
+
+  // Cria a categoria direto do combobox (ou seleciona a existente com o mesmo nome)
   const handleAddCategory = async (nameOverride?: string) => {
-    const nameToUse = nameOverride || searchQuery;
-    if (!nameToUse.trim()) return;
+    const nameToUse = (nameOverride || searchQuery).trim();
+    if (!nameToUse) return null;
     if (creatingCategoryRef.current) return null;
     creatingCategoryRef.current = true;
-    
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || "b34bdae5-7a67-4b63-a46f-8aad43a06c63";
-
-      if (!userId) {
-        toast.error("Usuário não autenticado");
-        return null;
+      const jaExiste = categorias.some((cat) => cat.nome.toLowerCase() === nameToUse.toLowerCase());
+      const categoria = await createCursoCategoria(nameToUse);
+      if (!jaExiste) {
+        toast.success(`Categoria "${categoria.nome}" criada`);
+        setCategorias((prev) => [...prev, categoria]);
       }
-
-      const trimmedName = nameToUse.trim();
-      const existingCategory = categorias.find(
-        (cat) => cat.nome.toLowerCase() === trimmedName.toLowerCase()
-      );
-
-      if (existingCategory) {
-        form.setValue("categoria_id", existingCategory.id, { shouldDirty: true, shouldValidate: true });
-        form.setValue("tema", "outros", { shouldDirty: true, shouldValidate: true });
-        setSearchQuery("");
-        setOpenCombobox(false);
-        return existingCategory.id;
-      }
-
-      const { data, error } = await supabase
-        .from("curso_categorias")
-        .insert([{ nome: trimmedName, user_id: userId }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      toast.success("Tema criado!");
-      setCategorias(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome)));
-      form.setValue("categoria_id", data.id, { shouldDirty: true, shouldValidate: true });
-      form.setValue("tema", "outros", { shouldDirty: true, shouldValidate: true });
-      setSearchQuery("");
-      setOpenCombobox(false);
-      return data.id;
+      selecionarCategoria(categoria.id);
+      return categoria.id;
     } catch (error: any) {
-      toast.error("Erro ao criar tema");
+      toast.error(error?.message || "Erro ao criar categoria");
       return null;
     } finally {
       creatingCategoryRef.current = false;
@@ -271,10 +228,12 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="tema"
-                render={({ field }) => (
+                name="categoria_id"
+                render={({ field }) => {
+                  const selecionada = categorias.find((cat) => cat.id === field.value);
+                  return (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Tema</FormLabel>
+                    <FormLabel>Categoria</FormLabel>
                     <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -284,74 +243,49 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                             aria-expanded={openCombobox}
                             className={cn(
                               "w-full justify-between font-normal",
-                              !field.value && "text-muted-foreground"
+                              !selecionada && "text-muted-foreground"
                             )}
                           >
-                            {selectedCategoriaId
-                              ? categorias.find((cat) => cat.id === selectedCategoriaId)?.nome || "Tema personalizado"
-                              : field.value
-                              ? [...fixedTemas, ...categorias.map(c => ({ id: c.id, nome: c.nome }))].find(
-                                  (t) => t.id === field.value || t.nome === field.value
-                                )?.nome || field.value
-                              : "Selecione o tema..."}
+                            <span className="flex items-center gap-2 truncate">
+                              {selecionada && (
+                                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: corDaCategoria(selecionada.cor) }} />
+                              )}
+                              {selecionada ? selecionada.nome : "Selecione ou crie..."}
+                            </span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[200px] p-0" align="start">
+                      <PopoverContent className="w-[240px] p-0" align="start">
                         <Command>
-                          <CommandInput 
-                            placeholder="Buscar ou criar..." 
+                          <CommandInput
+                            placeholder="Buscar ou criar..."
                             value={searchQuery}
                             onValueChange={setSearchQuery}
                           />
                           <CommandList>
-                            <CommandGroup heading="Temas Sugeridos">
-                              {fixedTemas.map((tema) => (
-                                <CommandItem
-                                  key={tema.id}
-                                  value={tema.nome}
-                                  onSelect={() => {
-                                    form.setValue("tema", tema.id);
-                                    form.setValue("categoria_id", null);
-                                    setOpenCombobox(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      field.value === tema.id ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  {tema.nome}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
                             {categorias.length > 0 && (
-                              <CommandGroup heading="Meus Temas">
+                              <CommandGroup heading="Categorias">
                                 {categorias.map((cat) => (
                                   <CommandItem
                                     key={cat.id}
                                     value={cat.nome}
-                                    onSelect={() => {
-                                      form.setValue("categoria_id", cat.id, { shouldDirty: true, shouldValidate: true });
-                                      form.setValue("tema", "outros", { shouldDirty: true, shouldValidate: true });
-                                      setOpenCombobox(false);
-                                    }}
+                                    onSelect={() => selecionarCategoria(cat.id)}
                                   >
                                     <Check
                                       className={cn(
                                         "mr-2 h-4 w-4",
-                                        selectedCategoriaId === cat.id ? "opacity-100" : "opacity-0"
+                                        field.value === cat.id ? "opacity-100" : "opacity-0"
                                       )}
                                     />
+                                    <span className="mr-2 h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: corDaCategoria(cat.cor) }} />
                                     {cat.nome}
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
                             )}
-                            {searchQuery && ![...fixedTemas, ...categorias].some(t => t.nome.toLowerCase() === searchQuery.toLowerCase()) && (
-                              <CommandGroup heading="Novo Tema">
+                            {searchQuery.trim() && !categorias.some((c) => c.nome.toLowerCase() === searchQuery.trim().toLowerCase()) && (
+                              <CommandGroup heading="Nova categoria">
                                 <CommandItem
                                   value={`criar-${searchQuery}`}
                                   onMouseDown={(event) => {
@@ -363,12 +297,21 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                   }}
                                   className="gap-2 text-primary cursor-pointer"
                                 >
-                                  <Plus size={14} /> Criar "{searchQuery}"
+                                  <Plus size={14} /> Criar "{searchQuery.trim()}"
+                                </CommandItem>
+                              </CommandGroup>
+                            )}
+                            {field.value && (
+                              <CommandGroup>
+                                <CommandItem value="__sem_categoria" onSelect={() => selecionarCategoria(null)} className="text-muted-foreground">
+                                  <X className="mr-2 h-4 w-4" /> Remover categoria
                                 </CommandItem>
                               </CommandGroup>
                             )}
                             <CommandEmpty>
-                              <p className="p-2 text-xs text-muted-foreground">Nenhum tema encontrado.</p>
+                              <p className="p-2 text-xs text-muted-foreground">
+                                {categorias.length === 0 ? "Digite um nome para criar a primeira categoria." : "Nenhuma categoria encontrada."}
+                              </p>
                             </CommandEmpty>
                           </CommandList>
                         </Command>
@@ -376,7 +319,8 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                     </Popover>
                     <FormMessage />
                   </FormItem>
-                )}
+                  );
+                }}
               />
 
               <FormField

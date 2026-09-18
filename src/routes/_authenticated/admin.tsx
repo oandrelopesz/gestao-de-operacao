@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Building2, Plus, Pencil, Trash2, ArrowUp, ArrowDown, Check, Sun, Moon,
   Columns3, Database, Download, AlertTriangle, EyeOff, Eye, RefreshCw,
-  Megaphone,
+  Megaphone, GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import { useAgencias, AGENCIA_COLORS, slugifyAgenciaId, type AgenciaDef } from "
 import { useDemandaColunas, COLUMN_COLORS, slugifyColumnId, type KanbanColumnDef } from "@/lib/demandaColunas";
 import { usePlataformas, slugifyPlataformaId, type PlataformaDef } from "@/lib/plataformas";
 import { useTheme } from "@/lib/theme";
+import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, CATEGORIA_COLORS, type CursoCategoriaDef } from "@/lib/cursoCategorias";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
@@ -41,6 +42,10 @@ type PlataformaDialog =
   | { mode: "create"; nome: string }
   | { mode: "edit"; id: string; nome: string; nomeOriginal: string };
 
+type CategoriaDialog =
+  | { mode: "create"; nome: string; hex: string }
+  | { mode: "edit"; id: string; nome: string; hex: string };
+
 type WipeTarget = "clientes" | "demandas" | "colunas";
 
 const WIPE_META: Record<WipeTarget, { titulo: string; botao: string }> = {
@@ -56,6 +61,15 @@ function traduzErroPlataforma(e: any): string {
     return "A tabela de plataformas ainda não existe no banco. Rode supabase/migrations/20260909120000_plataformas_ads.sql no SQL Editor do Supabase.";
   }
   return msg || "Erro ao salvar plataforma";
+}
+
+// Erro típico quando a migration de ordem das categorias ainda não foi aplicada no banco
+function traduzErroCategoria(e: any): string {
+  const msg: string = e?.message || "";
+  if (/ordem/i.test(msg) && /schema cache|does not exist|not find/i.test(msg)) {
+    return "A coluna de ordem das categorias ainda não existe no banco. Rode supabase/migrations/20260917120000_curso_categorias_ordem.sql no SQL Editor do Supabase.";
+  }
+  return msg || "Erro ao salvar categoria";
 }
 
 function AdminPage() {
@@ -77,6 +91,11 @@ function AdminPage() {
   const [plataformaDialog, setPlataformaDialog] = useState<PlataformaDialog | null>(null);
   const [plataformaToDelete, setPlataformaToDelete] = useState<PlataformaDef | null>(null);
   const [clientesPorPlataforma, setClientesPorPlataforma] = useState<Record<string, number>>({});
+
+  const [categorias, setCategorias] = useState<CursoCategoriaDef[]>([]);
+  const [categoriaDialog, setCategoriaDialog] = useState<CategoriaDialog | null>(null);
+  const [categoriaToDelete, setCategoriaToDelete] = useState<CursoCategoriaDef | null>(null);
+  const [cursosPorCategoria, setCursosPorCategoria] = useState<Record<string, number>>({});
 
   const [wipeTarget, setWipeTarget] = useState<WipeTarget | null>(null);
   const [wipeConfirm, setWipeConfirm] = useState("");
@@ -281,6 +300,89 @@ function AdminPage() {
     }
   };
 
+  // ---------- Categorias de cursos ----------
+  const loadCategorias = async () => {
+    try {
+      const [cats, { data: cursos }] = await Promise.all([
+        fetchCursoCategorias(),
+        supabase.from("cursos").select("categoria_id"),
+      ]);
+      setCategorias(cats);
+      const porCategoria: Record<string, number> = {};
+      (cursos || []).forEach((c) => { if (c.categoria_id) porCategoria[c.categoria_id] = (porCategoria[c.categoria_id] || 0) + 1; });
+      setCursosPorCategoria(porCategoria);
+    } catch (e: any) {
+      toast.error(traduzErroCategoria(e));
+    }
+  };
+
+  useEffect(() => {
+    loadCategorias();
+  }, []);
+
+  const handleSaveCategoria = async () => {
+    if (!categoriaDialog) return;
+    const nome = categoriaDialog.nome.trim();
+    if (!nome) {
+      toast.error("Informe o nome da categoria");
+      return;
+    }
+    const duplicada = categorias.some((c) => c.nome.toLowerCase() === nome.toLowerCase() && (categoriaDialog.mode === "create" || c.id !== categoriaDialog.id));
+    if (duplicada) {
+      toast.error("Já existe uma categoria com esse nome");
+      return;
+    }
+    setSaving(true);
+    try {
+      if (categoriaDialog.mode === "edit") {
+        const { error } = await supabase.from("curso_categorias").update({ nome, cor: categoriaDialog.hex }).eq("id", categoriaDialog.id);
+        if (error) throw error;
+        toast.success("Categoria atualizada");
+      } else {
+        await createCursoCategoria(nome, categoriaDialog.hex);
+        toast.success("Categoria criada");
+      }
+      setCategoriaDialog(null);
+      await loadCategorias();
+    } catch (e: any) {
+      toast.error(traduzErroCategoria(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const moveCategoria = async (categoria: CursoCategoriaDef, direction: -1 | 1) => {
+    const idx = categorias.findIndex((c) => c.id === categoria.id);
+    const target = idx + direction;
+    if (idx < 0 || target < 0 || target >= categorias.length) return;
+    const reordered = [...categorias];
+    reordered[idx] = categorias[target];
+    reordered[target] = categoria;
+    // Reescreve a ordem inteira para não depender de valores repetidos
+    setCategorias(reordered.map((c, i) => ({ ...c, ordem: i })));
+    const results = await Promise.all(reordered.map((c, i) => supabase.from("curso_categorias").update({ ordem: i }).eq("id", c.id)));
+    const falha = results.find((r) => r.error);
+    if (falha?.error) toast.error(traduzErroCategoria(falha.error));
+    await loadCategorias();
+  };
+
+  const handleDeleteCategoria = async () => {
+    if (!categoriaToDelete) return;
+    setSaving(true);
+    try {
+      // FK cursos.categoria_id é ON DELETE SET NULL: os cursos ficam, sem categoria
+      const { error } = await supabase.from("curso_categorias").delete().eq("id", categoriaToDelete.id);
+      if (error) throw error;
+      toast.success(`Categoria "${categoriaToDelete.nome}" excluída`);
+      setCategoriaToDelete(null);
+      await loadCategorias();
+    } catch (e: any) {
+      toast.error(traduzErroCategoria(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ---------- Colunas do Kanban ----------
   const handleSaveColuna = async () => {
     if (!colunaDialog) return;
@@ -426,7 +528,7 @@ function AdminPage() {
     <div className="space-y-8 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
-        <p className="text-muted-foreground">Configurações gerais: agências, colunas do Kanban, aparência e dados.</p>
+        <p className="text-muted-foreground">Configurações gerais: agências, plataformas, categorias de cursos, colunas do Kanban, aparência e dados.</p>
       </div>
 
       {/* Agências */}
@@ -536,6 +638,52 @@ function AdminPage() {
             })}
             {plataformasOrdenadas.length === 0 && (
               <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma plataforma. Clique em "Nova plataforma" para criar a primeira.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Categorias de cursos */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2"><GraduationCap size={18} /> Categorias de cursos</CardTitle>
+            <CardDescription>Abas da tela de Cursos, nesta ordem. Também dá para criar uma categoria direto no cadastro do curso.</CardDescription>
+          </div>
+          <Button size="sm" className="gap-2 shrink-0" onClick={() => setCategoriaDialog({ mode: "create", nome: "", hex: CATEGORIA_COLORS[categorias.length % CATEGORIA_COLORS.length] })}>
+            <Plus size={14} /> Nova categoria
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="divide-y rounded-md border">
+            {categorias.map((c, idx) => {
+              const qtd = cursosPorCategoria[c.id] || 0;
+              return (
+                <div key={c.id} className="flex items-center gap-3 px-3 py-2">
+                  <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ backgroundColor: corDaCategoria(c.cor) }} />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium truncate block">{c.nome}</span>
+                    <p className="text-xs text-muted-foreground">{qtd} {qtd === 1 ? "curso" : "cursos"}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => moveCategoria(c, -1)} title="Subir">
+                      <ArrowUp size={14} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === categorias.length - 1} onClick={() => moveCategoria(c, 1)} title="Descer">
+                      <ArrowDown size={14} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCategoriaDialog({ mode: "edit", id: c.id, nome: c.nome, hex: corDaCategoria(c.cor) })} title="Editar">
+                      <Pencil size={14} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setCategoriaToDelete(c)} title="Excluir">
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+            {categorias.length === 0 && (
+              <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma categoria. Clique em "Nova categoria" para criar a primeira.</p>
             )}
           </div>
         </CardContent>
@@ -769,6 +917,54 @@ function AdminPage() {
             <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDeletePlataforma(); }} disabled={saving} className="bg-destructive hover:bg-destructive/90">
               {saving ? "Aguarde..." : "Excluir plataforma"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog categoria de curso */}
+      <Dialog open={!!categoriaDialog} onOpenChange={(o) => { if (!o) setCategoriaDialog(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>{categoriaDialog?.mode === "edit" ? "Editar categoria" : "Nova categoria"}</DialogTitle>
+          </DialogHeader>
+          {categoriaDialog && (
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveCategoria(); }}>
+              <div className="space-y-2">
+                <Label htmlFor="categoria-nome">Nome</Label>
+                <Input
+                  id="categoria-nome"
+                  autoFocus
+                  placeholder="Ex.: Tráfego Pago"
+                  value={categoriaDialog.nome}
+                  onChange={(e) => setCategoriaDialog({ ...categoriaDialog, nome: e.target.value })}
+                />
+              </div>
+              <ColorPicker colors={CATEGORIA_COLORS} value={categoriaDialog.hex} onChange={(hex) => setCategoriaDialog({ ...categoriaDialog, hex })} />
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setCategoriaDialog(null)} disabled={saving}>Cancelar</Button>
+                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : categoriaDialog.mode === "edit" ? "Salvar" : "Criar categoria"}</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!categoriaToDelete} onOpenChange={(o) => { if (!o) setCategoriaToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir categoria "{categoriaToDelete?.nome}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A aba some da tela de Cursos.
+              {categoriaToDelete && (cursosPorCategoria[categoriaToDelete.id] || 0) > 0
+                ? ` ${cursosPorCategoria[categoriaToDelete.id]} ${cursosPorCategoria[categoriaToDelete.id] === 1 ? "curso fica" : "cursos ficam"} em "Sem categoria" até você editar.`
+                : " Nenhum curso usa esta categoria."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDeleteCategoria(); }} disabled={saving} className="bg-destructive hover:bg-destructive/90">
+              {saving ? "Aguarde..." : "Excluir categoria"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

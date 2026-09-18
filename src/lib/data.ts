@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL } from "@/lib/clientes";
 import { fetchDemandaColunas } from "@/lib/demandaColunas";
+import { fetchCursoCategorias } from "@/lib/cursoCategorias";
 import { setCached } from "@/lib/pageCache";
 
 /**
@@ -102,13 +103,12 @@ export async function loadFinanceiro() {
 
 export async function loadCursos() {
   const [cursosRes, catsRes] = await Promise.all([
-    supabase.from("cursos").select("*, curso_categorias(id, nome)").order("nome", { ascending: true }),
-    supabase.from("curso_categorias").select("id, nome").order("nome"),
+    supabase.from("cursos").select("*, curso_categorias(id, nome, cor)").order("nome", { ascending: true }),
+    fetchCursoCategorias(),
   ]);
   if (cursosRes.error) throw cursosRes.error;
-  if (catsRes.error) throw catsRes.error;
   const cursos = (cursosRes.data || []).map((c) => ({ ...c, em_andamento: !!c.em_andamento }));
-  return { cursos: cursos as any[], categorias: (catsRes.data || []) as { id: string; nome: string }[] };
+  return { cursos: cursos as any[], categorias: catsRes };
 }
 
 export async function loadLivros() {

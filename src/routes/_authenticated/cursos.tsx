@@ -38,13 +38,11 @@ import { CACHE_KEYS, loadCursos } from "@/lib/data";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CourseForm } from "@/components/cursos/CourseForm";
+import { corDaCategoria, type CursoCategoriaDef } from "@/lib/cursoCategorias";
 
-type Tema = "ia" | "trafego_pago" | "trackeamento" | "copywriting" | "gestao" | "vendas" | "multiplos_temas" | "outros";
+type Tema = string; // enum legado; a classificação agora é por categoria_id
 
-interface Categoria {
-  id: string;
-  nome: string;
-}
+type Categoria = CursoCategoriaDef;
 
 interface Curso {
   id: string;
@@ -60,16 +58,7 @@ interface Curso {
   curso_categorias?: Categoria | null;
 }
 
-const TEMAS_LEGADO: { id: Tema; label: string; color: string }[] = [
-  { id: "ia", label: "IA", color: "bg-purple-500" },
-  { id: "trafego_pago", label: "Tráfego Pago", color: "bg-blue-500" },
-  { id: "trackeamento", label: "Trackeamento", color: "bg-cyan-500" },
-  { id: "copywriting", label: "Copywriting", color: "bg-amber-500" },
-  { id: "gestao", label: "Gestão", color: "bg-emerald-500" },
-  { id: "vendas", label: "Vendas", color: "bg-orange-500" },
-  { id: "multiplos_temas", label: "Múltiplos Temas", color: "bg-rose-500" },
-  { id: "outros", label: "Outros", color: "bg-slate-500" },
-];
+const SEM_CATEGORIA = { id: "sem_categoria", label: "Sem categoria", hex: "#94a3b8" };
 
 export const Route = createFileRoute("/_authenticated/cursos")({
   component: CursosPage,
@@ -167,7 +156,7 @@ function CursosPage() {
   const filteredCursos = useMemo(() => {
     return cursos
       .filter(c => {
-        const matchesTema = currentTema === "todos" || c.tema === currentTema || c.categoria_id === currentTema;
+        const matchesTema = currentTema === "todos" || c.categoria_id === currentTema || (currentTema === SEM_CATEGORIA.id && !c.categoria_id);
         const matchesSearch = c.nome.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesTema && matchesSearch;
       })
@@ -191,30 +180,21 @@ function CursosPage() {
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { todos: cursos.length };
     cursos.forEach(c => {
-      if (c.categoria_id) {
-        counts[c.categoria_id] = (counts[c.categoria_id] || 0) + 1;
-      } else if (c.tema) {
-        counts[c.tema] = (counts[c.tema] || 0) + 1;
-      }
+      const key = c.categoria_id || SEM_CATEGORIA.id;
+      counts[key] = (counts[key] || 0) + 1;
     });
     return counts;
   }, [cursos]);
 
   const allTabs = useMemo(() => {
-    const tabs = [{ id: "todos", label: "Todos" }];
+    const tabs: { id: string; label: string; hex?: string }[] = [{ id: "todos", label: "Todos" }];
     
-    // Add dynamic categories
     categorias.forEach(cat => {
-      tabs.push({ id: cat.id, label: cat.nome });
+      tabs.push({ id: cat.id, label: cat.nome, hex: corDaCategoria(cat.cor) });
     });
 
-    // Add legacy themes only if they have courses and no category
-    TEMAS_LEGADO.forEach(t => {
-      const hasCourses = cursos.some(c => c.tema === t.id && !c.categoria_id);
-      if (hasCourses) {
-        tabs.push({ id: t.id, label: t.label });
-      }
-    });
+    // Cursos sem categoria (ex.: categoria excluída no Admin) ficam numa aba própria
+    if (cursos.some(c => !c.categoria_id)) tabs.push(SEM_CATEGORIA);
 
     return tabs;
   }, [categorias, cursos]);
@@ -234,7 +214,7 @@ function CursosPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cursos</h1>
-          <p className="text-muted-foreground text-sm">Repositório pessoal de cursos por temas</p>
+          <p className="text-muted-foreground text-sm">Repositório pessoal de cursos por categoria. Gerencie as categorias na aba Admin.</p>
         </div>
         <Button onClick={handleAddCourse} className="gap-2">
           <Plus size={18} />
@@ -247,6 +227,7 @@ function CursosPage() {
           <TabsList className="w-full justify-start overflow-x-auto h-auto p-1 bg-muted/50">
             {allTabs.map(t => (
               <TabsTrigger key={t.id} value={t.id} className="gap-2 shrink-0">
+                {t.hex && <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: t.hex }} />}
                 {t.label}
                 <Badge variant="secondary" className="px-1.5 h-4 text-[10px] leading-none">
                   {categoryCounts[t.id] || 0}
@@ -416,9 +397,10 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
     }
   };
 
-  const theme = curso.curso_categorias?.nome 
-    ? { label: curso.curso_categorias.nome, color: "bg-purple-500" }
-    : TEMAS_LEGADO.find(t => t.id === curso.tema) || { label: "Outros", color: "bg-slate-500" };
+  // Cor da categoria configurada no Admin
+  const theme = curso.curso_categorias?.nome
+    ? { label: curso.curso_categorias.nome, hex: corDaCategoria(curso.curso_categorias.cor) }
+    : { label: SEM_CATEGORIA.label, hex: SEM_CATEGORIA.hex };
 
   return (
     <Card className={cn(
@@ -429,8 +411,8 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1">
             <h3 className="font-bold text-base leading-tight">{curso.nome}</h3>
-            <Badge className={cn("text-[10px] h-5", theme?.color)}>
-              {theme?.label}
+            <Badge className="text-[10px] h-5 text-white border-transparent" style={{ backgroundColor: theme.hex }}>
+              {theme.label}
             </Badge>
           </div>
           <div className="flex items-center gap-1">
