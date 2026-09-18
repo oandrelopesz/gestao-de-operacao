@@ -12,7 +12,25 @@ const KEY_STORAGE = "swipe_key";
 
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
+/**
+ * Link de configuração: abrir `/qualquer-rota#swipe_key=XXX` grava a chave neste navegador e
+ * limpa o hash (o hash nunca vai para o servidor). Serve para configurar celular/outro PC.
+ */
+function absorverChaveDaUrl(): void {
+  if (typeof window === "undefined") return;
+  const m = window.location.hash.match(/(?:^#|[#&])swipe_key=([^&]+)/);
+  if (!m) return;
+  try {
+    localStorage.setItem(KEY_STORAGE, decodeURIComponent(m[1]).trim());
+  } catch {
+    // storage indisponível
+  }
+  tokenCache = null;
+  window.history.replaceState({}, "", window.location.pathname + window.location.search);
+}
+
 export function getSwipeKey(): string {
+  absorverChaveDaUrl();
   try {
     return localStorage.getItem(KEY_STORAGE) || "";
   } catch {

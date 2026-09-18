@@ -71,6 +71,16 @@ export function SwipeAdminCard() {
     }
   };
 
+  const copiarLink = async () => {
+    const link = `${window.location.origin}/swipe#swipe_key=${encodeURIComponent(chave.trim())}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Link copiado: abra no outro aparelho e a chave fica salva lá");
+    } catch {
+      window.prompt("Copie o link e abra no outro aparelho:", link);
+    }
+  };
+
   const criarRaiz = async () => {
     setCriandoRaiz(true);
     try {
@@ -123,6 +133,7 @@ export function SwipeAdminCard() {
           <div className="flex gap-2">
             <Input id="swipe-key" type="password" placeholder="Cole a chave configurada no projeto" value={chave} onChange={(e) => setChave(e.target.value)} autoComplete="off" />
             <Button onClick={salvarChave} disabled={salvandoChave || !chave.trim()}>{salvandoChave ? "Verificando..." : "Salvar"}</Button>
+            <Button variant="outline" onClick={copiarLink} disabled={!chave.trim()} title="Abra o link no celular ou em outro navegador para configurar a chave lá">Copiar link p/ outro aparelho</Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
             É o que impede quem tiver a URL do sistema de mexer no seu Drive. Precisa ser informada uma vez em cada navegador/celular.
