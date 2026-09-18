@@ -130,7 +130,11 @@ ficar ociosa e então:
    `.m3u8`, `.webm`, ou de players conhecidos (vturb, panda, vimeo, youtube, wistia) entram numa
    lista; cada uma é baixada depois com `yt-dlp` (que resolve HLS via ffmpeg).
 
-Timeout por job: 15 minutos (o n8n usa o mesmo valor na chamada HTTP).
+Orçamento de tempo: a captura de LP tem 12 minutos no total e para de baixar VSL quando o tempo
+acaba, devolvendo o html/zip/print do que já capturou; o download tem 13 minutos. A chamada HTTP
+do n8n espera 30 minutos. O worker é sempre quem desiste primeiro — se fosse o n8n, ele
+retentaria um job que ainda está rodando, levaria 409 do worker ocupado e queimaria as três
+tentativas do item à toa.
 
 ## Cookies
 Instagram, TikTok e Facebook bloqueiam download anônimo. O usuário exporta o `cookies.txt`

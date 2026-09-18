@@ -18,7 +18,9 @@
 - **Rede Docker:** `ALDigitalNet`, overlay, externa. O serviço recebe o alias `swipe_worker` e escuta na porta `8080`. Nunca é publicado no Traefik.
 - **Imagem:** `ghcr.io/oandrelopesz/swipe-worker:latest`, pública.
 - **Repositório GitHub:** `oandrelopesz/gestao-de-operacao`, branch `main`.
-- **Timeout de job:** 900000 ms (15 min), o mesmo no worker e na chamada HTTP do n8n.
+- **Orçamento de tempo:** o worker sempre responde antes de o n8n desistir. Captura de LP tem
+  orçamento de 12 min (`ORCAMENTO_MS`), download tem 13 min, e a chamada HTTP do n8n espera
+  1800000 ms (30 min). Quem limita o tempo é o worker, nunca o cliente.
 - **Limite de nome no Drive:** 180 caracteres antes da extensão; caracteres `\ / : * ? " < > |` viram `-`.
 - **Idioma:** código, comentários, mensagens de erro e commits em português, como o resto do repositório.
 - **Commits:** terminar a mensagem com `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
@@ -863,8 +865,11 @@ EOF
 **Interfaces:**
 - Consumes: `rodar` de `../exec.js`, `nomeVsl`/`limitar` de `../nomes.js`.
 - Produces: `capturar({ link, dir, base }, deps?) -> Promise<{ arquivos: Array<{ caminho, nome, mime }> }>` e `ehUrlDeVideo(url) -> boolean`.
-  - `deps` (para teste): `{ rodar, abrirNavegador, existeArquivo }`.
+  - `deps` (para teste): `{ rodar, abrirNavegador, existeArquivo, orcamentoMs }`.
   - `abrirNavegador(link) -> { urlsDeVideo: string[], screenshot(caminho): Promise<void>, fechar(): Promise<void> }`
+  - **Orçamento:** a captura tem 12 min no total (`ORCAMENTO_MS`). Antes de cada VSL a função
+    confere se ainda há tempo; sem tempo, devolve a LP com html/zip/print e para. Isso garante
+    que a resposta sai antes do timeout da chamada HTTP do n8n, que é de 30 min.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -936,6 +941,14 @@ test("single-file falhando derruba o job", async () => {
   const d = deps({ falhas: { "single-file": new Error("chromium morreu") } });
   await assert.rejects(() => capturar({ link: "https://lp.com", dir: "/tmp/j", base: "B" }, d), /chromium morreu/);
 });
+
+test("sem orçamento, devolve a LP sem baixar VSL nenhuma", async () => {
+  const d = deps({ urlsDeVideo: ["https://cdn.site.com/a.m3u8", "https://cdn.site.com/b.mp4"] });
+  const r = await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "Site - N - P" }, { ...d, orcamentoMs: -1 });
+  assert.equal(r.arquivos.filter((a) => a.nome.includes("VSL")).length, 0);
+  assert.equal(r.arquivos.length, 3, "html, zip e print continuam sendo entregues");
+  assert.equal(d.chamadas.filter((c) => c.cmd.includes("yt-dlp")).length, 0);
+});
 ```
 
 - [ ] **Step 2: Rodar o teste e confirmar que falha**
@@ -957,6 +970,9 @@ import { existsSync } from "node:fs";
 import { rodar as rodarReal } from "../exec.js";
 import { limitar, nomeVsl } from "../nomes.js";
 
+/** Orçamento total de uma captura de LP, com folga sobre o timeout da chamada HTTP do n8n. */
+const ORCAMENTO_MS = 12 * 60 * 1000;
+
 const EXT_VIDEO = /\.(mp4|m3u8|webm|mov|mpd)(\?|$)/i;
 const PLAYERS = /(converteai\.net|vturb|pandavideo|player\.vimeo\.com|youtube\.com\/embed|youtu\.be|wistia\.(net|com)|vidyard|jwplayer)/i;
 
@@ -970,6 +986,9 @@ export async function capturar({ link, dir, base }, deps = {}) {
   const rodar = deps.rodar || rodarReal;
   const abrir = deps.abrirNavegador || abrirNavegadorReal;
   const existe = deps.existeArquivo || existsSync;
+  // Orçamento total da captura. O n8n corta a chamada HTTP bem depois disso, então a resposta
+  // sempre sai daqui antes de ele desistir — senão o job seria retentado com o worker ocupado.
+  const prazo = Date.now() + (deps.orcamentoMs ?? ORCAMENTO_MS);
 
   const arquivos = [];
   const htmlLocal = join(dir, "pagina.html");
@@ -994,7 +1013,7 @@ export async function capturar({ link, dir, base }, deps = {}) {
     "--browser-args=[\"--no-sandbox\",\"--disable-dev-shm-usage\"]",
     "--browser-wait-until=networkidle0",
     "--browser-load-max-time=120000",
-  ], { cwd: dir, timeout: 5 * 60 * 1000 });
+  ], { cwd: dir, timeout: 4 * 60 * 1000 });
   arquivos.push({ caminho: htmlLocal, nome: limitar(base, "html"), mime: "text/html" });
 
   // 3) Espelho completo, zipado
@@ -1003,7 +1022,7 @@ export async function capturar({ link, dir, base }, deps = {}) {
     "--level=1", "--timeout=30", "--tries=2", "--no-verbose",
     "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     "-P", espelhoDir, link,
-  ], { cwd: dir, timeout: 5 * 60 * 1000 }).catch(() => {});
+  ], { cwd: dir, timeout: 3 * 60 * 1000 }).catch(() => {});
   await rodar("/usr/bin/zip", ["-r", "-q", zipLocal, "."], { cwd: espelhoDir, timeout: 2 * 60 * 1000 });
   arquivos.push({ caminho: zipLocal, nome: limitar(`${base} - mirror`, "zip"), mime: "application/zip" });
 
@@ -1012,14 +1031,20 @@ export async function capturar({ link, dir, base }, deps = {}) {
 
   // 5) Cada vídeo/VSL num arquivo separado; falha num vídeo não derruba a captura
   let indice = 0;
-  for (const url of urlsDeVideo.slice(0, 5)) {
+  for (const url of urlsDeVideo.slice(0, 3)) {
+    // Sem orçamento não vale começar outro vídeo: melhor devolver a LP com o que já temos do que
+    // estourar o tempo do n8n e perder a captura inteira numa retentativa.
+    if (Date.now() > prazo) {
+      console.warn(JSON.stringify({ evento: "lp.orcamento_estourado", link, baixados: indice }));
+      break;
+    }
     indice += 1;
     const destino = join(dir, `vsl-${indice}.mp4`);
     try {
       await rodar("/usr/local/bin/yt-dlp", [
         url, "--no-playlist", "--no-warnings", "--merge-output-format", "mp4",
-        "-f", "bv*+ba/b", "--referer", link, "-o", destino,
-      ], { cwd: dir, timeout: 8 * 60 * 1000 });
+        "-f", "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b", "--referer", link, "-o", destino,
+      ], { cwd: dir, timeout: 5 * 60 * 1000 });
       if (existe(destino)) {
         arquivos.push({ caminho: destino, nome: nomeVsl(base, indice), mime: "video/mp4" });
       }
@@ -1432,8 +1457,6 @@ import { capturar as capturarReal } from "./jobs/lp.js";
 import { publicarDownload as publicarDownloadReal, publicarLp as publicarLpReal } from "./publicar.js";
 import { lerConfig } from "./config.js";
 
-const TIMEOUT_JOB = 15 * 60 * 1000;
-
 export async function executarJob(corpo, deps = {}) {
   const criarDrive = deps.criarDrive || criarDriveReal;
   const comPastaTemp = deps.comPastaTemp || comPastaTempReal;
@@ -1504,8 +1527,11 @@ export function criarServidor({ config, executarJob: executar = executarJob }) {
       return responder(400, { ok: false, erro: "payload precisa de link e drive_folder_id" });
     }
 
+    // Um job por vez. A liberação acontece só no `finally`: soltar `ocupado` por relógio
+    // deixaria um segundo job entrar com o primeiro ainda rodando, e os dois disputariam
+    // a mesma pasta temporária e o mesmo disco. Quem limita o tempo são os timeouts de cada
+    // comando (a captura de LP tem orçamento de 12 min, o download 13).
     ocupado = true;
-    const relogio = setTimeout(() => { ocupado = false; }, TIMEOUT_JOB + 60_000);
     try {
       console.log(JSON.stringify({ evento: "job.inicio", id: corpo.id, tipo: corpo.tipo, link: corpo.payload.link }));
       const r = await executar(corpo, { config });
@@ -1516,7 +1542,6 @@ export function criarServidor({ config, executarJob: executar = executarJob }) {
       console.error(JSON.stringify({ evento: "job.erro", id: corpo.id, infra, erro: String(e?.message || e) }));
       responder(infra ? 503 : 500, { ok: false, erro: String(e?.message || e).slice(0, 500) });
     } finally {
-      clearTimeout(relogio);
       ocupado = false;
     }
   });
@@ -1919,7 +1944,7 @@ Expected: `{"ok":true,"busy":false,"versao":"1.0.0"}`. Apagar o workflow de test
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ id: $('Tem job?').item.json.id, tipo: $('Tem job?').item.json.tipo, payload: $('Tem job?').item.json.payload, ultima_tentativa: $('Tem job?').item.json.tentativas + 1 >= 3 }) }}",
-        "options": { "timeout": 900000, "response": { "response": { "neverError": true, "fullResponse": true } } }
+        "options": { "timeout": 1800000, "response": { "response": { "neverError": true, "fullResponse": true } } }
       },
       "id": "a1000000-0000-4000-8000-000000000006",
       "name": "Executar no worker",
