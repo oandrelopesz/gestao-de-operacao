@@ -72,3 +72,19 @@ test("sem orçamento, devolve a LP sem baixar VSL nenhuma", async () => {
   assert.equal(r.arquivos.length, 3, "html, zip e print continuam sendo entregues");
   assert.equal(d.chamadas.filter((c) => c.cmd.includes("yt-dlp")).length, 0);
 });
+
+test("espelho falhando não derruba a captura", async () => {
+  const d = deps({ falhas: { zip: new Error("nothing to do") } });
+  const r = await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "LP - N - P" }, d);
+  const nomes = r.arquivos.map((a) => a.nome);
+  assert.deepEqual(nomes, ["LP - N - P.html", "LP - N - P - print.png"]);
+});
+
+test("VSL que sai sem gravar arquivo não gasta número", async () => {
+  let vez = 0;
+  const d = deps({ urlsDeVideo: ["https://cdn.site.com/a.mp4", "https://cdn.site.com/b.mp4"] });
+  d.existeArquivo = () => { vez += 1; return vez > 1; }; // a 1ª não gravou, a 2ª gravou
+  const r = await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "LP - N - P" }, d);
+  const vsls = r.arquivos.filter((a) => a.nome.includes("VSL")).map((a) => a.nome);
+  assert.deepEqual(vsls, ["LP - N - P - VSL 01.mp4"], "a VSL que sobrou tem que ser a 01, sem buraco");
+});
