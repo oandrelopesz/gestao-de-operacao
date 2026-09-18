@@ -569,6 +569,80 @@ export type Database = {
         }
         Relationships: []
       }
+      habilidade_recursos: {
+        Row: {
+          autor: string | null
+          created_at: string
+          habilidade_id: string
+          id: string
+          link: string | null
+          observacao: string | null
+          ordem: number
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          autor?: string | null
+          created_at?: string
+          habilidade_id: string
+          id?: string
+          link?: string | null
+          observacao?: string | null
+          ordem?: number
+          tipo: string
+          titulo: string
+        }
+        Update: {
+          autor?: string | null
+          created_at?: string
+          habilidade_id?: string
+          id?: string
+          link?: string | null
+          observacao?: string | null
+          ordem?: number
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "habilidade_recursos_habilidade_id_fkey"
+            columns: ["habilidade_id"]
+            isOneToOne: false
+            referencedRelation: "habilidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      habilidades: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          ordem: number
+          peso: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          ordem?: number
+          peso?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          ordem?: number
+          peso?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       livros: {
         Row: {
           autor: string
@@ -996,6 +1070,50 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subhabilidades: {
+        Row: {
+          created_at: string
+          criterios: string | null
+          habilidade_id: string
+          id: string
+          nome: string
+          nota: number
+          ordem: number
+          peso: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criterios?: string | null
+          habilidade_id: string
+          id?: string
+          nome: string
+          nota?: number
+          ordem?: number
+          peso?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criterios?: string | null
+          habilidade_id?: string
+          id?: string
+          nome?: string
+          nota?: number
+          ordem?: number
+          peso?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subhabilidades_habilidade_id_fkey"
+            columns: ["habilidade_id"]
+            isOneToOne: false
+            referencedRelation: "habilidades"
             referencedColumns: ["id"]
           },
         ]

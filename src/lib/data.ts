@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatBRL } from "@/lib/clientes";
 import { fetchDemandaColunas } from "@/lib/demandaColunas";
 import { fetchCursoCategorias } from "@/lib/cursoCategorias";
+import { fetchHabilidades } from "@/lib/habilidades";
 import { setCached } from "@/lib/pageCache";
 
 /**
@@ -22,6 +23,7 @@ export const CACHE_KEYS = {
   cursos: "cursos",
   cursoCategorias: "curso-categorias",
   livros: "livros",
+  habilidades: "habilidades",
 } as const;
 
 export async function loadDemandas() {
@@ -133,6 +135,7 @@ export async function warmAllCaches(): Promise<void> {
     [CACHE_KEYS.acessos, loadAcessos],
     [CACHE_KEYS.financeiro, loadFinanceiro],
     [CACHE_KEYS.livros, loadLivros],
+    [CACHE_KEYS.habilidades, fetchHabilidades],
     [
       CACHE_KEYS.cursos,
       async () => {

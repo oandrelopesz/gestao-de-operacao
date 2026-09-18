@@ -25,6 +25,7 @@ import { useDemandaColunas, COLUMN_COLORS, slugifyColumnId, type KanbanColumnDef
 import { usePlataformas, slugifyPlataformaId, type PlataformaDef } from "@/lib/plataformas";
 import { useTheme } from "@/lib/theme";
 import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, CATEGORIA_COLORS, type CursoCategoriaDef } from "@/lib/cursoCategorias";
+import { HabilidadesAdminCard } from "@/components/habilidades/HabilidadesAdminCard";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
@@ -528,7 +529,7 @@ function AdminPage() {
     <div className="space-y-8 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
-        <p className="text-muted-foreground">Configurações gerais: agências, plataformas, categorias de cursos, colunas do Kanban, aparência e dados.</p>
+        <p className="text-muted-foreground">Configurações gerais: agências, plataformas, categorias de cursos, habilidades, colunas do Kanban, aparência e dados.</p>
       </div>
 
       {/* Agências */}
@@ -688,6 +689,8 @@ function AdminPage() {
           </div>
         </CardContent>
       </Card>
+
+      <HabilidadesAdminCard />
 
       {/* Colunas do Kanban */}
       <Card>
