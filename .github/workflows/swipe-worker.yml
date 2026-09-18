@@ -1,0 +1,45 @@
+# .github/workflows/swipe-worker.yml
+name: swipe-worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "worker/**"
+      - ".github/workflows/swipe-worker.yml"
+  workflow_dispatch:
+
+jobs:
+  testar-e-publicar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Testes
+        working-directory: worker
+        run: node --test
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: worker
+          push: true
+          tags: |
+            ghcr.io/oandrelopesz/swipe-worker:latest
+            ghcr.io/oandrelopesz/swipe-worker:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
