@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle, CalendarIcon, Info } from "lucide-react";
 import { format } from "date-fns";
@@ -13,7 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { NPS_METRICS, getScoreCategory, getMetricColor } from "@/lib/nps";
+import { NPS_METRICS, getScoreCategory, getMetricColor, calcularScoreNPS, type NPSNotas } from "@/lib/nps";
 import { useAgencias } from "@/lib/agencias";
 import { getUserId } from "@/lib/clientesService";
 import { toast } from "sonner";
@@ -34,13 +35,26 @@ export function NPSForm({ onSuccess, onClose, initialData, defaultClienteId }: N
   const [dataAvaliacao, setDataAvaliacao] = useState<Date>(initialData ? new Date(initialData.data_avaliacao) : new Date());
   const [observacoes, setObservacoes] = useState(initialData?.observacoes || "");
   
-  const [metrics, setMetrics] = useState<Record<string, number>>({
-    engajamento: initialData?.engajamento ?? 8,
-    resultados_campanha: initialData?.resultados_campanha ?? 8,
-    conversao_vendas: initialData?.conversao_vendas ?? 8,
-    relacionamento: initialData?.relacionamento ?? 8,
-    potencial_crescimento: initialData?.potencial_crescimento ?? 8,
+  // null = "sem resposta": o critério fica fora do score. Ao editar, mantém o que estava salvo.
+  const [metrics, setMetrics] = useState<NPSNotas>({
+    engajamento: initialData ? initialData.engajamento ?? null : 8,
+    resultados_campanha: initialData ? initialData.resultados_campanha ?? null : 8,
+    conversao_vendas: initialData ? initialData.conversao_vendas ?? null : 8,
+    relacionamento: initialData ? initialData.relacionamento ?? null : 8,
+    potencial_crescimento: initialData ? initialData.potencial_crescimento ?? null : 8,
   });
+  // Última nota antes de marcar "sem resposta", para voltar ao religar
+  const [ultimaNota, setUltimaNota] = useState<Record<string, number>>({});
+
+  const toggleSemResposta = (id: string, semResposta: boolean) => {
+    setMetrics((prev) => {
+      if (semResposta) {
+        if (typeof prev[id] === "number") setUltimaNota((u) => ({ ...u, [id]: prev[id] as number }));
+        return { ...prev, [id]: null };
+      }
+      return { ...prev, [id]: ultimaNota[id] ?? 8 };
+    });
+  };
 
   const { data: clientes } = useQuery({
     queryKey: ["clientes-ativos"],
@@ -54,14 +68,18 @@ export function NPSForm({ onSuccess, onClose, initialData, defaultClienteId }: N
     },
   });
 
-  const scoreTotal = Object.values(metrics).reduce((a, b) => a + b, 0);
-  const category = getScoreCategory(scoreTotal);
+  const { score: scoreTotal, respondidos } = calcularScoreNPS(metrics);
+  const category = getScoreCategory(scoreTotal ?? 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!clienteId) {
       toast.error("Selecione um cliente");
+      return;
+    }
+    if (scoreTotal === null) {
+      toast.error("Responda pelo menos um critério");
       return;
     }
 
@@ -96,7 +114,10 @@ export function NPSForm({ onSuccess, onClose, initialData, defaultClienteId }: N
     }
 
     if (error) {
-      toast.error("Erro ao salvar avaliação");
+      const msg = String(error.message || "");
+      toast.error(/sextas-feiras/i.test(msg)
+        ? "O banco ainda tem a trava de sexta-feira: rode supabase/migrations/20260918100000_nps_sem_resposta.sql no SQL Editor."
+        : msg || "Erro ao salvar avaliação");
       console.error(error);
     } else {
       toast.success("Avaliação salva com sucesso");
@@ -183,20 +204,36 @@ export function NPSForm({ onSuccess, onClose, initialData, defaultClienteId }: N
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <div className={cn(
-                  "px-2 py-0.5 rounded text-xs font-bold text-white transition-colors",
-                  getMetricColor(metrics[metric.id])
-                )}>
-                  {metrics[metric.id]}/10
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
+                    <Switch
+                      checked={metrics[metric.id] === null}
+                      onCheckedChange={(v) => toggleSemResposta(metric.id, v)}
+                      className="scale-75 origin-right data-[state=checked]:bg-slate-500"
+                      aria-label={`Sem resposta — ${metric.label}`}
+                    />
+                    Sem resposta
+                  </label>
+                  {metrics[metric.id] === null ? (
+                    <div className="px-2 py-0.5 rounded text-xs font-bold bg-muted text-muted-foreground">fora do score</div>
+                  ) : (
+                    <div className={cn(
+                      "px-2 py-0.5 rounded text-xs font-bold text-white transition-colors",
+                      getMetricColor(metrics[metric.id] as number)
+                    )}>
+                      {metrics[metric.id]}/10
+                    </div>
+                  )}
                 </div>
               </div>
               <Slider
-                value={[metrics[metric.id]]}
+                value={[metrics[metric.id] ?? 0]}
                 min={0}
                 max={10}
                 step={1}
+                disabled={metrics[metric.id] === null}
                 onValueChange={([val]) => setMetrics(prev => ({ ...prev, [metric.id]: val }))}
-                className="py-1"
+                className={cn("py-1", metrics[metric.id] === null && "opacity-40")}
               />
             </div>
           ))}
@@ -209,9 +246,11 @@ export function NPSForm({ onSuccess, onClose, initialData, defaultClienteId }: N
           "border-red-500/20 bg-red-500/5"
         )}>
           <div>
-            <p className="text-xs uppercase tracking-wider font-bold opacity-70">Score Consolidado</p>
+            <p className="text-xs uppercase tracking-wider font-bold opacity-70">
+              Score Consolidado{respondidos < NPS_METRICS.length && <span className="normal-case font-medium"> · {respondidos} de {NPS_METRICS.length} critérios (projetado para 50)</span>}
+            </p>
             <div className="flex items-center gap-3">
-              <span className="text-3xl font-black">{scoreTotal}/50</span>
+              <span className="text-3xl font-black">{scoreTotal ?? "—"}/50</span>
               <div className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase", category.color)}>
                 {category.label}
               </div>

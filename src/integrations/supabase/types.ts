@@ -324,6 +324,8 @@ export type Database = {
           tema: Database["public"]["Enums"]["curso_tema"]
           updated_at: string | null
           user_id: string
+          aulas: Json
+          tipo_acesso: string
         }
         Insert: {
           categoria_id?: string | null
@@ -339,6 +341,8 @@ export type Database = {
           tema?: Database["public"]["Enums"]["curso_tema"]
           updated_at?: string | null
           user_id?: string
+          aulas?: Json
+          tipo_acesso?: string
         }
         Update: {
           categoria_id?: string | null
@@ -354,6 +358,8 @@ export type Database = {
           tema?: Database["public"]["Enums"]["curso_tema"]
           updated_at?: string | null
           user_id?: string
+          aulas?: Json
+          tipo_acesso?: string
         }
         Relationships: [
           {
@@ -825,43 +831,43 @@ export type Database = {
       nps_avaliacoes: {
         Row: {
           cliente_id: string
-          conversao_vendas: number
+          conversao_vendas: number | null
           created_at: string
           data_avaliacao: string
-          engajamento: number
+          engajamento: number | null
           id: string
           observacoes: string | null
-          potencial_crescimento: number
-          relacionamento: number
-          resultados_campanha: number
+          potencial_crescimento: number | null
+          relacionamento: number | null
+          resultados_campanha: number | null
           score_total: number
           user_id: string
         }
         Insert: {
           cliente_id: string
-          conversao_vendas: number
+          conversao_vendas: number | null
           created_at?: string
           data_avaliacao?: string
-          engajamento: number
+          engajamento: number | null
           id?: string
           observacoes?: string | null
-          potencial_crescimento: number
-          relacionamento: number
-          resultados_campanha: number
+          potencial_crescimento: number | null
+          relacionamento: number | null
+          resultados_campanha: number | null
           score_total: number
           user_id: string
         }
         Update: {
           cliente_id?: string
-          conversao_vendas?: number
+          conversao_vendas?: number | null
           created_at?: string
           data_avaliacao?: string
-          engajamento?: number
+          engajamento?: number | null
           id?: string
           observacoes?: string | null
-          potencial_crescimento?: number
-          relacionamento?: number
-          resultados_campanha?: number
+          potencial_crescimento?: number | null
+          relacionamento?: number | null
+          resultados_campanha?: number | null
           score_total?: number
           user_id?: string
         }
@@ -1212,6 +1218,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ver_depois: {
+        Row: {
+          created_at: string
+          id: string
+          link: string
+          observacao: string | null
+          ordem: number
+          tipo: string
+          titulo: string
+          updated_at: string
+          visto: boolean
+          visto_em: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          link: string
+          observacao?: string | null
+          ordem?: number
+          tipo: string
+          titulo: string
+          updated_at?: string
+          visto?: boolean
+          visto_em?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          link?: string
+          observacao?: string | null
+          ordem?: number
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          visto?: boolean
+          visto_em?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {

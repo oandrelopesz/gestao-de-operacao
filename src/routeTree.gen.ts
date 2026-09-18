@@ -22,6 +22,7 @@ import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
 import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
 import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
+import { Route as AuthenticatedVerDepoisRouteImport } from './routes/_authenticated/ver-depois'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -88,6 +89,11 @@ const AuthenticatedSaldoRoute = AuthenticatedSaldoRouteImport.update({
   path: '/saldo',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedVerDepoisRoute = AuthenticatedVerDepoisRouteImport.update({
+  id: '/ver-depois',
+  path: '/ver-depois',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/nps': typeof AuthenticatedNpsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/saldo': typeof AuthenticatedSaldoRoute
+  '/ver-depois': typeof AuthenticatedVerDepoisRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/nps': typeof AuthenticatedNpsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/saldo': typeof AuthenticatedSaldoRoute
+  '/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/_authenticated/nps': typeof AuthenticatedNpsRoute
   '/_authenticated/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
+  '/_authenticated/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
@@ -148,6 +157,7 @@ export interface FileRouteTypes {
     | '/nps'
     | '/prospeccao'
     | '/saldo'
+    | '/ver-depois'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/nps'
     | '/prospeccao'
     | '/saldo'
+    | '/ver-depois'
     | '/'
   id:
     | '__root__'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/_authenticated/nps'
     | '/_authenticated/prospeccao'
     | '/_authenticated/saldo'
+    | '/_authenticated/ver-depois'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
@@ -277,6 +289,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSaldoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/ver-depois': {
+      id: '/_authenticated/ver-depois'
+      path: '/ver-depois'
+      fullPath: '/ver-depois'
+      preLoaderRoute: typeof AuthenticatedVerDepoisRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -291,6 +310,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedNpsRoute: typeof AuthenticatedNpsRoute
   AuthenticatedProspeccaoRoute: typeof AuthenticatedProspeccaoRoute
   AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
+  AuthenticatedVerDepoisRoute: typeof AuthenticatedVerDepoisRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
@@ -305,6 +325,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedNpsRoute: AuthenticatedNpsRoute,
   AuthenticatedProspeccaoRoute: AuthenticatedProspeccaoRoute,
   AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,
+  AuthenticatedVerDepoisRoute: AuthenticatedVerDepoisRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 

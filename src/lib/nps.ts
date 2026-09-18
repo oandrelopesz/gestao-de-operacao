@@ -157,3 +157,18 @@ export function getProximaSextaFormatada(): string {
   proxima.setDate(proxima.getDate() + dias);
   return proxima.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
+
+/** Notas por critério; null = "sem resposta" (não entra no score) */
+export type NPSNotas = Record<string, number | null>;
+
+/**
+ * Score consolidado na escala 0-50 considerando só os critérios respondidos:
+ * média das notas × 5. Assim "sem resposta" não puxa a nota para baixo.
+ * Retorna null quando nenhum critério foi respondido.
+ */
+export function calcularScoreNPS(notas: NPSNotas): { score: number | null; respondidos: number } {
+  const valores = NPS_METRICS.map((m) => notas[m.id]).filter((v): v is number => typeof v === "number");
+  if (valores.length === 0) return { score: null, respondidos: 0 };
+  const media = valores.reduce((a, b) => a + b, 0) / valores.length;
+  return { score: Math.round(media * 5), respondidos: valores.length };
+}

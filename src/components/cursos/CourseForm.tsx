@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -31,7 +31,9 @@ import {
   CommandItem, 
   CommandList 
 } from "@/components/ui/command";
-import { Eye, EyeOff, Plus, Check, ChevronsUpDown, X } from "lucide-react";
+import { Eye, EyeOff, Plus, Check, ChevronsUpDown, X, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TIPOS_ACESSO, tipoAcessoDe } from "@/lib/cursoAcesso";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, type CursoCategoriaDef } from "@/lib/cursoCategorias";
@@ -40,6 +42,9 @@ const courseSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   tema: z.string().optional(),
   categoria_id: z.string().optional().nullable(),
+  tipo_acesso: z.enum(["membros", "drive", "telegram"]),
+  /** Tipo drive: uma aula por linha, cada uma com link */
+  aulas: z.array(z.object({ titulo: z.string(), link: z.string() })),
   link_area_membros: z.string().optional().or(z.literal("")),
   login: z.string().optional().or(z.literal("")),
   senha: z.string().optional().or(z.literal("")),
@@ -70,6 +75,8 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       nome: "",
       tema: "outros",
       categoria_id: null,
+      tipo_acesso: "membros",
+      aulas: [],
       link_area_membros: "",
       login: "",
       senha: "",
@@ -129,6 +136,8 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
           nome: editingCourse.nome || "",
           tema: (editingCourse.tema as any) || "outros",
           categoria_id: editingCourse.categoria_id || null,
+          tipo_acesso: tipoAcessoDe(editingCourse.tipo_acesso),
+          aulas: Array.isArray(editingCourse.aulas) ? editingCourse.aulas.map((a: any) => ({ titulo: String(a?.titulo || ""), link: String(a?.link || "") })) : [],
           link_area_membros: editingCourse.link_area_membros || "",
           login: editingCourse.login || "",
           senha: editingCourse.senha || "",
@@ -140,7 +149,9 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
           nome: "",
           tema: "outros",
           categoria_id: null,
-          link_area_membros: "",
+          tipo_acesso: "membros",
+      aulas: [],
+      link_area_membros: "",
           login: "",
           senha: "",
           em_andamento: false,
@@ -149,6 +160,15 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       }
     }
   }, [editingCourse, open, form]);
+
+  const normalizarLink = (link: string) => {
+    const l = link.trim();
+    if (!l) return "";
+    return /^https?:\/\//i.test(l) ? l : `https://${l}`;
+  };
+
+  const { fields: aulas, append: addAula, remove: removeAula } = useFieldArray({ control: form.control, name: "aulas" });
+  const tipoAcesso = form.watch("tipo_acesso");
 
   const onSubmit = async (values: CourseFormValues) => {
     setLoading(true);
@@ -172,6 +192,13 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
         tema: values.tema || "outros",
         categoria_id: values.categoria_id,
         link_area_membros: finalLink,
+        tipo_acesso: values.tipo_acesso,
+        // Só aulas preenchidas; links sem protocolo ganham https://
+        aulas: values.tipo_acesso === "drive"
+          ? values.aulas
+              .filter((a) => a.titulo.trim() || a.link.trim())
+              .map((a, i) => ({ titulo: a.titulo.trim() || `Aula ${i + 1}`, link: normalizarLink(a.link) }))
+          : [],
         login: values.login,
         senha: values.senha,
         em_andamento: values.em_andamento,
@@ -346,19 +373,73 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
             <FormField
               control={form.control}
-              name="link_area_membros"
+              name="tipo_acesso"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Link da Área de Membros</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://..." {...field} />
-                  </FormControl>
+                  <FormLabel>Onde o curso está</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {TIPOS_ACESSO.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            {tipoAcesso === "drive" ? (
+              <div className="space-y-2 rounded-md border p-3 bg-muted/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium leading-none">Aulas (Google Drive)</span>
+                  <Button type="button" variant="outline" size="sm" className="gap-1 h-7" onClick={() => addAula({ titulo: `Aula ${aulas.length + 1}`, link: "" })}>
+                    <Plus size={12} /> Aula
+                  </Button>
+                </div>
+                {aulas.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Adicione cada aula com o link do arquivo no Drive.</p>
+                )}
+                {aulas.map((a, i) => (
+                  <div key={a.id} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] gap-2 items-center">
+                    <FormField
+                      control={form.control}
+                      name={`aulas.${i}.titulo`}
+                      render={({ field }) => (
+                        <FormItem><FormControl><Input placeholder={`Aula ${i + 1}`} className="h-8 text-sm" {...field} /></FormControl></FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`aulas.${i}.link`}
+                      render={({ field }) => (
+                        <FormItem><FormControl><Input placeholder="https://drive.google.com/..." className="h-8 text-sm" {...field} /></FormControl></FormItem>
+                      )}
+                    />
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeAula(i)} title="Remover aula">
+                      <Trash2 size={13} />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="link_area_membros"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{tipoAcesso === "telegram" ? "Link do Telegram" : "Link da Área de Membros"}</FormLabel>
+                    <FormControl>
+                      <Input placeholder={tipoAcesso === "telegram" ? "https://t.me/..." : "https://..."} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            <div className={cn("grid grid-cols-2 gap-4", tipoAcesso !== "membros" && "hidden")}>
               <FormField
                 control={form.control}
                 name="login"

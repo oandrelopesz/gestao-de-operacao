@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { 
   Plus, Search, MoreVertical, Pencil, Trash2, 
   ExternalLink, Copy, Check, Eye, EyeOff, 
-  PlayCircle, PauseCircle, BookOpen
+  PlayCircle, PauseCircle, BookOpen, Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CourseForm } from "@/components/cursos/CourseForm";
 import { corDaCategoria, type CursoCategoriaDef } from "@/lib/cursoCategorias";
+import { parseAulas, tipoAcessoDe } from "@/lib/cursoAcesso";
 
 type Tema = string; // enum legado; a classificação agora é por categoria_id
 
@@ -56,6 +57,8 @@ interface Curso {
   observacoes: string | null;
   ordem: number;
   curso_categorias?: Categoria | null;
+  tipo_acesso?: string | null;
+  aulas?: unknown;
 }
 
 const SEM_CATEGORIA = { id: "sem_categoria", label: "Sem categoria", hex: "#94a3b8" };
@@ -371,6 +374,8 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
   onDelete: () => void;
   onToggleStatus: () => void;
 }) {
+  const tipoAcesso = tipoAcessoDe(curso.tipo_acesso);
+  const aulas = parseAulas(curso.aulas);
   const [showPassword, setShowPassword] = useState(false);
   const [copiedLogin, setCopiedLogin] = useState(false);
   const [copiedPass, setCopiedPass] = useState(false);
@@ -441,7 +446,32 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
       </CardHeader>
 
       <CardContent className="px-4 py-0 space-y-3">
-        <div className="bg-muted/50 rounded-lg p-3 space-y-3 border border-muted-foreground/10">
+        {tipoAcesso === "drive" && (
+          <div className="bg-muted/50 rounded-lg p-3 border border-muted-foreground/10">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Aulas no Google Drive · {aulas.length}</span>
+            {aulas.length === 0 ? (
+              <p className="text-xs text-muted-foreground mt-1">Nenhuma aula cadastrada. Edite o curso para adicionar.</p>
+            ) : (
+              <ul className="mt-1.5 space-y-1 max-h-40 overflow-y-auto pr-1">
+                {aulas.map((a, i) => (
+                  <li key={i}>
+                    <a href={a.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs rounded px-1.5 py-1 hover:bg-muted transition-colors group/aula">
+                      <PlayCircle size={12} className="text-muted-foreground group-hover/aula:text-primary shrink-0" />
+                      <span className="truncate flex-1">{a.titulo || `Aula ${i + 1}`}</span>
+                      <ExternalLink size={11} className="text-muted-foreground opacity-0 group-hover/aula:opacity-100 shrink-0" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {tipoAcesso === "telegram" && (
+          <div className="bg-muted/50 rounded-lg p-3 border border-muted-foreground/10 text-xs text-muted-foreground flex items-center gap-2">
+            <Send size={13} className="text-sky-500" /> Curso no Telegram — abre direto no app.
+          </div>
+        )}
+        <div className={cn("bg-muted/50 rounded-lg p-3 space-y-3 border border-muted-foreground/10", tipoAcesso !== "membros" && "hidden")}>
           <div className="space-y-1">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Login</span>
             <div className="flex items-center justify-between gap-2">
@@ -497,21 +527,38 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
       </CardContent>
 
       <CardFooter className="p-4 pt-4">
-        <Button 
-          variant={curso.link_area_membros ? "default" : "secondary"} 
-          className="w-full gap-2" 
-          disabled={!curso.link_area_membros}
-          asChild={!!curso.link_area_membros}
-        >
-          {curso.link_area_membros ? (
-            <a href={curso.link_area_membros} target="_blank" rel="noopener noreferrer">
-              Acessar área de membros
-              <ExternalLink size={14} />
-            </a>
-          ) : (
-            <span>Link não cadastrado</span>
-          )}
-        </Button>
+        {tipoAcesso === "drive" ? (
+          <Button
+            variant={aulas[0] ? "default" : "secondary"}
+            className="w-full gap-2"
+            disabled={!aulas[0]}
+            asChild={!!aulas[0]}
+          >
+            {aulas[0] ? (
+              <a href={aulas[0].link} target="_blank" rel="noopener noreferrer">
+                Começar pela {aulas[0].titulo || "Aula 1"}
+                <ExternalLink size={14} />
+              </a>
+            ) : (
+              <span>Sem aulas cadastradas</span>
+            )}
+          </Button>
+        ) : (
+          <Button
+            variant={curso.link_area_membros ? "default" : "secondary"}
+            className={cn("w-full gap-2", tipoAcesso === "telegram" && curso.link_area_membros && "bg-sky-500 hover:bg-sky-600 text-white")}
+            disabled={!curso.link_area_membros}
+            asChild={!!curso.link_area_membros}
+          >
+            {curso.link_area_membros ? (
+              <a href={curso.link_area_membros} target="_blank" rel="noopener noreferrer">
+                {tipoAcesso === "telegram" ? <><Send size={14} /> Abrir no Telegram</> : <>Acessar área de membros<ExternalLink size={14} /></>}
+              </a>
+            ) : (
+              <span>Link não cadastrado</span>
+            )}
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );

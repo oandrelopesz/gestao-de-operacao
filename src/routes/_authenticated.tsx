@@ -19,6 +19,7 @@ import {
   Moon,
   Sparkles,
   Gauge,
+  Bookmark,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -67,6 +68,7 @@ const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
       { label: "Cursos", icon: <BookOpen size={17} />, to: "/cursos" },
       { label: "Livros", icon: <Book size={17} />, to: "/livros" },
       { label: "Habilidades", icon: <Gauge size={17} />, to: "/habilidades" },
+      { label: "Ver depois", icon: <Bookmark size={17} />, to: "/ver-depois" },
     ],
   },
   {
