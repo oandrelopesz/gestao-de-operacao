@@ -966,6 +966,21 @@ test("single-file falhando derruba o job", async () => {
   await assert.rejects(() => capturar({ link: "https://lp.com", dir: "/tmp/j", base: "B" }, d), /chromium morreu/);
 });
 
+test("espelho falhando não derruba a captura", async () => {
+  const d = deps({ falhas: { zip: new Error("nothing to do") } });
+  const r = await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "LP - N - P" }, d);
+  assert.deepEqual(r.arquivos.map((a) => a.nome), ["LP - N - P.html", "LP - N - P - print.png"]);
+});
+
+test("VSL que sai sem gravar arquivo não gasta número", async () => {
+  let vez = 0;
+  const d = deps({ urlsDeVideo: ["https://cdn.site.com/a.mp4", "https://cdn.site.com/b.mp4"] });
+  d.existeArquivo = () => { vez += 1; return vez > 1; }; // a 1ª não gravou, a 2ª gravou
+  const r = await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "LP - N - P" }, d);
+  const vsls = r.arquivos.filter((a) => a.nome.includes("VSL")).map((a) => a.nome);
+  assert.deepEqual(vsls, ["LP - N - P - VSL 01.mp4"], "a VSL que sobrou tem que ser a 01, sem buraco");
+});
+
 test("sem orçamento, devolve a LP sem baixar VSL nenhuma", async () => {
   const d = deps({ urlsDeVideo: ["https://cdn.site.com/a.m3u8", "https://cdn.site.com/b.mp4"] });
   const r = await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "Site - N - P" }, { ...d, orcamentoMs: -1 });
@@ -991,6 +1006,7 @@ Expected: FAIL — `Cannot find module '../src/jobs/lp.js'`
 // Mais um arquivo por vídeo/VSL encontrado na página.
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { rodar as rodarReal } from "../exec.js";
 import { limitar, nomeVsl } from "../nomes.js";
 
@@ -1040,15 +1056,22 @@ export async function capturar({ link, dir, base }, deps = {}) {
   ], { cwd: dir, timeout: 4 * 60 * 1000 });
   arquivos.push({ caminho: htmlLocal, nome: limitar(base, "html"), mime: "text/html" });
 
-  // 3) Espelho completo, zipado
+  // 3) Espelho completo, zipado. Os dois passos são acessórios: sem espelho a captura continua
+  // válida (html + print + VSL), então nenhum deles pode derrubar o job. O `mkdir` existe porque
+  // um wget que falha logo na primeira request nunca cria a pasta, e aí o zip falharia no `cwd`.
+  await mkdir(espelhoDir, { recursive: true });
   await rodar("/usr/bin/wget", [
     "--mirror", "--convert-links", "--adjust-extension", "--page-requisites", "--no-parent",
     "--level=1", "--timeout=30", "--tries=2", "--no-verbose",
     "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     "-P", espelhoDir, link,
   ], { cwd: dir, timeout: 3 * 60 * 1000 }).catch(() => {});
-  await rodar("/usr/bin/zip", ["-r", "-q", zipLocal, "."], { cwd: espelhoDir, timeout: 2 * 60 * 1000 });
-  arquivos.push({ caminho: zipLocal, nome: limitar(`${base} - mirror`, "zip"), mime: "application/zip" });
+  try {
+    await rodar("/usr/bin/zip", ["-r", "-q", zipLocal, "."], { cwd: espelhoDir, timeout: 2 * 60 * 1000 });
+    arquivos.push({ caminho: zipLocal, nome: limitar(`${base} - mirror`, "zip"), mime: "application/zip" });
+  } catch (e) {
+    console.warn(JSON.stringify({ evento: "lp.espelho_falhou", link, erro: String(e?.message || e) }));
+  }
 
   // 4) Print
   arquivos.push({ caminho: printLocal, nome: limitar(`${base} - print`, "png"), mime: "image/png" });
@@ -1071,6 +1094,8 @@ export async function capturar({ link, dir, base }, deps = {}) {
       ], { cwd: dir, timeout: 5 * 60 * 1000 });
       if (existe(destino)) {
         arquivos.push({ caminho: destino, nome: nomeVsl(base, indice), mime: "video/mp4" });
+      } else {
+        indice -= 1; // comando saiu 0 mas não gravou nada: não gasta número
       }
     } catch {
       indice -= 1; // não gasta número com vídeo que falhou
@@ -1087,34 +1112,43 @@ async function abrirNavegadorReal(link) {
     executablePath: "/usr/bin/chromium",
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
-  const contexto = await navegador.newContext({
-    viewport: { width: 1440, height: 900 },
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-  });
-  const pagina = await contexto.newPage();
-  const urlsDeVideo = [];
-  pagina.on("request", (r) => { if (ehUrlDeVideo(r.url())) urlsDeVideo.push(r.url()); });
-
-  await pagina.goto(link, { waitUntil: "domcontentloaded", timeout: 90_000 });
-  await pagina.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
-  // Rola até o fim para disparar lazy loading e o player da VSL
-  await pagina.evaluate(async () => {
-    await new Promise((pronto) => {
-      let y = 0;
-      const passo = setInterval(() => {
-        window.scrollBy(0, 600);
-        y += 600;
-        if (y >= document.body.scrollHeight + 1200) { clearInterval(passo); window.scrollTo(0, 0); pronto(); }
-      }, 150);
+  let contexto;
+  try {
+    contexto = await navegador.newContext({
+      viewport: { width: 1440, height: 900 },
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     });
-  }).catch(() => {});
-  await pagina.waitForTimeout(4000);
+    const pagina = await contexto.newPage();
+    const urlsDeVideo = [];
+    pagina.on("request", (r) => { if (ehUrlDeVideo(r.url())) urlsDeVideo.push(r.url()); });
 
-  return {
-    urlsDeVideo,
-    screenshot: (caminho) => pagina.screenshot({ path: caminho, fullPage: true }),
-    fechar: async () => { await contexto.close().catch(() => {}); await navegador.close().catch(() => {}); },
-  };
+    await pagina.goto(link, { waitUntil: "domcontentloaded", timeout: 90_000 });
+    await pagina.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
+    // Rola até o fim para disparar lazy loading e o player da VSL
+    await pagina.evaluate(async () => {
+      await new Promise((pronto) => {
+        let y = 0;
+        const passo = setInterval(() => {
+          window.scrollBy(0, 600);
+          y += 600;
+          if (y >= document.body.scrollHeight + 1200) { clearInterval(passo); window.scrollTo(0, 0); pronto(); }
+        }, 150);
+      });
+    }).catch(() => {});
+    await pagina.waitForTimeout(4000);
+
+    return {
+      urlsDeVideo,
+      screenshot: (caminho) => pagina.screenshot({ path: caminho, fullPage: true }),
+      fechar: async () => { await contexto.close().catch(() => {}); await navegador.close().catch(() => {}); },
+    };
+  } catch (e) {
+    // Nada foi devolvido, então ninguém vai chamar `fechar`: sem isto o Chromium fica órfão a
+    // cada LP que não carrega, e são muitas.
+    await contexto?.close().catch(() => {});
+    await navegador.close().catch(() => {});
+    throw e;
+  }
 }
 ```
 
