@@ -84,6 +84,15 @@ POST /job
 Erros de infraestrutura (token do Google, Drive fora do ar) devolvem **503** para o n8n
 reagendar sem consumir tentativa.
 
+A classificação é por origem, não só por status:
+- **Qualquer** falha da `google-token` é infraestrutura, inclusive `403` (chave errada) e `409`
+  (Drive desconectado). São erros de configuração que atingem todos os jobs de uma vez; se
+  consumissem tentativa, a fila inteira viraria `falhou` com Docs inúteis por causa de algo que
+  se conserta num clique. Ficando na fila, tudo volta a andar sozinho quando o usuário corrige.
+- Na **API do Drive**, `401`, `429` e `5xx` são infraestrutura; os demais `4xx` (pasta apagada,
+  cota estourada, arquivo inválido) consomem tentativa e terminam no Docs com o motivo.
+- Falha de rede antes de qualquer resposta (DNS, recusa de conexão, timeout) é infraestrutura.
+
 ## Regras de nome e pasta no Drive
 `base` = o `nome_arquivo` que vem no payload. A pasta da categoria (`drive_folder_id`) já existe.
 
