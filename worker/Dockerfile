@@ -33,7 +33,7 @@ RUN npm install --omit=dev --no-audit --no-fund \
  && test -x /app/node_modules/.bin/single-file
 
 COPY src ./src
-RUN mkdir -p /dados/tmp /cookies && chown -R node:node /dados
+RUN mkdir -p /dados/tmp /cookies && chown -R node:node /dados /cookies
 
 USER node
 EXPOSE 8080

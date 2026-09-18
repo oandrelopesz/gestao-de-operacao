@@ -4,7 +4,10 @@ version: "3.8"
 
 services:
   swipe_worker:
-    image: ghcr.io/oandrelopesz/swipe-worker:latest
+    # Imagem construída no próprio Docker da VPS (Portainer > Images > Build a new image).
+    # O repositório é privado, então não publicamos a imagem no GHCR; o Actions segue rodando os
+    # testes a cada push, e o nó é único, então a imagem local basta para o Swarm.
+    image: swipe-worker:latest
     environment:
       PORTA: "8080"
       SUPABASE_URL: "https://bnpvzguapunsztsdvmrs.supabase.co"
