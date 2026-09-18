@@ -31,8 +31,12 @@ usuário desligado.
   leads do usuário, sem relação com o swipe.)
 
 ## Arquitetura
-Swarm não aceita `build:` numa stack, então a imagem é construída no GitHub Actions e publicada
-no GHCR; o Portainer só puxa. O n8n orquestra (fila, estado, retry, aviso); o worker executa.
+Swarm não aceita `build:` numa stack, então a imagem tem que vir pronta. Como o repositório é
+privado e publicá-la exporia o código, ela é construída **no próprio Docker da VPS** (Portainer →
+Images → Build a new image, a partir de um tar de `worker/`) e referenciada pela tag local
+`swipe-worker:latest` — o Swarm tem um nó só, então não há distribuição a resolver. O GitHub
+Actions continua rodando os testes a cada push, que é a rede de segurança que importa.
+O n8n orquestra (fila, estado, retry, aviso); o worker executa.
 
 ```
 /swipe (browser) --insert--> swipe_jobs (Supabase)
