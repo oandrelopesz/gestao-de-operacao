@@ -231,7 +231,9 @@ function HabilidadesPage() {
       setHabilidades((prev) => prev.map((h) => (h.id === r.habilidade_id ? { ...h, recursos: h.recursos.filter((x) => x.id !== r.id) } : h)));
     } catch (e: any) {
       toast.error(e.message || "Erro ao remover sugestão");
+      return;
     }
+    toast.success("Sugestão removida");
   };
 
   const promptTexto = useMemo(() => (promptHab ? gerarPromptPesquisa(promptHab) : ""), [promptHab]);
@@ -517,7 +519,7 @@ function HabilidadeCard({
             {precisaAtencao && (
               <p className="text-xs rounded-md px-3 py-2" style={{ backgroundColor: `${nivel.hex}1a`, color: nivel.hex }}>
                 <Target size={12} className="inline mr-1 -mt-0.5" />
-                Nota {formatNota(nota)} ({nivel.label.toLowerCase()}): vale começar por aqui. Use o prompt acima para uma pesquisa completa e os itens abaixo como ponto de partida.
+                Nota {formatNota(nota)} ({nivel.label.toLowerCase()}): vale começar por aqui. Use o prompt acima para uma pesquisa completa e os itens abaixo como ponto de partida. O que não fizer sentido para você, remova pelo ×.
               </p>
             )}
             {sugestoesAbertas && (
@@ -547,7 +549,7 @@ function HabilidadeCard({
                             {r.observacao && <span className="block text-xs text-muted-foreground">{r.observacao}</span>}
                           </a>
                           <ExternalLink size={12} className="mt-1 text-muted-foreground shrink-0" />
-                          <button type="button" onClick={() => onDeleteRecurso(r)} className="mt-0.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity" title="Remover sugestão">
+                          <button type="button" onClick={() => onDeleteRecurso(r)} className="mt-0.5 rounded p-0.5 text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors" title="Não é relevante para mim: remover sugestão" aria-label={`Remover sugestão ${r.titulo}`}>
                             <X size={13} />
                           </button>
                         </li>

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import { formatBRL } from "@/lib/clientes";
+import { parseOperacoesResumo } from "@/lib/clientes";
+import { formatMoeda } from "@/lib/moedas";
 import { fetchDemandaColunas } from "@/lib/demandaColunas";
 import { fetchCursoCategorias } from "@/lib/cursoCategorias";
 import { fetchHabilidades } from "@/lib/habilidades";
@@ -55,20 +56,23 @@ export async function loadClientesView() {
 
   const { data: saldos, error: saldosError } = await supabase
     .from("saldo_ads_view")
-    .select("cliente_id, plataformas, verba_diaria_calc, ativo");
+    .select("cliente_id, plataformas, verba_diaria_calc, ativo, operacao_nome, moeda");
   if (saldosError) console.warn("Erro ao buscar saldos para enriquecimento:", saldosError);
 
   return ((data as any[]) || []).map((cli) => {
     const cliSaldos = (saldos || []).filter((s) => s.cliente_id === cli.id && s.ativo !== false);
+    const operacoes = parseOperacoesResumo(cli.operacoes);
+    // Resumo por plataforma (na moeda da operação); com mais de uma operação, prefixa o nome dela
     const summary = cliSaldos
       .map((s) => {
         const platNames = s.plataformas && s.plataformas.length > 0 ? s.plataformas.join(", ") : "Outras";
         const verba = (s.verba_diaria_calc || 0) * 30;
-        return `${platNames} ${formatBRL(verba)}`;
+        const prefixo = operacoes.length > 1 && s.operacao_nome ? `${s.operacao_nome}: ` : "";
+        return `${prefixo}${platNames} ${formatMoeda(verba, s.moeda)}`;
       })
       .join(" / ");
     const uniquePlats = Array.from(new Set(cliSaldos.flatMap((s) => s.plataformas || [])));
-    return { ...cli, saldo_ads_summary: summary, plataformas_ativas: uniquePlats };
+    return { ...cli, operacoes, saldo_ads_summary: summary, plataformas_ativas: uniquePlats };
   });
 }
 

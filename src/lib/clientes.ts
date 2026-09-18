@@ -64,3 +64,37 @@ export const PAGAMENTO_META: Record<string, { label: string; classes: string }> 
   pendente: { label: "Pendente", classes: "bg-amber-500/10 text-amber-700 dark:text-amber-300" },
   atrasado: { label: "Atrasado", classes: "bg-red-500/10 text-red-700 dark:text-red-300" },
 };
+
+/** Resumo de uma operação do cliente, como vem no JSON `operacoes` da clientes_view */
+export interface OperacaoResumo {
+  id: string;
+  nome: string;
+  objetivo: string | null;
+  moeda: string;
+  tipo_verba: "mensal" | "total_periodo";
+  /** Verba mensal equivalente na moeda da operação */
+  verba_mensal: number | null;
+  /** Verba mensal equivalente convertida para BRL pela cotação mais recente */
+  verba_mensal_brl: number | null;
+  verba_total_contratada: number | null;
+  data_inicio_verba: string | null;
+  data_limite_verba: string | null;
+  plataformas: string[];
+}
+
+export function parseOperacoesResumo(raw: unknown): OperacaoResumo[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((o: any) => ({
+    id: String(o?.id ?? ""),
+    nome: String(o?.nome ?? "Principal"),
+    objetivo: o?.objetivo ?? null,
+    moeda: typeof o?.moeda === "string" ? o.moeda : "BRL",
+    tipo_verba: o?.tipo_verba === "total_periodo" ? "total_periodo" : "mensal",
+    verba_mensal: o?.verba_mensal === null || o?.verba_mensal === undefined ? null : Number(o.verba_mensal),
+    verba_mensal_brl: o?.verba_mensal_brl === null || o?.verba_mensal_brl === undefined ? null : Number(o.verba_mensal_brl),
+    verba_total_contratada: o?.verba_total_contratada === null || o?.verba_total_contratada === undefined ? null : Number(o.verba_total_contratada),
+    data_inicio_verba: o?.data_inicio_verba ?? null,
+    data_limite_verba: o?.data_limite_verba ?? null,
+    plataformas: Array.isArray(o?.plataformas) ? o.plataformas.map(String) : [],
+  }));
+}

@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCachedState, hasCached } from "@/lib/pageCache";
 import { CACHE_KEYS, loadSaldo } from "@/lib/data";
 import { formatBRL } from "@/lib/clientes";
+import { formatMoeda } from "@/lib/moedas";
 import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
 import { saveCliente, loadClienteFormValues, getUserId } from "@/lib/clientesService";
 import { toast } from "sonner";
@@ -111,8 +112,18 @@ interface SaldoRow {
   alerta_dispensado: boolean;
   status_alerta: string;
   observacoes: string | null;
+  operacao_id: string | null;
+  operacao_nome: string | null;
+  operacao_ordem: number | null;
+  /** Moeda da operação (BRL, USD, EUR, GBP) — saldo e recargas deste registro estão nela */
+  moeda: string;
+  /** BRL por 1 unidade da moeda, pela cotação mais recente gravada */
+  cotacao_brl: number;
   clientes?: { status_operacional: string | null; verba_ads: number | null };
 }
+
+/** Valor do registro convertido para BRL (para somar registros de moedas diferentes) */
+const emBRL = (row: SaldoRow, valor: number | null | undefined) => Number(valor || 0) * (Number(row.cotacao_brl) || 1);
 
 interface ClienteGroup {
   cliente_id: string;
@@ -121,19 +132,24 @@ interface ClienteGroup {
   status_operacional: string | null;
   metodo_pagamento_principal: string;
   plataformas: SaldoRow[];
+  /** Em BRL (soma de registros que podem estar em moedas diferentes) */
   saldo_total_consolidado: number;
   verba_diaria_total: number;
+  /** Moeda única do cliente, ou null se houver operações em moedas diferentes */
+  moeda_unica: string | null;
+  qtd_operacoes: number;
   pior_status_alerta: string;
   data_prevista_fim_proxima: string | null;
   plataforma_mais_proxima: string;
 }
 
 /** Plataforma(s) de um registro de saldo, para o seletor de recarga */
-const contaDeRecarga = (row: SaldoRow): RecargaConta => ({
+const contaDeRecarga = (row: SaldoRow, comOperacao = false): RecargaConta => ({
   id: row.id,
-  label: (row.plataformas || []).join(", ") || "Sem plataforma",
+  label: (comOperacao && row.operacao_nome ? `${row.operacao_nome} · ` : "") + ((row.plataformas || []).join(", ") || "Sem plataforma"),
   metodo_pagamento: row.metodo_pagamento,
   verba_diaria: row.verba_diaria_calc,
+  moeda: row.moeda,
 });
 
 const formatDate = (iso?: string | null) => {
@@ -242,9 +258,23 @@ function SaldoPage() {
             : "Registro atualizado"
         );
       } else {
+        // Registro avulso entra na primeira operação ativa do cliente (cria "Principal" se não houver)
+        let operacaoId: string | null = null;
+        if (values.cliente_id) {
+          const { data: ops } = await supabase
+            .from("operacoes").select("id").eq("cliente_id", values.cliente_id).eq("ativa", true)
+            .order("ordem").order("created_at").limit(1);
+          operacaoId = ops?.[0]?.id ?? null;
+          if (!operacaoId) {
+            const { data: nova, error: erroOp } = await supabase
+              .from("operacoes").insert([{ cliente_id: values.cliente_id, nome: "Principal" }]).select("id").single();
+            if (erroOp) throw erroOp;
+            operacaoId = nova.id;
+          }
+        }
         const { data: newRecord, error } = await supabase
           .from("saldo_ads")
-          .insert([{ ...values, user_id: userId }])
+          .insert([{ ...values, user_id: userId, operacao_id: operacaoId }])
           .select()
           .single();
         if (error) throw error;
@@ -350,7 +380,7 @@ function SaldoPage() {
     setHistoryIsConsolidated(consolidated);
     setHistoryOpen(true);
 
-    let query = supabase.from("recargas").select("*, saldo_ads!inner(plataformas)");
+    let query = supabase.from("recargas").select("*, saldo_ads!inner(plataformas, operacoes(nome, moeda))");
     query = consolidated ? query.eq("saldo_ads.cliente_id", record.cliente_id) : query.eq("saldo_ads_id", record.id);
     const { data, error } = await query.order("data_recarga", { ascending: false });
     if (error) toast.error("Erro ao carregar histórico");
@@ -378,6 +408,8 @@ function SaldoPage() {
           plataformas: [],
           saldo_total_consolidado: 0,
           verba_diaria_total: 0,
+          moeda_unica: item.moeda || "BRL",
+          qtd_operacoes: 0,
           pior_status_alerta: "ok",
           data_prevista_fim_proxima: null,
           plataforma_mais_proxima: "",
@@ -385,12 +417,14 @@ function SaldoPage() {
       }
       const group = groups[clientId];
       group.plataformas.push(item);
+      if (group.moeda_unica !== null && (item.moeda || "BRL") !== group.moeda_unica) group.moeda_unica = null;
+      group.qtd_operacoes = new Set(group.plataformas.map((p) => p.operacao_id || "")).size;
 
       if (item.metodo_pagamento !== group.metodo_pagamento_principal) group.metodo_pagamento_principal = "misto";
 
       if (item.metodo_pagamento !== "cartao") {
-        group.saldo_total_consolidado += item.saldo_atual_estimado || 0;
-        group.verba_diaria_total += item.verba_diaria_calc || 0;
+        group.saldo_total_consolidado += emBRL(item, item.saldo_atual_estimado);
+        group.verba_diaria_total += emBRL(item, item.verba_diaria_calc);
 
         const status = statusEfetivo(item);
         const currentWeight = STATUS_ALERTA.find((s) => s.id === status)?.weight ?? 0;
@@ -449,7 +483,8 @@ function SaldoPage() {
     return {
       totalContas: data.length,
       uniqueClients,
-      saldoTotal: monitored.reduce((acc, curr) => acc + (curr.saldo_atual_estimado || 0), 0),
+      saldoTotal: monitored.reduce((acc, curr) => acc + emBRL(curr, curr.saldo_atual_estimado), 0),
+      temMoedaEstrangeira: monitored.some((i) => (i.moeda || "BRL") !== "BRL"),
       emAlerta: activeAlerts.filter((i) => i.status_alerta === "alerta").length,
       criticos: activeAlerts.filter((i) => i.status_alerta === "critico" || i.status_alerta === "zerado").length,
       dispensados: data.filter((i) => ALERTING.includes(i.status_alerta) && i.alerta_dispensado).length,
@@ -540,7 +575,7 @@ function SaldoPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="numeric text-2xl font-semibold">{formatBRL(metrics.saldoTotal)}</div>
-                  <p className="text-xs text-muted-foreground">Soma dos registros Pix/Boleto</p>
+                  <p className="text-xs text-muted-foreground">Soma dos registros Pix/Boleto{metrics.temMoedaEstrangeira ? ", convertida pela cotação do dia" : ""}</p>
                 </CardContent>
               </Card>
             </TooltipTrigger>
@@ -739,12 +774,19 @@ function SaldoPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-0.5">
                           <p className="text-[10px] text-muted-foreground uppercase font-semibold">Saldo total</p>
-                          <p className="text-xl font-bold tracking-tight text-primary">{formatBRL(group.saldo_total_consolidado)}</p>
+                          <p className="text-xl font-bold tracking-tight text-primary">
+                            {group.moeda_unica && group.moeda_unica !== "BRL"
+                              ? formatMoeda(group.plataformas.filter((p) => p.metodo_pagamento !== "cartao").reduce((a, p) => a + (p.saldo_atual_estimado || 0), 0), group.moeda_unica)
+                              : formatBRL(group.saldo_total_consolidado)}
+                            {!group.moeda_unica && <span className="ml-1 text-[10px] font-normal text-muted-foreground">em R$</span>}
+                          </p>
                         </div>
                         <div className="space-y-0.5 text-right">
                           <p className="text-[10px] text-muted-foreground uppercase font-semibold">Verba diária total</p>
                           <p className="text-sm font-bold">
-                            {formatBRL(group.verba_diaria_total)}<span className="text-[10px] text-muted-foreground font-normal">/dia</span>
+                            {group.moeda_unica && group.moeda_unica !== "BRL"
+                              ? formatMoeda(group.plataformas.filter((p) => p.metodo_pagamento !== "cartao").reduce((a, p) => a + (p.verba_diaria_calc || 0), 0), group.moeda_unica)
+                              : formatBRL(group.verba_diaria_total)}<span className="text-[10px] text-muted-foreground font-normal">/dia</span>
                           </p>
                         </div>
                       </div>
@@ -783,9 +825,13 @@ function SaldoPage() {
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2 flex-wrap">
+                              {group.qtd_operacoes > 1 && plat.operacao_nome && (
+                                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{plat.operacao_nome}</span>
+                              )}
                               {plat.plataformas?.map((p) => (
                                 <Badge key={p} className={cn("text-[10px] px-1.5 py-0", corPlataforma(p))}>{p}</Badge>
                               ))}
+                              {(plat.moeda || "BRL") !== "BRL" && <Badge variant="outline" className="text-[9px] h-4 py-0">{plat.moeda}</Badge>}
                               {isCartao && <Badge variant="outline" className="text-[9px] h-4 py-0 text-blue-600 border-blue-200">Cartão</Badge>}
                               {status === "dispensado" && (
                                 <Badge variant="outline" className="text-[9px] h-4 py-0 text-zinc-500 gap-1"><BellOff size={9} /> Alerta dispensado</Badge>
@@ -799,7 +845,7 @@ function SaldoPage() {
                               {isCartao ? (
                                 <span className="text-xs font-semibold text-blue-600 uppercase">Cartão</span>
                               ) : (
-                                <span className="text-sm font-bold">{formatBRL(plat.saldo_atual_estimado)}</span>
+                                <span className="text-sm font-bold">{formatMoeda(plat.saldo_atual_estimado, plat.moeda)}</span>
                               )}
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -853,7 +899,7 @@ function SaldoPage() {
                                 </span>
                                 <span>
                                   {plat.data_ultima_recarga
-                                    ? `Última: ${formatBRL(plat.valor_ultima_recarga)} em ${formatDate(plat.data_ultima_recarga)}`
+                                    ? `Última: ${formatMoeda(plat.valor_ultima_recarga, plat.moeda)} em ${formatDate(plat.data_ultima_recarga)}`
                                     : "—"}
                                 </span>
                               </div>
@@ -873,15 +919,15 @@ function SaldoPage() {
                             <div className="grid grid-cols-3 gap-2 text-[11px] pt-3 mt-3 border-t">
                               <div className="space-y-0.5">
                                 <p className="text-muted-foreground">Verba diária</p>
-                                <p className="font-semibold">{formatBRL(plat.verba_diaria_calc)}</p>
+                                <p className="font-semibold">{formatMoeda(plat.verba_diaria_calc, plat.moeda)}</p>
                               </div>
                               <div className="space-y-0.5 text-center">
                                 <p className="text-muted-foreground">Verba mensal</p>
-                                <p className="font-semibold">{formatBRL((plat.verba_diaria_calc || 0) * 30)}</p>
+                                <p className="font-semibold">{formatMoeda((plat.verba_diaria_calc || 0) * 30, plat.moeda)}</p>
                               </div>
                               <div className="space-y-0.5 text-right">
                                 <p className="text-muted-foreground">{isCartao ? "Recargas" : "Total investido"}</p>
-                                <p className="font-semibold">{isCartao ? plat.qtd_recargas : formatBRL(plat.saldo_total_acumulado)}</p>
+                                <p className="font-semibold">{isCartao ? plat.qtd_recargas : formatMoeda(plat.saldo_total_acumulado, plat.moeda)}</p>
                               </div>
                             </div>
                           )}
@@ -953,7 +999,7 @@ function SaldoPage() {
           {recargaTarget && (
             <RecargaForm
               loading={saving}
-              contas={recargaTarget.contas.map(contaDeRecarga)}
+              contas={(() => { const multi = new Set(recargaTarget.contas.map((c) => c.operacao_id || "")).size > 1; return recargaTarget.contas.map((c) => contaDeRecarga(c, multi)); })()}
               defaultContaId={recargaTarget.defaultId}
               defaultMetodo={recargaTarget.contas.find((c) => c.id === recargaTarget.defaultId)?.metodo_pagamento || undefined}
               onSubmit={handleRecarga}
@@ -982,7 +1028,7 @@ function SaldoPage() {
                   <div>
                     <p className="text-[10px] text-muted-foreground">{selectedForHistory.metodo_pagamento === "cartao" ? "Método" : "Saldo"}</p>
                     <p className="text-lg font-bold">
-                      {selectedForHistory.metodo_pagamento === "cartao" ? "Cartão" : formatBRL(selectedForHistory.saldo_atual_estimado)}
+                      {selectedForHistory.metodo_pagamento === "cartao" ? "Cartão" : formatMoeda(selectedForHistory.saldo_atual_estimado, selectedForHistory.moeda)}
                     </p>
                   </div>
                   <div>
@@ -1011,7 +1057,7 @@ function SaldoPage() {
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-bold">{formatBRL(recarga.valor)}</p>
+                            <p className="text-sm font-bold">{formatMoeda(recarga.valor, recarga.saldo_ads?.operacoes?.moeda || selectedForHistory?.moeda)}</p>
                             {historyIsConsolidated && recarga.saldo_ads?.plataformas?.map((p: string) => (
                               <Badge key={p} variant="outline" className="text-[9px] h-4 py-0">{p}</Badge>
                             ))}

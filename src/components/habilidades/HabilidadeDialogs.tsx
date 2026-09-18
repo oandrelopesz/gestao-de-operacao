@@ -351,7 +351,7 @@ export function PromptDialog({ habilidade, prompt, onClose }: {
         <DialogHeader>
           <DialogTitle>Prompt de pesquisa · {habilidade?.nome}</DialogTitle>
           <DialogDescription>
-            Gerado a partir das suas notas de agora. Cole em um modelo com navegação (Claude Cowork, GPT com browser) e ele entrega um .docx com o plano de estudos.
+            Gerado agora a partir das notas e subhabilidades atuais desta habilidade (inclusive as que você adicionou): as de nota mais baixa viram prioridade e as altas ficam de fora. Mudou uma nota? Gere de novo. Cole em um modelo com navegação (Claude Cowork, GPT com browser) e ele entrega um .docx com o plano de estudos.
           </DialogDescription>
         </DialogHeader>
         <Textarea readOnly value={prompt} className="h-[55vh] font-mono text-xs leading-relaxed resize-none" />

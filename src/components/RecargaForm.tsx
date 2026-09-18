@@ -19,7 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
+import { maskBRLInput, parseBRLInput } from "@/lib/clientes";
+import { formatMoeda, simboloMoeda } from "@/lib/moedas";
 import { useMemo, useState } from "react";
 
 const recargaSchema = z.object({
@@ -39,6 +40,8 @@ export interface RecargaConta {
   label: string;
   metodo_pagamento?: string | null;
   verba_diaria?: number | null;
+  /** Moeda da operação: a recarga é registrada nela */
+  moeda?: string | null;
 }
 
 interface RecargaFormProps {
@@ -76,6 +79,8 @@ export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubm
 
   const [valorDisplay, setValorDisplay] = useState("");
   const contaSelecionada = contas.find((c) => c.id === form.watch("saldo_ads_id"));
+  const moeda = contaSelecionada?.moeda || contas[0]?.moeda || "BRL";
+  const simbolo = simboloMoeda(moeda);
 
   return (
     <Form {...form}>
@@ -107,13 +112,13 @@ export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubm
                     {contas.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.label}
-                        {c.verba_diaria ? <span className="text-muted-foreground"> · {formatBRL(c.verba_diaria)}/dia</span> : null}
+                        {c.verba_diaria ? <span className="text-muted-foreground"> · {formatMoeda(c.verba_diaria, c.moeda)}/dia</span> : null}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {contaSelecionada?.verba_diaria ? (
-                  <p className="text-xs text-muted-foreground">Consumo estimado de {formatBRL(contaSelecionada.verba_diaria)}/dia nesta plataforma.</p>
+                  <p className="text-xs text-muted-foreground">Consumo estimado de {formatMoeda(contaSelecionada.verba_diaria, contaSelecionada.moeda)}/dia nesta plataforma.</p>
                 ) : null}
                 <FormMessage />
               </FormItem>
@@ -140,11 +145,11 @@ export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubm
           name="valor"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Valor (R$)</FormLabel>
+              <FormLabel>Valor ({simbolo})</FormLabel>
               <FormControl>
                 <Input
                   inputMode="numeric"
-                  placeholder="R$ 0,00"
+                  placeholder={`${simbolo} 0,00`}
                   value={valorDisplay}
                   onChange={(e) => {
                     const masked = maskBRLInput(e.target.value);
@@ -154,7 +159,7 @@ export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubm
                 />
               </FormControl>
               <p className="text-xs text-muted-foreground">
-                {formatBRL(field.value)}
+                {formatMoeda(field.value, moeda)}{moeda !== "BRL" && <span> · recarga registrada em {moeda}</span>}
               </p>
               <FormMessage />
             </FormItem>
