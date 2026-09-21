@@ -4,6 +4,7 @@
 import { existsSync } from "node:fs";
 import { rodar as rodarReal } from "../exec.js";
 import { listarMidias as listarReal } from "../tmp.js";
+import { ehAdsLibrary, baixarAnuncio as baixarAnuncioReal } from "./adslibrary.js";
 
 const REDES_COM_COOKIE = new Set(["instagram", "facebook", "tiktok", "linkedin", "x", "pinterest"]);
 
@@ -16,6 +17,9 @@ export function cookiesDe(rede, existe) {
 }
 
 export async function baixar({ link, rede, dir }, deps = {}) {
+  // Anúncio da Ads Library: nem yt-dlp nem gallery-dl conhecem a página; captura própria
+  if (ehAdsLibrary(link)) return (deps.baixarAnuncio || baixarAnuncioReal)({ link, dir });
+
   const rodar = deps.rodar || rodarReal;
   const listarMidias = deps.listarMidias || listarReal;
   const cookies = cookiesDe(rede, deps.existeArquivo);

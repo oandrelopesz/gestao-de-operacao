@@ -33,3 +33,10 @@ dist-ssr
 
 # Workspace do subagent-driven-development (scratch, não versionado)
 .superpowers/
+
+# Cookies exportados do navegador para o swipe worker (nunca commitar)
+/instagram.txt
+/tiktok.txt
+/facebook.txt
+/cookies.txt
+/*_cookies.txt
