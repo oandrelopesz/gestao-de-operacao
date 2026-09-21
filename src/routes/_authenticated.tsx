@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   LayoutDashboard,
+  Lightbulb,
   Users,
   Wallet,
   MessageSquare,
@@ -50,6 +51,7 @@ const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     title: "Operação",
     links: [
       { label: "Demandas", icon: <LayoutDashboard size={17} />, to: "/" },
+      { label: "Ideias", icon: <Lightbulb size={17} />, to: "/ideias" },
       { label: "Planilha/CRM", icon: <KeyRound size={17} />, to: "/acessos" },
       { label: "Saldo", icon: <Wallet size={17} />, to: "/saldo" },
       { label: "NPS de Clientes", icon: <MessageSquare size={17} />, to: "/nps" },

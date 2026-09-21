@@ -18,6 +18,7 @@ import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenticated/habilidades'
+import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
 import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated/livros'
 import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
 import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
@@ -70,6 +71,11 @@ const AuthenticatedHabilidadesRoute =
     path: '/habilidades',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedIdeiasRoute = AuthenticatedIdeiasRouteImport.update({
+  id: '/ideias',
+  path: '/ideias',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedLivrosRoute = AuthenticatedLivrosRouteImport.update({
   id: '/livros',
   path: '/livros',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/cursos': typeof AuthenticatedCursosRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/habilidades': typeof AuthenticatedHabilidadesRoute
+  '/ideias': typeof AuthenticatedIdeiasRoute
   '/livros': typeof AuthenticatedLivrosRoute
   '/nps': typeof AuthenticatedNpsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/cursos': typeof AuthenticatedCursosRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/habilidades': typeof AuthenticatedHabilidadesRoute
+  '/ideias': typeof AuthenticatedIdeiasRoute
   '/livros': typeof AuthenticatedLivrosRoute
   '/nps': typeof AuthenticatedNpsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/_authenticated/cursos': typeof AuthenticatedCursosRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/habilidades': typeof AuthenticatedHabilidadesRoute
+  '/_authenticated/ideias': typeof AuthenticatedIdeiasRoute
   '/_authenticated/livros': typeof AuthenticatedLivrosRoute
   '/_authenticated/nps': typeof AuthenticatedNpsRoute
   '/_authenticated/prospeccao': typeof AuthenticatedProspeccaoRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/cursos'
     | '/financeiro'
     | '/habilidades'
+    | '/ideias'
     | '/livros'
     | '/nps'
     | '/prospeccao'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/cursos'
     | '/financeiro'
     | '/habilidades'
+    | '/ideias'
     | '/livros'
     | '/nps'
     | '/prospeccao'
@@ -194,6 +205,7 @@ export interface FileRouteTypes {
     | '/_authenticated/cursos'
     | '/_authenticated/financeiro'
     | '/_authenticated/habilidades'
+    | '/_authenticated/ideias'
     | '/_authenticated/livros'
     | '/_authenticated/nps'
     | '/_authenticated/prospeccao'
@@ -273,6 +285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHabilidadesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/ideias': {
+      id: '/_authenticated/ideias'
+      path: '/ideias'
+      fullPath: '/ideias'
+      preLoaderRoute: typeof AuthenticatedIdeiasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/livros': {
       id: '/_authenticated/livros'
       path: '/livros'
@@ -325,6 +344,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCursosRoute: typeof AuthenticatedCursosRoute
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedHabilidadesRoute: typeof AuthenticatedHabilidadesRoute
+  AuthenticatedIdeiasRoute: typeof AuthenticatedIdeiasRoute
   AuthenticatedLivrosRoute: typeof AuthenticatedLivrosRoute
   AuthenticatedNpsRoute: typeof AuthenticatedNpsRoute
   AuthenticatedProspeccaoRoute: typeof AuthenticatedProspeccaoRoute
@@ -341,6 +361,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCursosRoute: AuthenticatedCursosRoute,
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedHabilidadesRoute: AuthenticatedHabilidadesRoute,
+  AuthenticatedIdeiasRoute: AuthenticatedIdeiasRoute,
   AuthenticatedLivrosRoute: AuthenticatedLivrosRoute,
   AuthenticatedNpsRoute: AuthenticatedNpsRoute,
   AuthenticatedProspeccaoRoute: AuthenticatedProspeccaoRoute,

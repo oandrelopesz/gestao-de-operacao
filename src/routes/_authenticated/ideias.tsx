@@ -1,0 +1,230 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Search, Lightbulb, Pencil, Trash2, ExternalLink, SquareKanban, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { IdeiaDialog } from "@/components/ideias/IdeiaDialog";
+import { EnviarParaDemandasDialog } from "@/components/ideias/EnviarParaDemandasDialog";
+import { fetchIdeias, excluirIdeia, mensagemErro, type Ideia } from "@/lib/ideias";
+import { TIPOS_IDEIA, tipoIdeiaMeta, filtrarIdeias, dominioDoLink } from "@/lib/ideiasTexto";
+import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
+import { loadClientesLite } from "@/lib/data";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/_authenticated/ideias")({
+  component: IdeiasPage,
+});
+
+function IdeiasPage() {
+  const navigate = useNavigate();
+  const { agencias, meta: agenciaMeta } = useAgencias();
+  const [ideias, setIdeias] = useState<Ideia[]>([]);
+  const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [busca, setBusca] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [filtroAgencia, setFiltroAgencia] = useState("todas");
+  const [dialog, setDialog] = useState<{ ideia?: Ideia } | null>(null);
+  const [enviando, setEnviando] = useState<Ideia | null>(null);
+  const [toDelete, setToDelete] = useState<Ideia | null>(null);
+
+  const load = async () => {
+    try {
+      setIdeias(await fetchIdeias());
+      setErro(null);
+    } catch (e: any) {
+      setErro(mensagemErro(e));
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    load();
+    loadClientesLite().then(setClientes).catch((e) => console.error("Erro ao buscar clientes:", e));
+  }, []);
+
+  const filtradas = useMemo(
+    () => filtrarIdeias(ideias, { tipo: filtroTipo, agencia: filtroAgencia, busca }),
+    [ideias, filtroTipo, filtroAgencia, busca],
+  );
+
+  // Contagem por tipo respeitando o filtro de agência (o de tipo não, senão as abas zerariam)
+  const contagem = useMemo(() => {
+    const c: Record<string, number> = { todos: 0 };
+    ideias.forEach((i) => {
+      if (filtroAgencia !== "todas" && i.agencia !== filtroAgencia) return;
+      c.todos += 1;
+      c[i.tipo] = (c[i.tipo] || 0) + 1;
+    });
+    return c;
+  }, [ideias, filtroAgencia]);
+
+  const nomeCliente = (id: string | null) => clientes.find((c) => c.id === id)?.nome;
+
+  const excluir = async () => {
+    if (!toDelete) return;
+    try {
+      await excluirIdeia(toDelete.id);
+      setIdeias((prev) => prev.filter((i) => i.id !== toDelete.id));
+      toast.success("Ideia removida");
+    } catch (e: any) {
+      toast.error(mensagemErro(e));
+    }
+    setToDelete(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Ideias</h1>
+          <p className="text-muted-foreground text-sm">
+            Ideias de implementação para este sistema, outros sistemas ou clientes. Quando chegar a hora, envie para as demandas.
+          </p>
+        </div>
+        <Button className="gap-2" onClick={() => setDialog({})}>
+          <Plus size={18} /> Adicionar ideia
+        </Button>
+      </div>
+
+      {erro && (
+        <Card className="border-destructive/40"><CardContent className="p-4 text-sm text-destructive">{erro}</CardContent></Card>
+      )}
+
+      <div className="flex flex-col gap-3">
+        <Tabs value={filtroTipo} onValueChange={setFiltroTipo}>
+          <TabsList className="w-full justify-start overflow-x-auto h-auto p-1 bg-muted/50">
+            <TabsTrigger value="todos" className="gap-2 shrink-0">
+              Todas <Badge variant="secondary" className="px-1.5 h-4 text-[10px] leading-none">{contagem.todos || 0}</Badge>
+            </TabsTrigger>
+            {TIPOS_IDEIA.map((t) => (
+              <TabsTrigger key={t.id} value={t.id} className="gap-2 shrink-0">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.hex }} />
+                {t.label}
+                <Badge variant="secondary" className="px-1.5 h-4 text-[10px] leading-none">{contagem[t.id] || 0}</Badge>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+            <Input placeholder="Buscar por nome, descrição ou link..." className="pl-10" value={busca} onChange={(e) => setBusca(e.target.value)} />
+          </div>
+          <Select value={filtroAgencia} onValueChange={setFiltroAgencia}>
+            <SelectTrigger className="sm:w-[200px]"><SelectValue placeholder="Agência" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas as agências</SelectItem>
+              {agencias.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: a.hex }} />
+                    {a.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {filtradas.length === 0 && !loading ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
+          <div className="bg-muted rounded-full p-4"><Lightbulb size={36} className="text-muted-foreground" /></div>
+          <h3 className="text-lg font-medium">{ideias.length === 0 ? "Nenhuma ideia ainda" : "Nenhuma ideia nesse filtro"}</h3>
+          <p className="text-muted-foreground max-w-xs text-sm">Anote a ideia agora; quando for a hora, ela vira demanda com um clique.</p>
+          <Button onClick={() => setDialog({})}>Adicionar a primeira ideia</Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtradas.map((ideia) => {
+            const tipo = tipoIdeiaMeta(ideia.tipo);
+            const ag = ideia.agencia ? agenciaMeta(ideia.agencia) : undefined;
+            const cliente = ideia.tipo === "cliente" ? nomeCliente(ideia.cliente_id) : undefined;
+            return (
+              <Card key={ideia.id} className="overflow-hidden group flex flex-col">
+                <div className="h-2 w-full" style={{ backgroundColor: tipo.hex }} />
+                <div className="p-4 pb-2 space-y-2 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Badge className="text-[10px] h-5 text-white border-transparent" style={{ backgroundColor: tipo.hex }}>{tipo.label}</Badge>
+                    {ag && (
+                      <Badge variant="outline" className="text-[10px] h-5" style={agenciaBadgeStyle(ag.hex)}>{ag.label}</Badge>
+                    )}
+                    {ideia.demanda_id && (
+                      <Badge variant="outline" className="text-[10px] h-5 gap-1 text-emerald-600 border-emerald-600/40" title="Já existe uma demanda criada a partir desta ideia">
+                        <CheckCircle2 size={10} /> Nas demandas
+                      </Badge>
+                    )}
+                  </div>
+                  <h3 className="font-semibold leading-snug">{ideia.titulo}</h3>
+                  {cliente && <p className="text-[11px] text-muted-foreground">Cliente: {cliente}</p>}
+                  {ideia.descricao && <p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-line">{ideia.descricao}</p>}
+                  {ideia.links.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {ideia.links.map((l) => (
+                        <a
+                          key={l}
+                          href={l}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+                          title={l}
+                        >
+                          <ExternalLink size={10} /> {dominioDoLink(l)}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <CardContent className="p-4 pt-2 mt-auto">
+                  <div className="flex items-center gap-1.5">
+                    <Button size="sm" className="flex-1 gap-1.5" onClick={() => setEnviando(ideia)}>
+                      <SquareKanban size={14} /> Enviar para demandas
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setDialog({ ideia })} title="Editar"><Pencil size={14} /></Button>
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => setToDelete(ideia)} title="Remover"><Trash2 size={14} /></Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <IdeiaDialog state={dialog} clientes={clientes} onClose={() => setDialog(null)} onSaved={load} />
+
+      <EnviarParaDemandasDialog
+        ideia={enviando}
+        onClose={() => setEnviando(null)}
+        onEnviada={(demandaId, coluna) => {
+          setIdeias((prev) => prev.map((i) => (i.id === enviando?.id ? { ...i, demanda_id: demandaId } : i)));
+          toast.success(`Demanda criada em "${coluna.title}"`, {
+            action: { label: "Ver demandas", onClick: () => navigate({ to: "/" }) },
+          });
+        }}
+      />
+
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => { if (!o) setToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover "{toDelete?.titulo}"?</AlertDialogTitle>
+            <AlertDialogDescription>A ideia sai da lista. Demandas já criadas a partir dela continuam no Kanban.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={excluir} className="bg-destructive hover:bg-destructive/90">Remover</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
