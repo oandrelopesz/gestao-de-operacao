@@ -20,7 +20,9 @@ export type IdeiaInput = Pick<Ideia, "tipo" | "titulo" | "descricao" | "links" |
 const ERRO_TABELA = "A tabela ideias ainda não existe. Rode supabase/migrations/20260921120000_ideias.sql no SQL Editor.";
 
 export function mensagemErro(error: { message: string }): string {
-  return /schema cache|does not exist|not find/i.test(error.message) ? ERRO_TABELA : error.message;
+  return /ideias/i.test(error.message) && /schema cache|does not exist|not find/i.test(error.message)
+    ? ERRO_TABELA
+    : error.message;
 }
 
 export async function fetchIdeias(): Promise<Ideia[]> {
@@ -44,6 +46,7 @@ export async function excluirIdeia(id: string): Promise<void> {
 /**
  * Cria a demanda na coluna escolhida — título, descrição + links e cliente copiados da ideia,
  * no fim da coluna, como o "quick add" do Kanban — e grava demanda_id na ideia.
+ * Se o vínculo demanda_id falhar, a demanda não é desfeita (ela já existe no Kanban).
  */
 export async function enviarIdeiaParaDemandas(ideia: Ideia, colunaId: string): Promise<string> {
   const userId = await getUserId();
@@ -74,6 +77,6 @@ export async function enviarIdeiaParaDemandas(ideia: Ideia, colunaId: string): P
   if (error) throw error;
 
   const { error: erroVinculo } = await supabase.from("ideias").update({ demanda_id: data.id }).eq("id", ideia.id);
-  if (erroVinculo) throw erroVinculo;
+  if (erroVinculo) console.warn("Demanda criada, mas não foi possível vincular à ideia:", erroVinculo);
   return data.id;
 }

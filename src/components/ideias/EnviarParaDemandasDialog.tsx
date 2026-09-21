@@ -6,8 +6,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { fetchDemandaColunas, type KanbanColumnDef } from "@/lib/demandaColunas";
 import { enviarIdeiaParaDemandas, mensagemErro, type Ideia } from "@/lib/ideias";
 import { colunaPadrao, montarDescricaoDemanda } from "@/lib/ideiasTexto";
-import { clearCache } from "@/lib/pageCache";
-import { CACHE_KEYS } from "@/lib/data";
 import { toast } from "sonner";
 
 interface Props {
@@ -27,12 +25,16 @@ export function EnviarParaDemandasDialog({ ideia, onClose, onEnviada }: Props) {
     if (!ideia) return;
     let ativo = true;
     setCarregando(true);
-    fetchDemandaColunas().then((cols) => {
-      if (!ativo) return;
-      setColunas(cols);
-      setColunaId(colunaPadrao(cols));
-      setCarregando(false);
-    });
+    fetchDemandaColunas()
+      .then((cols) => {
+        if (!ativo) return;
+        setColunas(cols);
+        setColunaId(colunaPadrao(cols));
+      })
+      .catch((e) => console.error("Erro ao buscar colunas:", e))
+      .finally(() => {
+        if (ativo) setCarregando(false);
+      });
     return () => { ativo = false; };
   }, [ideia]);
 
@@ -43,8 +45,6 @@ export function EnviarParaDemandasDialog({ ideia, onClose, onEnviada }: Props) {
     setEnviando(true);
     try {
       const demandaId = await enviarIdeiaParaDemandas(ideia, colunaId);
-      // A aba Demandas recarrega do banco em vez de mostrar a lista antiga do cache
-      clearCache(CACHE_KEYS.demandas);
       onEnviada(demandaId, coluna);
       onClose();
     } catch (e: any) {
