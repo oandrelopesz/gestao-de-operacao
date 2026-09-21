@@ -59,3 +59,19 @@ export const ehVideo = (ext) => VIDEOS.has(String(ext).toLowerCase());
 export const ehImagem = (ext) => IMAGENS.has(String(ext).toLowerCase());
 export const ehMidia = (ext) => ehVideo(ext) || ehImagem(ext);
 export const mimeDe = (ext) => MIMES[String(ext).toLowerCase()] || "application/octet-stream";
+
+/**
+ * Tira da URL os parâmetros de rastreio (utm_*, fbclid, gclid...). Eles não mudam a página, mas
+ * o wget grava cada URL como nome de arquivo: com a query inteira dos UTMs o nome passa de 250
+ * caracteres e o Windows não consegue extrair o zip. Devolve a entrada intacta se não for URL.
+ */
+export function semRastreio(link) {
+  let u;
+  try { u = new URL(link); } catch { return link; }
+  for (const chave of [...u.searchParams.keys()]) {
+    if (/^utm_/i.test(chave) || /^(fbclid|gclid|gbraid|wbraid|dclid|ttclid|msclkid|srsltid|mc_cid|mc_eid|igshid)$/i.test(chave)) {
+      u.searchParams.delete(chave);
+    }
+  }
+  return u.toString();
+}

@@ -5,9 +5,9 @@
 // Mais um arquivo por vídeo/VSL encontrado na página.
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, open } from "node:fs/promises";
 import { rodar as rodarReal } from "../exec.js";
-import { limitar, nomeVsl } from "../nomes.js";
+import { limitar, nomeVsl, semRastreio } from "../nomes.js";
 
 /** Orçamento total de uma captura de LP, com folga sobre o timeout da chamada HTTP do n8n. */
 const ORCAMENTO_MS = 20 * 60 * 1000;
@@ -17,7 +17,9 @@ const PLAYERS = /(converteai\.net|vturb|pandavideo|player\.vimeo\.com|youtube\.c
 
 export function ehUrlDeVideo(url) {
   const u = String(url);
-  if (/\.(css|js|png|jpe?g|gif|svg|woff2?|ico)(\?|$)/i.test(u) && !PLAYERS.test(u)) return false;
+  // Script/estilo/imagem nunca é vídeo, nem no domínio do player: o yt-dlp salvaria o .js cru
+  // como "VSL". O player, ao rodar, pede as .m3u8/.mp4 de verdade, e essas entram por EXT_VIDEO.
+  if (/\.(css|js|mjs|json|png|jpe?g|gif|svg|webp|woff2?|ico|txt)(\?|$)/i.test(u)) return false;
   return EXT_VIDEO.test(u) || PLAYERS.test(u);
 }
 
@@ -25,6 +27,7 @@ export async function capturar({ link, dir, base }, deps = {}) {
   const rodar = deps.rodar || rodarReal;
   const abrir = deps.abrirNavegador || abrirNavegadorReal;
   const existe = deps.existeArquivo || existsSync;
+  const ehMp4 = deps.ehMp4 || ehMp4Real;
   // Orçamento total da captura (20 min). O n8n corta a chamada HTTP bem depois disso (30 min),
   // então a resposta sempre sai daqui antes de ele desistir — senão o job seria retentado com o
   // worker ocupado.
@@ -69,7 +72,8 @@ export async function capturar({ link, dir, base }, deps = {}) {
     // e "index.html?utm_source=..|..", e o Explorer recusa o zip inteiro como "pasta inválida".
     "--restrict-file-names=windows",
     "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-    "-P", espelhoDir, link,
+    // Sem os utm_* da URL: senão o wget grava uma cópia da página com a query inteira no nome
+    "-P", espelhoDir, semRastreio(link),
   ], { cwd: dir, timeout: 3 * 60 * 1000 }).catch(() => {});
   try {
     await rodar("/usr/bin/zip", ["-r", "-q", zipLocal, "."], { cwd: espelhoDir, timeout: 2 * 60 * 1000 });
@@ -97,10 +101,10 @@ export async function capturar({ link, dir, base }, deps = {}) {
         url, "--no-playlist", "--no-warnings", "--merge-output-format", "mp4",
         "-f", "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b", "--referer", link, "-o", destino,
       ], { cwd: dir, timeout: 5 * 60 * 1000 });
-      if (existe(destino)) {
+      if (existe(destino) && (await ehMp4(destino))) {
         arquivos.push({ caminho: destino, nome: nomeVsl(base, indice), mime: "video/mp4" });
       } else {
-        indice -= 1; // comando saiu 0 mas não gravou nada: não gasta número
+        indice -= 1; // não gravou nada, ou gravou algo que não é MP4: não gasta número
       }
     } catch {
       indice -= 1; // não gasta número com vídeo que falhou
@@ -131,6 +135,23 @@ export async function interagirComoUsuario(pagina) {
     if (y % 3000 === 0) altura = await alturaDaPagina();
   }
   await pagina.evaluate(() => window.scrollTo(0, 0));
+}
+/**
+ * Confere pelo cabeçalho que o yt-dlp gravou um MP4 de verdade ("ftyp" nos bytes 4-8). O extrator
+ * genérico dele salva qualquer URL direta com o nome pedido — já aconteceu de virar "VSL" um .js.
+ */
+async function ehMp4Real(caminho) {
+  let arquivo;
+  try {
+    arquivo = await open(caminho, "r");
+    const cabecalho = Buffer.alloc(12);
+    const { bytesRead } = await arquivo.read(cabecalho, 0, 12, 0);
+    return bytesRead >= 8 && cabecalho.subarray(4, 8).toString("latin1") === "ftyp";
+  } catch {
+    return false;
+  } finally {
+    await arquivo?.close();
+  }
 }
 /** Playwright de verdade: rola a página inteira e escuta a rede atrás de vídeo. */
 async function abrirNavegadorReal(link) {

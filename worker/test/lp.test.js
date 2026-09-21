@@ -5,13 +5,17 @@ import { capturar, ehUrlDeVideo, interagirComoUsuario } from "../src/jobs/lp.js"
 test("reconhece URL de vídeo e player conhecido", () => {
   assert.ok(ehUrlDeVideo("https://cdn.site.com/vsl.mp4"));
   assert.ok(ehUrlDeVideo("https://cdn.site.com/stream/master.m3u8?token=1"));
-  assert.ok(ehUrlDeVideo("https://scripts.converteai.net/abc/players/xyz/player.js"));
+  // Script do player não é vídeo: o yt-dlp salvaria o .js cru como "VSL". O player, ao rodar,
+  // dispara as .m3u8 de verdade, e essas sim entram.
+  assert.ok(!ehUrlDeVideo("https://scripts.converteai.net/abc/players/xyz/player.js"));
+  assert.ok(!ehUrlDeVideo("https://scripts.converteai.net/lib/js/smartplayer-wc/v4/smartplayer.js"));
+  assert.ok(ehUrlDeVideo("https://cdn.converteai.net/abc/6a74/main.m3u8"));
   assert.ok(ehUrlDeVideo("https://player.vimeo.com/video/12345"));
   assert.ok(!ehUrlDeVideo("https://cdn.site.com/estilo.css"));
   assert.ok(!ehUrlDeVideo("https://cdn.site.com/foto.jpg"));
 });
 
-function deps({ urlsDeVideo = [], falhas = {} } = {}) {
+function deps({ urlsDeVideo = [], falhas = {}, respostasMp4 = [] } = {}) {
   const chamadas = [];
   return {
     chamadas,
@@ -26,6 +30,8 @@ function deps({ urlsDeVideo = [], falhas = {} } = {}) {
       fechar: async () => {},
     }),
     existeArquivo: () => true,
+    // respostas de ehMp4 na ordem das chamadas; sem lista, tudo é MP4
+    ehMp4: async () => (respostasMp4.length ? respostasMp4.shift() : true),
   };
 }
 
@@ -69,6 +75,15 @@ test("interação simula usuário de verdade: mouse, roda até o fim e volta ao 
   const rolado = eventos.filter((e) => e[0] === "wheel").reduce((t, e) => t + e[1], 0);
   assert.ok(rolado >= 2500, "rolou a página toda: " + rolado);
   assert.equal(eventos.at(-1)[0], "evaluate", "termina voltando ao topo");
+});
+
+test("arquivo que o yt-dlp gravou mas não é MP4 não vira VSL nem gasta número", async () => {
+  // O extrator genérico do yt-dlp salva qualquer URL direta (até um .js) com o nome pedido.
+  const d = deps({ urlsDeVideo: ["https://cdn.site.com/a.m3u8", "https://cdn.site.com/b.m3u8"], respostasMp4: [false, true] });
+  const r = await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "Site - Nicho - Player" }, d);
+  const nomes = r.arquivos.map((a) => a.nome);
+  assert.ok(nomes.includes("Site - Nicho - Player - VSL 01.mp4"));
+  assert.ok(!nomes.includes("Site - Nicho - Player - VSL 02.mp4"));
 });
 
 test("vídeos da página viram arquivos VSL numerados", async () => {

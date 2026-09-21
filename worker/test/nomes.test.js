@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sanitizar, limitar, extensaoDe, nomeCard, nomeVsl, nomeUnico, ehVideo, ehImagem, mimeDe } from "../src/nomes.js";
+import { sanitizar, limitar, extensaoDe, nomeCard, nomeVsl, nomeUnico, ehVideo, ehImagem, mimeDe, semRastreio } from "../src/nomes.js";
 
 test("sanitizar troca caracteres proibidos por hífen e colapsa espaços", () => {
   assert.equal(sanitizar('Oferta: "Dr. Fulano" / 2026'), "Oferta- -Dr. Fulano- - 2026");
@@ -48,4 +48,14 @@ test("classificação por extensão", () => {
   assert.equal(mimeDe("mp4"), "video/mp4");
   assert.equal(mimeDe("jpg"), "image/jpeg");
   assert.equal(mimeDe("xyz"), "application/octet-stream");
+});
+
+test("semRastreio tira utm_*, fbclid e afins e mantém o resto da URL", () => {
+  assert.equal(
+    semRastreio("https://site.com/lp/?utm_source=FB&utm_campaign=%5B16%5D%7C123&fbclid=abc&utm_id=9"),
+    "https://site.com/lp/",
+  );
+  assert.equal(semRastreio("https://site.com/lp/?v=2&utm_medium=x&gclid=1"), "https://site.com/lp/?v=2");
+  assert.equal(semRastreio("https://site.com/lp/#topo"), "https://site.com/lp/#topo");
+  assert.equal(semRastreio("não é url"), "não é url");
 });
