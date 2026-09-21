@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { capturar, ehUrlDeVideo } from "../src/jobs/lp.js";
+import { capturar, ehUrlDeVideo, interagirComoUsuario } from "../src/jobs/lp.js";
 
 test("reconhece URL de vídeo e player conhecido", () => {
   assert.ok(ehUrlDeVideo("https://cdn.site.com/vsl.mp4"));
@@ -42,6 +42,33 @@ test("captura gera html, zip e print", async () => {
   assert.ok(d.chamadas.some((c) => c.cmd.includes("wget")));
   assert.ok(d.chamadas.some((c) => c.cmd.includes("zip")));
   assert.ok(d.chamadas.some((c) => c.cmd === "screenshot"));
+});
+
+test("espelho usa nomes de arquivo válidos no Windows (sem ? | : nos nomes)", async () => {
+  // Sem essa flag o wget grava "estilo.css?ver=1" e "index.html?utm_source=..|..", e o Explorer
+  // do Windows recusa o zip inteiro como "pasta inválida".
+  const d = deps();
+  await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "Site - Nicho - Player" }, d);
+  const wget = d.chamadas.find((c) => c.cmd.includes("wget"));
+  assert.ok(wget.args.includes("--restrict-file-names=windows"));
+});
+
+test("interação simula usuário de verdade: mouse, roda até o fim e volta ao topo", async () => {
+  // Sites com WP Rocket "Delay JavaScript execution" só carregam os scripts (inclusive o player da
+  // VSL) depois de mousemove/wheel/tecla. scrollBy via JS dispara "scroll", que não conta.
+  const eventos = [];
+  const pagina = {
+    mouse: { move: async (x, y) => eventos.push(["move", x, y]), wheel: async (dx, dy) => eventos.push(["wheel", dy]) },
+    keyboard: { press: async (k) => eventos.push(["key", k]) },
+    evaluate: async (fn) => (String(fn).includes("scrollHeight") ? 2500 : eventos.push(["evaluate"])),
+    waitForTimeout: async () => {},
+  };
+  await interagirComoUsuario(pagina);
+  assert.ok(eventos.some((e) => e[0] === "move"));
+  assert.ok(eventos.some((e) => e[0] === "key"));
+  const rolado = eventos.filter((e) => e[0] === "wheel").reduce((t, e) => t + e[1], 0);
+  assert.ok(rolado >= 2500, "rolou a página toda: " + rolado);
+  assert.equal(eventos.at(-1)[0], "evaluate", "termina voltando ao topo");
 });
 
 test("vídeos da página viram arquivos VSL numerados", async () => {

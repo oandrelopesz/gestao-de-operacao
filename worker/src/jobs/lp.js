@@ -65,6 +65,9 @@ export async function capturar({ link, dir, base }, deps = {}) {
   await rodar("/usr/bin/wget", [
     "--mirror", "--convert-links", "--adjust-extension", "--page-requisites", "--no-parent",
     "--level=1", "--timeout=30", "--tries=2", "--no-verbose",
+    // Nomes gravados no espelho precisam abrir no Windows: sem isto o wget salva "estilo.css?ver=1"
+    // e "index.html?utm_source=..|..", e o Explorer recusa o zip inteiro como "pasta inválida".
+    "--restrict-file-names=windows",
     "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     "-P", espelhoDir, link,
   ], { cwd: dir, timeout: 3 * 60 * 1000 }).catch(() => {});
@@ -107,6 +110,28 @@ export async function capturar({ link, dir, base }, deps = {}) {
   return { arquivos };
 }
 
+/**
+ * Interage como um usuário de verdade: move o mouse, aperta uma tecla e rola com a roda até o
+ * fim da página, depois volta ao topo. Sites com WP Rocket "Delay JavaScript execution" (e
+ * similares) só carregam os scripts — inclusive o player da VSL — depois de mousemove/wheel/
+ * tecla; scrollBy via JS dispara só "scroll", que não conta, e a página fica sem vídeo.
+ */
+export async function interagirComoUsuario(pagina) {
+  await pagina.mouse.move(720, 450);
+  await pagina.mouse.move(740, 470);
+  await pagina.keyboard.press("Shift");
+  const alturaDaPagina = () => pagina.evaluate(() => document.documentElement.scrollHeight);
+  let altura = await alturaDaPagina();
+  let y = 0;
+  // Rola até 1200px além do fim conhecido, relendo a altura de tempos em tempos (lazy loading cresce a página)
+  while (y < altura + 1200 && y < 200_000) {
+    await pagina.mouse.wheel(0, 600);
+    y += 600;
+    await pagina.waitForTimeout(150);
+    if (y % 3000 === 0) altura = await alturaDaPagina();
+  }
+  await pagina.evaluate(() => window.scrollTo(0, 0));
+}
 /** Playwright de verdade: rola a página inteira e escuta a rede atrás de vídeo. */
 async function abrirNavegadorReal(link) {
   const { chromium } = await import("playwright-core");
@@ -126,17 +151,9 @@ async function abrirNavegadorReal(link) {
 
     await pagina.goto(link, { waitUntil: "domcontentloaded", timeout: 90_000 });
     await pagina.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
-    // Rola até o fim para disparar lazy loading e o player da VSL
-    await pagina.evaluate(async () => {
-      await new Promise((pronto) => {
-        let y = 0;
-        const passo = setInterval(() => {
-          window.scrollBy(0, 600);
-          y += 600;
-          if (y >= document.body.scrollHeight + 1200) { clearInterval(passo); window.scrollTo(0, 0); pronto(); }
-        }, 150);
-      });
-    }).catch(() => {});
+    await interagirComoUsuario(pagina).catch(() => {});
+    // A interação destrava scripts adiados (player da VSL inclusive): espera a rede assentar de novo
+    await pagina.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
     await pagina.waitForTimeout(4000);
 
     return {
