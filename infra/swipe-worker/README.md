@@ -20,6 +20,34 @@ O worker é idempotente por nome de arquivo: ao reprocessar um job ele reaprovei
 
 A consequência é que o botão "Tentar de novo" do app **não** atualiza uma LP que mudou de conteúdo — o worker vê os arquivos antigos e não faz nada. Para recapturar de verdade, apague a pasta do item no Google Drive antes de mandar o job de novo.
 
+## Job preso em `rodando`
+
+Se um item fica em "baixando" por mais de 40 min, o job correspondente em `swipe_jobs` está preso em
+`rodando`: a execução do n8n morreu depois do nó "Marcar rodando" (referência quebrada numa expressão,
+n8n reiniciado no meio, etc.). Conferir em n8n → Executions o erro exato, corrigir, e devolver o job
+para a fila: `swipe_jobs.status = 'aguardando'` (valores aceitos: `aguardando|rodando|ok|erro`) e
+`swipe_itens.status = 'pendente'`. O gatilho de 1 min pega o job de novo.
+
+**Armadilha ao editar o workflow no n8n:** colar/reimportar nós com o mesmo nome faz o n8n renomeá-los
+com sufixo `1` (`Tem job?1`, `Decidir1`) e reescrever as expressões; se depois os nomes voltam, as
+expressões ficam apontando para nós que não existem e a execução morre em "Item baixando". Depois de
+qualquer edição, rodar uma execução manual e conferir que ela chega ao worker (`job.inicio` nos logs).
+
+## Sites que só carregam o player depois de uma interação
+
+Sites com WP Rocket "Delay JavaScript execution" (scripts `type="rocketlazyloadscript"`) e similares
+só executam os scripts — inclusive o carregador do player da VSL (VTurb/converteai etc.) — depois de
+mousemove/wheel/tecla. O worker simula essa interação (`interagirComoUsuario` em `src/jobs/lp.js`)
+antes de escutar a rede. Sintoma de regressão: LP capturada sem `- VSL 01.mp4`, print mostrando só o
+placeholder preto do player e html sem nenhum `<script>`.
+
+## O zip do espelho "não abre" no Windows
+
+O `wget --mirror` grava cada URL como nome de arquivo; sem `--restrict-file-names=windows` ficam nomes
+com `?` e `|` (query strings), que o Windows proíbe — o Explorer recusa o zip inteiro como "pasta
+inválida", embora ele seja válido (abre no Linux/Mac). A flag está no `wget` de `src/jobs/lp.js`; se
+voltar a acontecer, confira `unzip -l` procurando `?` nos nomes.
+
 ## Ver o que o worker está fazendo
 
 Os logs do serviço saem em JSON (uma linha por evento) no Portainer. Para ver os eventos, abra:
