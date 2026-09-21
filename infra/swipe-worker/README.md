@@ -41,6 +41,25 @@ mousemove/wheel/tecla. O worker simula essa interação (`interagirComoUsuario` 
 antes de escutar a rede. Sintoma de regressão: LP capturada sem `- VSL 01.mp4`, print mostrando só o
 placeholder preto do player e html sem nenhum `<script>`.
 
+## O que conta como VSL
+
+O worker escuta a rede da página e manda para o `yt-dlp` as URLs de vídeo (`.mp4`, `.m3u8`, `.mpd`) e
+de embeds (YouTube, Vimeo, Wistia...). Três filtros existem porque cada um já quebrou de verdade
+na LP da A2 Digital (VTurb) em 21/09/2026:
+
+- **Script do player não é vídeo.** `player.js`/`smartplayer.js` do converteai casavam com o domínio
+  do player e o extrator genérico do `yt-dlp` salvava o JavaScript cru como `VSL 01.mp4`.
+  `.js/.css/imagem` nunca vão para o `yt-dlp`; o player, ao rodar, pede as `.m3u8` de verdade.
+- **Uma playlist HLS por pasta.** A master `main.m3u8` lista `video_0/1/2.m3u8` na mesma pasta, e o
+  player pede a master e depois uma rendição — sem o filtro a VSL vinha em 720p e em 360p.
+  Fica a primeira URL da pasta (a master), que o `yt-dlp` resolve na melhor qualidade.
+- **Tamanho mínimo de 100 KB.** Players baixam um MP4 de 2x2 px e 0,12 s (1,6 KB) para testar se
+  o navegador deixa dar autoplay; ele passa na checagem de cabeçalho. 3 s no bitrate mais baixo já
+  passam de 100 KB, então nenhuma VSL real fica de fora.
+
+Se uma LP vier sem VSL, conferir nos logs se apareceu `job.fim` com `ok: true` e testar a URL do vídeo
+com `yt-dlp` à mão; se vier com VSL duplicada ou minúscula, é um destes filtros que precisa de ajuste.
+
 ## O zip do espelho "não abre" no Windows
 
 O `wget --mirror` grava cada URL como nome de arquivo; sem `--restrict-file-names=windows` ficam nomes
