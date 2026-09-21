@@ -98,11 +98,12 @@
       "name": "Executar no worker",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
+      "onError": "continueRegularOutput",
       "position": [740, -100]
     },
     {
       "parameters": {
-        "jsCode": "const r = $input.first().json;\nconst job = $('Tem job?').first().json;\nconst corpo = r.body || {};\nconst status = r.statusCode || 0;\nconst tentativas = job.tentativas + 1;\n\n// 409 (ocupado) e 503 (Drive fora) não consomem tentativa: o job volta para a fila\nif (status === 409 || status === 503) {\n  return [{ json: { acao: 'devolver', job_id: job.id, item_id: job.item_id, tentativas: job.tentativas, erro: corpo.erro || `worker respondeu ${status}` } }];\n}\n\nif (corpo.ok === true) {\n  return [{ json: { acao: 'ok', job_id: job.id, item_id: job.item_id, resultado: corpo.resultado } }];\n}\n\nconst erro = corpo.erro || `worker respondeu ${status}`;\nif (tentativas < 3) {\n  return [{ json: { acao: 'devolver', job_id: job.id, item_id: job.item_id, tentativas, erro } }];\n}\nreturn [{ json: { acao: 'falhou', job_id: job.id, item_id: job.item_id, tentativas, erro, docs: corpo.docs || null, link: job.payload.link, nome: job.payload.nome_arquivo } }];"
+        "jsCode": "const r = $input.first().json;\nconst job = $('Tem job?').first().json;\nconst corpo = r.body || {};\nconst status = r.statusCode || 0;\nconst tentativas = job.tentativas + 1;\n\n// Sem resposta HTTP (worker reiniciando, rede, timeout do n8n): o nó entrega { error } em vez de\n// { statusCode, body }. É infraestrutura, como o 503: volta para a fila sem consumir tentativa.\nif (r.error) {\n  const msg = r.error.message || (typeof r.error === 'string' ? r.error : JSON.stringify(r.error));\n  return [{ json: { acao: 'devolver', job_id: job.id, item_id: job.item_id, tentativas: job.tentativas, erro: `sem resposta do worker: ${msg}` } }];\n}\n\n// 409 (ocupado) e 503 (Drive fora) não consomem tentativa: o job volta para a fila\nif (status === 409 || status === 503) {\n  return [{ json: { acao: 'devolver', job_id: job.id, item_id: job.item_id, tentativas: job.tentativas, erro: corpo.erro || `worker respondeu ${status}` } }];\n}\n\nif (corpo.ok === true) {\n  return [{ json: { acao: 'ok', job_id: job.id, item_id: job.item_id, resultado: corpo.resultado } }];\n}\n\nconst erro = corpo.erro || `worker respondeu ${status}`;\nif (tentativas < 3) {\n  return [{ json: { acao: 'devolver', job_id: job.id, item_id: job.item_id, tentativas, erro } }];\n}\nreturn [{ json: { acao: 'falhou', job_id: job.id, item_id: job.item_id, tentativas, erro, docs: corpo.docs || null, link: job.payload.link, nome: job.payload.nome_arquivo } }];"
       },
       "id": "a1000000-0000-4000-8000-000000000007",
       "name": "Decidir",
