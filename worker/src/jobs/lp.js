@@ -23,6 +23,21 @@ export function ehUrlDeVideo(url) {
   return EXT_VIDEO.test(u) || PLAYERS.test(u);
 }
 
+/**
+ * Playlists HLS/DASH na mesma pasta são qualidades do mesmo vídeo (VTurb: main.m3u8 + video_N.m3u8),
+ * e o player pede a master antes da rendição. Fica só a primeira URL de cada pasta; o resto passa.
+ */
+export function umaPlaylistPorPasta(urls) {
+  const pastas = new Set();
+  return urls.filter((url) => {
+    if (!/\.(m3u8|mpd)(\?|$)/i.test(url)) return true;
+    let pasta;
+    try { const u = new URL(url); pasta = u.origin + u.pathname.slice(0, u.pathname.lastIndexOf("/") + 1); } catch { return true; }
+    if (pastas.has(pasta)) return false;
+    pastas.add(pasta);
+    return true;
+  });
+}
 export async function capturar({ link, dir, base }, deps = {}) {
   const rodar = deps.rodar || rodarReal;
   const abrir = deps.abrirNavegador || abrirNavegadorReal;
@@ -87,7 +102,7 @@ export async function capturar({ link, dir, base }, deps = {}) {
 
   // 5) Cada vídeo/VSL num arquivo separado; falha num vídeo não derruba a captura
   let indice = 0;
-  for (const url of urlsDeVideo.slice(0, 3)) {
+  for (const url of umaPlaylistPorPasta(urlsDeVideo).slice(0, 3)) {
     // Sem orçamento não vale começar outro vídeo: melhor devolver a LP com o que já temos do que
     // estourar o tempo do n8n e perder a captura inteira numa retentativa.
     if (Date.now() > prazo) {

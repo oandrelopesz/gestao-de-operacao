@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { capturar, ehUrlDeVideo, interagirComoUsuario } from "../src/jobs/lp.js";
+import { capturar, ehUrlDeVideo, interagirComoUsuario, umaPlaylistPorPasta } from "../src/jobs/lp.js";
 
 test("reconhece URL de vídeo e player conhecido", () => {
   assert.ok(ehUrlDeVideo("https://cdn.site.com/vsl.mp4"));
@@ -79,11 +79,34 @@ test("interação simula usuário de verdade: mouse, roda até o fim e volta ao 
 
 test("arquivo que o yt-dlp gravou mas não é MP4 não vira VSL nem gasta número", async () => {
   // O extrator genérico do yt-dlp salva qualquer URL direta (até um .js) com o nome pedido.
-  const d = deps({ urlsDeVideo: ["https://cdn.site.com/a.m3u8", "https://cdn.site.com/b.m3u8"], respostasMp4: [false, true] });
+  const d = deps({ urlsDeVideo: ["https://cdn.site.com/v1/a.m3u8", "https://cdn.site.com/v2/b.m3u8"], respostasMp4: [false, true] });
   const r = await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "Site - Nicho - Player" }, d);
   const nomes = r.arquivos.map((a) => a.nome);
   assert.ok(nomes.includes("Site - Nicho - Player - VSL 01.mp4"));
   assert.ok(!nomes.includes("Site - Nicho - Player - VSL 02.mp4"));
+});
+
+test("playlists HLS na mesma pasta são o mesmo vídeo: só a primeira (a master) baixa", () => {
+  // VTurb/converteai: main.m3u8 lista video_0.m3u8, video_1.m3u8... na mesma pasta; o player pede a
+  // master e depois uma rendição, e sem isto a VSL vinha duas vezes (720p e 360p).
+  assert.deepEqual(umaPlaylistPorPasta([
+    "https://cdn.converteai.net/acc/6a74/main.m3u8",
+    "https://cdn.converteai.net/acc/6a74/video_2.m3u8",
+    "https://cdn.converteai.net/acc/6a74/video_0.m3u8",
+    "https://cdn.converteai.net/acc/outro/main.m3u8",
+    "https://cdn.site.com/vsl.mp4",
+  ]), [
+    "https://cdn.converteai.net/acc/6a74/main.m3u8",
+    "https://cdn.converteai.net/acc/outro/main.m3u8",
+    "https://cdn.site.com/vsl.mp4",
+  ]);
+});
+
+test("captura baixa uma VSL só, mesmo com master e rendição na rede", async () => {
+  const d = deps({ urlsDeVideo: ["https://cdn.x.net/acc/vid/main.m3u8", "https://cdn.x.net/acc/vid/video_2.m3u8"] });
+  const r = await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "Site - Nicho - Player" }, d);
+  assert.equal(r.arquivos.filter((a) => a.nome.includes("VSL")).length, 1);
+  assert.equal(d.chamadas.filter((c) => c.cmd.includes("yt-dlp")).length, 1);
 });
 
 test("vídeos da página viram arquivos VSL numerados", async () => {
