@@ -649,6 +649,74 @@ export type Database = {
         }
         Relationships: []
       }
+      ideias: {
+        Row: {
+          agencia: string | null
+          cliente_id: string | null
+          created_at: string
+          demanda_id: string | null
+          descricao: string | null
+          id: string
+          links: string[]
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          agencia?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          demanda_id?: string | null
+          descricao?: string | null
+          id?: string
+          links?: string[]
+          tipo: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          agencia?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          demanda_id?: string | null
+          descricao?: string | null
+          id?: string
+          links?: string[]
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ideias_agencia_fkey"
+            columns: ["agencia"]
+            isOneToOne: false
+            referencedRelation: "agencias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideias_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideias_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideias_demanda_id_fkey"
+            columns: ["demanda_id"]
+            isOneToOne: false
+            referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       livros: {
         Row: {
           autor: string
