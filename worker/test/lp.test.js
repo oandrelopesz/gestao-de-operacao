@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { capturar, ehUrlDeVideo, interagirComoUsuario, umaPlaylistPorPasta } from "../src/jobs/lp.js";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { capturar, ehUrlDeVideo, interagirComoUsuario, umaPlaylistPorPasta, ehVideoDeVerdade, TAMANHO_MINIMO_VSL } from "../src/jobs/lp.js";
 
 test("reconhece URL de vídeo e player conhecido", () => {
   assert.ok(ehUrlDeVideo("https://cdn.site.com/vsl.mp4"));
@@ -107,6 +110,24 @@ test("captura baixa uma VSL só, mesmo com master e rendição na rede", async (
   const r = await capturar({ link: "https://lp.com", dir: "/tmp/j", base: "Site - Nicho - Player" }, d);
   assert.equal(r.arquivos.filter((a) => a.nome.includes("VSL")).length, 1);
   assert.equal(d.chamadas.filter((c) => c.cmd.includes("yt-dlp")).length, 1);
+});
+
+test("ehVideoDeVerdade: só MP4 com tamanho de vídeo; .js e o MP4 de 2x2 px do autoplay ficam de fora", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "swipe-vsl-"));
+  // MP4 real de 2x2 px / 0,12 s que o player VTurb baixa para testar autoplay (capturado em 21/09/2026)
+  const autoplay = Buffer.from("AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAu5tZGF0", "base64");
+  writeFileSync(join(dir, "autoplay.mp4"), autoplay);
+  writeFileSync(join(dir, "player.mp4"), "(function(t,n,s){try{n._plt=n._plt||0}catch(e){}})();");
+  const grande = Buffer.alloc(TAMANHO_MINIMO_VSL + 1);
+  grande.write("ftypisom", 4, "latin1");
+  writeFileSync(join(dir, "vsl.mp4"), grande);
+  const semCabecalho = Buffer.alloc(TAMANHO_MINIMO_VSL + 1);
+  writeFileSync(join(dir, "lixo.mp4"), semCabecalho);
+  assert.equal(await ehVideoDeVerdade(join(dir, "autoplay.mp4")), false);
+  assert.equal(await ehVideoDeVerdade(join(dir, "player.mp4")), false);
+  assert.equal(await ehVideoDeVerdade(join(dir, "lixo.mp4")), false);
+  assert.equal(await ehVideoDeVerdade(join(dir, "vsl.mp4")), true);
+  assert.equal(await ehVideoDeVerdade(join(dir, "nao-existe.mp4")), false);
 });
 
 test("vídeos da página viram arquivos VSL numerados", async () => {

@@ -42,7 +42,7 @@ export async function capturar({ link, dir, base }, deps = {}) {
   const rodar = deps.rodar || rodarReal;
   const abrir = deps.abrirNavegador || abrirNavegadorReal;
   const existe = deps.existeArquivo || existsSync;
-  const ehMp4 = deps.ehMp4 || ehMp4Real;
+  const ehMp4 = deps.ehMp4 || ehVideoDeVerdade;
   // Orçamento total da captura (20 min). O n8n corta a chamada HTTP bem depois disso (30 min),
   // então a resposta sempre sai daqui antes de ele desistir — senão o job seria retentado com o
   // worker ocupado.
@@ -151,14 +151,20 @@ export async function interagirComoUsuario(pagina) {
   }
   await pagina.evaluate(() => window.scrollTo(0, 0));
 }
+/** Menor VSL que faz sentido guardar: 3 s no bitrate mais baixo já passam disto. */
+export const TAMANHO_MINIMO_VSL = 100 * 1024;
+
 /**
- * Confere pelo cabeçalho que o yt-dlp gravou um MP4 de verdade ("ftyp" nos bytes 4-8). O extrator
- * genérico dele salva qualquer URL direta com o nome pedido — já aconteceu de virar "VSL" um .js.
+ * Confere que o yt-dlp gravou um vídeo de verdade: cabeçalho MP4 ("ftyp" nos bytes 4-8) e tamanho
+ * mínimo. O extrator genérico salva qualquer URL direta com o nome pedido — já virou "VSL" um .js —
+ * e players usam um MP4 de 2x2 px e 0,1 s para testar autoplay, que passa só pelo cabeçalho.
  */
-async function ehMp4Real(caminho) {
+export async function ehVideoDeVerdade(caminho) {
   let arquivo;
   try {
     arquivo = await open(caminho, "r");
+    const { size } = await arquivo.stat();
+    if (size < TAMANHO_MINIMO_VSL) return false;
     const cabecalho = Buffer.alloc(12);
     const { bytesRead } = await arquivo.read(cabecalho, 0, 12, 0);
     return bytesRead >= 8 && cabecalho.subarray(4, 8).toString("latin1") === "ftyp";
