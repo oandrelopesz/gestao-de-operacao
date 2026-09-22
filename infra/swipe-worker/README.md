@@ -67,6 +67,17 @@ com `?` e `|` (query strings), que o Windows proíbe — o Explorer recusa o zip
 inválida", embora ele seja válido (abre no Linux/Mac). A flag está no `wget` de `src/jobs/lp.js`; se
 voltar a acontecer, confira `unzip -l` procurando `?` nos nomes.
 
+## Anúncios da Biblioteca de Anúncios do Facebook
+
+Link `facebook.com/ads/library/?id=<n>` de um anúncio: nem o yt-dlp nem o gallery-dl conhecem a
+página, então o worker abre com o Chromium (a página é pública, sem login), acha o card pelo número
+do id e baixa o criativo (`src/jobs/adslibrary.js`). Anúncio de vídeo vira `.mp4`; estático vira
+`.jpg`; vários criativos viram carrossel. Funciona sem os cookies de Facebook.
+
+Duas limitações honestas: a Ads Library serve a imagem no tamanho de exibição (não o arquivo
+original em alta), e se o anúncio for removido/inativado o card não aparece — o erro é claro
+("Anúncio não encontrado na Ads Library") e o job segue a retentativa normal.
+
 ## Ver o que o worker está fazendo
 
 Os logs do serviço saem em JSON (uma linha por evento) no Portainer. Para ver os eventos, abra:
