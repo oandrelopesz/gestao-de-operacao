@@ -74,20 +74,21 @@ export function limparIdToken(): void {
 }
 
 let iniciadoCom: string | null = null;
+// Um único callback global do GIS (o `initialize` só pode registrar um). Quem está aguardando
+// (login silencioso ou o botão) assume este ponteiro; o credential sempre é cacheado antes.
+let onCredencial: ((idToken: string | null) => void) | null = null;
 
-function inicializar(g: GoogleGsi, clientId: string, callback: (cred: string | null) => void): void {
+function garantirInit(g: GoogleGsi, clientId: string): void {
+  if (iniciadoCom === clientId) return; // inicializa só uma vez (evita o aviso "initialize() multiple times")
   g.initialize({
     client_id: clientId,
     auto_select: true,
     use_fedcm_for_prompt: true,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     callback: (resp: any) => {
-      if (resp?.credential) {
-        guardar(resp.credential);
-        callback(resp.credential);
-      } else {
-        callback(null);
-      }
+      const cred = resp?.credential || null;
+      if (cred) guardar(cred);
+      if (onCredencial) onCredencial(cred);
     },
   });
   iniciadoCom = clientId;
@@ -108,10 +109,13 @@ export function loginSilencioso(clientId: string): Promise<string | null> {
           const done = (v: string | null) => {
             if (!resolvido) {
               resolvido = true;
+              if (onCredencial === handler) onCredencial = null;
               resolve(v);
             }
           };
-          inicializar(g, clientId, (cred) => done(cred));
+          const handler = (cred: string | null) => done(cred);
+          garantirInit(g, clientId);
+          onCredencial = handler;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           g.prompt((n: any) => {
             const semUi =
@@ -136,16 +140,11 @@ export function renderBotaoGoogle(
 ): void {
   carregarGis()
     .then((g) => {
-      if (iniciadoCom !== clientId) {
-        inicializar(g, clientId, (cred) => {
-          if (cred) onToken(cred);
-        });
-      } else {
-        // reusa a inicialização, mas garante que o callback atual seja o desta tela
-        inicializar(g, clientId, (cred) => {
-          if (cred) onToken(cred);
-        });
-      }
+      garantirInit(g, clientId);
+      // este botão passa a ser quem recebe o próximo credential
+      onCredencial = (cred) => {
+        if (cred) onToken(cred);
+      };
       container.innerHTML = "";
       g.renderButton(container, {
         type: "standard",
