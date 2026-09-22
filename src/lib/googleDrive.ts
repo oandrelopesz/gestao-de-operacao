@@ -3,6 +3,8 @@
  * chave do swipe file (guardada em localStorage). Uploads vão direto do navegador para o Drive
  * (upload resumível, aguenta arquivos grandes e retoma quando cai).
  */
+import { idTokenEmCache, loginSilencioso, limparIdToken } from "@/lib/googleAuth";
+
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const DRIVE = "https://www.googleapis.com/drive/v3";
@@ -53,6 +55,7 @@ export interface DriveStatus {
   expires_at: string | null;
   scope: string | null;
   key_configured: boolean;
+  google_login: boolean;
   client_id: string | null;
   redirect_uri: string | null;
 }
@@ -80,20 +83,54 @@ export function oauthUrl(clientId: string, redirectUri: string, userId: string, 
 }
 
 let tokenCache: { token: string; expiresAt: number } | null = null;
+let statusCache: { data: DriveStatus; at: number } | null = null;
 
 export class SwipeKeyError extends Error {}
+/**
+ * Não há como autenticar no Drive: nem login Google (silencioso) nem chave. Herda de SwipeKeyError
+ * para não quebrar quem já trata SwipeKeyError; a UI usa isso para oferecer "Entrar com Google".
+ */
+export class DriveAuthError extends SwipeKeyError {}
+
+/** Status do Drive com cache curto (para saber se o login Google está disponível sem bater toda hora). */
+export async function statusDoDrive(forcar = false): Promise<DriveStatus> {
+  if (!forcar && statusCache && Date.now() - statusCache.at < 60_000) return statusCache.data;
+  const data = await driveStatus();
+  statusCache = { data, at: Date.now() };
+  return data;
+}
 
 export async function getAccessToken(): Promise<string> {
   if (tokenCache && tokenCache.expiresAt - Date.now() > 60_000) return tokenCache.token;
+
+  // 1) Login Google (funciona em qualquer navegador/dispositivo), quando disponível
+  let idToken = idTokenEmCache();
+  if (!idToken) {
+    const st = await statusDoDrive().catch(() => null);
+    if (st?.google_login && st.client_id) idToken = await loginSilencioso(st.client_id);
+  }
+
+  // 2) Fallback: chave do swipe file (navegadores já configurados)
   const key = getSwipeKey();
-  if (!key) throw new SwipeKeyError("Informe a chave do swipe file (Admin → Google Drive).");
-  const r = await fetch(`${FUNCTIONS_URL}/google-token`, {
-    method: "POST",
-    headers: { apikey: ANON_KEY, "Content-Type": "application/json", "x-swipe-key": key },
-    body: "{}",
-  });
+  if (!idToken && !key) {
+    const st = statusCache?.data;
+    throw new DriveAuthError(
+      st?.google_login
+        ? "Entre com o Google para usar o swipe file."
+        : "Informe a chave do swipe file (Admin → Google Drive).",
+    );
+  }
+
+  const headers: Record<string, string> = { apikey: ANON_KEY, "Content-Type": "application/json" };
+  if (idToken) headers["x-google-id-token"] = idToken;
+  else headers["x-swipe-key"] = key;
+
+  const r = await fetch(`${FUNCTIONS_URL}/google-token`, { method: "POST", headers, body: "{}" });
   const data = await r.json().catch(() => ({}));
-  if (r.status === 403) throw new SwipeKeyError(data.error || "Chave do swipe file inválida");
+  if (r.status === 403) {
+    limparIdToken();
+    throw new DriveAuthError(data.error || "Acesso ao swipe file não autorizado");
+  }
   if (!r.ok) throw new Error(data.error || `Erro ao obter token (${r.status})`);
   tokenCache = { token: data.access_token, expiresAt: new Date(data.expires_at).getTime() };
   return data.access_token;

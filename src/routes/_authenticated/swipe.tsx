@@ -20,7 +20,10 @@ import {
   CATEGORIAS, REDES, STATUS_META, categoriaMeta, redeLabel, fetchNichos, fetchItens, fetchSwipeConfig, excluirItem, erroAmigavel, temChave,
   type SwipeItem, type SwipeNicho, type SwipeConfig, type SwipeCategoria,
 } from "@/lib/swipe";
+import { statusDoDrive } from "@/lib/googleDrive";
+import { loginSilencioso } from "@/lib/googleAuth";
 import { SwipeAddDialog } from "@/components/swipe/SwipeAddDialog";
+import { BotaoGoogleLogin } from "@/components/swipe/BotaoGoogleLogin";
 
 export const Route = createFileRoute("/_authenticated/swipe")({
   component: SwipePage,
@@ -56,6 +59,8 @@ function SwipePage() {
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
   const [dialog, setDialog] = useState<{ completar?: SwipeItem; preset?: Selecao } | null>(null);
   const [toDelete, setToDelete] = useState<SwipeItem | null>(null);
+  const [driveReady, setDriveReady] = useState<boolean>(temChave());
+  const [googleInfo, setGoogleInfo] = useState<{ login: boolean; clientId: string | null }>({ login: false, clientId: null });
 
   const load = async () => {
     try {
@@ -71,8 +76,25 @@ function SwipePage() {
     }
   };
 
+  // Descobre como liberar o Drive neste navegador: chave já configurada, ou login Google (que
+  // funciona em qualquer dispositivo). Tenta o login silencioso (One Tap) antes de pedir clique.
+  const checarDrive = async () => {
+    if (temChave()) { setDriveReady(true); return; }
+    try {
+      const st = await statusDoDrive();
+      setGoogleInfo({ login: !!st.google_login, clientId: st.client_id });
+      if (st.google_login && st.client_id) {
+        const idToken = await loginSilencioso(st.client_id);
+        if (idToken) setDriveReady(true);
+      }
+    } catch {
+      // sem status: mantém não-pronto; o aviso orienta o usuário
+    }
+  };
+
   useEffect(() => {
     load();
+    checarDrive();
     // O serviço de download muda o status: reflete na hora
     const channel = supabase
       .channel("swipe-itens")
@@ -126,7 +148,7 @@ function SwipePage() {
     setToDelete(null);
   };
 
-  const pronto = !!config?.root_folder_id && temChave();
+  const pronto = !!config?.root_folder_id && driveReady;
 
   return (
     <div className="space-y-5">
@@ -156,12 +178,24 @@ function SwipePage() {
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardContent className="p-4 text-sm flex items-start gap-3">
             <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium">Falta configurar o Drive neste navegador</p>
-              <p className="text-muted-foreground">
-                {!config?.root_folder_id ? 'Conecte o Google e crie a pasta "Swipe File" ' : "Informe a chave do swipe file "}
-                em <Link to="/admin" className="underline underline-offset-2">Admin → Google Drive</Link>. Os itens já salvos continuam visíveis abaixo.
-              </p>
+            <div className="space-y-2">
+              <p className="font-medium">Falta liberar o Drive neste navegador</p>
+              {googleInfo.login && googleInfo.clientId && config?.root_folder_id ? (
+                <>
+                  <p className="text-muted-foreground">
+                    Entre com sua conta Google para usar o swipe file em qualquer navegador ou dispositivo. Os itens já salvos continuam visíveis abaixo.
+                  </p>
+                  <BotaoGoogleLogin
+                    clientId={googleInfo.clientId}
+                    onEntrou={() => { setDriveReady(true); load(); }}
+                  />
+                </>
+              ) : (
+                <p className="text-muted-foreground">
+                  {!config?.root_folder_id ? 'Conecte o Google e crie a pasta "Swipe File" ' : "Informe a chave do swipe file "}
+                  em <Link to="/admin" className="underline underline-offset-2">Admin → Google Drive</Link>. Os itens já salvos continuam visíveis abaixo.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

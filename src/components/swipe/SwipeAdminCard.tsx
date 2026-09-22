@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { HardDrive, ExternalLink, KeyRound, RefreshCw, CheckCircle2, AlertTriangle, FolderPlus } from "lucide-react";
+import { HardDrive, ExternalLink, KeyRound, RefreshCw, CheckCircle2, AlertTriangle, FolderPlus, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { driveStatus, oauthUrl, getSwipeKey, setSwipeKey, ensureFolder, getAccessToken, type DriveStatus } from "@/lib/googleDrive";
 import { fetchSwipeConfig, saveSwipeConfig, erroAmigavel, type SwipeConfig } from "@/lib/swipe";
+import { BotaoGoogleLogin } from "@/components/swipe/BotaoGoogleLogin";
 import { FALLBACK_USER_ID, getUserId } from "@/lib/clientesService";
 
 /**
@@ -128,8 +129,28 @@ export function SwipeAdminCard() {
           </Button>
         </div>
 
+        {status?.google_login && status.client_id && (
+          <div className="rounded-md border p-3 space-y-2">
+            <Label className="flex items-center gap-2"><LogIn size={14} /> Entrar com Google (recomendado)</Label>
+            <p className="text-[11px] text-muted-foreground">
+              Libera o swipe file em qualquer navegador ou dispositivo com a sua conta Google — sem precisar de chave. Só a sua conta tem acesso.
+            </p>
+            <BotaoGoogleLogin
+              clientId={status.client_id}
+              onEntrou={async () => {
+                try {
+                  await getAccessToken();
+                  toast.success("Entrou: este navegador já acessa o swipe file");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Não foi possível entrar com o Google");
+                }
+              }}
+            />
+          </div>
+        )}
+
         <div className="rounded-md border p-3 space-y-2">
-          <Label htmlFor="swipe-key" className="flex items-center gap-2"><KeyRound size={14} /> Chave do swipe file (neste navegador)</Label>
+          <Label htmlFor="swipe-key" className="flex items-center gap-2"><KeyRound size={14} /> Chave do swipe file (alternativa)</Label>
           <div className="flex gap-2">
             <Input id="swipe-key" type="password" placeholder="Cole a chave configurada no projeto" value={chave} onChange={(e) => setChave(e.target.value)} autoComplete="off" />
             <Button onClick={salvarChave} disabled={salvandoChave || !chave.trim()}>{salvandoChave ? "Verificando..." : "Salvar"}</Button>
