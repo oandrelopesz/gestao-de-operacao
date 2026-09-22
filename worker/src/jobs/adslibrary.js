@@ -21,13 +21,52 @@ export function idDoAnuncio(link) {
 }
 
 /**
+ * Extrai as mídias em ALTA do JSON que a Ads Library embute na página, para o anúncio de `id`.
+ * Cada anúncio tem "ad_archive_id":"<id>" seguido de "snapshot":{ images:[{original_image_url,
+ * resized_image_url}], videos:[{video_hd_url,video_sd_url}], cards:[...] } — pegamos a original e
+ * o HD, que são o arquivo cheio (a <img>/<video> renderizada é só o tamanho de exibição). As URLs
+ * vêm escapadas com \/. Devolve [] se o id não estiver no HTML — aí o chamador cai no DOM.
+ */
+export function midiasDoHtml(html, id) {
+  const marcador = '"ad_archive_id":"' + id + '"';
+  const ini = html.indexOf(marcador);
+  if (ini < 0) return [];
+  // o trecho deste anúncio vai até o próximo ad_archive_id (ou o fim)
+  const prox = html.indexOf('"ad_archive_id":"', ini + marcador.length);
+  const trecho = html.slice(ini, prox < 0 ? html.length : prox);
+  const dec = (u) => { try { return JSON.parse('"' + u + '"'); } catch { return u.replace(/\\\//g, "/"); } };
+  const midias = [];
+  const vistos = new Set();
+  const add = (tipo, url, largura) => { if (!url || vistos.has(url)) return; vistos.add(url); midias.push(largura ? { tipo, url, largura } : { tipo, url }); };
+  // vídeos primeiro (HD; sd só se não houver hd do mesmo bloco não é distinguível aqui, então pega os dois e o dedup/escolha resolve)
+  // hd e sd são o MESMO vídeo em pastas diferentes; fica só o hd (sd apenas se não houver hd nenhum)
+  const hd = [...trecho.matchAll(/"video_hd_url":"(https:[^"]+)"/g)].map((m) => dec(m[1])).filter(Boolean);
+  const videos = hd.length > 0 ? hd : [...trecho.matchAll(/"video_sd_url":"(https:[^"]+)"/g)].map((m) => dec(m[1])).filter(Boolean);
+  for (const url of videos) add("video", url);
+  for (const m of trecho.matchAll(/"original_image_url":"(https:[^"]+)"/g)) add("imagem", dec(m[1]), 9999);
+  return midias;
+}
+
+/**
  * Do que o card mostra, o que vale guardar: se tem vídeo, só os vídeos (as imagens são poster e
  * miniaturas); senão, as imagens grandes, uma vez cada (o Facebook repete a mesma imagem com
  * assinaturas diferentes na query).
  */
 export function escolherMidias(midias) {
   const videos = midias.filter((m) => m.tipo === "video" && m.url);
-  if (videos.length > 0) return videos.map(({ tipo, url }) => ({ tipo, url }));
+  if (videos.length > 0) {
+    // hd e sd do mesmo vídeo aparecem como URLs diferentes na mesma pasta: fica um por pasta (o 1º = hd)
+    const vistas = new Set();
+    const escolhidos = [];
+    for (const v of videos) {
+      let chave = v.url;
+      try { const u = new URL(v.url); chave = u.hostname + u.pathname.replace(/\/[^/]*$/, ""); } catch { /* fica a URL */ }
+      if (vistas.has(chave)) continue;
+      vistas.add(chave);
+      escolhidos.push({ tipo: "video", url: v.url });
+    }
+    return escolhidos;
+  }
   const vistas = new Set();
   const imagens = [];
   for (const m of midias) {
@@ -116,7 +155,12 @@ async function abrirAnuncioReal(link, id) {
     await pagina.waitForTimeout(3000);
 
     return {
-      midias: async () => (await pagina.evaluate(coletar, id)) || [],
+      midias: async () => {
+        // 1ª opção: o JSON embutido na página traz a original/HD; 2ª: o que está renderizado (exibição)
+        const doJson = midiasDoHtml(await pagina.content(), id);
+        if (doJson.length > 0) return doJson;
+        return (await pagina.evaluate(coletar, id)) || [];
+      },
       baixar: async (url) => {
         const r = await contexto.request.get(url, { timeout: 5 * 60 * 1000 });
         if (!r.ok()) throw new Error(`fbcdn respondeu ${r.status()} ao baixar a mídia`);

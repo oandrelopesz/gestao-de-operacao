@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ehAdsLibrary, idDoAnuncio, escolherMidias, baixarAnuncio } from "../src/jobs/adslibrary.js";
+import { ehAdsLibrary, idDoAnuncio, escolherMidias, baixarAnuncio, midiasDoHtml } from "../src/jobs/adslibrary.js";
 import { baixar } from "../src/jobs/download.js";
 
 test("ehAdsLibrary reconhece só o link de anúncio da Ads Library (com id)", () => {
@@ -87,4 +87,31 @@ test("baixar() desvia link da Ads Library para baixarAnuncio sem chamar yt-dlp",
   const r = await baixar({ link: "https://www.facebook.com/ads/library/?id=1196920881913840", rede: "facebook", dir: "/tmp/j" }, d);
   assert.equal(r.modo, "unico");
   assert.deepEqual(chamadas, []);
+});
+
+const HTML = "...\"ad_archive_id\":\"111\",\"snapshot\":{\"images\":[{\"original_image_url\":\"https:\\/\\/sc.fbcdn.net\\/orig1.jpg\",\"resized_image_url\":\"https:\\/\\/sc.fbcdn.net\\/small1.jpg\"}],\"videos\":[],\"cards\":[]},{\"ad_archive_id\":\"222\",\"snapshot\":{\"images\":[{\"original_image_url\":\"https:\\/\\/sc.fbcdn.net\\/poster2.jpg\",\"resized_image_url\":\"https:\\/\\/sc.fbcdn.net\\/small2.jpg\"}],\"videos\":[{\"video_hd_url\":\"https:\\/\\/v.fbcdn.net\\/hd2.mp4\",\"video_sd_url\":\"https:\\/\\/v.fbcdn.net\\/sd2.mp4\"}],\"cards\":[]}}";
+
+test("midiasDoHtml: anuncio estatico devolve a imagem ORIGINAL (nao a resized)", () => {
+  assert.deepEqual(midiasDoHtml(HTML, "111"), [{ tipo: "imagem", url: "https://sc.fbcdn.net/orig1.jpg", largura: 9999 }]);
+});
+
+test("midiasDoHtml: anuncio de video devolve o HD; escolherMidias descarta o poster", () => {
+  const m = midiasDoHtml(HTML, "222");
+  assert.ok(m.some((x) => x.tipo === "video" && x.url === "https://v.fbcdn.net/hd2.mp4"));
+  assert.deepEqual(escolherMidias(m), [{ tipo: "video", url: "https://v.fbcdn.net/hd2.mp4" }]);
+});
+
+test("midiasDoHtml: com HD presente, o SD do mesmo video (outra pasta) e ignorado", () => {
+  const html = '"ad_archive_id":"333","snapshot":{"images":[],"videos":[{"video_hd_url":"https:\\/\\/v.fbcdn.net\\/m366\\/hd.mp4","video_sd_url":"https:\\/\\/v.fbcdn.net\\/m69\\/sd.mp4"}],"cards":[]}}';
+  const m = midiasDoHtml(html, "333");
+  assert.deepEqual(m, [{ tipo: "video", url: "https://v.fbcdn.net/m366/hd.mp4" }]);
+});
+
+test("midiasDoHtml: id ausente devolve vazio (cai no fallback do DOM)", () => {
+  assert.deepEqual(midiasDoHtml(HTML, "999"), []);
+});
+
+test("midiasDoHtml: le so o anuncio do id, nao vaza midia do vizinho", () => {
+  const m = midiasDoHtml(HTML, "111");
+  assert.ok(!m.some((x) => /2\.(jpg|mp4)/.test(x.url)));
 });
