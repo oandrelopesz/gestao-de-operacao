@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { ensureFolder, getSwipeKey, type DriveFile } from "@/lib/googleDrive";
+import { ensureFolder, getSwipeKey, trashFile, type DriveFile } from "@/lib/googleDrive";
 
 export type SwipeCategoria =
   | "oferta" | "video_organico" | "video_anuncio" | "anuncio_estatico"
@@ -236,8 +236,18 @@ export async function atualizarItem(id: string, patch: Partial<SwipeItem>): Prom
   if (error) throw error;
 }
 
-export async function excluirItem(id: string): Promise<void> {
-  const { error } = await supabase.from("swipe_itens").delete().eq("id", id);
+/**
+ * Remove o item do catálogo e manda o arquivo dele para a Lixeira do Drive, para não deixar arquivo
+ * morto. Só o `drive_file_id` vai para a Lixeira: em item de arquivo único ele é o próprio arquivo,
+ * e em carrossel/LP ele é a pasta dedicada do item (leva o conteúdo junto). O `drive_folder_id` de um
+ * item de arquivo único é a pasta compartilhada da categoria — nunca é apagado. Se a Lixeira falhar,
+ * a linha do banco não é apagada (nada de órfão): dá para tentar de novo.
+ */
+export async function excluirItem(item: Pick<SwipeItem, "id" | "drive_file_id">): Promise<void> {
+  if (item.drive_file_id) {
+    await trashFile(item.drive_file_id);
+  }
+  const { error } = await supabase.from("swipe_itens").delete().eq("id", item.id);
   if (error) throw error;
 }
 

@@ -117,9 +117,9 @@ function SwipePage() {
   const excluir = async () => {
     if (!toDelete) return;
     try {
-      await excluirItem(toDelete.id);
+      await excluirItem(toDelete);
       setItens((prev) => prev.filter((i) => i.id !== toDelete.id));
-      toast.success("Removido do catálogo (o arquivo continua no Drive)");
+      toast.success(toDelete.drive_file_id ? "Removido do catálogo e enviado para a Lixeira do Drive" : "Removido do catálogo");
     } catch (e) {
       toast.error(erroAmigavel(e));
     }
@@ -292,7 +292,11 @@ function SwipePage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remover "{toDelete?.nome_arquivo || toDelete?.player}" do catálogo?</AlertDialogTitle>
-            <AlertDialogDescription>O arquivo no Drive não é apagado — só sai desta lista.</AlertDialogDescription>
+            <AlertDialogDescription>
+              {toDelete?.drive_file_id
+                ? "O arquivo também vai para a Lixeira do Drive (dá para recuperar por ~30 dias)."
+                : "Sai desta lista. Este item ainda não tem arquivo no Drive."}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>

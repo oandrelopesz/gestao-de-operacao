@@ -151,6 +151,23 @@ export async function getFile(id: string): Promise<DriveFile> {
   return driveJson<DriveFile>(`/files/${id}?fields=${FILE_FIELDS}`);
 }
 
+/**
+ * Manda um arquivo (ou pasta) para a Lixeira do Drive. Se já não existe (404/trashed), não é erro:
+ * o objetivo — não deixar arquivo morto — já está cumprido. Uma pasta na Lixeira leva o conteúdo junto.
+ */
+export async function trashFile(id: string): Promise<void> {
+  const r = await driveFetch(`/files/${id}?fields=id`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ trashed: true }),
+  });
+  if (r.status === 404) return; // já sumiu do Drive
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data?.error?.message || `Google Drive respondeu ${r.status} ao mover para a Lixeira`);
+  }
+}
+
 /** Cria um Google Docs com o texto (via conversão do Drive, sem precisar da API do Docs) */
 export async function createGoogleDoc(parentId: string, name: string, texto: string): Promise<DriveFile> {
   const boundary = "swipe" + Math.random().toString(36).slice(2);
