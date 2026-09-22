@@ -86,6 +86,48 @@ export type Database = {
         }
         Relationships: []
       }
+      alertas_saldo_enviados: {
+        Row: {
+          enviado_em: string
+          id: string
+          mensagem: string | null
+          nivel: number
+          recarga_ref: string | null
+          saldo_ads_id: string
+        }
+        Insert: {
+          enviado_em?: string
+          id?: string
+          mensagem?: string | null
+          nivel: number
+          recarga_ref?: string | null
+          saldo_ads_id: string
+        }
+        Update: {
+          enviado_em?: string
+          id?: string
+          mensagem?: string | null
+          nivel?: number
+          recarga_ref?: string | null
+          saldo_ads_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alertas_saldo_enviados_saldo_ads_id_fkey"
+            columns: ["saldo_ads_id"]
+            isOneToOne: false
+            referencedRelation: "saldo_ads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alertas_saldo_enviados_saldo_ads_id_fkey"
+            columns: ["saldo_ads_id"]
+            isOneToOne: false
+            referencedRelation: "saldo_ads_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           agencia: string
@@ -1773,6 +1815,23 @@ export type Database = {
       }
     }
     Functions: {
+      alertas_saldo_marcar: {
+        Args: { p_mensagem?: string; p_nivel: number; p_saldo_ads_id: string }
+        Returns: undefined
+      }
+      alertas_saldo_pendentes: {
+        Args: never
+        Returns: {
+          cliente_nome: string
+          dias_restantes: number
+          mensagem: string
+          nivel: number
+          operacao_nome: string
+          recarga_ref: string
+          saldo_ads_id: string
+          saldo_atual_estimado: number
+        }[]
+      }
       calcular_proxima_execucao: {
         Args: {
           p_data_referencia?: string
@@ -1789,6 +1848,10 @@ export type Database = {
         Returns: number
       }
       cotacao_brl: { Args: { p_moeda: string }; Returns: number }
+      formatar_moeda: {
+        Args: { p_moeda?: string; p_valor: number }
+        Returns: string
+      }
       get_nps_categoria: { Args: { score: number }; Returns: string }
       operacao_verba_mensal: {
         Args: { o: Database["public"]["Tables"]["operacoes"]["Row"] }
