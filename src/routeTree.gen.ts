@@ -9,30 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedAcessosRouteImport } from './routes/_authenticated/acessos'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
-import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
-import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
-import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenticated/habilidades'
-import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
-import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated/livros'
-import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
-import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
-import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
-import { Route as AuthenticatedSwipeRouteImport } from './routes/_authenticated/swipe'
 import { Route as AuthenticatedVerDepoisRouteImport } from './routes/_authenticated/ver-depois'
+import { Route as AuthenticatedSwipeRouteImport } from './routes/_authenticated/swipe'
+import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
+import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
+import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
+import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated/livros'
+import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
+import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenticated/habilidades'
+import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
+import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
+import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAcessosRouteImport } from './routes/_authenticated/acessos'
 
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -40,29 +40,39 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAcessosRoute = AuthenticatedAcessosRouteImport.update({
-  id: '/acessos',
-  path: '/acessos',
+const AuthenticatedVerDepoisRoute = AuthenticatedVerDepoisRouteImport.update({
+  id: '/ver-depois',
+  path: '/ver-depois',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const AuthenticatedSwipeRoute = AuthenticatedSwipeRouteImport.update({
+  id: '/swipe',
+  path: '/swipe',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
-  id: '/clientes',
-  path: '/clientes',
+const AuthenticatedSaldoRoute = AuthenticatedSaldoRouteImport.update({
+  id: '/saldo',
+  path: '/saldo',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedCursosRoute = AuthenticatedCursosRouteImport.update({
-  id: '/cursos',
-  path: '/cursos',
+const AuthenticatedProspeccaoRoute = AuthenticatedProspeccaoRouteImport.update({
+  id: '/prospeccao',
+  path: '/prospeccao',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedFinanceiroRoute = AuthenticatedFinanceiroRouteImport.update({
-  id: '/financeiro',
-  path: '/financeiro',
+const AuthenticatedNpsRoute = AuthenticatedNpsRouteImport.update({
+  id: '/nps',
+  path: '/nps',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLivrosRoute = AuthenticatedLivrosRouteImport.update({
+  id: '/livros',
+  path: '/livros',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedIdeiasRoute = AuthenticatedIdeiasRouteImport.update({
+  id: '/ideias',
+  path: '/ideias',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedHabilidadesRoute =
@@ -71,39 +81,29 @@ const AuthenticatedHabilidadesRoute =
     path: '/habilidades',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedIdeiasRoute = AuthenticatedIdeiasRouteImport.update({
-  id: '/ideias',
-  path: '/ideias',
+const AuthenticatedFinanceiroRoute = AuthenticatedFinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedLivrosRoute = AuthenticatedLivrosRouteImport.update({
-  id: '/livros',
-  path: '/livros',
+const AuthenticatedCursosRoute = AuthenticatedCursosRouteImport.update({
+  id: '/cursos',
+  path: '/cursos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedNpsRoute = AuthenticatedNpsRouteImport.update({
-  id: '/nps',
-  path: '/nps',
+const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedProspeccaoRoute = AuthenticatedProspeccaoRouteImport.update({
-  id: '/prospeccao',
-  path: '/prospeccao',
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedSaldoRoute = AuthenticatedSaldoRouteImport.update({
-  id: '/saldo',
-  path: '/saldo',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSwipeRoute = AuthenticatedSwipeRouteImport.update({
-  id: '/swipe',
-  path: '/swipe',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedVerDepoisRoute = AuthenticatedVerDepoisRouteImport.update({
-  id: '/ver-depois',
-  path: '/ver-depois',
+const AuthenticatedAcessosRoute = AuthenticatedAcessosRouteImport.update({
+  id: '/acessos',
+  path: '/acessos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
@@ -222,18 +222,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -243,81 +243,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/acessos': {
-      id: '/_authenticated/acessos'
-      path: '/acessos'
-      fullPath: '/acessos'
-      preLoaderRoute: typeof AuthenticatedAcessosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/clientes': {
-      id: '/_authenticated/clientes'
-      path: '/clientes'
-      fullPath: '/clientes'
-      preLoaderRoute: typeof AuthenticatedClientesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/cursos': {
-      id: '/_authenticated/cursos'
-      path: '/cursos'
-      fullPath: '/cursos'
-      preLoaderRoute: typeof AuthenticatedCursosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/financeiro': {
-      id: '/_authenticated/financeiro'
-      path: '/financeiro'
-      fullPath: '/financeiro'
-      preLoaderRoute: typeof AuthenticatedFinanceiroRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/habilidades': {
-      id: '/_authenticated/habilidades'
-      path: '/habilidades'
-      fullPath: '/habilidades'
-      preLoaderRoute: typeof AuthenticatedHabilidadesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/ideias': {
-      id: '/_authenticated/ideias'
-      path: '/ideias'
-      fullPath: '/ideias'
-      preLoaderRoute: typeof AuthenticatedIdeiasRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/livros': {
-      id: '/_authenticated/livros'
-      path: '/livros'
-      fullPath: '/livros'
-      preLoaderRoute: typeof AuthenticatedLivrosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/nps': {
-      id: '/_authenticated/nps'
-      path: '/nps'
-      fullPath: '/nps'
-      preLoaderRoute: typeof AuthenticatedNpsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/prospeccao': {
-      id: '/_authenticated/prospeccao'
-      path: '/prospeccao'
-      fullPath: '/prospeccao'
-      preLoaderRoute: typeof AuthenticatedProspeccaoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/saldo': {
-      id: '/_authenticated/saldo'
-      path: '/saldo'
-      fullPath: '/saldo'
-      preLoaderRoute: typeof AuthenticatedSaldoRouteImport
+    '/_authenticated/ver-depois': {
+      id: '/_authenticated/ver-depois'
+      path: '/ver-depois'
+      fullPath: '/ver-depois'
+      preLoaderRoute: typeof AuthenticatedVerDepoisRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/swipe': {
@@ -327,11 +257,81 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSwipeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/ver-depois': {
-      id: '/_authenticated/ver-depois'
-      path: '/ver-depois'
-      fullPath: '/ver-depois'
-      preLoaderRoute: typeof AuthenticatedVerDepoisRouteImport
+    '/_authenticated/saldo': {
+      id: '/_authenticated/saldo'
+      path: '/saldo'
+      fullPath: '/saldo'
+      preLoaderRoute: typeof AuthenticatedSaldoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/prospeccao': {
+      id: '/_authenticated/prospeccao'
+      path: '/prospeccao'
+      fullPath: '/prospeccao'
+      preLoaderRoute: typeof AuthenticatedProspeccaoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/nps': {
+      id: '/_authenticated/nps'
+      path: '/nps'
+      fullPath: '/nps'
+      preLoaderRoute: typeof AuthenticatedNpsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/livros': {
+      id: '/_authenticated/livros'
+      path: '/livros'
+      fullPath: '/livros'
+      preLoaderRoute: typeof AuthenticatedLivrosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ideias': {
+      id: '/_authenticated/ideias'
+      path: '/ideias'
+      fullPath: '/ideias'
+      preLoaderRoute: typeof AuthenticatedIdeiasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/habilidades': {
+      id: '/_authenticated/habilidades'
+      path: '/habilidades'
+      fullPath: '/habilidades'
+      preLoaderRoute: typeof AuthenticatedHabilidadesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/financeiro': {
+      id: '/_authenticated/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof AuthenticatedFinanceiroRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/cursos': {
+      id: '/_authenticated/cursos'
+      path: '/cursos'
+      fullPath: '/cursos'
+      preLoaderRoute: typeof AuthenticatedCursosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/clientes': {
+      id: '/_authenticated/clientes'
+      path: '/clientes'
+      fullPath: '/clientes'
+      preLoaderRoute: typeof AuthenticatedClientesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/acessos': {
+      id: '/_authenticated/acessos'
+      path: '/acessos'
+      fullPath: '/acessos'
+      preLoaderRoute: typeof AuthenticatedAcessosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
   }
