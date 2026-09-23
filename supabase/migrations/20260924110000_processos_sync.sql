@@ -28,7 +28,9 @@ DECLARE
   v_titulo TEXT;
   v_ordem INTEGER;
   v_roadmap UUID;
+  v_prev TEXT;
 BEGIN
+  v_prev := current_setting('app.sem_regra_data', true);
   PERFORM set_config('app.sem_regra_data', 'on', true);
   SELECT ps.*, pr.tipo, pr.status AS proc_status, pr.cliente_id, c.nome AS cliente_nome
     INTO p
@@ -37,7 +39,7 @@ BEGIN
     JOIN clientes c ON c.id = pr.cliente_id
    WHERE ps.id = p_passo;
   IF NOT FOUND OR p.tipo <> 'onboarding' THEN
-    PERFORM set_config('app.sem_regra_data', 'off', true);
+    PERFORM set_config('app.sem_regra_data', COALESCE(NULLIF(v_prev, ''), 'off'), true);
     RETURN;
   END IF;
   SELECT * INTO d FROM demandas WHERE processo_passo_id = p_passo;
@@ -67,7 +69,7 @@ BEGIN
           d.id := NULL;
         ELSIF alvo <> d.status THEN
           SELECT COALESCE(MAX(ordem), -1) + 1 INTO v_ordem FROM demandas WHERE status = alvo;
-          UPDATE demandas SET status = alvo, ordem = v_ordem WHERE id = d.id;
+          UPDATE demandas SET status = alvo, ordem = v_ordem, prazo = p.data, titulo = v_titulo, descricao = p.observacoes, cliente_id = p.cliente_id, roadmap_id = v_roadmap WHERE id = d.id;
         END IF;
       END IF;
       IF d.id IS NOT NULL THEN
@@ -79,7 +81,7 @@ BEGIN
       END IF;
     END IF;
   END IF;
-  PERFORM set_config('app.sem_regra_data', 'off', true);
+  PERFORM set_config('app.sem_regra_data', COALESCE(NULLIF(v_prev, ''), 'off'), true);
 END $$;
 
 -- Roadmap: 100% conclui o processo (e o passo do onboarding ligado); desfazer reabre
@@ -110,7 +112,9 @@ BEGIN
   END IF;
   SELECT tipo INTO v_tipo FROM processos WHERE id = NEW.processo_id;
   IF v_tipo = 'onboarding' THEN
-    PERFORM sincronizar_passo(NEW.id, TG_OP = 'UPDATE' AND OLD.data IS DISTINCT FROM NEW.data AND pg_trigger_depth() = 1);
+    IF COALESCE(current_setting('app.passo_via_demanda', true), 'off') <> 'on' THEN
+      PERFORM sincronizar_passo(NEW.id, TG_OP = 'UPDATE' AND OLD.data IS DISTINCT FROM NEW.data AND pg_trigger_depth() = 1);
+    END IF;
     -- Prazo do roadmap ligado a este passo acompanha a data do passo
     UPDATE processos SET prazo_final = NEW.data
      WHERE passo_onboarding_id = NEW.id AND prazo_final IS DISTINCT FROM NEW.data;
@@ -126,18 +130,30 @@ DROP TRIGGER IF EXISTS processo_passos_sync_del ON public.processo_passos;
 CREATE TRIGGER processo_passos_sync_del BEFORE DELETE ON public.processo_passos
   FOR EACH ROW EXECUTE FUNCTION public.processo_passos_sync();
 
+CREATE OR REPLACE FUNCTION public.processo_passos_pos_delete()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF (SELECT tipo FROM processos WHERE id = OLD.processo_id) = 'roadmap' THEN
+    PERFORM atualizar_conclusao_roadmap(OLD.processo_id);
+  END IF;
+  RETURN OLD;
+END $$;
+DROP TRIGGER IF EXISTS processo_passos_del_roadmap ON public.processo_passos;
+CREATE TRIGGER processo_passos_del_roadmap AFTER DELETE ON public.processo_passos
+  FOR EACH ROW EXECUTE FUNCTION public.processo_passos_pos_delete();
+
 -- Processo: encerrar tira as demandas abertas; roadmap ligado/desligado a um passo; prazo do roadmap → data do passo
 CREATE OR REPLACE FUNCTION public.processos_sync()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_data DATE;
 BEGIN
-  IF NEW.tipo = 'onboarding' AND NEW.status IS DISTINCT FROM OLD.status AND NEW.status = 'encerrado' THEN
+  IF TG_OP = 'UPDATE' AND NEW.tipo = 'onboarding' AND NEW.status IS DISTINCT FROM OLD.status AND NEW.status = 'encerrado' THEN
     DELETE FROM demandas d USING processo_passos ps
      WHERE d.processo_passo_id = ps.id AND ps.processo_id = NEW.id AND d.status <> 'feito';
   END IF;
   IF NEW.tipo = 'roadmap' THEN
-    IF NEW.passo_onboarding_id IS DISTINCT FROM OLD.passo_onboarding_id THEN
-      IF OLD.passo_onboarding_id IS NOT NULL THEN PERFORM sincronizar_passo(OLD.passo_onboarding_id); END IF;
+    IF TG_OP = 'INSERT' OR NEW.passo_onboarding_id IS DISTINCT FROM OLD.passo_onboarding_id THEN
+      IF TG_OP = 'UPDATE' AND OLD.passo_onboarding_id IS NOT NULL THEN PERFORM sincronizar_passo(OLD.passo_onboarding_id); END IF;
       IF NEW.passo_onboarding_id IS NOT NULL THEN
         -- Ao ligar: a data do passo manda; sem data no passo, o prazo do roadmap vira a data do passo
         SELECT data INTO v_data FROM processo_passos WHERE id = NEW.passo_onboarding_id;
@@ -148,14 +164,14 @@ BEGIN
         END IF;
         PERFORM sincronizar_passo(NEW.passo_onboarding_id);
       END IF;
-    ELSIF NEW.prazo_final IS DISTINCT FROM OLD.prazo_final AND NEW.passo_onboarding_id IS NOT NULL AND pg_trigger_depth() = 1 THEN
+    ELSIF TG_OP = 'UPDATE' AND NEW.prazo_final IS DISTINCT FROM OLD.prazo_final AND NEW.passo_onboarding_id IS NOT NULL AND pg_trigger_depth() = 1 THEN
       UPDATE processo_passos SET data = NEW.prazo_final WHERE id = NEW.passo_onboarding_id AND data IS DISTINCT FROM NEW.prazo_final;
     END IF;
   END IF;
   RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS processos_sync ON public.processos;
-CREATE TRIGGER processos_sync AFTER UPDATE ON public.processos
+CREATE TRIGGER processos_sync AFTER INSERT OR UPDATE ON public.processos
   FOR EACH ROW EXECUTE FUNCTION public.processos_sync();
 
 -- Demandas → passo: mover o card atualiza a data/conclusão do passo
@@ -164,13 +180,19 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE r TEXT; v_fim INT; v_proc UUID;
 BEGIN
   IF pg_trigger_depth() > 1 OR NEW.processo_passo_id IS NULL THEN RETURN NEW; END IF;
-  IF NEW.status = 'feito' AND OLD.status IS DISTINCT FROM 'feito' THEN
-    UPDATE processo_passos SET concluido_em = COALESCE(concluido_em, now()) WHERE id = NEW.processo_passo_id;
+  PERFORM set_config('app.passo_via_demanda', 'on', true);
+  IF current_setting('app.sem_regra_data', true) = 'on' THEN
+    PERFORM set_config('app.passo_via_demanda', 'off', true);
     RETURN NEW;
   END IF;
-  IF NEW.status = 'feito' THEN RETURN NEW; END IF;
-  IF OLD.status = 'feito' THEN
-    UPDATE processo_passos SET concluido_em = NULL WHERE id = NEW.processo_passo_id;
+  IF NEW.status = 'feito' AND OLD.status IS DISTINCT FROM 'feito' THEN
+    UPDATE processo_passos SET concluido_em = COALESCE(concluido_em, now()) WHERE id = NEW.processo_passo_id;
+    PERFORM set_config('app.passo_via_demanda', 'off', true);
+    RETURN NEW;
+  END IF;
+  IF NEW.status = 'feito' THEN
+    PERFORM set_config('app.passo_via_demanda', 'off', true);
+    RETURN NEW;
   END IF;
   IF NEW.status IS DISTINCT FROM OLD.status THEN
     SELECT regra_data INTO r FROM demanda_colunas WHERE id = NEW.status;
@@ -178,13 +200,15 @@ BEGIN
       -- Standby / coluna sem regra: passo sem data, no fim da trilha; entrega vazia
       SELECT processo_id INTO v_proc FROM processo_passos WHERE id = NEW.processo_passo_id;
       SELECT COALESCE(MAX(ordem), -1) + 1 INTO v_fim FROM processo_passos WHERE processo_id = v_proc;
-      UPDATE processo_passos SET data = NULL, ordem = v_fim WHERE id = NEW.processo_passo_id;
+      UPDATE processo_passos SET data = NULL, ordem = v_fim, concluido_em = CASE WHEN OLD.status = 'feito' THEN NULL ELSE concluido_em END WHERE id = NEW.processo_passo_id;
       UPDATE demandas SET prazo = NULL WHERE id = NEW.id AND prazo IS NOT NULL;
+      PERFORM set_config('app.passo_via_demanda', 'off', true);
       RETURN NEW;
     END IF;
   END IF;
   -- Coluna com regra (a entrega já foi recalculada) ou entrega editada no painel
-  UPDATE processo_passos SET data = NEW.prazo WHERE id = NEW.processo_passo_id AND data IS DISTINCT FROM NEW.prazo;
+  UPDATE processo_passos SET data = NEW.prazo, concluido_em = CASE WHEN OLD.status = 'feito' THEN NULL ELSE concluido_em END WHERE id = NEW.processo_passo_id AND (data IS DISTINCT FROM NEW.prazo OR (OLD.status = 'feito' AND concluido_em IS NOT NULL));
+  PERFORM set_config('app.passo_via_demanda', 'off', true);
   RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS demandas_30_atualiza_passo ON public.demandas;
