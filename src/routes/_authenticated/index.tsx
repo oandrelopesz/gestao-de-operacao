@@ -58,6 +58,7 @@ import { KanbanCardView } from "@/components/KanbanCard";
 import { useKanbanDnd } from "@/lib/useKanbanDnd";
 import { cn } from "@/lib/utils";
 import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId } from "@/lib/demandaColunas";
+import { msAteProximaVirada } from "@/lib/viradaDia";
 import {
   COLUNA_FDS,
   DIAS_FDS,
@@ -145,6 +146,19 @@ function DemandasPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // A virada do dia (00:00, no banco) muda as colunas: recarrega depois dela e quando a aba volta
+  // a aparecer (em aba escondida o navegador congela o timer)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const agendar = () => {
+      timer = setTimeout(() => { fetchDemandas(); agendar(); }, msAteProximaVirada(new Date()));
+    };
+    const aoVoltar = () => { if (document.visibilityState === "visible") fetchDemandas(); };
+    agendar();
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => { clearTimeout(timer); document.removeEventListener("visibilitychange", aoVoltar); };
   }, []);
 
   const fetchClientes = async () => {
