@@ -1023,6 +1023,7 @@ export type Database = {
           id: string
           nome: string
           pasta_id: string
+          player: string | null
           storage_path: string
           tamanho: number
           updated_at: string
@@ -1033,6 +1034,7 @@ export type Database = {
           id?: string
           nome: string
           pasta_id: string
+          player?: string | null
           storage_path: string
           tamanho?: number
           updated_at?: string
@@ -1043,6 +1045,7 @@ export type Database = {
           id?: string
           nome?: string
           pasta_id?: string
+          player?: string | null
           storage_path?: string
           tamanho?: number
           updated_at?: string
@@ -1549,6 +1552,7 @@ export type Database = {
           iniciado_em: string | null
           item_id: string
           payload: Json
+          posicao: number
           status: string
           tentativas: number
           tipo: string
@@ -1561,6 +1565,7 @@ export type Database = {
           iniciado_em?: string | null
           item_id: string
           payload?: Json
+          posicao?: number
           status?: string
           tentativas?: number
           tipo: string
@@ -1573,6 +1578,7 @@ export type Database = {
           iniciado_em?: string | null
           item_id?: string
           payload?: Json
+          posicao?: number
           status?: string
           tentativas?: number
           tipo?: string

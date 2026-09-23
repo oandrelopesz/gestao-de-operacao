@@ -110,3 +110,11 @@ test("corDaPasta: usa a própria cor ou herda do ancestral mais próximo; sem ne
   assert.equal(corDaPasta(pastas, "tr"), "#3b82f6");
   assert.equal(corDaPasta(pastas, "solta"), PASTA_CORES[3]);
 });
+
+test("filtrarPdfs: também encontra pelo player", () => {
+  const pdfs = [
+    { nome: "Guia", arquivo_nome: "guia.pdf", player: "Pedro Sobral" },
+    { nome: "Outro", arquivo_nome: "o.pdf", player: null },
+  ];
+  assert.deepEqual(filtrarPdfs(pdfs, "sobral").map((f) => f.nome), ["Guia"]);
+});

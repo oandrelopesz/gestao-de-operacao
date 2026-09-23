@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Plus, Search, ExternalLink, Copy, Trash2, Upload, FolderOpen, ChevronDown, ChevronRight, Folder, Image as ImageIcon,
-  Video, LayoutTemplate, Globe, FileText, GalleryHorizontal, Tag, AlertTriangle, RefreshCw,
+  Video, LayoutTemplate, Globe, FileText, GalleryHorizontal, Tag, AlertTriangle, RefreshCw, RotateCcw, Pause, Play, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,12 +18,16 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   CATEGORIAS, REDES, STATUS_META, categoriaMeta, redeLabel, fetchNichos, fetchItens, fetchSwipeConfig, excluirItem, erroAmigavel, temChave,
-  type SwipeItem, type SwipeNicho, type SwipeConfig, type SwipeCategoria,
+  fetchFila, pausarItem, retomarItem, tentarDeNovo,
+  type SwipeItem, type SwipeNicho, type SwipeConfig, type SwipeCategoria, type SwipeJob,
 } from "@/lib/swipe";
+import { podeTentarDeNovo } from "@/lib/swipeFila";
+import { FilaDownloads } from "@/components/swipe/FilaDownloads";
 import { statusDoDrive } from "@/lib/googleDrive";
 import { loginSilencioso } from "@/lib/googleAuth";
 import { SwipeAddDialog } from "@/components/swipe/SwipeAddDialog";
 import { BotaoGoogleLogin } from "@/components/swipe/BotaoGoogleLogin";
+import { ExcluirNichoDialog } from "@/components/swipe/ExcluirNichoDialog";
 
 export const Route = createFileRoute("/_authenticated/swipe")({
   component: SwipePage,
@@ -50,6 +54,8 @@ function SwipePage() {
   const [config, setConfig] = useState<SwipeConfig | null>(null);
   const [nichos, setNichos] = useState<SwipeNicho[]>([]);
   const [itens, setItens] = useState<SwipeItem[]>([]);
+  const [fila, setFila] = useState<SwipeJob[]>([]);
+  const [itemOcupado, setItemOcupado] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
@@ -59,15 +65,17 @@ function SwipePage() {
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
   const [dialog, setDialog] = useState<{ completar?: SwipeItem; preset?: Selecao } | null>(null);
   const [toDelete, setToDelete] = useState<SwipeItem | null>(null);
+  const [nichoToDelete, setNichoToDelete] = useState<SwipeNicho | null>(null);
   const [driveReady, setDriveReady] = useState<boolean>(temChave());
   const [googleInfo, setGoogleInfo] = useState<{ login: boolean; clientId: string | null }>({ login: false, clientId: null });
 
   const load = async () => {
     try {
-      const [c, n, i] = await Promise.all([fetchSwipeConfig(), fetchNichos(), fetchItens()]);
+      const [c, n, i, f] = await Promise.all([fetchSwipeConfig(), fetchNichos(), fetchItens(), fetchFila().catch(() => [] as SwipeJob[])]);
       setConfig(c);
       setNichos(n);
       setItens(i);
+      setFila(f);
       setErro(null);
     } catch (e) {
       setErro(erroAmigavel(e));
@@ -102,6 +110,28 @@ function SwipePage() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  // A fila muda sem mexer nos itens (reordenar, job começando): enquanto houver algo na fila,
+  // atualiza a cada 5 s com a aba visível.
+  const filaAtiva = fila.some((j) => j.status === "aguardando" || j.status === "rodando");
+  useEffect(() => {
+    if (!filaAtiva) return;
+    const t = window.setInterval(() => { if (document.visibilityState === "visible") load(); }, 5000);
+    return () => window.clearInterval(t);
+  }, [filaAtiva]);
+
+  const acaoNoItem = async (item: SwipeItem, fn: () => Promise<void>, sucesso: string) => {
+    setItemOcupado(item.id);
+    try {
+      await fn();
+      toast.success(sucesso);
+    } catch (e) {
+      toast.error(erroAmigavel(e));
+    } finally {
+      setItemOcupado(null);
+      await load();
+    }
+  };
 
   const nichosRaiz = useMemo(() => nichos.filter((n) => !n.pai_id), [nichos]);
   const subnichosDe = (id: string) => nichos.filter((n) => n.pai_id === id);
@@ -214,7 +244,7 @@ function SwipePage() {
                 const aberto = abertos.has(n.id) || selecao.nicho_id === n.id;
                 return (
                   <div key={n.id}>
-                    <div className={cn("flex items-center rounded hover:bg-muted", selecao.nicho_id === n.id && !selecao.subnicho_id && !selecao.categoria && "bg-muted")}>
+                    <div className={cn("group/nicho flex items-center rounded hover:bg-muted", selecao.nicho_id === n.id && !selecao.subnicho_id && !selecao.categoria && "bg-muted")}>
                       <button type="button" onClick={() => toggleAberto(n.id)} className="p-1.5 text-muted-foreground" aria-label="Expandir">
                         {aberto ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                       </button>
@@ -222,15 +252,23 @@ function SwipePage() {
                         <span className="truncate">{n.nome}</span>
                         <Badge variant="secondary" className="ml-auto px-1.5 h-4 text-[10px]">{contagem((i) => i.nicho_id === n.id)}</Badge>
                       </button>
+                      <button type="button" onClick={() => setNichoToDelete(n)} className="mr-1 p-1 rounded text-muted-foreground hover:text-destructive opacity-0 group-hover/nicho:opacity-100 focus-visible:opacity-100 transition-opacity" title="Excluir nicho">
+                        <Trash2 size={12} />
+                      </button>
                     </div>
                     {aberto && (
                       <div className="ml-5 border-l pl-2 space-y-0.5">
                         {subs.map((s) => (
                           <div key={s.id}>
-                            <button type="button" onClick={() => setSelecao({ nicho_id: n.id, subnicho_id: s.id })} className={cn("w-full text-left text-sm rounded px-2 py-1 flex items-center gap-2 hover:bg-muted", selecao.subnicho_id === s.id && !selecao.categoria && "bg-muted")}>
-                              <span className="truncate">{s.nome}</span>
-                              <Badge variant="secondary" className="ml-auto px-1.5 h-4 text-[10px]">{contagem((i) => i.subnicho_id === s.id)}</Badge>
-                            </button>
+                            <div className={cn("group/sub flex items-center rounded hover:bg-muted", selecao.subnicho_id === s.id && !selecao.categoria && "bg-muted")}>
+                              <button type="button" onClick={() => setSelecao({ nicho_id: n.id, subnicho_id: s.id })} className="flex-1 min-w-0 text-left text-sm px-2 py-1 flex items-center gap-2">
+                                <span className="truncate">{s.nome}</span>
+                                <Badge variant="secondary" className="ml-auto px-1.5 h-4 text-[10px]">{contagem((i) => i.subnicho_id === s.id)}</Badge>
+                              </button>
+                              <button type="button" onClick={() => setNichoToDelete(s)} className="mr-1 p-1 rounded text-muted-foreground hover:text-destructive opacity-0 group-hover/sub:opacity-100 focus-visible:opacity-100 transition-opacity" title="Excluir subnicho">
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                             {selecao.subnicho_id === s.id && (
                               <CategoriasDaPasta itens={itens.filter((i) => i.subnicho_id === s.id)} selecao={selecao} onSelect={(c) => setSelecao({ nicho_id: n.id, subnicho_id: s.id, categoria: c })} />
                             )}
@@ -251,6 +289,8 @@ function SwipePage() {
 
         {/* Lista */}
         <div className="space-y-4 min-w-0">
+          <FilaDownloads jobs={fila} itens={itens} nomeNicho={nomeNicho} onChange={load} />
+
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
@@ -305,6 +345,12 @@ function SwipePage() {
                   onCopiar={copiar}
                   onEnviarArquivo={() => setDialog({ completar: item })}
                   onExcluir={() => setToDelete(item)}
+                  ocupado={itemOcupado === item.id}
+                  onTentarDeNovo={() => acaoNoItem(item, () => tentarDeNovo(item), item.drive_file_id
+                    ? "De volta à fila. O Docs com o link foi para a Lixeira: vai chegar um resultado só."
+                    : "De volta à fila, sem duplicar nada no Drive.")}
+                  onPausar={() => acaoNoItem(item, () => pausarItem(item.id), "Pausado: sai da vez até você retomar")}
+                  onRetomar={() => acaoNoItem(item, () => retomarItem(item.id), "De volta à fila (no fim)")}
                 />
               ))}
             </div>
@@ -320,6 +366,17 @@ function SwipePage() {
         nichos={nichos}
         completar={dialog?.completar ?? null}
         preset={dialog?.preset}
+      />
+
+      <ExcluirNichoDialog
+        nicho={nichoToDelete}
+        nichos={nichos}
+        itens={itens}
+        onClose={() => setNichoToDelete(null)}
+        onDeleted={async (nicho) => {
+          if (selecao.nicho_id === nicho.id || selecao.subnicho_id === nicho.id) setSelecao({});
+          await load();
+        }}
       />
 
       <AlertDialog open={!!toDelete} onOpenChange={(o) => { if (!o) setToDelete(null); }}>
@@ -357,14 +414,15 @@ function CategoriasDaPasta({ itens, selecao, onSelect }: { itens: SwipeItem[]; s
   );
 }
 
-function ItemCard({ item, nicho, subnicho, onCopiar, onEnviarArquivo, onExcluir }: {
+function ItemCard({ item, nicho, subnicho, onCopiar, onEnviarArquivo, onExcluir, ocupado, onTentarDeNovo, onPausar, onRetomar }: {
   item: SwipeItem; nicho: string; subnicho: string;
   onCopiar: (t: string) => void; onEnviarArquivo: () => void; onExcluir: () => void;
+  ocupado: boolean; onTentarDeNovo: () => void; onPausar: () => void; onRetomar: () => void;
 }) {
   const cat = categoriaMeta(item.categoria);
   const status = STATUS_META[item.status];
   const abrir = item.drive_web_link || (item.drive_file_id ? `https://drive.google.com/open?id=${item.drive_file_id}` : null);
-  const precisaArquivo = item.status === "falhou" || item.status === "manual" || item.status === "pendente";
+  const precisaArquivo = item.status === "falhou" || item.status === "manual" || item.status === "pendente" || item.status === "pausado";
 
   return (
     <Card className={cn("overflow-hidden flex flex-col group", item.status === "falhou" && "border-red-500/40")}>
@@ -405,6 +463,21 @@ function ItemCard({ item, nicho, subnicho, onCopiar, onEnviarArquivo, onExcluir 
             </Button>
           ) : (
             <Button size="sm" variant="secondary" className="flex-1" disabled>Sem arquivo</Button>
+          )}
+          {podeTentarDeNovo(item) && (
+            <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={onTentarDeNovo} disabled={ocupado} title="Tentar baixar de novo (o Docs com o link vai para a Lixeira e não duplica nada)">
+              {ocupado ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+            </Button>
+          )}
+          {(item.status === "pendente" || item.status === "baixando") && (
+            <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={onPausar} disabled={ocupado} title="Pausar (sai da vez; se estiver baixando, libera para o próximo)">
+              {ocupado ? <Loader2 size={14} className="animate-spin" /> : <Pause size={14} />}
+            </Button>
+          )}
+          {item.status === "pausado" && (
+            <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={onRetomar} disabled={ocupado} title="Retomar (volta para o fim da fila)">
+              {ocupado ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+            </Button>
           )}
           {precisaArquivo && (
             <Button size="sm" variant="outline" className="gap-1.5" onClick={onEnviarArquivo} title="Enviar o arquivo manualmente"><Upload size={14} /></Button>

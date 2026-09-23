@@ -29,7 +29,7 @@ import {
   type PastaNo, type PdfPasta,
 } from "@/lib/pdfsArvore";
 import { PastaDialog, ExcluirPastaDialog, type PastaDialogState } from "@/components/pdfs/PastaDialogs";
-import { PdfViewer, PdfEditDialog, EscolherPastaDialog } from "@/components/pdfs/PdfDialogs";
+import { PdfViewer, PdfEditDialog, EnviarPdfsDialog, type PdfParaEnviar } from "@/components/pdfs/PdfDialogs";
 
 export const Route = createFileRoute("/_authenticated/pdfs")({
   validateSearch: (s: Record<string, unknown>): { pasta?: string } =>
@@ -69,7 +69,8 @@ function PdfsPage() {
   const [busca, setBusca] = useState("");
   const [abertas, setAbertas] = useState<Set<string>>(new Set());
   const [envios, setEnvios] = useState<Envio[]>([]);
-  const [pendentes, setPendentes] = useState<File[] | null>(null);
+  /** Arquivos aguardando o popup de envio (nome, player e pasta) */
+  const [pendentes, setPendentes] = useState<{ arquivos: File[]; pastaId: string | null } | null>(null);
   const [arrastandoArquivos, setArrastandoArquivos] = useState(false);
   const [alvo, setAlvo] = useState<string | null>(null);
   const [visualizando, setVisualizando] = useState<PdfArquivo | null>(null);
@@ -152,17 +153,22 @@ function PdfsPage() {
 
   // ------------------------------------------------------------ Envio
 
-  const enviar = async (arquivos: File[], pastaId: string) => {
+  const enviar = async (itens: PdfParaEnviar[], pastaId: string) => {
     const destino = bib.pastas.find((p) => p.id === pastaId);
-    const fila = arquivos.map((f) => ({ arquivo: f, envio: { id: `${Date.now()}-${Math.random()}`, nome: f.name, progresso: 0, status: "enviando" as const } }));
+    const fila = itens.map((item) => ({
+      item,
+      envio: { id: `${Date.now()}-${Math.random()}`, nome: item.nome.trim() || item.arquivo.name, progresso: 0, status: "enviando" as const },
+    }));
     setEnvios((prev) => [...prev, ...fila.map((i) => i.envio)]);
     const atualizar = (id: string, patch: Partial<Envio>) =>
       setEnvios((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
 
     let ok = 0;
-    for (const { arquivo, envio } of fila) {
+    for (const { item, envio } of fila) {
       try {
-        const novo = await enviarPdf(arquivo, pastaId, (fracao) => atualizar(envio.id, { progresso: Math.round(fracao * 100) }));
+        const novo = await enviarPdf(item.arquivo, pastaId, { nome: item.nome, player: item.player }, (fracao) =>
+          atualizar(envio.id, { progresso: Math.round(fracao * 100) }),
+        );
         setBiblioteca((prev) => ({ ...(prev ?? VAZIA), pdfs: [novo, ...(prev ?? VAZIA).pdfs] }));
         atualizar(envio.id, { status: "ok", progresso: 100 });
         ok += 1;
@@ -184,9 +190,8 @@ function PdfsPage() {
     if (grandes.length) toast.error(`Maior que 50 MB, não enviado: ${grandes.map((f) => f.name).join(", ")}`);
     const validos = pdfs.filter((f) => f.size <= PDF_TAMANHO_MAX);
     if (!validos.length) return;
-    if (!bib.pastas.length) { toast.error("Crie uma pasta antes de guardar PDFs"); return; }
-    if (pastaId) enviar(validos, pastaId);
-    else setPendentes(validos);
+    // Sempre passa pelo popup: nome (opcional), player e tema — já com a pasta aberta/de destino escolhida
+    setPendentes({ arquivos: validos, pastaId });
   };
 
   // ------------------------------------------------------------ Arrastar e soltar
@@ -327,7 +332,7 @@ function PdfsPage() {
           <Button variant="outline" className="gap-2" onClick={() => setPastaDialog({ mode: "create", parentId: pastaAtual?.id ?? null })}>
             <FolderPlus size={18} /> {pastaAtual ? "Nova subpasta" : "Novo tema"}
           </Button>
-          <Button className="gap-2" onClick={escolherArquivos} disabled={!bib.pastas.length}>
+          <Button className="gap-2" onClick={escolherArquivos}>
             <Upload size={18} /> Enviar PDFs
           </Button>
         </div>
@@ -595,14 +600,15 @@ function PdfsPage() {
         }
       />
 
-      <EscolherPastaDialog
-        arquivos={pendentes}
+      <EnviarPdfsDialog
+        arquivos={pendentes?.arquivos ?? null}
+        pastaInicial={pendentes?.pastaId ?? null}
         pastas={bib.pastas}
         onClose={() => setPendentes(null)}
-        onEscolhida={(pastaId) => {
-          const arquivos = pendentes ?? [];
+        onPastaCriada={(pasta) => setBiblioteca((prev) => ({ ...(prev ?? VAZIA), pastas: [...(prev ?? VAZIA).pastas, pasta] }))}
+        onConfirmar={(itens, pastaId) => {
           setPendentes(null);
-          enviar(arquivos, pastaId);
+          enviar(itens, pastaId);
         }}
       />
 
@@ -731,9 +737,15 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onExcluir }: Pdf
       <button type="button" onClick={onVer} className="min-w-0 flex-1 text-left">
         <span className="block truncate text-sm font-medium group-hover:underline underline-offset-2">{pdf.nome}</span>
         <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          {pdf.player && (
+            <>
+              <span className="truncate font-medium text-foreground/80">{pdf.player}</span>
+              <span>·</span>
+            </>
+          )}
           {local && (
             <>
-              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cor }} />
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: cor }} />
               <span className="truncate">{local}</span>
               <span>·</span>
             </>
@@ -755,7 +767,7 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onExcluir }: Pdf
             <Button variant="ghost" size="icon" className="h-8 w-8" title="Mais opções"><MoreVertical size={15} /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onEditar}><Pencil size={14} className="mr-2" /> Renomear / mover</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onEditar}><Pencil size={14} className="mr-2" /> Editar (nome, player, pasta)</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onExcluir}>
               <Trash2 size={14} className="mr-2" /> Excluir

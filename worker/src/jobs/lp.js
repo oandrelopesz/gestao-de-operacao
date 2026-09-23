@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { mkdir, open } from "node:fs/promises";
 import { rodar as rodarReal } from "../exec.js";
+import { registrar } from "../parada.js";
 import { limitar, nomeVsl, semRastreio } from "../nomes.js";
 
 /** Orçamento total de uma captura de LP, com folga sobre o timeout da chamada HTTP do n8n. */
@@ -181,6 +182,9 @@ async function abrirNavegadorReal(link) {
     executablePath: "/usr/bin/chromium",
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
+  // Pausa pedida pelo usuário fecha o navegador; o registro sai sozinho quando ele fecha
+  const soltarNavegador = registrar(() => navegador.close());
+  navegador.on("disconnected", soltarNavegador);
   let contexto;
   try {
     contexto = await navegador.newContext({

@@ -205,6 +205,27 @@ export async function trashFile(id: string): Promise<void> {
   }
 }
 
+/**
+ * true se a pasta (ou qualquer subpasta dela) tiver algum arquivo fora da Lixeira.
+ * Pastas vazias (ex.: as de categoria que sobraram) não contam.
+ */
+export async function pastaTemArquivos(folderId: string): Promise<boolean> {
+  let pageToken = "";
+  do {
+    const q = `'${escapeQuery(folderId)}' in parents and trashed=false`;
+    const r = await driveFetch(`/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,mimeType)&pageSize=200${pageToken ? `&pageToken=${pageToken}` : ""}`);
+    if (r.status === 404) return false; // pasta já não existe
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data?.error?.message || `Google Drive respondeu ${r.status}`);
+    for (const f of (data.files || []) as { id: string; mimeType: string }[]) {
+      if (f.mimeType !== FOLDER_MIME) return true;
+      if (await pastaTemArquivos(f.id)) return true;
+    }
+    pageToken = data.nextPageToken || "";
+  } while (pageToken);
+  return false;
+}
+
 /** Cria um Google Docs com o texto (via conversão do Drive, sem precisar da API do Docs) */
 export async function createGoogleDoc(parentId: string, name: string, texto: string): Promise<DriveFile> {
   const boundary = "swipe" + Math.random().toString(36).slice(2);

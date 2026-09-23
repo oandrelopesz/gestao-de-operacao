@@ -7,6 +7,7 @@ import { baixar as baixarReal } from "./jobs/download.js";
 import { capturar as capturarReal } from "./jobs/lp.js";
 import { publicarDownload as publicarDownloadReal, publicarLp as publicarLpReal } from "./publicar.js";
 import { lerConfig } from "./config.js";
+import { JobPausado, checarParada, paradaPedida, reiniciarParada, vigiarPausa as vigiarPausaReal } from "./parada.js";
 
 export async function executarJob(corpo, deps = {}) {
   const criarDrive = deps.criarDrive || criarDriveReal;
@@ -16,22 +17,33 @@ export async function executarJob(corpo, deps = {}) {
   const publicarDownload = deps.publicarDownload || publicarDownloadReal;
   const publicarLp = deps.publicarLp || publicarLpReal;
   const config = deps.config;
+  const vigiarPausa = deps.vigiarPausa || vigiarPausaReal;
 
   const { tipo, payload, ultima_tentativa: ultima } = corpo;
   const { link, nome_arquivo: base, drive_folder_id: paiId, rede } = payload;
   const drive = criarDrive({ supabaseUrl: config.supabaseUrl, swipeKey: config.swipeKey });
 
+  // Botão "Pausar" do app: marca o job como pausado no banco; a vigia percebe e derruba o que
+  // estiver rodando. Um job por vez, então o estado de parada é zerado a cada job.
+  reiniciarParada();
+  const pararVigia = vigiarPausa({ jobId: corpo.id, supabaseUrl: config.supabaseUrl, anonKey: config.supabaseAnonKey });
+
   try {
     const resultado = await comPastaTemp(`job-${corpo.id}`, async (dir) => {
       if (tipo === "lp") {
         const { arquivos } = await capturar({ link, dir, base }, {});
+        checarParada(); // pausado no fim da captura: não publica pela metade
         return publicarLp(drive, { arquivos, base, paiId });
       }
-      const { arquivos, modo } = await baixar({ link, rede, dir }, {});
+      const { arquivos, modo } = await baixar({ link, rede, dir, categoria: payload.categoria }, {});
+      checarParada();
       return publicarDownload(drive, { arquivos, modo, base, paiId });
     });
     return { ok: true, resultado };
   } catch (e) {
+    // Pausado pelo usuário: volta sem gastar tentativa e sem criar o Docs de falha. Qualquer erro
+    // depois do pedido de parada é consequência dela (processo morto, navegador fechado).
+    if (e instanceof JobPausado || paradaPedida()) return { ok: false, pausado: true, erro: "pausado pelo usuário" };
     if (e instanceof DriveIndisponivel) throw e; // 503: não conta tentativa
     const erro = String(e?.message || e).slice(0, 500);
     let docs = null;
@@ -54,6 +66,8 @@ export async function executarJob(corpo, deps = {}) {
         });
     }
     return { ok: false, erro, docs };
+  } finally {
+    pararVigia();
   }
 }
 

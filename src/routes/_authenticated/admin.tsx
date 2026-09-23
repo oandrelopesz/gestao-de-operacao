@@ -27,6 +27,7 @@ import { useTheme } from "@/lib/theme";
 import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, CATEGORIA_COLORS, type CursoCategoriaDef } from "@/lib/cursoCategorias";
 import { HabilidadesAdminCard } from "@/components/habilidades/HabilidadesAdminCard";
 import { SwipeAdminCard } from "@/components/swipe/SwipeAdminCard";
+import { SwipeNichosAdminCard } from "@/components/swipe/SwipeNichosAdminCard";
 import { PdfsAdminCard } from "@/components/pdfs/PdfsAdminCard";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -695,6 +696,8 @@ function AdminPage() {
       <HabilidadesAdminCard />
 
       <SwipeAdminCard />
+
+      <SwipeNichosAdminCard />
 
       <PdfsAdminCard />
 

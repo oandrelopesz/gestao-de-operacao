@@ -8,6 +8,8 @@ export interface PdfArquivo {
   pasta_id: string;
   nome: string;
   arquivo_nome: string;
+  /** Autor, empresa ou fonte do PDF */
+  player: string | null;
   storage_path: string;
   tamanho: number;
   created_at: string;
@@ -42,7 +44,7 @@ export async function fetchPdfBiblioteca(): Promise<PdfBiblioteca> {
     supabase.from("pdf_pastas").select("id, nome, parent_id, cor, ordem"),
     supabase
       .from("pdfs")
-      .select("id, pasta_id, nome, arquivo_nome, storage_path, tamanho, created_at")
+      .select("id, pasta_id, nome, arquivo_nome, player, storage_path, tamanho, created_at")
       .order("created_at", { ascending: false }),
   ]);
   if (pastasRes.error) throw pastasRes.error;
@@ -121,6 +123,7 @@ function novoCaminho(): string {
 export async function enviarPdf(
   arquivo: File,
   pastaId: string,
+  meta: { nome?: string; player?: string },
   onProgresso?: (fracao: number) => void,
 ): Promise<PdfArquivo> {
   if (arquivo.size > PDF_TAMANHO_MAX) throw new Error("Arquivo maior que o limite de 50 MB.");
@@ -161,12 +164,14 @@ export async function enviarPdf(
     .from("pdfs")
     .insert([{
       pasta_id: pastaId,
-      nome: nomeSemExtensao(arquivo.name).trim() || "Sem nome",
+      // Sem nome informado, fica o nome do documento original
+      nome: meta.nome?.trim() || nomeSemExtensao(arquivo.name).trim() || "Sem nome",
+      player: meta.player?.trim() || null,
       arquivo_nome: arquivo.name,
       storage_path: caminho,
       tamanho: arquivo.size,
     }])
-    .select("id, pasta_id, nome, arquivo_nome, storage_path, tamanho, created_at")
+    .select("id, pasta_id, nome, arquivo_nome, player, storage_path, tamanho, created_at")
     .single();
   if (error) {
     await supabase.storage.from(PDF_BUCKET).remove([caminho]).catch(() => {});
@@ -175,7 +180,7 @@ export async function enviarPdf(
   return data as PdfArquivo;
 }
 
-export async function atualizarPdf(id: string, patch: Partial<Pick<PdfArquivo, "nome" | "pasta_id">>): Promise<void> {
+export async function atualizarPdf(id: string, patch: Partial<Pick<PdfArquivo, "nome" | "pasta_id" | "player">>): Promise<void> {
   const { error } = await supabase
     .from("pdfs")
     .update(patch.nome !== undefined ? { ...patch, nome: patch.nome.trim() } : patch)

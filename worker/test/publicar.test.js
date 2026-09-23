@@ -27,12 +27,12 @@ test("vídeo único vai direto na pasta da categoria", async () => {
   assert.equal(r.tamanho, 2048);
 });
 
-test("carrossel cria pasta e numera os cards com o nome base", async () => {
+test("carrossel cria pasta com o nome base e numera os cards como Card 01, Card 02", async () => {
   const d = driveFake();
   const r = await publicarDownload(d, { arquivos: ["/tmp/j/a.jpg", "/tmp/j/b.jpg"], modo: "carrossel", base: "Carrossel - Médico - Dr X", paiId: "cat1" });
   assert.equal(d.acoes[0].tipo, "pasta");
   assert.equal(d.acoes[0].nome, "Carrossel - Médico - Dr X");
-  assert.deepEqual(d.acoes.slice(1).map((a) => a.nome), ["Carrossel - Médico - Dr X - 01.jpg", "Carrossel - Médico - Dr X - 02.jpg"]);
+  assert.deepEqual(d.acoes.slice(1).map((a) => a.nome), ["Card 01.jpg", "Card 02.jpg"]);
   assert.ok(d.acoes.slice(1).every((a) => a.paiId === "pasta:Carrossel - Médico - Dr X"));
   assert.equal(r.drive_file_id, "pasta:Carrossel - Médico - Dr X");
   assert.equal(r.mime, "application/vnd.google-apps.folder");
@@ -64,21 +64,21 @@ test("nome repetido na pasta ganha sufixo", async () => {
 
 test("retry não duplica: card que já está na pasta é pulado", async () => {
   const d = driveFake();
-  d.nomesEm = async (paiId) => (paiId === "pasta:Carrossel - N - P" ? ["Carrossel - N - P - 01.jpg"] : []);
+  d.nomesEm = async (paiId) => (paiId === "pasta:Carrossel - N - P" ? ["Card 01.jpg"] : []);
   const r = await publicarDownload(d, {
     arquivos: ["/tmp/j/a.jpg", "/tmp/j/b.jpg"], modo: "carrossel", base: "Carrossel - N - P", paiId: "cat1",
   });
   const enviados = d.acoes.filter((a) => a.tipo === "upload").map((a) => a.nome);
-  assert.deepEqual(enviados, ["Carrossel - N - P - 02.jpg"], "só o card que faltava devia subir");
+  assert.deepEqual(enviados, ["Card 02.jpg"], "só o card que faltava devia subir");
   assert.equal(r.drive_file_id, "pasta:Carrossel - N - P");
 });
 
-test("carrossel respeita a extensão de cada card", async () => {
+test("carrossel respeita a extensão de cada card, misturando imagem e vídeo", async () => {
   const d = driveFake();
   await publicarDownload(d, {
-    arquivos: ["/tmp/j/a.jpg", "/tmp/j/b.png"], modo: "carrossel", base: "C - N - P", paiId: "cat1",
+    arquivos: ["/tmp/j/a.jpg", "/tmp/j/b.mp4", "/tmp/j/c.png", "/tmp/j/d.mov"], modo: "carrossel", base: "C - N - P", paiId: "cat1",
   });
   const enviados = d.acoes.filter((a) => a.tipo === "upload");
-  assert.deepEqual(enviados.map((a) => a.nome), ["C - N - P - 01.jpg", "C - N - P - 02.png"]);
-  assert.deepEqual(enviados.map((a) => a.mime), ["image/jpeg", "image/png"]);
+  assert.deepEqual(enviados.map((a) => a.nome), ["Card 01.jpg", "Card 02.mp4", "Card 03.png", "Card 04.mov"]);
+  assert.deepEqual(enviados.map((a) => a.mime), ["image/jpeg", "video/mp4", "image/png", "video/quicktime"]);
 });

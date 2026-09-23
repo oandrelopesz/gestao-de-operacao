@@ -182,7 +182,7 @@ export function SwipeAddDialog({ open, onClose, onSaved, rootFolderId, nichos, c
           const ordenados = [...arquivos].sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { numeric: true }));
           for (let i = 0; i < ordenados.length; i++) {
             const f = ordenados[i];
-            const nome = `${String(i + 1).padStart(2, "0")}.${extensaoDe(f)}`;
+            const nome = `Card ${String(i + 1).padStart(2, "0")}.${extensaoDe(f)}`; // mesmo padrão do serviço de download
             setProgresso({ pct: Math.round((i / ordenados.length) * 100), texto: `Enviando card ${i + 1} de ${ordenados.length}...` });
             await uploadFile(f, { name: nome, parentId: pasta.id, onProgress: (p) => setProgresso({ pct: Math.round(((i + p / 100) / ordenados.length) * 100), texto: `Enviando card ${i + 1} de ${ordenados.length}...` }) });
           }

@@ -33,8 +33,9 @@ export function extensaoDe(caminho) {
   return m ? m[1].toLowerCase() : "";
 }
 
-export function nomeCard(base, indice, extensao) {
-  return limitar(`${base} - ${String(indice).padStart(2, "0")}`, extensao);
+/** Card de carrossel dentro da pasta do item: "Card 01.jpg", "Card 02.mp4"... (a pasta já leva o nome base). */
+export function nomeCard(indice, extensao) {
+  return limitar(`Card ${String(indice).padStart(2, "0")}`, extensao);
 }
 
 export function nomeVsl(base, indice) {

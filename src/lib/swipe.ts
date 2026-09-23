@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import { ensureFolder, getSwipeKey, trashFile, type DriveFile } from "@/lib/googleDrive";
+import { ensureFolder, getSwipeKey, trashFile, pastaTemArquivos, type DriveFile } from "@/lib/googleDrive";
+import { novasPosicoes, posicaoNoTopo, podeTentarDeNovo, type JobFila } from "@/lib/swipeFila";
 
 export type SwipeCategoria =
   | "oferta" | "video_organico" | "video_anuncio" | "anuncio_estatico"
@@ -7,7 +8,7 @@ export type SwipeCategoria =
 
 export type SwipeRede = "instagram" | "facebook" | "youtube" | "tiktok" | "linkedin" | "x" | "pinterest" | "internet" | "outro";
 
-export type SwipeStatus = "pendente" | "baixando" | "pronto" | "falhou" | "manual";
+export type SwipeStatus = "pendente" | "baixando" | "pronto" | "falhou" | "manual" | "pausado";
 
 /** Nome da pasta (plural) e prefixo do arquivo (singular) de cada categoria */
 export const CATEGORIAS: { id: SwipeCategoria; pasta: string; singular: string; hex: string }[] = [
@@ -39,6 +40,7 @@ export const STATUS_META: Record<SwipeStatus, { label: string; hex: string }> = 
   pronto: { label: "No Drive", hex: "#10b981" },
   falhou: { label: "Falhou · link salvo", hex: "#ef4444" },
   manual: { label: "Enviar arquivo", hex: "#f59e0b" },
+  pausado: { label: "Pausado", hex: "#8b5cf6" },
 };
 
 export const categoriaMeta = (id: string) => CATEGORIAS.find((c) => c.id === id) || CATEGORIAS[0];
@@ -251,9 +253,164 @@ export async function excluirItem(item: Pick<SwipeItem, "id" | "drive_file_id">)
   if (error) throw error;
 }
 
+/**
+ * O que sai junto ao excluir um nicho/subnicho. Nicho: os subnichos dele e todos os itens do nicho
+ * (o banco não deixa item sem nicho). Subnicho: só os itens marcados com ele — que podem ficar no
+ * nicho pai, sem subnicho.
+ */
+export function resumoExclusaoNicho(nicho: SwipeNicho, nichos: SwipeNicho[], itens: SwipeItem[]) {
+  const subnichos = nicho.pai_id ? [] : nichos.filter((n) => n.pai_id === nicho.id);
+  const afetados = nicho.pai_id
+    ? itens.filter((i) => i.subnicho_id === nicho.id)
+    : itens.filter((i) => i.nicho_id === nicho.id);
+  return { subnichos, itens: afetados, podeManterItens: !!nicho.pai_id };
+}
+
+export type PastaDoNichoNoDrive = "lixeira" | "mantida" | "sem_pasta" | "erro";
+
+/**
+ * Exclui um nicho (com seus subnichos) ou um subnicho.
+ * 1. Se `excluirItens`, cada item vai para a Lixeira do Drive e sai do banco (mesma regra de excluirItem;
+ *    se o Drive falhar, para aqui sem apagar o nicho). Nicho com itens exige `excluirItens`.
+ * 2. Apaga a linha do nicho (subnichos em cascata; itens que ficam perdem só o subnicho).
+ * 3. Por último, e sem bloquear, manda a pasta do Drive para a Lixeira — só se ela não tiver mais
+ *    nenhum arquivo, para nunca levar junto arquivo de item que ficou.
+ */
+export async function excluirNicho(
+  nicho: SwipeNicho,
+  nichos: SwipeNicho[],
+  itens: SwipeItem[],
+  opts: { excluirItens: boolean },
+): Promise<PastaDoNichoNoDrive> {
+  const resumo = resumoExclusaoNicho(nicho, nichos, itens);
+  if (resumo.itens.length && !resumo.podeManterItens && !opts.excluirItens) {
+    throw new Error("Esse nicho ainda tem itens. Confirme a exclusão deles junto.");
+  }
+  if (opts.excluirItens) {
+    for (const item of resumo.itens) await excluirItem(item);
+  }
+
+  const { error } = await supabase.from("swipe_nichos").delete().eq("id", nicho.id);
+  if (error) throw error;
+
+  if (!nicho.drive_folder_id) return "sem_pasta";
+  try {
+    if (await pastaTemArquivos(nicho.drive_folder_id)) return "mantida";
+    await trashFile(nicho.drive_folder_id);
+    return "lixeira";
+  } catch {
+    return "erro";
+  }
+}
+
 export async function enfileirarJob(itemId: string, tipo: "download" | "lp", payload: Record<string, string | number | boolean | null>): Promise<void> {
   const { error } = await supabase.from("swipe_jobs").insert([{ item_id: itemId, tipo, payload }]);
   if (error) throw error;
+}
+
+// ---------------------------------------------------------------- Fila de downloads
+
+export interface SwipeJob extends JobFila {
+  payload: Record<string, unknown>;
+  tentativas: number;
+  erro: string | null;
+}
+
+/** Jobs que ainda importam para a fila: rodando, esperando e pausados. */
+export async function fetchFila(): Promise<SwipeJob[]> {
+  const { data, error } = await supabase
+    .from("swipe_jobs")
+    .select("id, item_id, tipo, status, posicao, created_at, iniciado_em, payload, tentativas, erro")
+    .in("status", ["aguardando", "rodando", "pausado"])
+    .order("posicao")
+    .order("created_at");
+  if (error) throw error;
+  return (data || []) as unknown as SwipeJob[];
+}
+
+/** Grava a ordem escolhida para quem está esperando (a posição na lista vira a ordem). */
+export async function reordenarFila(aguardando: JobFila[], ordemIds: string[]): Promise<void> {
+  const mudancas = novasPosicoes(aguardando, ordemIds);
+  const results = await Promise.all(
+    mudancas.map((m) => supabase.from("swipe_jobs").update({ posicao: m.posicao }).eq("id", m.id).eq("status", "aguardando")),
+  );
+  const falha = results.find((r) => r.error);
+  if (falha?.error) throw falha.error;
+}
+
+/** Fura a fila: o job passa a ser o próximo (não interrompe o que está baixando). */
+export async function baixarEmSeguida(jobId: string, aguardando: JobFila[]): Promise<void> {
+  const { error } = await supabase.from("swipe_jobs").update({ posicao: posicaoNoTopo(aguardando) }).eq("id", jobId);
+  if (error) throw error;
+}
+
+/**
+ * Pausa o item: o job sai da vez (se estiver baixando, o serviço percebe em segundos, derruba o
+ * download e libera para o próximo). Não gasta tentativa.
+ */
+export async function pausarItem(itemId: string): Promise<void> {
+  const { error } = await supabase
+    .from("swipe_jobs")
+    .update({ status: "pausado" })
+    .eq("item_id", itemId)
+    .in("status", ["aguardando", "rodando"]);
+  if (error) throw error;
+  const { error: e2 } = await supabase
+    .from("swipe_itens")
+    .update({ status: "pausado" })
+    .eq("id", itemId)
+    .in("status", ["pendente", "baixando"]);
+  if (e2) throw e2;
+}
+
+/** Retoma um item pausado: volta para o fim da fila (dá para reorganizar depois). */
+export async function retomarItem(itemId: string): Promise<void> {
+  const { error } = await supabase
+    .from("swipe_jobs")
+    .update({ status: "aguardando", posicao: Date.now(), iniciado_em: null })
+    .eq("item_id", itemId)
+    .eq("status", "pausado");
+  if (error) throw error;
+  const { error: e2 } = await supabase.from("swipe_itens").update({ status: "pendente", erro: null }).eq("id", itemId).eq("status", "pausado");
+  if (e2) throw e2;
+}
+
+/**
+ * "Tentar de novo" num item que falhou, sem duplicar nada no Drive:
+ * 1. o Docs com o link salvo (criado na falha) vai para a Lixeira — senão sobrariam o Docs e o arquivo;
+ * 2. o mesmo job volta para o fim da fila, com as tentativas zeradas (ou um job novo, se o antigo não existe mais).
+ * O serviço reaproveita a pasta do item no Drive e pula os arquivos que já estão lá, então chega um resultado só.
+ */
+export async function tentarDeNovo(item: SwipeItem): Promise<void> {
+  if (!podeTentarDeNovo(item)) throw new Error("Só dá para tentar de novo um item que falhou e tem link.");
+  if (item.drive_file_id) await trashFile(item.drive_file_id);
+
+  const { error: eItem } = await supabase
+    .from("swipe_itens")
+    .update({ status: "pendente", erro: null, drive_file_id: null, drive_web_link: null })
+    .eq("id", item.id);
+  if (eItem) throw eItem;
+
+  const { data: jobs, error: eJobs } = await supabase
+    .from("swipe_jobs")
+    .select("id")
+    .eq("item_id", item.id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (eJobs) throw eJobs;
+  if (jobs && jobs.length) {
+    const { error } = await supabase
+      .from("swipe_jobs")
+      .update({ status: "aguardando", tentativas: 0, erro: null, iniciado_em: null, concluido_em: null, posicao: Date.now() })
+      .eq("id", jobs[0].id);
+    if (error) throw error;
+    return;
+  }
+  if (!item.drive_folder_id) throw new Error("O item não tem a pasta de destino no Drive; use \"Enviar arquivo\".");
+  const tipo = item.categoria === "landing_page" || item.categoria === "site" ? "lp" : "download";
+  await enfileirarJob(item.id, tipo, {
+    link: item.link, categoria: item.categoria, nome_arquivo: item.nome_arquivo, drive_folder_id: item.drive_folder_id, rede: item.rede,
+  });
 }
 
 export function erroAmigavel(e: unknown): string {

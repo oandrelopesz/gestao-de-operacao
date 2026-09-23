@@ -41,7 +41,7 @@ export async function publicarDownload(drive, { arquivos, modo, base, paiId }) {
     for (let i = 0; i < arquivos.length; i++) {
       const caminho = arquivos[i];
       const ext = extensaoDe(caminho) || "jpg";
-      const nome = nomeCard(base, i + 1, ext);
+      const nome = nomeCard(i + 1, ext);
       if (jaTem.has(nome)) {
         total += await tamanhoDe(caminho);
         continue;

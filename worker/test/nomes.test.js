@@ -23,9 +23,9 @@ test("extensaoDe pega a extensão em minúsculas", () => {
   assert.equal(extensaoDe("/tmp/x/sem-extensao"), "");
 });
 
-test("nomeCard numera com dois dígitos", () => {
-  assert.equal(nomeCard("Carrossel - Médico - Dr Fulano", 1, "jpg"), "Carrossel - Médico - Dr Fulano - 01.jpg");
-  assert.equal(nomeCard("Carrossel - Médico - Dr Fulano", 12, "png"), "Carrossel - Médico - Dr Fulano - 12.png");
+test("nomeCard: Card 01, Card 02... com a extensão de cada card", () => {
+  assert.equal(nomeCard(1, "jpg"), "Card 01.jpg");
+  assert.equal(nomeCard(12, "mp4"), "Card 12.mp4");
 });
 
 test("nomeVsl sempre em mp4", () => {

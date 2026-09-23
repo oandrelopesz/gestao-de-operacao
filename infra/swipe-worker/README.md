@@ -14,6 +14,33 @@
 
 3. **Workflow do n8n**: importar `n8n-workflow.json`, conferir as credenciais e publicar.
 
+## Fila: ordem, pausa e "Tentar de novo" (23/09/2026)
+
+- **Ordem**: o n8n pega o job `aguardando` de menor `swipe_jobs.posicao` (empate: o mais antigo).
+  Job novo nasce com o instante em ms (fim da fila); o painel "Fila de downloads" da aba Swipe file
+  numera quem espera a partir de 0 ao arrastar/usar as setas, e "Baixar em seguida" põe o job uma
+  posição antes do primeiro.
+- **Pausar**: o app marca job e item como `pausado`. Durante um job, o worker consulta o status dele
+  a cada 3 s (`SUPABASE_ANON_KEY` na stack — sem ela a pausa só vale para quem ainda não começou);
+  ao ver `pausado`, mata o grupo de processos (yt-dlp/ffmpeg/single-file) e fecha o Chromium, responde
+  `{ ok: false, pausado: true }` sem gastar tentativa nem criar o Docs, e fica livre: o próximo começa
+  no gatilho seguinte (até 1 min). As atualizações de "devolver" e "falhou" no n8n só valem com o job
+  ainda `rodando` (e o item `baixando`), então não desfazem a pausa; "pronto" sempre grava.
+- **Retomar** volta o job para o fim da fila; o download recomeça do zero, mas a publicação é
+  idempotente (pasta reaproveitada, arquivos com o mesmo nome pulados).
+- **Tentar de novo** (item `falhou`): o app manda o Docs com o link para a Lixeira, zera as
+  tentativas e devolve o mesmo job para o fim da fila (cria um job só se o antigo não existir mais).
+- `patch-fila.cjs` tem a mudança do workflow como função idempotente (usada no template e no publicado).
+
+## Carrossel
+
+Categoria `carrossel` usa o **gallery-dl primeiro** (o yt-dlp só extrai os vídeos de um post do
+Instagram e "dava certo" com um card só), com `-D <pasta do job>` e nome `{num:>03}_...` para a
+ordem natural dos arquivos ser a do post; se ele não baixar nada, cai para o yt-dlp com a playlist
+liberada. É sempre uma pasta (mesmo com um card), com os cards `Card 01.jpg`, `Card 02.mp4`... e
+formatos padronizados pelo ffmpeg: webp/heic/bmp → jpg, gif → mp4, webm/mkv/avi/m4v → mp4 (se a
+conversão falhar, fica o original).
+
 ## Recapturar uma LP que mudou
 
 O worker é idempotente por nome de arquivo: ao reprocessar um job ele reaproveita a pasta no Google Drive e pula os arquivos que já estão lá. Esse comportamento evita que um job reagendado por falha de infraestrutura duplique os cards de um carrossel.

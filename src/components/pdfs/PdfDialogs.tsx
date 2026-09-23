@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, ExternalLink, FileText, Loader2, X } from "lucide-react";
+import { Download, ExternalLink, FileText, FolderPlus, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { atualizarPdf, baixarConteudo, salvarNoComputador, mensagemErroPdf, type PdfArquivo } from "@/lib/pdfs";
-import { opcoesDePasta, formatarTamanho, type PdfPasta } from "@/lib/pdfsArvore";
+import { atualizarPdf, baixarConteudo, criarPasta, salvarNoComputador, mensagemErroPdf, type PdfArquivo } from "@/lib/pdfs";
+import { opcoesDePasta, formatarTamanho, nomeSemExtensao, PASTA_CORES, type PdfPasta } from "@/lib/pdfsArvore";
 
 function SelectPasta({ pastas, value, onChange, id }: { pastas: PdfPasta[]; value: string; onChange: (v: string) => void; id?: string }) {
   const opcoes = useMemo(() => opcoesDePasta(pastas), [pastas]);
   return (
-    <Select value={value || undefined} onValueChange={onChange}>
+    // O Radix dispara onValueChange("") quando o valor aponta para uma opção que acabou de ser criada
+    // e ainda não está registrada (pasta criada dentro do popup); ignorar evita perder a seleção.
+    <Select value={value || undefined} onValueChange={(v) => { if (v) onChange(v); }}>
       <SelectTrigger id={id}><SelectValue placeholder="Escolher pasta" /></SelectTrigger>
       <SelectContent>
         {opcoes.map((o) => (
@@ -133,17 +135,19 @@ interface PdfEditDialogProps {
   pdf: PdfArquivo | null;
   pastas: PdfPasta[];
   onClose: () => void;
-  onSaved: (patch: { nome: string; pasta_id: string }) => void;
+  onSaved: (patch: { nome: string; pasta_id: string; player: string | null }) => void;
 }
 
 export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogProps) {
   const [nome, setNome] = useState("");
+  const [player, setPlayer] = useState("");
   const [pastaId, setPastaId] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!pdf) return;
     setNome(pdf.nome);
+    setPlayer(pdf.player || "");
     setPastaId(pdf.pasta_id);
   }, [pdf]);
 
@@ -153,8 +157,9 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
     if (!pastaId) { toast.error("Escolha a pasta"); return; }
     setSaving(true);
     try {
-      await atualizarPdf(pdf.id, { nome: nome.trim(), pasta_id: pastaId });
-      onSaved({ nome: nome.trim(), pasta_id: pastaId });
+      const patch = { nome: nome.trim(), pasta_id: pastaId, player: player.trim() || null };
+      await atualizarPdf(pdf.id, patch);
+      onSaved(patch);
       toast.success("PDF atualizado");
       onClose();
     } catch (e) {
@@ -168,13 +173,17 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
     <Dialog open={!!pdf} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-[440px]">
         <DialogHeader>
-          <DialogTitle>Renomear ou mover PDF</DialogTitle>
+          <DialogTitle>Editar PDF</DialogTitle>
           <DialogDescription>Arquivo original: {pdf?.arquivo_nome}</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save(); }}>
           <div className="space-y-2">
             <Label htmlFor="pdf-nome">Nome</Label>
             <Input id="pdf-nome" autoFocus value={nome} onChange={(e) => setNome(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pdf-player">Player</Label>
+            <Input id="pdf-player" placeholder="Ex.: Pedro Sobral, Meta, Anthropic" value={player} onChange={(e) => setPlayer(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="pdf-pasta">Pasta</Label>
@@ -190,45 +199,184 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
   );
 }
 
-// ---------------------------------------------------------------- Escolher pasta para envio
+// ---------------------------------------------------------------- Popup de envio
 
-interface EscolherPastaDialogProps {
-  arquivos: File[] | null;
-  pastas: PdfPasta[];
-  onClose: () => void;
-  onEscolhida: (pastaId: string) => void;
+export interface PdfParaEnviar {
+  arquivo: File;
+  nome: string;
+  player: string;
 }
 
-/** Quando os PDFs chegam fora de uma pasta (na raiz da aba), pergunta onde guardar. */
-export function EscolherPastaDialog({ arquivos, pastas, onClose, onEscolhida }: EscolherPastaDialogProps) {
+interface EnviarPdfsDialogProps {
+  /** Arquivos já validados (só PDFs, até 50 MB); null = fechado */
+  arquivos: File[] | null;
+  /** Pasta aberta ou pasta onde os arquivos foram soltos */
+  pastaInicial: string | null;
+  pastas: PdfPasta[];
+  onClose: () => void;
+  onPastaCriada: (pasta: PdfPasta) => void;
+  onConfirmar: (itens: PdfParaEnviar[], pastaId: string) => void;
+}
+
+/**
+ * Ao adicionar PDFs: nome (opcional — vazio mantém o nome do documento), player e o tema/pasta.
+ * Dá para criar um tema ou uma subpasta ali mesmo, sem sair do popup.
+ */
+export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPastaCriada, onConfirmar }: EnviarPdfsDialogProps) {
+  const [campos, setCampos] = useState<{ nome: string; player: string }[]>([]);
   const [pastaId, setPastaId] = useState("");
+  const [criando, setCriando] = useState<{ parentId: string | null } | null>(null);
+  const [novoNome, setNovoNome] = useState("");
+  const [salvandoPasta, setSalvandoPasta] = useState(false);
 
   useEffect(() => {
-    if (arquivos) setPastaId("");
-  }, [arquivos]);
+    if (!arquivos) return;
+    setCampos(arquivos.map(() => ({ nome: "", player: "" })));
+    setPastaId(pastaInicial ?? "");
+    setCriando(null);
+    setNovoNome("");
+  }, [arquivos, pastaInicial]);
+
+  const pastaEscolhida = pastas.find((p) => p.id === pastaId);
+  const setCampo = (idx: number, patch: Partial<{ nome: string; player: string }>) =>
+    setCampos((prev) => prev.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
+
+  const criarPastaAqui = async () => {
+    if (!criando) return;
+    const nome = novoNome.trim();
+    if (!nome) { toast.error("Dê um nome para a pasta"); return; }
+    const repetida = pastas.find((p) => (p.parent_id ?? null) === criando.parentId && p.nome.toLowerCase() === nome.toLowerCase());
+    if (repetida) {
+      setPastaId(repetida.id);
+      setCriando(null);
+      setNovoNome("");
+      toast.info(`"${repetida.nome}" já existia e foi selecionada`);
+      return;
+    }
+    setSalvandoPasta(true);
+    try {
+      const temas = pastas.filter((p) => !p.parent_id).length;
+      const nova = await criarPasta(pastas, {
+        nome,
+        parent_id: criando.parentId,
+        cor: criando.parentId ? null : PASTA_CORES[temas % PASTA_CORES.length],
+      });
+      onPastaCriada(nova);
+      setPastaId(nova.id);
+      setCriando(null);
+      setNovoNome("");
+      toast.success(criando.parentId ? `Subpasta "${nova.nome}" criada` : `Tema "${nova.nome}" criado`);
+    } catch (e) {
+      toast.error(mensagemErroPdf(e));
+    } finally {
+      setSalvandoPasta(false);
+    }
+  };
+
+  const confirmar = () => {
+    if (!arquivos) return;
+    if (criando) { criarPastaAqui(); return; }
+    if (!pastaId) { toast.error("Escolha o tema ou a pasta do PDF"); return; }
+    onConfirmar(arquivos.map((arquivo, i) => ({ arquivo, nome: campos[i]?.nome ?? "", player: campos[i]?.player ?? "" })), pastaId);
+  };
 
   const n = arquivos?.length ?? 0;
   return (
     <Dialog open={!!arquivos} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-[440px]">
+      <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Guardar em qual pasta?</DialogTitle>
-          <DialogDescription>
-            {n === 1 ? `"${arquivos?.[0]?.name}"` : `${n} PDFs`} — escolha o tema ou a subpasta.
-          </DialogDescription>
+          <DialogTitle>{n === 1 ? "Adicionar PDF" : `Adicionar ${n} PDFs`}</DialogTitle>
+          <DialogDescription>O nome é opcional: se ficar em branco, fica o nome do documento original.</DialogDescription>
         </DialogHeader>
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!pastaId) { toast.error("Escolha a pasta"); return; }
-            onEscolhida(pastaId);
-          }}
-        >
-          <SelectPasta pastas={pastas} value={pastaId} onChange={setPastaId} />
+        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); confirmar(); }}>
+          <div className="space-y-3">
+            {arquivos?.map((arquivo, i) => (
+              <div key={`${arquivo.name}-${i}`} className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <FileText size={14} className="shrink-0 text-red-500" />
+                  <span className="truncate">{arquivo.name}</span>
+                  <span className="shrink-0">· {formatarTamanho(arquivo.size)}</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor={`pdf-nome-${i}`} className="text-xs">Nome (opcional)</Label>
+                    <Input
+                      id={`pdf-nome-${i}`}
+                      autoFocus={i === 0}
+                      placeholder={nomeSemExtensao(arquivo.name)}
+                      value={campos[i]?.nome ?? ""}
+                      onChange={(e) => setCampo(i, { nome: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`pdf-player-${i}`} className="text-xs">Player</Label>
+                    <Input
+                      id={`pdf-player-${i}`}
+                      placeholder="Ex.: Pedro Sobral, Meta, Anthropic"
+                      value={campos[i]?.player ?? ""}
+                      onChange={(e) => setCampo(i, { player: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {n > 1 && (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                onClick={() => setCampos((prev) => prev.map((c) => ({ ...c, player: prev[0]?.player ?? "" })))}
+              >
+                Usar o player do primeiro em todos
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="pdf-envio-pasta">Tema / pasta</Label>
+            <SelectPasta id="pdf-envio-pasta" pastas={pastas} value={pastaId} onChange={setPastaId} />
+            {criando ? (
+              <div className="flex items-center gap-2 rounded-lg border border-dashed p-2">
+                <FolderPlus size={15} className="shrink-0 text-primary" />
+                <Input
+                  autoFocus
+                  className="h-8"
+                  placeholder={criando.parentId ? `Nova subpasta em "${pastas.find((p) => p.id === criando.parentId)?.nome}"` : "Nome do novo tema"}
+                  value={novoNome}
+                  onChange={(e) => setNovoNome(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setCriando(null); } }}
+                />
+                <Button type="button" size="sm" className="h-8" onClick={criarPastaAqui} disabled={salvandoPasta}>
+                  {salvandoPasta ? <Loader2 size={14} className="animate-spin" /> : "Criar"}
+                </Button>
+                <Button type="button" size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => setCriando(null)} title="Cancelar">
+                  <X size={14} />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => { setNovoNome(""); setCriando({ parentId: null }); }}>
+                  <FolderPlus size={13} /> Novo tema
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  disabled={!pastaEscolhida}
+                  title={pastaEscolhida ? undefined : "Escolha primeiro o tema onde a subpasta vai ficar"}
+                  onClick={() => { setNovoNome(""); setCriando({ parentId: pastaId }); }}
+                >
+                  <FolderPlus size={13} /> {pastaEscolhida ? `Subpasta em "${pastaEscolhida.nome}"` : "Nova subpasta"}
+                </Button>
+              </div>
+            )}
+          </div>
+
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" disabled={!pastaId}>Guardar</Button>
+            <Button type="submit" disabled={!pastaId || !!criando}>
+              {n === 1 ? "Guardar PDF" : `Guardar ${n} PDFs`}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

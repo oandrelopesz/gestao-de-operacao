@@ -141,10 +141,11 @@ export function formatarTamanho(bytes: number): string {
 
 const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-export function filtrarPdfs<T extends { nome: string; arquivo_nome: string }>(pdfs: T[], busca: string): T[] {
+/** Busca pelo nome dado, pelo nome original do arquivo ou pelo player. */
+export function filtrarPdfs<T extends { nome: string; arquivo_nome: string; player?: string | null }>(pdfs: T[], busca: string): T[] {
   const termo = semAcento(busca.trim());
   if (!termo) return pdfs;
-  return pdfs.filter((f) => semAcento(f.nome).includes(termo) || semAcento(f.arquivo_nome).includes(termo));
+  return pdfs.filter((f) => [f.nome, f.arquivo_nome, f.player || ""].some((c) => semAcento(c).includes(termo)));
 }
 
 /** Cor da pasta: a própria ou a do ancestral mais próximo que tiver uma (subpastas herdam do tema). */

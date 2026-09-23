@@ -4,6 +4,7 @@
 // achamos o card pelo id e baixamos o que está nele.
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
+import { registrar } from "../parada.js";
 
 /** Largura mínima para uma <img> do card contar como criativo (abaixo disso é avatar/ícone). */
 const LARGURA_MINIMA = 200;
@@ -126,6 +127,9 @@ async function abrirAnuncioReal(link, id) {
     executablePath: "/usr/bin/chromium",
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
+  // Pausa pedida pelo usuário fecha o navegador; o registro sai sozinho quando ele fecha
+  const soltarNavegador = registrar(() => navegador.close());
+  navegador.on("disconnected", soltarNavegador);
   let contexto;
   try {
     contexto = await navegador.newContext({
