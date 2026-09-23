@@ -1,23 +1,29 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+export type RegraData = "nenhuma" | "hoje" | "amanha" | "depois_amanha" | "dias_semana";
+
 export interface KanbanColumnDef {
   id: string;
   title: string;
   color: string;
   hex: string;
   sistema: boolean;
+  /** Data de entrega gravada ao mover um card para esta coluna */
+  regra: RegraData;
+  /** Dias da semana (0 = domingo … 6 = sábado) em que a coluna se divide; vazio = coluna simples */
+  dias: number[];
 }
 
 // Fallback usado apenas se a tabela demanda_colunas não estiver disponível
 export const DEFAULT_COLUMNS: KanbanColumnDef[] = [
-  { id: "recorrentes", title: "Recorrentes", color: "slate-500", hex: "#64748b", sistema: true },
-  { id: "fazer_hoje", title: "Fazer hoje", color: "red-500", hex: "#ef4444", sistema: false },
-  { id: "fazer_amanha", title: "Fazer amanhã", color: "yellow-500", hex: "#eab308", sistema: false },
-  { id: "fazer_depois_amanha", title: "Fazer depois de amanhã", color: "orange-500", hex: "#f97316", sistema: false },
-  { id: "fazer_fim_de_semana", title: "Fazer no fim de semana", color: "violet-500", hex: "#8b5cf6", sistema: true },
-  { id: "standby", title: "Standby", color: "blue-500", hex: "#3b82f6", sistema: false },
-  { id: "feito", title: "Feito", color: "green-500", hex: "#22c55e", sistema: true },
+  { id: "recorrentes", title: "Recorrentes", color: "slate-500", hex: "#64748b", sistema: true, regra: "nenhuma", dias: [] },
+  { id: "fazer_hoje", title: "Fazer hoje", color: "red-500", hex: "#ef4444", sistema: false, regra: "hoje", dias: [] },
+  { id: "fazer_amanha", title: "Fazer amanhã", color: "yellow-500", hex: "#eab308", sistema: false, regra: "amanha", dias: [] },
+  { id: "fazer_depois_amanha", title: "Fazer depois de amanhã", color: "orange-500", hex: "#f97316", sistema: false, regra: "depois_amanha", dias: [] },
+  { id: "fazer_fim_de_semana", title: "Fazer no fim de semana", color: "violet-500", hex: "#8b5cf6", sistema: true, regra: "dias_semana", dias: [6, 0] },
+  { id: "standby", title: "Standby", color: "blue-500", hex: "#3b82f6", sistema: false, regra: "nenhuma", dias: [] },
+  { id: "feito", title: "Feito", color: "green-500", hex: "#22c55e", sistema: true, regra: "nenhuma", dias: [] },
 ];
 
 export const COLUMN_COLORS = [
@@ -40,14 +46,14 @@ export function slugifyColumnId(title: string): string {
 export async function fetchDemandaColunas(): Promise<KanbanColumnDef[]> {
   const { data, error } = await supabase
     .from("demanda_colunas")
-    .select("id, titulo, hex, ordem, sistema")
+    .select("id, titulo, hex, ordem, sistema, regra_data, dias_semana")
     .order("ordem", { ascending: true });
   // Só cai no padrão se a tabela não existir; tabela vazia (colunas apagadas no Admin) = board vazio
   if (error) {
     console.error("Erro ao buscar colunas:", error);
     return DEFAULT_COLUMNS;
   }
-  return (data || []).map((c) => ({ id: c.id, title: c.titulo, color: "", hex: c.hex, sistema: c.sistema }));
+  return (data || []).map((c) => ({ id: c.id, title: c.titulo, color: "", hex: c.hex, sistema: c.sistema, regra: (c.regra_data ?? "nenhuma") as RegraData, dias: (c.dias_semana ?? []).map(Number) }));
 }
 
 export function useDemandaColunas() {

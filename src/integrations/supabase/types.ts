@@ -86,6 +86,24 @@ export type Database = {
         }
         Relationships: []
       }
+      app_config: {
+        Row: {
+          chave: string
+          updated_at: string
+          valor: Json
+        }
+        Insert: {
+          chave: string
+          updated_at?: string
+          valor: Json
+        }
+        Update: {
+          chave?: string
+          updated_at?: string
+          valor?: Json
+        }
+        Relationships: []
+      }
       alertas_saldo_enviados: {
         Row: {
           enviado_em: string
@@ -324,27 +342,33 @@ export type Database = {
       demanda_colunas: {
         Row: {
           created_at: string
+          dias_semana: number[]
           hex: string
           id: string
           ordem: number
+          regra_data: string
           sistema: boolean
           titulo: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          dias_semana?: number[]
           hex?: string
           id: string
           ordem?: number
+          regra_data?: string
           sistema?: boolean
           titulo: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          dias_semana?: number[]
           hex?: string
           id?: string
           ordem?: number
+          regra_data?: string
           sistema?: boolean
           titulo?: string
           updated_at?: string
@@ -390,6 +414,7 @@ export type Database = {
           descricao: string | null
           dia_fim_de_semana: string | null
           dia_referencia: string | null
+          dia_semana: number | null
           frequencia: Database["public"]["Enums"]["demanda_frequencia"] | null
           frequencia_dia_mes: number | null
           frequencia_dias_semana: string[] | null
@@ -415,6 +440,7 @@ export type Database = {
           descricao?: string | null
           dia_fim_de_semana?: string | null
           dia_referencia?: string | null
+          dia_semana?: number | null
           frequencia?: Database["public"]["Enums"]["demanda_frequencia"] | null
           frequencia_dia_mes?: number | null
           frequencia_dias_semana?: string[] | null
@@ -440,6 +466,7 @@ export type Database = {
           descricao?: string | null
           dia_fim_de_semana?: string | null
           dia_referencia?: string | null
+          dia_semana?: number | null
           frequencia?: Database["public"]["Enums"]["demanda_frequencia"] | null
           frequencia_dia_mes?: number | null
           frequencia_dias_semana?: string[] | null
