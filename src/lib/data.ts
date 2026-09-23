@@ -4,6 +4,7 @@ import { formatMoeda } from "@/lib/moedas";
 import { fetchDemandaColunas } from "@/lib/demandaColunas";
 import { fetchCursoCategorias } from "@/lib/cursoCategorias";
 import { fetchHabilidades } from "@/lib/habilidades";
+import { fetchPdfBiblioteca } from "@/lib/pdfs";
 import { setCached } from "@/lib/pageCache";
 
 /**
@@ -25,6 +26,7 @@ export const CACHE_KEYS = {
   cursoCategorias: "curso-categorias",
   livros: "livros",
   habilidades: "habilidades",
+  pdfs: "pdfs",
 } as const;
 
 export async function loadDemandas() {
@@ -140,6 +142,7 @@ export async function warmAllCaches(): Promise<void> {
     [CACHE_KEYS.financeiro, loadFinanceiro],
     [CACHE_KEYS.livros, loadLivros],
     [CACHE_KEYS.habilidades, fetchHabilidades],
+    [CACHE_KEYS.pdfs, fetchPdfBiblioteca],
     [
       CACHE_KEYS.cursos,
       async () => {

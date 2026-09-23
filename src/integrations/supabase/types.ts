@@ -978,6 +978,85 @@ export type Database = {
           },
         ]
       }
+      pdf_pastas: {
+        Row: {
+          cor: string | null
+          created_at: string
+          id: string
+          nome: string
+          ordem: number
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          ordem?: number
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdf_pastas_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_pastas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pdfs: {
+        Row: {
+          arquivo_nome: string
+          created_at: string
+          id: string
+          nome: string
+          pasta_id: string
+          storage_path: string
+          tamanho: number
+          updated_at: string
+        }
+        Insert: {
+          arquivo_nome: string
+          created_at?: string
+          id?: string
+          nome: string
+          pasta_id: string
+          storage_path: string
+          tamanho?: number
+          updated_at?: string
+        }
+        Update: {
+          arquivo_nome?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          pasta_id?: string
+          storage_path?: string
+          tamanho?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdfs_pasta_id_fkey"
+            columns: ["pasta_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_pastas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pendencias_clientes: {
         Row: {
           cliente_id: string

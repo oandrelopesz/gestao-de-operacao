@@ -1,0 +1,154 @@
+/**
+ * Regras puras da aba PDFs (árvore de pastas, nomes e busca), sem Supabase nem alias "@/",
+ * para rodar em `node --test`.
+ */
+
+export interface PdfPasta {
+  id: string;
+  nome: string;
+  /** null = tema na raiz */
+  parent_id: string | null;
+  /** Hex; só os temas da raiz costumam ter cor, as subpastas herdam */
+  cor: string | null;
+  ordem: number;
+}
+
+export interface PastaNo extends PdfPasta {
+  filhos: PastaNo[];
+}
+
+export const PASTA_CORES = ["#3b82f6", "#8b5cf6", "#10b981", "#64748b", "#f59e0b", "#06b6d4", "#f97316", "#f43f5e"];
+
+const porOrdemENome = (a: PdfPasta, b: PdfPasta) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR");
+
+/** Árvore ordenada. Uma pasta cujo pai não existe mais vira raiz, para nunca sumir da tela. */
+export function montarArvore(pastas: PdfPasta[]): PastaNo[] {
+  const nos = new Map<string, PastaNo>(pastas.map((p) => [p.id, { ...p, filhos: [] }]));
+  const raizes: PastaNo[] = [];
+  for (const no of nos.values()) {
+    const pai = no.parent_id ? nos.get(no.parent_id) : undefined;
+    if (pai) pai.filhos.push(no);
+    else raizes.push(no);
+  }
+  const ordenar = (lista: PastaNo[]) => {
+    lista.sort(porOrdemENome);
+    lista.forEach((n) => ordenar(n.filhos));
+  };
+  ordenar(raizes);
+  return raizes;
+}
+
+/** Pastas da raiz até `id` (inclusive). Vazio se o id não existir. */
+export function caminhoDaPasta(pastas: PdfPasta[], id: string | null): PdfPasta[] {
+  const porId = new Map(pastas.map((p) => [p.id, p]));
+  const caminho: PdfPasta[] = [];
+  const vistos = new Set<string>();
+  let atual = id ? porId.get(id) : undefined;
+  while (atual && !vistos.has(atual.id)) {
+    vistos.add(atual.id);
+    caminho.unshift(atual);
+    atual = atual.parent_id ? porId.get(atual.parent_id) : undefined;
+  }
+  return caminho;
+}
+
+/** A própria pasta e todas as que estão abaixo dela, em qualquer nível. */
+export function idsDescendentes(pastas: PdfPasta[], id: string): Set<string> {
+  const ids = new Set<string>([id]);
+  let mudou = true;
+  while (mudou) {
+    mudou = false;
+    for (const p of pastas) {
+      if (p.parent_id && ids.has(p.parent_id) && !ids.has(p.id)) {
+        ids.add(p.id);
+        mudou = true;
+      }
+    }
+  }
+  return ids;
+}
+
+/** Quantidade de PDFs por pasta: `direto` só nela, `total` incluindo as subpastas. */
+export function contarPdfsPorPasta(
+  pastas: PdfPasta[],
+  pdfs: { pasta_id: string }[],
+): Map<string, { direto: number; total: number }> {
+  const direto = new Map<string, number>();
+  pdfs.forEach((f) => direto.set(f.pasta_id, (direto.get(f.pasta_id) || 0) + 1));
+  const resultado = new Map<string, { direto: number; total: number }>();
+  for (const p of pastas) {
+    let total = 0;
+    idsDescendentes(pastas, p.id).forEach((id) => (total += direto.get(id) || 0));
+    resultado.set(p.id, { direto: direto.get(p.id) || 0, total });
+  }
+  return resultado;
+}
+
+/** Uma pasta não pode ser movida para dentro dela mesma nem de uma subpasta sua. */
+export function podeMoverPasta(pastas: PdfPasta[], id: string, novoPai: string | null): boolean {
+  return novoPai === null || !idsDescendentes(pastas, id).has(novoPai);
+}
+
+export interface OpcaoPasta {
+  id: string;
+  nome: string;
+  nivel: number;
+  caminho: string;
+}
+
+/** Lista achatada em ordem de árvore (para selects). `excluir` remove essa pasta e suas subpastas. */
+export function opcoesDePasta(pastas: PdfPasta[], excluir?: string): OpcaoPasta[] {
+  const fora = excluir ? idsDescendentes(pastas, excluir) : new Set<string>();
+  const saida: OpcaoPasta[] = [];
+  const visitar = (nos: PastaNo[], nivel: number, prefixo: string) => {
+    for (const n of nos) {
+      if (fora.has(n.id)) continue;
+      const caminho = prefixo ? `${prefixo} / ${n.nome}` : n.nome;
+      saida.push({ id: n.id, nome: n.nome, nivel, caminho });
+      visitar(n.filhos, nivel + 1, caminho);
+    }
+  };
+  visitar(montarArvore(pastas), 0, "");
+  return saida;
+}
+
+/** Ordem para uma nova pasta: depois da última irmã. */
+export function proximaOrdem(pastas: PdfPasta[], parentId: string | null): number {
+  const irmas = pastas.filter((p) => (p.parent_id ?? null) === parentId);
+  return irmas.length ? Math.max(...irmas.map((p) => p.ordem)) + 1 : 0;
+}
+
+/** PDF pelo tipo ou pela extensão (arquivos arrastados às vezes chegam sem tipo). */
+export function ehPdf(arquivo: { name: string; type: string }): boolean {
+  return arquivo.type === "application/pdf" || /\.pdf$/i.test(arquivo.name);
+}
+
+export function nomeSemExtensao(arquivo: string): string {
+  return arquivo.replace(/\.pdf$/i, "");
+}
+
+/** Nome seguro para salvar no computador, sempre terminando em .pdf. */
+export function nomeParaDownload(nome: string): string {
+  const limpo = nome.replace(/[\\/:*?"<>|]/g, "-").trim() || "arquivo";
+  return /\.pdf$/i.test(limpo) ? limpo : `${limpo}.pdf`;
+}
+
+export function formatarTamanho(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1).replace(".", ",")} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+}
+
+const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+export function filtrarPdfs<T extends { nome: string; arquivo_nome: string }>(pdfs: T[], busca: string): T[] {
+  const termo = semAcento(busca.trim());
+  if (!termo) return pdfs;
+  return pdfs.filter((f) => semAcento(f.nome).includes(termo) || semAcento(f.arquivo_nome).includes(termo));
+}
+
+/** Cor da pasta: a própria ou a do ancestral mais próximo que tiver uma (subpastas herdam do tema). */
+export function corDaPasta(pastas: PdfPasta[], id: string | null): string {
+  const comCor = caminhoDaPasta(pastas, id).reverse().find((p) => p.cor && p.cor.startsWith("#"));
+  return comCor?.cor || PASTA_CORES[3];
+}
