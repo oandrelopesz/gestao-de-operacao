@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  X, 
-  Trash2, 
-  Copy, 
-  CheckCircle2, 
-  Clock, 
-  User, 
-  Calendar as CalendarIcon, 
+import {
+  X,
+  Trash2,
+  Copy,
+  CheckCircle2,
+  Clock,
+  User,
+  Calendar as CalendarIcon,
+  CalendarDays,
   ArrowRight,
   Plus,
   Check,
@@ -35,6 +36,14 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { hojeBrasilia, diasDeAtraso, formatarDataCurta } from "@/lib/entrega";
+import { NOMES_DIA } from "@/lib/colunasDias";
+
+/** Parseia "YYYY-MM-DD" como data local, evitando o deslocamento de dia do fuso. */
+function parsePrazoLocal(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
 
 interface Demanda {
   id: string;
@@ -42,7 +51,7 @@ interface Demanda {
   descricao?: string;
   status: string;
   prioridade: string;
-  prazo?: string;
+  prazo?: string | null;
   cliente_id: string | null;
   created_at?: string;
   recorrente?: boolean;
@@ -284,7 +293,50 @@ export function DemandaDrawer({
                 </div>
               </div>
             )}
-            
+
+            <div className="grid grid-cols-[120px,1fr] items-center gap-2">
+              <div className="flex items-center gap-2 text-zinc-400">
+                <CalendarDays size={14} />
+                <span>Entrega</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 px-1.5 py-0.5 rounded transition-colors text-left">
+                      {demanda.prazo
+                        ? `${formatarDataCurta(demanda.prazo)} · ${NOMES_DIA[parsePrazoLocal(demanda.prazo).getDay()].toLowerCase()}`
+                        : "Definir data"}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={demanda.prazo ? parsePrazoLocal(demanda.prazo) : undefined}
+                      onSelect={(date) => date && saveUpdate({ prazo: format(date, "yyyy-MM-dd") })}
+                      initialFocus
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+                {demanda.prazo && (
+                  <button
+                    type="button"
+                    title="Remover data"
+                    className="text-zinc-300 hover:text-destructive transition-colors"
+                    onClick={() => saveUpdate({ prazo: null })}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+                {demanda.status !== "feito" && diasDeAtraso(demanda.prazo, hojeBrasilia()) > 0 && (
+                  <span className="text-red-500 text-xs">
+                    Atrasada há {diasDeAtraso(demanda.prazo, hojeBrasilia())}{" "}
+                    {diasDeAtraso(demanda.prazo, hojeBrasilia()) === 1 ? "dia" : "dias"}
+                  </span>
+                )}
+              </div>
+            </div>
+
             {/* Add field placeholder button */}
             <div className="pt-2 flex flex-wrap gap-2">
                <DropdownMenu>
