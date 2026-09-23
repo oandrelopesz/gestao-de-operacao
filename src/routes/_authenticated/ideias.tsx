@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { IdeiaDialog } from "@/components/ideias/IdeiaDialog";
 import { EnviarParaDemandasDialog } from "@/components/ideias/EnviarParaDemandasDialog";
-import { fetchIdeias, excluirIdeia, marcarConcluida, mensagemErro, type Ideia } from "@/lib/ideias";
+import { fetchIdeias, excluirIdeia, marcarConcluida, mensagemErro, retirarDasDemandas, type Ideia } from "@/lib/ideias";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { TIPOS_IDEIA, tipoIdeiaMeta, filtrarIdeias, dominioDoLink, type SituacaoIdeia } from "@/lib/ideiasTexto";
@@ -39,6 +39,7 @@ function IdeiasPage() {
   const [dialog, setDialog] = useState<{ ideia?: Ideia } | null>(null);
   const [enviando, setEnviando] = useState<Ideia | null>(null);
   const [toDelete, setToDelete] = useState<Ideia | null>(null);
+  const [retirando, setRetirando] = useState<Ideia | null>(null);
 
   const load = async () => {
     try {
@@ -90,6 +91,21 @@ function IdeiasPage() {
     } catch (e: any) {
       setIdeias((prev) => prev.map((i) => (i.id === ideia.id ? { ...i, ...antes } : i)));
       toast.error(mensagemErro(e));
+    }
+  };
+
+  // Ideia já enviada: o botão vira "Já enviada" e pergunta se é para tirar o card do Kanban
+  const retirar = async () => {
+    if (!retirando) return;
+    const ideia = retirando;
+    setRetirando(null);
+    try {
+      await retirarDasDemandas(ideia);
+      setIdeias((prev) => prev.map((i) => (i.id === ideia.id ? { ...i, demanda_id: null } : i)));
+      toast.success(`"${ideia.titulo}" saiu da aba de Demandas`);
+    } catch (e: any) {
+      toast.error(mensagemErro(e));
+      load();
     }
   };
 
@@ -249,9 +265,21 @@ function IdeiasPage() {
                       </Button>
                     ) : (
                       <>
-                        <Button size="sm" className="flex-1 gap-1.5" onClick={() => setEnviando(ideia)}>
-                          <SquareKanban size={14} /> Enviar para demandas
-                        </Button>
+                        {ideia.demanda_id ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 gap-1.5 text-emerald-600 border-emerald-600/40 bg-emerald-500/10 hover:bg-emerald-500/15 hover:text-emerald-700"
+                            onClick={() => setRetirando(ideia)}
+                            title="Clique para retirar da aba de Demandas"
+                          >
+                            <CheckCircle2 size={14} /> Já enviada para demandas
+                          </Button>
+                        ) : (
+                          <Button size="sm" className="flex-1 gap-1.5" onClick={() => setEnviando(ideia)}>
+                            <SquareKanban size={14} /> Enviar para demandas
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -285,6 +313,19 @@ function IdeiasPage() {
           });
         }}
       />
+
+      <AlertDialog open={!!retirando} onOpenChange={(o) => { if (!o) setRetirando(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retirar "{retirando?.titulo}" da aba de Demandas?</AlertDialogTitle>
+            <AlertDialogDescription>O card sai do Kanban e a ideia continua aqui, pronta para ser enviada de novo quando quiser.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={retirar}>Retirar das demandas</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!toDelete} onOpenChange={(o) => { if (!o) setToDelete(null); }}>
         <AlertDialogContent>

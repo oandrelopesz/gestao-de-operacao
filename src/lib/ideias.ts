@@ -93,3 +93,17 @@ export async function enviarIdeiaParaDemandas(ideia: Ideia, colunaId: string): P
   if (erroVinculo) console.warn("Demanda criada, mas não foi possível vincular à ideia:", erroVinculo);
   return data.id;
 }
+
+/**
+ * Tira do Kanban a demanda criada a partir da ideia (a ideia continua na aba). A FK
+ * ideias.demanda_id é ON DELETE SET NULL, mas o vínculo é limpo também aqui para o caso de a
+ * demanda já ter sido apagada por outro caminho.
+ */
+export async function retirarDasDemandas(ideia: Pick<Ideia, "id" | "demanda_id">): Promise<void> {
+  if (ideia.demanda_id) {
+    const { error } = await supabase.from("demandas").delete().eq("id", ideia.demanda_id);
+    if (error) throw error;
+  }
+  const { error } = await supabase.from("ideias").update({ demanda_id: null }).eq("id", ideia.id);
+  if (error) throw error;
+}
