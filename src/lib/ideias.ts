@@ -11,6 +11,10 @@ export interface Ideia {
   agencia: string | null;
   cliente_id: string | null;
   demanda_id: string | null;
+  /** null = aberta */
+  concluida_em: string | null;
+  /** manual = botão da aba; demanda = a demanda ligada foi para Feito */
+  concluida_por: "manual" | "demanda" | null;
   created_at: string;
   updated_at: string;
 }
@@ -35,6 +39,15 @@ export async function salvarIdeia(input: IdeiaInput, id?: string): Promise<void>
   const { error } = id
     ? await supabase.from("ideias").update(input).eq("id", id)
     : await supabase.from("ideias").insert([input]);
+  if (error) throw error;
+}
+
+/** Conclui (ou reabre) a ideia pelo botão da aba. */
+export async function marcarConcluida(id: string, concluida: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("ideias")
+    .update(concluida ? { concluida_em: new Date().toISOString(), concluida_por: "manual" } : { concluida_em: null, concluida_por: null })
+    .eq("id", id);
   if (error) throw error;
 }
 

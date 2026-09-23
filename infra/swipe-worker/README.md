@@ -41,6 +41,32 @@ liberada. É sempre uma pasta (mesmo com um card), com os cards `Card 01.jpg`, `
 formatos padronizados pelo ffmpeg: webp/heic/bmp → jpg, gif → mp4, webm/mkv/avi/m4v → mp4 (se a
 conversão falhar, fica o original).
 
+## Plataformas e cookies (23/09/2026)
+
+`swipe_itens.rede` separa orgânico de biblioteca de anúncios: `instagram`, `facebook`, `meta_ads`,
+`tiktok`, `tiktok_ads`, `youtube`, `google_ads`, `linkedin`, `x`, `threads`, `kwai`, `pinterest`,
+`internet`, `outro` (lista e detecção pelo link em `src/lib/swipeRedes.ts`). Cookies por plataforma
+(`ARQUIVO_DE_COOKIES` em `src/jobs/download.js`): Meta Ads usa o do Facebook, TikTok Ads o do TikTok,
+Threads o do Instagram. Configs montados: `swipe_cookies_instagram_v2`, `_tiktok_v2`, `_facebook`,
+`_youtube`, `_linkedin`.
+
+- **Cookies são copiados para a pasta do job** (`.cookies.txt`, 0600): yt-dlp e gallery-dl regravam o
+  arquivo e o config do Swarm é só leitura — sem a cópia o yt-dlp quebra com `Read-only file system`.
+- **YouTube**: a VPS toma "Sign in to confirm you're not a bot" sem cookie. O cookie tem que ser
+  exportado de uma **janela anônima** (logar, exportar, fechar sem sair): exportado de uma aba em uso,
+  o YouTube rotaciona a sessão e o yt-dlp responde "The page needs to be reloaded".
+- **LinkedIn** (`src/jobs/linkedin.js`): lido como visitante (JSON-LD do post = imagens na ordem;
+  `data-native-document-config` no `<article>` = documento em slides, pelo manifesto na maior
+  resolução). Logado, o LinkedIn devolve a página montada por JS; a sessão só é usada se o post pedir
+  login — e com cookie exportado de outro navegador ele manda para o login mesmo assim (post restrito
+  pelo autor = "Enviar arquivo" manual).
+- **Captador genérico de página** (`src/jobs/pagina.js`): TikTok Ads e Google Ads vão direto para ele;
+  nos demais é a última tentativa depois de yt-dlp e gallery-dl. Maior mp4 > 100 KB; senão HLS/embed
+  via yt-dlp; senão a maior imagem > 30 KB — **em categoria de vídeo só aceita vídeo** (a imagem seria
+  a miniatura).
+- Mudança pequena no worker sem retransferir tudo: imagem-patch `FROM swipe-worker:latest` +
+  `COPY src/jobs/x.js /app/src/jobs/` (tar de poucos KB) e `ForceUpdate` no serviço.
+
 ## Recapturar uma LP que mudou
 
 O worker é idempotente por nome de arquivo: ao reprocessar um job ele reaproveita a pasta no Google Drive e pula os arquivos que já estão lá. Esse comportamento evita que um job reagendado por falha de infraestrutura duplique os cards de um carrossel.

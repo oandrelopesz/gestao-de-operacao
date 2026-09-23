@@ -29,6 +29,12 @@ services:
       - source: swipe_cookies_facebook
         target: /cookies/facebook.txt
         mode: 0444
+      - source: swipe_cookies_youtube
+        target: /cookies/youtube.txt
+        mode: 0444
+      - source: swipe_cookies_linkedin
+        target: /cookies/linkedin.txt
+        mode: 0444
     networks:
       - ALDigitalNet
     deploy:
@@ -54,6 +60,10 @@ configs:
   swipe_cookies_tiktok:
     external: true
   swipe_cookies_facebook:
+    external: true
+  swipe_cookies_youtube:
+    external: true
+  swipe_cookies_linkedin:
     external: true
 
 networks:

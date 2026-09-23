@@ -299,7 +299,7 @@ function SwipePage() {
             <Select value={filtroRede} onValueChange={setFiltroRede}>
               <SelectTrigger className="sm:w-[170px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="todas">Todas as redes</SelectItem>
+                <SelectItem value="todas">Todas as plataformas</SelectItem>
                 {REDES.map((r) => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}
               </SelectContent>
             </Select>

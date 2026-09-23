@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { uploadFile, ensureFolder, SwipeKeyError } from "@/lib/googleDrive";
 import {
-  CATEGORIAS, REDES, encontrarNicho, garantirPastas, nomeArquivo, extensaoDe, criarItem, atualizarItem, enfileirarJob, erroAmigavel,
+  CATEGORIAS, REDES, detectarRede, encontrarNicho, garantirPastas, nomeArquivo, extensaoDe, criarItem, atualizarItem, enfileirarJob, erroAmigavel,
   type SwipeCategoria, type SwipeRede, type SwipeNicho, type SwipeItem,
 } from "@/lib/swipe";
 
@@ -32,18 +32,6 @@ export interface SwipeAddDialogProps {
   completar?: SwipeItem | null;
   /** Nicho/subnicho pré-selecionados (ex.: ao adicionar a partir da árvore) */
   preset?: { nicho_id?: string; subnicho_id?: string; categoria?: SwipeCategoria };
-}
-
-function detectarRede(link: string): SwipeRede | null {
-  const l = link.toLowerCase();
-  if (/instagram\.com/.test(l)) return "instagram";
-  if (/facebook\.com|fb\.watch/.test(l)) return "facebook";
-  if (/youtube\.com|youtu\.be/.test(l)) return "youtube";
-  if (/tiktok\.com/.test(l)) return "tiktok";
-  if (/linkedin\.com/.test(l)) return "linkedin";
-  if (/x\.com|twitter\.com/.test(l)) return "x";
-  if (/pinterest\./.test(l)) return "pinterest";
-  return l ? "internet" : null;
 }
 
 function formatBytes(n: number): string {
@@ -245,7 +233,7 @@ export function SwipeAddDialog({ open, onClose, onSaved, rootFolderId, nichos, c
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Rede onde viu</Label>
+                <Label>Plataforma</Label>
                 <Select value={rede} onValueChange={(v) => { setRede(v as SwipeRede); setRedeManual(true); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

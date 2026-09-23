@@ -695,6 +695,8 @@ export type Database = {
         Row: {
           agencia: string | null
           cliente_id: string | null
+          concluida_em: string | null
+          concluida_por: string | null
           created_at: string
           demanda_id: string | null
           descricao: string | null
@@ -707,6 +709,8 @@ export type Database = {
         Insert: {
           agencia?: string | null
           cliente_id?: string | null
+          concluida_em?: string | null
+          concluida_por?: string | null
           created_at?: string
           demanda_id?: string | null
           descricao?: string | null
@@ -719,6 +723,8 @@ export type Database = {
         Update: {
           agencia?: string | null
           cliente_id?: string | null
+          concluida_em?: string | null
+          concluida_por?: string | null
           created_at?: string
           demanda_id?: string | null
           descricao?: string | null

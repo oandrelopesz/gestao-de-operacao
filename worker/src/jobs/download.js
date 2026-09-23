@@ -4,19 +4,31 @@
 // Carrossel inverte a ordem: o yt-dlp só extrai os VÍDEOS de um post (imagem não é com ele), então
 // num carrossel misto ele "dava certo" baixando um card só. O gallery-dl pega todos, na ordem do post.
 import { existsSync } from "node:fs";
-import { unlink } from "node:fs/promises";
+import { copyFile, chmod, readFile, unlink } from "node:fs/promises";
 import { rodar as rodarReal } from "../exec.js";
 import { listarMidias as listarReal } from "../tmp.js";
 import { extensaoDe, ehImagem, ehVideo } from "../nomes.js";
 import { ehAdsLibrary, baixarAnuncio as baixarAnuncioReal } from "./adslibrary.js";
+import { ehPostLinkedin, baixarPostLinkedin as baixarPostLinkedinReal, cabecalhoDeCookies } from "./linkedin.js";
+import { capturarMidiaDaPagina as capturarMidiaDaPaginaReal } from "./pagina.js";
 
-const REDES_COM_COOKIE = new Set(["instagram", "facebook", "tiktok", "linkedin", "x", "pinterest"]);
+/** Arquivo de cookies de cada plataforma: bibliotecas de anúncio e Threads usam o login da rede-mãe. */
+const ARQUIVO_DE_COOKIES = {
+  instagram: "instagram", threads: "instagram",
+  facebook: "facebook", meta_ads: "facebook",
+  tiktok: "tiktok", tiktok_ads: "tiktok",
+  linkedin: "linkedin", x: "x", pinterest: "pinterest", youtube: "youtube",
+};
+
+/** Plataformas que nem o yt-dlp nem o gallery-dl conhecem: vão direto para o captador de página. */
+const SO_PELA_PAGINA = new Set(["tiktok_ads", "google_ads"]);
 
 /** Caminho do cookies.txt montado pela stack, se existir para essa rede. */
 export function cookiesDe(rede, existe) {
   const checar = existe || existsSync;
-  if (!REDES_COM_COOKIE.has(rede)) return null;
-  const caminho = `/cookies/${rede}.txt`;
+  const nome = ARQUIVO_DE_COOKIES[rede];
+  if (!nome) return null;
+  const caminho = `/cookies/${nome}.txt`;
   return checar(caminho) ? caminho : null;
 }
 
@@ -27,10 +39,53 @@ export async function baixar({ link, rede, dir, categoria }, deps = {}) {
   const rodar = deps.rodar || rodarReal;
   const listarMidias = deps.listarMidias || listarReal;
   const normalizar = deps.normalizarFormatos || ((arquivos) => normalizarFormatos(arquivos, { rodar }));
-  const cookies = cookiesDe(rede, deps.existeArquivo);
+  const cookiesOriginal = cookiesDe(rede, deps.existeArquivo);
   const carrossel = categoria === "carrossel";
+  // yt-dlp e gallery-dl regravam o arquivo de cookies (o YouTube renova a sessão a cada acesso), e o
+  // montado pela stack é só leitura: cada job usa uma cópia gravável na própria pasta temporária.
+  let cookies = null;
+  if (cookiesOriginal) {
+    const copia = `${dir}/.cookies.txt`;
+    const copiarCookies = deps.copiarCookies || (async (de, para) => { await copyFile(de, para); await chmod(para, 0o600); });
+    cookies = await copiarCookies(cookiesOriginal, copia).then(() => copia).catch(() => cookiesOriginal);
+  }
 
   const erros = [];
+  const capturarMidiaDaPagina = deps.capturarMidiaDaPagina || capturarMidiaDaPaginaReal;
+  const pelaPagina = async () => {
+    try {
+      return await capturarMidiaDaPagina({ link, dir, cookies, somenteVideo: /^video_/.test(categoria || "") }, { rodar, listarMidias });
+    } catch (e) {
+      if (e?.name === "JobPausado") throw e;
+      erros.push(`página: ${String(e?.message || e).slice(0, 200)}`);
+      return null;
+    }
+  };
+
+  // TikTok Ads / Google Ads: nenhuma das ferramentas conhece a página; o captador resolve
+  if (SO_PELA_PAGINA.has(rede)) {
+    const r = await pelaPagina();
+    if (r) return carrossel ? { arquivos: await normalizar(r.arquivos), modo: "carrossel" } : r;
+    throw new Error(`O link não baixou nenhum arquivo (${erros.join(" | ")})`);
+  }
+
+  // Post do LinkedIn (imagem, carrossel de imagens ou documento): leitor próprio. Sem imagem no post
+  // (vídeo), devolve [] e segue para o yt-dlp; o erro (ex.: pediu login) entra na mensagem final.
+  if (ehPostLinkedin(link)) {
+    const baixarPostLinkedin = deps.baixarPostLinkedin || baixarPostLinkedinReal;
+    const lerArquivo = deps.lerArquivo || ((c) => readFile(c, "utf8"));
+    try {
+      const texto = cookies ? await lerArquivo(cookies).catch(() => "") : "";
+      const arquivos = await baixarPostLinkedin({ link, dir, cookies: cabecalhoDeCookies(texto, "linkedin.com") });
+      if (arquivos.length) {
+        if (carrossel || arquivos.length > 1) return { arquivos: await normalizar(arquivos), modo: "carrossel" };
+        return { arquivos, modo: "unico" };
+      }
+    } catch (e) {
+      if (e?.name === "JobPausado") throw e;
+      erros.push(`linkedin: ${String(e?.message || e).slice(0, 200)}`);
+    }
+  }
 
   const argsYt = [
     link,
@@ -64,7 +119,8 @@ export async function baixar({ link, rede, dir, categoria }, deps = {}) {
     const argsGal = carrossel
       ? ["-D", dir, "-f", "{num:>03}_{filename}.{extension}", "--retries", "3", "--quiet", link]
       : ["--dest", dir, "--retries", "3", "--quiet", link];
-    if (cookies) argsGal.splice(0, 0, "--cookies", cookies);
+    // cookies-update=false: o gallery-dl tenta regravar o arquivo, que na VPS é config só leitura
+    if (cookies) argsGal.splice(0, 0, "--cookies", cookies, "-o", "cookies-update=false");
     try {
       await rodar("/usr/local/bin/gallery-dl", argsGal, { cwd: dir, timeout: 13 * 60 * 1000 });
     } catch (e) {
@@ -75,6 +131,12 @@ export async function baixar({ link, rede, dir, categoria }, deps = {}) {
 
   let arquivos = carrossel ? await comGalleryDl() : await comYtDlp();
   if (arquivos.length === 0) arquivos = carrossel ? await comYtDlp() : await comGalleryDl();
+
+  // Última tentativa: abrir a página e pegar o vídeo/imagem principal que ela carrega
+  if (arquivos.length === 0) {
+    const r = await pelaPagina();
+    if (r) arquivos = r.arquivos;
+  }
 
   if (arquivos.length === 0) {
     const detalhe = erros.length ? ` (${erros.join(" | ")})` : "";

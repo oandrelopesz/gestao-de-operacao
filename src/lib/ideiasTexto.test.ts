@@ -67,3 +67,15 @@ test("tipoIdeiaMeta: id desconhecido cai no primeiro tipo", () => {
   assert.equal(tipoIdeiaMeta("cliente").label, "Para cliente");
   assert.equal(tipoIdeiaMeta("xyz").id, "este_sistema");
 });
+
+test("filtrarIdeias: situação separa abertas de concluídas (padrão: abertas)", () => {
+  const base = { tipo: "este_sistema", agencia: null, descricao: null, links: [] as string[] };
+  const ideias = [
+    { ...base, titulo: "Aberta", concluida_em: null },
+    { ...base, titulo: "Feita", concluida_em: "2026-09-23T10:00:00Z" },
+  ];
+  const f = { tipo: "todos", agencia: "todas", busca: "" };
+  assert.deepEqual(filtrarIdeias(ideias, f).map((i) => i.titulo), ["Aberta"]);
+  assert.deepEqual(filtrarIdeias(ideias, { ...f, situacao: "concluidas" }).map((i) => i.titulo), ["Feita"]);
+  assert.deepEqual(filtrarIdeias(ideias, { ...f, situacao: "abertas" }).map((i) => i.titulo), ["Aberta"]);
+});

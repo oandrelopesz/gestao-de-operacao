@@ -6,7 +6,8 @@ export type SwipeCategoria =
   | "oferta" | "video_organico" | "video_anuncio" | "anuncio_estatico"
   | "post_estatico" | "carrossel" | "landing_page" | "site";
 
-export type SwipeRede = "instagram" | "facebook" | "youtube" | "tiktok" | "linkedin" | "x" | "pinterest" | "internet" | "outro";
+import type { SwipeRede } from "@/lib/swipeRedes";
+export { REDES, redeLabel, detectarRede, type SwipeRede } from "@/lib/swipeRedes";
 
 export type SwipeStatus = "pendente" | "baixando" | "pronto" | "falhou" | "manual" | "pausado";
 
@@ -22,17 +23,6 @@ export const CATEGORIAS: { id: SwipeCategoria; pasta: string; singular: string; 
   { id: "site", pasta: "Sites", singular: "Site", hex: "#06b6d4" },
 ];
 
-export const REDES: { id: SwipeRede; label: string }[] = [
-  { id: "instagram", label: "Instagram" },
-  { id: "facebook", label: "Facebook" },
-  { id: "youtube", label: "YouTube" },
-  { id: "tiktok", label: "TikTok" },
-  { id: "linkedin", label: "LinkedIn" },
-  { id: "x", label: "X (Twitter)" },
-  { id: "pinterest", label: "Pinterest" },
-  { id: "internet", label: "Internet (site / LP)" },
-  { id: "outro", label: "Outro" },
-];
 
 export const STATUS_META: Record<SwipeStatus, { label: string; hex: string }> = {
   pendente: { label: "Na fila", hex: "#64748b" },
@@ -44,7 +34,6 @@ export const STATUS_META: Record<SwipeStatus, { label: string; hex: string }> = 
 };
 
 export const categoriaMeta = (id: string) => CATEGORIAS.find((c) => c.id === id) || CATEGORIAS[0];
-export const redeLabel = (id: string) => REDES.find((r) => r.id === id)?.label || id;
 
 export interface SwipeNicho {
   id: string;

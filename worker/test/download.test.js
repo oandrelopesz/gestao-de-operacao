@@ -87,6 +87,8 @@ test("cookies entram quando existe arquivo para a rede", async () => {
   assert.equal(cookiesDe("instagram", () => true), "/cookies/instagram.txt");
   assert.equal(cookiesDe("instagram", () => false), null);
   assert.equal(cookiesDe("internet", () => true), null);
+  // O YouTube barra IP de servidor ("Sign in to confirm you're not a bot") sem cookie de login
+  assert.equal(cookiesDe("youtube", () => true), "/cookies/youtube.txt");
 });
 
 test("o comando leva --cookies quando a rede tem cookies", async () => {
@@ -166,4 +168,101 @@ test("normalizarFormatos: se a conversão falhar, fica o arquivo original (não 
   const rodar = async () => { throw new ComandoFalhou("ffmpeg", 1, "codec"); };
   const saida = await normalizarFormatos(["/t/1.heic"], { rodar, apagar: async () => {} });
   assert.deepEqual(saida, ["/t/1.heic"]);
+});
+
+// ---------------------------------------------------------------- LinkedIn e cookies
+
+test("post do LinkedIn usa o leitor próprio antes do yt-dlp e vira carrossel com várias imagens", async () => {
+  const d = depsCarrossel({ porEtapa: {} });
+  let recebido;
+  d.baixarPostLinkedin = async (a) => { recebido = a; return ["/tmp/j/001_linkedin.jpg", "/tmp/j/002_linkedin.jpg"]; };
+  d.lerArquivo = async () => ".linkedin.com\tTRUE\t/\tTRUE\t0\tli_at\tAAA";
+  const r = await baixar({ link: "https://www.linkedin.com/posts/x-share-1/", rede: "linkedin", dir: "/tmp/j", categoria: "carrossel" }, d);
+  assert.equal(r.modo, "carrossel");
+  assert.equal(r.arquivos.length, 2);
+  assert.equal(d.chamadas.length, 0, "nem yt-dlp nem gallery-dl");
+  assert.equal(recebido.cookies, "li_at=AAA");
+});
+
+test("post do LinkedIn com uma imagem só (não carrossel) sai como unico", async () => {
+  const d = depsCarrossel({ porEtapa: {} });
+  d.baixarPostLinkedin = async () => ["/tmp/j/001_linkedin.jpg"];
+  const r = await baixar({ link: "https://www.linkedin.com/posts/x-share-1/", rede: "linkedin", dir: "/tmp/j", categoria: "post_estatico" }, d);
+  assert.equal(r.modo, "unico");
+});
+
+test("post do LinkedIn sem imagem (vídeo) segue para o yt-dlp", async () => {
+  const d = depsCarrossel({ porEtapa: { ytdlp: ["/tmp/j/v.mp4"] } });
+  d.baixarPostLinkedin = async () => [];
+  const r = await baixar({ link: "https://www.linkedin.com/posts/x-share-1/", rede: "linkedin", dir: "/tmp/j", categoria: "video_organico" }, d);
+  assert.deepEqual(r.arquivos, ["/tmp/j/v.mp4"]);
+  assert.ok(d.chamadas[0].cmd.includes("yt-dlp"));
+});
+
+test("erro do leitor do LinkedIn (pediu login) aparece na mensagem final se nada baixar", async () => {
+  const d = depsCarrossel({ gallery: new ComandoFalhou("gallery-dl", 1, "Unsupported URL"), ytdlp: new ComandoFalhou("yt-dlp", 1, "ERROR: Unable to extract video"), porEtapa: {} });
+  d.baixarPostLinkedin = async () => { throw new Error("O LinkedIn pediu login para ver esse post"); };
+  await assert.rejects(
+    () => baixar({ link: "https://www.linkedin.com/posts/x-share-1/", rede: "linkedin", dir: "/tmp/j", categoria: "post_estatico" }, d),
+    /pediu login/,
+  );
+});
+
+test("gallery-dl com cookies não tenta regravar o arquivo (config da VPS é só leitura)", async () => {
+  const d = depsCarrossel({ porEtapa: { gallery: ["/tmp/j/001_a.jpg"] } });
+  await baixar({ link: "https://instagram.com/p/x", rede: "instagram", dir: "/tmp/j", categoria: "carrossel" }, d);
+  const args = d.chamadas[0].args;
+  assert.equal(args[args.indexOf("-o") + 1], "cookies-update=false");
+});
+
+// ---------------------------------------------------------------- Plataformas novas
+
+test("cookies por plataforma: bibliotecas de anúncio e Threads usam o login da rede-mãe", () => {
+  assert.equal(cookiesDe("meta_ads", () => true), "/cookies/facebook.txt");
+  assert.equal(cookiesDe("tiktok_ads", () => true), "/cookies/tiktok.txt");
+  assert.equal(cookiesDe("threads", () => true), "/cookies/instagram.txt");
+  assert.equal(cookiesDe("google_ads", () => true), null);
+  assert.equal(cookiesDe("kwai", () => true), null);
+});
+
+test("TikTok Ads e Google Ads vão direto para o captador de página", async () => {
+  for (const rede of ["tiktok_ads", "google_ads"]) {
+    const d = depsCarrossel({ porEtapa: {} });
+    d.capturarMidiaDaPagina = async () => ({ arquivos: ["/tmp/j/pagina-1.mp4"], modo: "unico" });
+    const r = await baixar({ link: "https://ads.tiktok.com/x", rede, dir: "/tmp/j", categoria: "video_anuncio" }, d);
+    assert.deepEqual(r.arquivos, ["/tmp/j/pagina-1.mp4"]);
+    assert.equal(d.chamadas.length, 0, `${rede}: nem yt-dlp nem gallery-dl`);
+  }
+});
+
+test("site qualquer: captador de página é a última tentativa depois de yt-dlp e gallery-dl", async () => {
+  const d = depsCarrossel({ gallery: new ComandoFalhou("gallery-dl", 1, "Unsupported URL"), ytdlp: new ComandoFalhou("yt-dlp", 1, "ERROR: Unsupported URL"), porEtapa: {} });
+  d.capturarMidiaDaPagina = async () => ({ arquivos: ["/tmp/j/pagina-1.jpg"], modo: "unico" });
+  const r = await baixar({ link: "https://kwai.com/x", rede: "kwai", dir: "/tmp/j", categoria: "video_organico" }, d);
+  assert.deepEqual(r.arquivos, ["/tmp/j/pagina-1.jpg"]);
+  assert.deepEqual(d.chamadas.map((c) => (c.cmd.includes("yt-dlp") ? "yt" : "gal")), ["yt", "gal"]);
+});
+
+test("captador de página falhando também entra na mensagem final", async () => {
+  const d = depsCarrossel({ gallery: new ComandoFalhou("gallery-dl", 1, "x"), ytdlp: new ComandoFalhou("yt-dlp", 1, "ERROR: y"), porEtapa: {} });
+  d.capturarMidiaDaPagina = async () => { throw new Error("Nenhum vídeo ou imagem na página"); };
+  await assert.rejects(() => baixar({ link: "https://site.com/x", rede: "internet", dir: "/tmp/j", categoria: "anuncio_estatico" }, d), /página: Nenhum vídeo/);
+});
+
+test("categoria de vídeo: captador de página roda em modo somente vídeo", async () => {
+  const d = depsCarrossel({ gallery: new ComandoFalhou("gallery-dl", 1, "x"), ytdlp: new ComandoFalhou("yt-dlp", 1, "ERROR: y"), porEtapa: {} });
+  let opcoes;
+  d.capturarMidiaDaPagina = async (a) => { opcoes = a; return { arquivos: ["/tmp/j/pagina-1.mp4"], modo: "unico" }; };
+  await baixar({ link: "https://site.com/v", rede: "internet", dir: "/tmp/j", categoria: "video_anuncio" }, d);
+  assert.equal(opcoes.somenteVideo, true);
+});
+
+test("cookies vão para uma cópia gravável na pasta do job (yt-dlp e gallery-dl regravam o arquivo)", async () => {
+  const d = deps({ ytdlp: {}, midias: ["/tmp/j/v.mp4"] });
+  const copias = [];
+  d.copiarCookies = async (origem, destino) => { copias.push([origem, destino]); };
+  await baixar({ link: "https://instagram.com/reel/x", rede: "instagram", dir: "/tmp/j" }, d);
+  assert.deepEqual(copias, [["/cookies/instagram.txt", "/tmp/j/.cookies.txt"]]);
+  const args = d.chamadas[0].args;
+  assert.equal(args[args.indexOf("--cookies") + 1], "/tmp/j/.cookies.txt");
 });

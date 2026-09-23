@@ -51,13 +51,21 @@ export interface IdeiaFiltravel {
   titulo: string;
   descricao: string | null;
   links: string[];
+  concluida_em?: string | null;
 }
 
-/** Filtros da aba: tipo ("todos" = qualquer), agência ("todas" = qualquer) e busca livre */
-export function filtrarIdeias<T extends IdeiaFiltravel>(ideias: T[], f: { tipo: string; agencia: string; busca: string }): T[] {
+export type SituacaoIdeia = "abertas" | "concluidas";
+
+/** Filtros da aba: situação (padrão abertas), tipo ("todos" = qualquer), agência ("todas" = qualquer) e busca livre */
+export function filtrarIdeias<T extends IdeiaFiltravel>(
+  ideias: T[],
+  f: { tipo: string; agencia: string; busca: string; situacao?: SituacaoIdeia },
+): T[] {
   const q = f.busca.trim().toLowerCase();
+  const concluidas = f.situacao === "concluidas";
   return ideias.filter(
     (i) =>
+      !!i.concluida_em === concluidas &&
       (f.tipo === "todos" || i.tipo === f.tipo) &&
       (f.agencia === "todas" || i.agencia === f.agencia) &&
       (!q ||
