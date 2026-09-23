@@ -135,3 +135,38 @@ Rotas `/onboarding` e `/roadmap` (`src/routes/_authenticated/`), cada uma com ab
 
 - Migrar hospedagem para a Vercel (pergunta separada; recomendação registrada na conversa).
 - Notificações/WhatsApp para passos.
+
+---
+
+# Adendo (23/09/2026) — entrega, colunas por regra de data e Admin por aba
+
+Aprovado pelo usuário ("pode executar tudo"). Executado em três planos, nesta ordem: **A** (Demandas: entrega + colunas), **B** (Onboarding + Roadmap, este documento acima), **C** (Admin por aba + menu).
+
+## A. Demandas: data de entrega e colunas com regra de data
+
+- Toda demanda tem **Entrega** (`demandas.prazo`, já existe). O painel do card ganha o campo com calendário (e limpar). O card mostra "Entrega dd/MM"; vermelho com "Atrasada há N dias" quando `prazo < hoje` e a demanda não está em Feito.
+- Toda demanda com cliente mostra a **tag do cliente** no card (feito em 4645c29). Demandas vindas do onboarding sempre levam o cliente.
+- Cada coluna tem uma **regra de data** (`demanda_colunas.regra_data`): `nenhuma` · `hoje` · `amanha` · `depois_amanha` · `dias_semana` (+ `dias_semana smallint[]`, 0 = domingo … 6 = sábado, na ordem em que as seções aparecem).
+  - Fazer hoje/amanhã/depois de amanhã = hoje/amanha/depois_amanha; Fazer no fim de semana = dias_semana {6,0}; demais = nenhuma.
+  - Mover um card **para** uma coluna com regra (pelo quadro, pelo painel ou pelo formulário) grava a entrega: hoje+0/+1/+2, ou o próximo dia escolhido (hoje, se hoje já é o dia). Colunas sem regra mantêm a entrega.
+  - A virada da meia-noite e a sincronização do onboarding **não** recalculam a entrega (flag de sessão), então a data de um card continua a mesma quando ele muda de coluna sozinho.
+- **Colunas "por dias da semana"** generalizam a do fim de semana: qualquer coluna (sistema ou criada pelo usuário) pode ter dias; ela se divide em uma seção por dia, entrar nela vindo de outra coluna abre o popup de escolha do dia, o card mostra o dia e o menu ⋯ troca o dia. `demandas.dia_fim_de_semana` vira `demandas.dia_semana smallint` (sabado→6, domingo→0).
+- Criar/editar coluna (no quadro e no Admin) tem: nome, cor, regra de data e, se "Dias da semana", os dias marcados.
+- A virada pode ser ligada/desligada no Admin (`app_config.virada_ativa`, padrão ligada).
+
+Sincronização do onboarding (seção acima) passa a usar a entrega: passo.data ⇄ demanda.prazo. Card do passo em coluna sem regra (Standby, personalizada sem regra) → passo sem data (fim da trilha) e entrega vazia.
+
+## C. Admin por aba e menu lateral
+
+`app_config (chave text PK, valor jsonb)` guarda configurações simples. A página Admin passa a ter abas no topo:
+
+- **Geral**: Menu lateral (mostrar/ocultar cada aba e mudar a ordem; Admin sempre visível), Agências, Plataformas de ads, Aparência, Dados, Zona de perigo.
+- **Demandas**: Colunas (nome, cor, regra de data, dias, ordem, excluir) e "Virada automática à meia-noite" liga/desliga.
+- **Onboarding**: templates de onboarding (mesmo editor da aba), "Enviar passos para Demandas com até N dias de antecedência" (0–2, padrão 2 = até depois de amanhã), "Ativar tráfego automaticamente ao concluir" (padrão ligado).
+- **Roadmap**: templates de roadmap.
+- **PDFs**: pastas (card atual) e tamanho máximo por arquivo em MB.
+- **Ver depois**: tipos de link (nome e cor; criar, renomear, reordenar, excluir — itens de um tipo excluído viram "Outro link"). Tabela `ver_depois_tipos`; a CHECK fixa de `ver_depois.tipo` sai.
+- **Livros**: meta de livros lidos por ano (mostrada na aba Livros com o progresso do ano).
+- **Cursos**, **Swipe file**, **Habilidades**: os cards que já existem, cada um na sua aba.
+
+Ruling: para Livros não há "status" configuráveis (o modelo é lido/em andamento); a configuração útil é a meta anual.
