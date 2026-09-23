@@ -160,7 +160,11 @@ export function DemandaDrawer({
   };
 
   const currentColumn = columns.find(c => c.id === demanda.status);
-  const creationDate = demanda.created_at 
+  // Card recorrente (mãe) não tem "atraso" de entrega — mesmo critério do card no quadro
+  const atraso = demanda.status !== "feito" && demanda.status !== "recorrentes"
+    ? diasDeAtraso(demanda.prazo, hojeBrasilia())
+    : 0;
+  const creationDate = demanda.created_at
     ? formatDistanceToNow(new Date(demanda.created_at), { addSuffix: true, locale: ptBR })
     : "";
 
@@ -328,10 +332,9 @@ export function DemandaDrawer({
                     <X size={12} />
                   </button>
                 )}
-                {demanda.status !== "feito" && diasDeAtraso(demanda.prazo, hojeBrasilia()) > 0 && (
+                {atraso > 0 && (
                   <span className="text-red-500 text-xs">
-                    Atrasada há {diasDeAtraso(demanda.prazo, hojeBrasilia())}{" "}
-                    {diasDeAtraso(demanda.prazo, hojeBrasilia()) === 1 ? "dia" : "dias"}
+                    Atrasada há {atraso} {atraso === 1 ? "dia" : "dias"}
                   </span>
                 )}
               </div>

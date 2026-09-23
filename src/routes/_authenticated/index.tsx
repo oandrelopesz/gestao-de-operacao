@@ -320,24 +320,22 @@ function DemandasPage() {
 
   const handleUpdateDemanda = async (id: string, values: any) => {
     try {
-      const { error } = await supabase
+      // Devolve a linha atualizada: gatilhos do banco podem recalcular prazo/dia_semana (ex.: ao
+      // mudar o status pelo menu "Mover para"), e o join com clientes mantém nome/agência em dia
+      // no painel e no card quando o cliente muda.
+      const { data, error } = await supabase
         .from("demandas")
         .update(values)
-        .eq("id", id);
+        .eq("id", id)
+        .select("*, clientes(nome, agencia)")
+        .single();
       if (error) throw error;
-      
-      // Update local state for immediate feedback. Trocar o cliente também troca o join
-      // "clientes" (nome/agência), senão o painel e o card mostram o cliente antigo.
-      const local = { ...values };
-      if ("cliente_id" in values) {
-        const c = clientes.find((x) => x.id === values.cliente_id);
-        local.clientes = c ? { nome: c.nome, agencia: c.agencia } : null;
-      }
-      setDemandas((prev: any[]) => prev.map(d => d.id === id ? { ...d, ...local } : d));
+
+      setDemandas((prev: any[]) => prev.map(d => d.id === id ? { ...d, ...data } : d));
       if (selectedDemanda?.id === id) {
-        setSelectedDemanda((prev: any) => ({ ...prev, ...local }));
+        setSelectedDemanda((prev: any) => ({ ...prev, ...data }));
       }
-      
+
       // Silently sync
       fetchDemandas();
     } catch (error: any) {
@@ -492,17 +490,31 @@ function DemandasPage() {
   const containerIds = useMemo(() => containerIdsDoQuadro(columns), [columns]);
   const getContainer = useCallback((d: any) => containerDe(d, mapa), [mapa]);
 
-  /** Persiste status + ordem + dia dos cards que estão nos containers informados. */
+  /**
+   * Persiste status + ordem + dia dos cards que estão nos containers informados.
+   * O gatilho do banco recalcula `prazo` (e normaliza `dia_semana`) a partir da coluna/dia
+   * salvos; por isso cada update devolve a linha e o retorno é mesclado no estado, senão o
+   * card continua mostrando a entrega antiga até o próximo fetch.
+   */
   const salvarContainers = async (lista: any[], containers: string[]) => {
     const afetados = new Set(containers);
     try {
       const results = await Promise.all(
         lista
           .filter((d) => afetados.has(getContainer(d)))
-          .map((d) => supabase.from("demandas").update(camposParaSalvar(d, mapa) as any).eq("id", d.id))
+          .map((d) =>
+            supabase
+              .from("demandas")
+              .update(camposParaSalvar(d, mapa) as any)
+              .eq("id", d.id)
+              .select("id, prazo, dia_semana")
+              .single()
+          )
       );
       const failed = results.find((r) => r.error);
       if (failed?.error) throw failed.error;
+      const atualizados = new Map(results.map((r) => [r.data!.id, r.data!]));
+      setDemandas((prev: any[]) => prev.map((d) => (atualizados.has(d.id) ? { ...d, ...atualizados.get(d.id) } : d)));
     } catch {
       toast.error("Erro ao sincronizar movimento");
       fetchDemandas();
@@ -528,8 +540,9 @@ function DemandasPage() {
     onDrop: async (finalList, activeId, origin, target) => {
       setActiveDemanda(null);
       // Entrou numa coluna por dias vinda de outra coluna: pergunta o dia antes de salvar
+      // (a menos que a coluna só tenha um dia possível — o card já caiu na seção certa)
       const alvo = parseSecao(target);
-      if (alvo && parseSecao(origin)?.coluna !== alvo.coluna) {
+      if (alvo && parseSecao(origin)?.coluna !== alvo.coluna && (mapa[alvo.coluna]?.length ?? 0) > 1) {
         setEscolhaDia({ id: activeId, origem: origin, coluna: alvo.coluna, sugerido: alvo.dia });
         return;
       }
@@ -759,6 +772,7 @@ function DemandasPage() {
                     demanda={activeDemanda}
                     onEdit={() => {}}
                     onDelete={() => {}}
+                    diasDaColuna={columns.find((c) => c.id === activeDemanda.status)?.dias}
                   />
                 ) : null}
               </DragOverlay>

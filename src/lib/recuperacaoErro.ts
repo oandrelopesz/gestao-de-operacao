@@ -22,6 +22,8 @@ export function podeRecarregar(ultimaRecargaMs: number | null, agoraMs: number):
 /** Recarrega a página, no máximo uma vez a cada 20 s. Devolve false se a trava impediu. */
 export function recarregarUmaVez(): boolean {
   if (typeof window === "undefined") return false;
+  // Sem internet: recarregar não resolve nada e só troca o erro por uma tela em branco
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
   let ultima: number | null = null;
   try {
     const salvo = window.sessionStorage.getItem(CHAVE_ULTIMA_RECARGA);
