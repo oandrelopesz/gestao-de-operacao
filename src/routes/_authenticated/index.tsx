@@ -58,6 +58,21 @@ import { KanbanCardView } from "@/components/KanbanCard";
 import { useKanbanDnd } from "@/lib/useKanbanDnd";
 import { cn } from "@/lib/utils";
 import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId } from "@/lib/demandaColunas";
+import {
+  COLUNA_FDS,
+  DIAS_FDS,
+  ROTULO_DIA,
+  secaoFds,
+  ehSecaoFds,
+  diaDaSecao,
+  containerIdsDoQuadro,
+  containerDe,
+  aplicarContainer,
+  moverParaDia,
+  camposParaSalvar,
+  type DiaFds,
+} from "@/lib/fimDeSemana";
+import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
 
 type ColumnDialogState =
   | { mode: "create"; title: string; hex: string }
@@ -251,6 +266,7 @@ function DemandasPage() {
       if (sanitizedValues.frequencia_intervalo_dias === "" || isNaN(sanitizedValues.frequencia_intervalo_dias)) {
         sanitizedValues.frequencia_intervalo_dias = null;
       }
+      sanitizedValues.dia_fim_de_semana = sanitizedValues.status === COLUNA_FDS ? (editingDemanda?.dia_fim_de_semana ?? "sabado") : null;
 
       if (editingDemanda?.id) {
         const { error } = await supabase
@@ -443,36 +459,74 @@ function DemandasPage() {
   // Drag and Drop Logic
   const byOrdem = (a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0);
 
-  // Drag-and-drop do Kanban (mover entre colunas e reordenar) - ver src/lib/useKanbanDnd.ts
+  // Estado do quadro antes do arrasto: se o popup de dia for cancelado, volta para ele
+  const antesDoArrastoRef = useRef<any[]>([]);
+  const [escolhaDia, setEscolhaDia] = useState<{ id: string; origem: string; sugerido: DiaFds } | null>(null);
+  const containerIds = useMemo(() => containerIdsDoQuadro(columns.map((c) => c.id)), [columns]);
+
+  /** Persiste status + ordem + dia dos cards que estão nos containers informados. */
+  const salvarContainers = async (lista: any[], containers: string[]) => {
+    const afetados = new Set(containers);
+    try {
+      const results = await Promise.all(
+        lista
+          .filter((d) => afetados.has(containerDe(d)))
+          .map((d) => supabase.from("demandas").update(camposParaSalvar(d) as any).eq("id", d.id))
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    } catch {
+      toast.error("Erro ao sincronizar movimento");
+      fetchDemandas();
+    }
+  };
+
+  // Drag-and-drop do Kanban (mover entre colunas e reordenar) - ver src/lib/useKanbanDnd.ts.
+  // A coluna de fim de semana vira duas seções (Sábado/Domingo) - ver src/lib/fimDeSemana.ts
   const { collisionDetection, measuring, onDragStart, onDragOver, onDragEnd, onDragCancel } = useKanbanDnd<any>({
     items: demandas,
     setItems: setDemandas,
-    containerIds: columns.map((c) => c.id),
-    getContainer: (d) => d.status,
-    setContainer: (d, status) => ({ ...d, status }),
+    containerIds,
+    getContainer: containerDe,
+    setContainer: aplicarContainer,
     // Cards recorrentes (mãe) ficam travados e nada entra na coluna deles via drag
     isItemLocked: (d) => d.status === "recorrentes",
     isContainerLocked: (id) => id === "recorrentes",
-    onStart: (d) => setActiveDemanda(d),
+    onStart: (d) => {
+      antesDoArrastoRef.current = demandas;
+      setActiveDemanda(d);
+    },
     onCancel: () => setActiveDemanda(null),
-    onDrop: async (finalList, _activeId, origin, target) => {
+    onDrop: async (finalList, activeId, origin, target) => {
       setActiveDemanda(null);
-      const affected = new Set([origin, target]);
-      try {
-        // Persiste status + ordem das colunas envolvidas (origem e destino)
-        const results = await Promise.all(
-          finalList
-            .filter((d) => affected.has(d.status))
-            .map((d) => supabase.from("demandas").update({ status: d.status as any, ordem: d.ordem ?? 0 }).eq("id", d.id))
-        );
-        const failed = results.find((r) => r.error);
-        if (failed?.error) throw failed.error;
-      } catch {
-        toast.error("Erro ao sincronizar movimento");
-        fetchDemandas();
+      // Entrou no fim de semana vindo de outra coluna: pergunta o dia antes de salvar
+      if (ehSecaoFds(target) && !ehSecaoFds(origin)) {
+        setEscolhaDia({ id: activeId, origem: origin, sugerido: diaDaSecao(target) });
+        return;
       }
+      await salvarContainers(finalList, [origin, target]);
     },
   });
+
+  const escolherDia = async (dia: DiaFds) => {
+    if (!escolhaDia) return;
+    const lista = moverParaDia(demandas, escolhaDia.id, dia);
+    setDemandas(lista);
+    setEscolhaDia(null);
+    await salvarContainers(lista, [escolhaDia.origem, ...DIAS_FDS.map(secaoFds)]);
+  };
+
+  const cancelarEscolhaDia = () => {
+    setDemandas(antesDoArrastoRef.current);
+    setEscolhaDia(null);
+  };
+
+  const mudarDia = async (id: string, dia: DiaFds) => {
+    const lista = moverParaDia(demandas, id, dia);
+    if (lista === demandas) return;
+    setDemandas(lista);
+    await salvarContainers(lista, DIAS_FDS.map(secaoFds));
+  };
 
   return (
     <div className="space-y-4 flex flex-col h-[calc(100vh-8rem)]">
@@ -595,7 +649,12 @@ function DemandasPage() {
               onDragCancel={onDragCancel}
             >
               <div className="flex gap-4 h-full min-w-max pb-4">
-                {columns.map((col) => (
+                {columns.map((col) => {
+                  const cards = filteredDemandas.filter((d) => d.status === col.id).sort(byOrdem);
+                  const secoes = col.id === COLUNA_FDS
+                    ? DIAS_FDS.map((dia) => ({ id: secaoFds(dia), titulo: ROTULO_DIA[dia], demandas: cards.filter((d) => containerDe(d) === secaoFds(dia)) }))
+                    : undefined;
+                  return (
                   <KanbanColumn
                     key={col.id}
                     id={col.id}
@@ -606,7 +665,9 @@ function DemandasPage() {
                     onRenameColumn={() => setColumnDialog({ mode: "rename", id: col.id, title: col.title, hex: col.hex })}
                     onClearColumn={() => setColumnConfirm({ type: "clear", column: col })}
                     onDeleteColumn={() => setColumnConfirm({ type: "delete", column: col })}
-                    demandas={filteredDemandas.filter((d) => d.status === col.id).sort(byOrdem)}
+                    demandas={cards}
+                    secoes={secoes}
+                    onSetDia={mudarDia}
                     onQuickAdd={handleQuickAdd}
                     onFullAdd={(status) => {
                       setEditingDemanda({ status });
@@ -637,7 +698,8 @@ function DemandasPage() {
                       }
                     }}
                   />
-                ))}
+                  );
+                })}
 
                 <button
                   type="button"
@@ -850,6 +912,13 @@ function DemandasPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EscolherDiaDialog
+        aberto={!!escolhaDia}
+        sugerido={escolhaDia?.sugerido ?? "sabado"}
+        onEscolher={escolherDia}
+        onCancelar={cancelarEscolhaDia}
+      />
       {popoverConfig && (
         <div 
           className="fixed z-[100] w-64 bg-white dark:bg-zinc-950 border rounded-lg shadow-xl p-4 animate-in zoom-in duration-200"
