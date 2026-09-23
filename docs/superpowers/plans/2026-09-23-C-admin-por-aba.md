@@ -267,3 +267,71 @@ export function alternarOculta(cfg: MenuConfig, to: string): MenuConfig {
 4. Admin › Livros: meta 12 mostra "X de 12" na aba Livros.
 5. Admin › PDFs: limite de 10 MB e a mensagem certa ao tentar enviar um arquivo maior (só a validação no front; não é preciso enviar de verdade). Voltar para 50.
 6. Admin › Onboarding: janela 1 faz um passo com data de depois de amanhã sair de Demandas. Voltar para 2.
+
+---
+
+### Task 7: Ideias — categorias configuráveis (pedido do usuário em 23/09, noite)
+
+"Quero poder adicionar novas categorias além de Este sistema / Outro sistema / Para cliente — no formulário da ideia, num botão no topo da aba e no Admin."
+
+**Files:**
+- Create: `supabase/migrations/20260924130000_ideias_categorias.sql`, `src/lib/ideiasCategorias.ts`, `src/components/ideias/CategoriasIdeiasDialog.tsx`, `src/components/admin/IdeiasCategoriasCard.tsx`
+- Modify: `src/lib/ideiasTexto.ts`, `src/components/ideias/IdeiaDialog.tsx`, `src/routes/_authenticated/ideias.tsx`, `src/routes/_authenticated/admin.tsx` (nova seção **"Ideias"** nas abas do Admin, logo após "Demandas"), `src/integrations/supabase/types.ts`
+
+- [ ] **Step 1: Migration** (o controlador aplica)
+```sql
+-- Categorias de ideias editáveis. 'cliente' é fixa: ela liga os campos de agência/cliente.
+CREATE TABLE IF NOT EXISTS public.ideia_categorias (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  hex TEXT NOT NULL DEFAULT '#64748b',
+  ordem INTEGER NOT NULL DEFAULT 0,
+  sistema BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.ideia_categorias ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'ideia_categorias' AND policyname = 'ideia_categorias_all') THEN
+    CREATE POLICY "ideia_categorias_all" ON public.ideia_categorias FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+INSERT INTO public.ideia_categorias (id, label, hex, ordem, sistema) VALUES
+  ('este_sistema', 'Este sistema', '#8b5cf6', 0, false),
+  ('outro_sistema', 'Outro sistema', '#06b6d4', 1, false),
+  ('cliente', 'Para cliente', '#f59e0b', 2, true)
+ON CONFLICT (id) DO NOTHING;
+ALTER TABLE public.ideias DROP CONSTRAINT IF EXISTS ideias_tipo_check;
+
+-- Categoria excluída: as ideias dela vão para a primeira categoria restante que não seja 'cliente' (ou 'cliente')
+CREATE OR REPLACE FUNCTION public.ideia_categoria_excluida()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE destino TEXT;
+BEGIN
+  IF OLD.sistema THEN RAISE EXCEPTION 'A categoria "%" é fixa e não pode ser excluída', OLD.label; END IF;
+  SELECT id INTO destino FROM public.ideia_categorias WHERE id <> OLD.id AND id <> 'cliente' ORDER BY ordem LIMIT 1;
+  UPDATE public.ideias SET tipo = COALESCE(destino, 'cliente') WHERE tipo = OLD.id;
+  RETURN OLD;
+END $$;
+DROP TRIGGER IF EXISTS ideia_categoria_excluida ON public.ideia_categorias;
+CREATE TRIGGER ideia_categoria_excluida BEFORE DELETE ON public.ideia_categorias
+  FOR EACH ROW EXECUTE FUNCTION public.ideia_categoria_excluida();
+```
+Controlador: confirmar o nome real da CHECK de `ideias.tipo` (`SELECT conname FROM pg_constraint WHERE conrelid='public.ideias'::regclass AND contype='c'`) e dropar pelo nome real se diferente.
+
+- [ ] **Step 2: `src/lib/ideiasCategorias.ts`**
+  - `interface CategoriaIdeia { id: string; label: string; hex: string; ordem: number; sistema: boolean }`
+  - `fetchCategoriasIdeias()` (ordenado por ordem; fallback aos 3 padrões de `TIPOS_IDEIA` se a tabela falhar)
+  - `criarCategoriaIdeia(label, hex): Promise<CategoriaIdeia>` (id = slug + sufixo aleatório, como `slugifyColumnId`; ordem = maior + 1)
+  - `atualizarCategoriaIdeia(id, { label?, hex? })`, `excluirCategoriaIdeia(id)`, `moverCategoriaIdeia(lista, id, delta)` (troca ordens)
+  - hook `useCategoriasIdeias()` → `{ categorias, recarregar }`, que escuta `window` evento `"ideias-categorias"` para recarregar quando outra tela alterar
+  - Em `ideiasTexto.ts`: `TipoIdeia` vira `string`; `tipoIdeiaMeta(id, categorias?)` procura na lista passada (fallback: `{ id, label: id, hex: "#64748b" }`); `TIPOS_IDEIA` continua exportado como padrão/fallback. Ajuste o teste existente `ideiasTexto.test.ts` se depender do tipo literal.
+
+- [ ] **Step 3: UI**
+  - **Aba Ideias:** as abas/filtros de tipo no topo passam a listar as categorias da tabela. Ao lado delas vai um botão **"+ Categoria"**, que abre o `CategoriasIdeiasDialog`, uma lista para criar, renomear, trocar a cor, reordenar e excluir (exclusão confirmada, desabilitada para `sistema`).
+  - **`IdeiaDialog`:** o seletor de tipo lista as categorias e tem uma opção final **"+ Nova categoria…"**. Ela abre um mini-form inline (nome + cor) e, ao criar, já seleciona a nova categoria. Os campos agência/cliente continuam aparecendo só quando `tipo === "cliente"`.
+  - **Admin › Ideias:** o `IdeiasCategoriasCard` reusa o mesmo conteúdo do dialog, embutido num Card.
+  - Cada criação ou alteração dispara `window.dispatchEvent(new Event("ideias-categorias"))`.
+
+- [ ] **Step 4:** `npx tsc --noEmit` e `npm test`. **Commit:** "Ideias: categorias configuráveis (na aba e no Admin)".
+
+Na Task 6 (verificação), acrescente: criar a categoria "Teste" pelo formulário da ideia, ver o filtro novo e excluí-la pelo Admin.
