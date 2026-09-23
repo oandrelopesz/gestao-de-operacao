@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { type DiaFds } from "@/lib/fimDeSemana";
 
 interface Demanda {
   id: string;
@@ -21,7 +20,7 @@ interface Demanda {
   descricao?: string;
   status: string;
   prioridade: string;
-  prazo?: string;
+  prazo?: string | null;
   cliente_id: string | null;
   recorrente?: boolean;
   frequencia_tipo?: string;
@@ -32,7 +31,7 @@ interface Demanda {
   proxima_execucao?: string;
   recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
-  dia_fim_de_semana?: string | null;
+  dia_semana?: number | null;
 }
 
 interface KanbanColumnProps {
@@ -52,7 +51,8 @@ interface KanbanColumnProps {
   onDeleteColumn?: () => void;
   /** Colunas de sistema (recorrentes, feito) podem ser renomeadas, mas não excluídas */
   isSystem?: boolean;
-  onSetDia?: (id: string, dia: DiaFds) => void;
+  onSetDia?: (id: string, dia: number) => void;
+  diasDaColuna?: number[];
   secoes?: { id: string; titulo: string; demandas: Demanda[] }[];
 }
 
@@ -85,6 +85,7 @@ export function KanbanColumn({
   onDeleteColumn,
   isSystem,
   onSetDia,
+  diasDaColuna,
   secoes,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id, disabled: !!secoes });
@@ -138,6 +139,7 @@ export function KanbanColumn({
       onComplete={onComplete}
       onMoveToDone={onMoveToDone}
       onSetDia={onSetDia}
+      diasDaColuna={diasDaColuna}
     />
   );
 

@@ -60,19 +60,16 @@ import { cn } from "@/lib/utils";
 import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId } from "@/lib/demandaColunas";
 import { msAteProximaVirada } from "@/lib/viradaDia";
 import {
-  COLUNA_FDS,
-  DIAS_FDS,
-  ROTULO_DIA,
-  secaoFds,
-  ehSecaoFds,
-  diaDaSecao,
+  mapaDias as montarMapaDias,
   containerIdsDoQuadro,
   containerDe,
   aplicarContainer,
   moverParaDia,
   camposParaSalvar,
-  type DiaFds,
-} from "@/lib/fimDeSemana";
+  parseSecao,
+  secaoId,
+  NOMES_DIA,
+} from "@/lib/colunasDias";
 import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
 
 type ColumnDialogState =
@@ -280,7 +277,10 @@ function DemandasPage() {
       if (sanitizedValues.frequencia_intervalo_dias === "" || isNaN(sanitizedValues.frequencia_intervalo_dias)) {
         sanitizedValues.frequencia_intervalo_dias = null;
       }
-      sanitizedValues.dia_fim_de_semana = sanitizedValues.status === COLUNA_FDS ? (editingDemanda?.dia_fim_de_semana ?? "sabado") : null;
+      const diasCol = mapa[sanitizedValues.status];
+      sanitizedValues.dia_semana = diasCol?.length
+        ? (diasCol.includes(editingDemanda?.dia_semana) ? editingDemanda.dia_semana : diasCol[0])
+        : null;
 
       if (editingDemanda?.id) {
         const { error } = await supabase
@@ -481,8 +481,10 @@ function DemandasPage() {
 
   // Estado do quadro antes do arrasto: se o popup de dia for cancelado, volta para ele
   const antesDoArrastoRef = useRef<any[]>([]);
-  const [escolhaDia, setEscolhaDia] = useState<{ id: string; origem: string; sugerido: DiaFds } | null>(null);
-  const containerIds = useMemo(() => containerIdsDoQuadro(columns.map((c) => c.id)), [columns]);
+  const [escolhaDia, setEscolhaDia] = useState<{ id: string; origem: string; coluna: string; sugerido: number } | null>(null);
+  const mapa = useMemo(() => montarMapaDias(columns), [columns]);
+  const containerIds = useMemo(() => containerIdsDoQuadro(columns), [columns]);
+  const getContainer = useCallback((d: any) => containerDe(d, mapa), [mapa]);
 
   /** Persiste status + ordem + dia dos cards que estão nos containers informados. */
   const salvarContainers = async (lista: any[], containers: string[]) => {
@@ -490,8 +492,8 @@ function DemandasPage() {
     try {
       const results = await Promise.all(
         lista
-          .filter((d) => afetados.has(containerDe(d)))
-          .map((d) => supabase.from("demandas").update(camposParaSalvar(d) as any).eq("id", d.id))
+          .filter((d) => afetados.has(getContainer(d)))
+          .map((d) => supabase.from("demandas").update(camposParaSalvar(d, mapa) as any).eq("id", d.id))
       );
       const failed = results.find((r) => r.error);
       if (failed?.error) throw failed.error;
@@ -502,12 +504,12 @@ function DemandasPage() {
   };
 
   // Drag-and-drop do Kanban (mover entre colunas e reordenar) - ver src/lib/useKanbanDnd.ts.
-  // A coluna de fim de semana vira duas seções (Sábado/Domingo) - ver src/lib/fimDeSemana.ts
+  // Colunas por dias da semana viram várias seções (uma por dia) - ver src/lib/colunasDias.ts
   const { collisionDetection, measuring, onDragStart, onDragOver, onDragEnd, onDragCancel } = useKanbanDnd<any>({
     items: demandas,
     setItems: setDemandas,
     containerIds,
-    getContainer: containerDe,
+    getContainer,
     setContainer: aplicarContainer,
     // Cards recorrentes (mãe) ficam travados e nada entra na coluna deles via drag
     isItemLocked: (d) => d.status === "recorrentes",
@@ -519,21 +521,22 @@ function DemandasPage() {
     onCancel: () => setActiveDemanda(null),
     onDrop: async (finalList, activeId, origin, target) => {
       setActiveDemanda(null);
-      // Entrou no fim de semana vindo de outra coluna: pergunta o dia antes de salvar
-      if (ehSecaoFds(target) && !ehSecaoFds(origin)) {
-        setEscolhaDia({ id: activeId, origem: origin, sugerido: diaDaSecao(target) });
+      // Entrou numa coluna por dias vinda de outra coluna: pergunta o dia antes de salvar
+      const alvo = parseSecao(target);
+      if (alvo && parseSecao(origin)?.coluna !== alvo.coluna) {
+        setEscolhaDia({ id: activeId, origem: origin, coluna: alvo.coluna, sugerido: alvo.dia });
         return;
       }
       await salvarContainers(finalList, [origin, target]);
     },
   });
 
-  const escolherDia = async (dia: DiaFds) => {
+  const escolherDia = async (dia: number) => {
     if (!escolhaDia) return;
-    const lista = moverParaDia(demandas, escolhaDia.id, dia);
+    const lista = moverParaDia(demandas, escolhaDia.id, dia, mapa);
     setDemandas(lista);
     setEscolhaDia(null);
-    await salvarContainers(lista, [escolhaDia.origem, ...DIAS_FDS.map(secaoFds)]);
+    await salvarContainers(lista, [escolhaDia.origem, ...(mapa[escolhaDia.coluna] ?? []).map((d) => secaoId(escolhaDia.coluna, d))]);
   };
 
   const cancelarEscolhaDia = () => {
@@ -541,11 +544,13 @@ function DemandasPage() {
     setEscolhaDia(null);
   };
 
-  const mudarDia = async (id: string, dia: DiaFds) => {
-    const lista = moverParaDia(demandas, id, dia);
+  const mudarDia = async (id: string, dia: number) => {
+    const card = demandas.find((d) => d.id === id);
+    if (!card) return;
+    const lista = moverParaDia(demandas, id, dia, mapa);
     if (lista === demandas) return;
     setDemandas(lista);
-    await salvarContainers(lista, DIAS_FDS.map(secaoFds));
+    await salvarContainers(lista, (mapa[card.status] ?? []).map((d) => secaoId(card.status, d)));
   };
 
   return (
@@ -671,8 +676,8 @@ function DemandasPage() {
               <div className="flex gap-4 h-full min-w-max pb-4">
                 {columns.map((col) => {
                   const cards = filteredDemandas.filter((d) => d.status === col.id).sort(byOrdem);
-                  const secoes = col.id === COLUNA_FDS
-                    ? DIAS_FDS.map((dia) => ({ id: secaoFds(dia), titulo: ROTULO_DIA[dia], demandas: cards.filter((d) => containerDe(d) === secaoFds(dia)) }))
+                  const secoes = col.dias.length
+                    ? col.dias.map((dia) => ({ id: secaoId(col.id, dia), titulo: NOMES_DIA[dia], demandas: cards.filter((d) => getContainer(d) === secaoId(col.id, dia)) }))
                     : undefined;
                   return (
                   <KanbanColumn
@@ -687,6 +692,7 @@ function DemandasPage() {
                     onDeleteColumn={() => setColumnConfirm({ type: "delete", column: col })}
                     demandas={cards}
                     secoes={secoes}
+                    diasDaColuna={col.dias}
                     onSetDia={mudarDia}
                     onQuickAdd={handleQuickAdd}
                     onFullAdd={(status) => {
@@ -935,7 +941,9 @@ function DemandasPage() {
 
       <EscolherDiaDialog
         aberto={!!escolhaDia}
-        sugerido={escolhaDia?.sugerido ?? "sabado"}
+        titulo={columns.find((c) => c.id === escolhaDia?.coluna)?.title ?? ""}
+        dias={escolhaDia ? mapa[escolhaDia.coluna] ?? [] : []}
+        sugerido={escolhaDia?.sugerido ?? null}
         onEscolher={escolherDia}
         onCancelar={cancelarEscolhaDia}
       />

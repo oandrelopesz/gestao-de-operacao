@@ -2,7 +2,7 @@ import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
-import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { COLUNA_FDS, DIAS_FDS, ROTULO_DIA, type DiaFds } from "@/lib/fimDeSemana";
+import { NOMES_DIA, rotuloFazerNoDia } from "@/lib/colunasDias";
+import { hojeBrasilia, diasDeAtraso, formatarDataCurta } from "@/lib/entrega";
 
 interface Demanda {
   id: string;
@@ -19,7 +20,7 @@ interface Demanda {
   descricao?: string;
   status: string;
   prioridade: string;
-  prazo?: string;
+  prazo?: string | null;
   cliente_id: string | null;
   recorrente?: boolean;
   frequencia_tipo?: string;
@@ -30,7 +31,7 @@ interface Demanda {
   proxima_execucao?: string;
   recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
-  dia_fim_de_semana?: string | null;
+  dia_semana?: number | null;
 }
 
 interface KanbanCardProps {
@@ -39,7 +40,8 @@ interface KanbanCardProps {
   onDelete: (id: string, name: string) => void;
   onComplete?: (id: string) => void;
   onMoveToDone?: (id: string) => void;
-  onSetDia?: (id: string, dia: DiaFds) => void;
+  onSetDia?: (id: string, dia: number) => void;
+  diasDaColuna?: number[];
 }
 
 interface SortableBindings {
@@ -65,11 +67,15 @@ export function KanbanCard(props: KanbanCardProps) {
 }
 
 /** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
-export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
+export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, diasDaColuna, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
   const isRecorrenteMae = demanda.status === "recorrentes";
   const isDragging = sortable?.isDragging ?? false;
 
   const isDone = demanda.status === "feito";
+  const diaCard = diasDaColuna?.length
+    ? (demanda.dia_semana != null && diasDaColuna.includes(demanda.dia_semana) ? demanda.dia_semana : diasDaColuna[0])
+    : null;
+  const atraso = !isDone && !isRecorrenteMae ? diasDeAtraso(demanda.prazo, hojeBrasilia()) : 0;
 
   // Get preview of description (first 2 lines)
   const descriptionPreview = demanda.descricao ? demanda.descricao.split('\n').slice(0, 2).join('\n') : "";
@@ -104,7 +110,8 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
           "transition-[transform,box-shadow,border-color] duration-150 bg-card border border-border/70 shadow-xs hover:shadow-md hover:-translate-y-px hover:border-primary/30 overflow-hidden rounded-lg",
           isDone && "opacity-60",
           isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20",
-          isDoneForNow && "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50"
+          isDoneForNow && "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50",
+          atraso > 0 && "border-red-500/70 bg-red-500/5 ring-1 ring-red-500/30"
         )}
         onClick={(e) => {
           e.stopPropagation();
@@ -162,14 +169,14 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(demanda); }} className="gap-2 py-1.5">
                     <Pencil size={12} /> Detalhes
                   </DropdownMenuItem>
-                  {demanda.status === COLUNA_FDS && onSetDia && DIAS_FDS.map((dia) => (
+                  {onSetDia && diasDaColuna && diasDaColuna.length > 1 && diasDaColuna.map((dia) => (
                     <DropdownMenuItem
                       key={dia}
-                      disabled={(demanda.dia_fim_de_semana ?? "sabado") === dia}
+                      disabled={diaCard === dia}
                       onClick={(e) => { e.stopPropagation(); onSetDia(demanda.id, dia); }}
                       className="gap-2 py-1.5"
                     >
-                      <CalendarDays size={12} /> Fazer no {ROTULO_DIA[dia].toLowerCase()}
+                      <CalendarDays size={12} /> {rotuloFazerNoDia(dia)}
                     </DropdownMenuItem>
                   ))}
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); }} className="gap-2 py-1.5">
@@ -186,7 +193,7 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
             </div>
           </div>
 
-          {(demanda.clientes?.nome || demanda.descricao || isRecorrenteMae || demanda.status === COLUNA_FDS) && (
+          {(demanda.clientes?.nome || demanda.descricao || isRecorrenteMae || diaCard != null || demanda.prazo) && (
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
               {demanda.clientes?.nome && (
                 <span
@@ -206,10 +213,22 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                 </span>
               )}
 
-              {demanda.status === COLUNA_FDS && (
+              {diaCard != null && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-300">
-                  <CalendarDays size={10} /> {ROTULO_DIA[demanda.dia_fim_de_semana === "domingo" ? "domingo" : "sabado"]}
+                  <CalendarDays size={10} /> {NOMES_DIA[diaCard]}
                 </span>
+              )}
+
+              {demanda.prazo && !isRecorrenteMae && (
+                atraso > 0 ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-500 text-white" title={`Entrega era ${formatarDataCurta(demanda.prazo)}`}>
+                    <AlertTriangle size={10} /> Atrasada há {atraso} {atraso === 1 ? "dia" : "dias"}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-600 dark:text-zinc-300" title="Data de entrega">
+                    <CalendarDays size={10} /> Entrega {formatarDataCurta(demanda.prazo)}
+                  </span>
+                )
               )}
 
               {isRecorrenteMae && (
