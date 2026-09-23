@@ -71,6 +71,7 @@ import {
   secaoId,
   NOMES_DIA,
 } from "@/lib/colunasDias";
+import { ehEsquemaDesatualizado, recarregarUmaVez } from "@/lib/recuperacaoErro";
 import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
 
 type ColumnDialogState =
@@ -339,6 +340,7 @@ function DemandasPage() {
       // Silently sync
       fetchDemandas();
     } catch (error: any) {
+      if (ehEsquemaDesatualizado(error) && recarregarUmaVez()) return;
       toast.error("Erro ao salvar alterações");
     }
   };
@@ -515,7 +517,9 @@ function DemandasPage() {
       if (failed?.error) throw failed.error;
       const atualizados = new Map(results.map((r) => [r.data!.id, r.data!]));
       setDemandas((prev: any[]) => prev.map((d) => (atualizados.has(d.id) ? { ...d, ...atualizados.get(d.id) } : d)));
-    } catch {
+    } catch (erro) {
+      // Aba aberta numa versão anterior do site depois de mudança no banco: recarrega sozinha
+      if (ehEsquemaDesatualizado(erro) && recarregarUmaVez()) return;
       toast.error("Erro ao sincronizar movimento");
       fetchDemandas();
     }

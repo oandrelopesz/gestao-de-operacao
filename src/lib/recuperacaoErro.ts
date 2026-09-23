@@ -15,6 +15,16 @@ export function ehCodigoDesatualizado(erro: unknown): boolean {
   return PADRAO_CODIGO_DESATUALIZADO.test(`${name ?? ""} ${message ?? ""}`);
 }
 
+/**
+ * Erro do banco de "coluna/campo que não existe": a aba está com o código de uma versão anterior
+ * do site depois de uma mudança no banco. Recarregar traz o código novo.
+ */
+export function ehEsquemaDesatualizado(erro: unknown): boolean {
+  if (!erro || typeof erro !== "object") return false;
+  const { code, message } = erro as { code?: string; message?: string };
+  return code === "PGRST204" || code === "42703" || /schema cache|column .* does not exist/i.test(message ?? "");
+}
+
 export function podeRecarregar(ultimaRecargaMs: number | null, agoraMs: number): boolean {
   return ultimaRecargaMs == null || agoraMs - ultimaRecargaMs > INTERVALO_MIN_RECARGA_MS;
 }

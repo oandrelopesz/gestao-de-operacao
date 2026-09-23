@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ehCodigoDesatualizado, podeRecarregar, INTERVALO_MIN_RECARGA_MS } from "./recuperacaoErro.ts";
+import { ehCodigoDesatualizado, ehEsquemaDesatualizado, podeRecarregar, INTERVALO_MIN_RECARGA_MS } from "./recuperacaoErro.ts";
 
 test("reconhece falha ao buscar código de uma versão anterior do site", () => {
   assert.equal(ehCodigoDesatualizado(new TypeError("Failed to fetch dynamically imported module: https://x/assets/pdfs-abc.js")), true);
@@ -10,6 +10,13 @@ test("reconhece falha ao buscar código de uma versão anterior do site", () => 
   assert.equal(ehCodigoDesatualizado(new Error("Unable to preload CSS for /assets/index-1.css")), true);
   assert.equal(ehCodigoDesatualizado(new Error("Cannot read properties of undefined (reading 'nome')")), false);
   assert.equal(ehCodigoDesatualizado(null), false);
+});
+
+test("reconhece erro de campo que não existe mais no banco (aba com versão anterior)", () => {
+  assert.equal(ehEsquemaDesatualizado({ code: "PGRST204", message: "Could not find the 'x' column of 'demandas' in the schema cache" }), true);
+  assert.equal(ehEsquemaDesatualizado({ code: "42703", message: "column demandas.x does not exist" }), true);
+  assert.equal(ehEsquemaDesatualizado({ code: "23505", message: "duplicate key" }), false);
+  assert.equal(ehEsquemaDesatualizado(undefined), false);
 });
 
 test("só recarrega a página se a última recarga automática foi há mais de 20 s (evita laço)", () => {
