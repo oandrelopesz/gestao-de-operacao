@@ -267,7 +267,7 @@ export function DemandaDrawer({
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className="text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 px-1.5 py-0.5 rounded transition-colors text-left truncate max-w-full">
-                        {demanda.clientes?.nome || "Adicionar cliente"}
+                        {clientes.find((c) => c.id === demanda.cliente_id)?.nome || demanda.clientes?.nome || "Adicionar cliente"}
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="max-h-[300px] overflow-y-auto">

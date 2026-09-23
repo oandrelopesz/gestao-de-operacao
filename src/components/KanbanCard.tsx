@@ -2,7 +2,7 @@ import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
-import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -186,8 +186,17 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
             </div>
           </div>
 
-          {(demanda.descricao || isRecorrenteMae || demanda.status === COLUNA_FDS) && (
-            <div className="flex items-center gap-2 pt-0.5">
+          {(demanda.clientes?.nome || demanda.descricao || isRecorrenteMae || demanda.status === COLUNA_FDS) && (
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              {demanda.clientes?.nome && (
+                <span
+                  title={`Cliente: ${demanda.clientes.nome}`}
+                  className="inline-flex items-center gap-1 max-w-full truncate text-[10px] font-medium px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                >
+                  <User size={10} className="shrink-0" /> <span className="truncate">{demanda.clientes.nome}</span>
+                </span>
+              )}
+
               {demanda.descricao && (
                 <span
                   title="Esta tarefa tem observação"

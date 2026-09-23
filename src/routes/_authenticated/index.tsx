@@ -320,10 +320,16 @@ function DemandasPage() {
         .eq("id", id);
       if (error) throw error;
       
-      // Update local state for immediate feedback
-      setDemandas((prev: any[]) => prev.map(d => d.id === id ? { ...d, ...values } : d));
+      // Update local state for immediate feedback. Trocar o cliente também troca o join
+      // "clientes" (nome/agência), senão o painel e o card mostram o cliente antigo.
+      const local = { ...values };
+      if ("cliente_id" in values) {
+        const c = clientes.find((x) => x.id === values.cliente_id);
+        local.clientes = c ? { nome: c.nome, agencia: c.agencia } : null;
+      }
+      setDemandas((prev: any[]) => prev.map(d => d.id === id ? { ...d, ...local } : d));
       if (selectedDemanda?.id === id) {
-        setSelectedDemanda((prev: any) => ({ ...prev, ...values }));
+        setSelectedDemanda((prev: any) => ({ ...prev, ...local }));
       }
       
       // Silently sync
