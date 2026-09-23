@@ -57,7 +57,7 @@ export function Trilha({ processo, roadmaps, somenteLeitura = false, onMudou, on
   const [novoAberto, setNovoAberto] = useState(false);
 
   const hoje = hojeBrasilia();
-  const proximoId = proximoPasso(ordenados);
+  const proximoId = proximoPasso(passos);
   const roadmapDoPasso = useCallback(
     (id: string) => roadmaps.find((r) => r.passo_onboarding_id === id) ?? null,
     [roadmaps],
@@ -276,6 +276,7 @@ export function Trilha({ processo, roadmaps, somenteLeitura = false, onMudou, on
       <PassoPainel
         passo={painelPasso}
         tipo={processo.tipo}
+        passos={processo.passos}
         roadmap={painelPasso ? roadmapDoPasso(painelPasso.id) : null}
         somenteLeitura={somenteLeitura}
         onClose={() => setPainelId(null)}
@@ -365,7 +366,7 @@ function NoDaTrilha({
           type="button"
           disabled={somenteLeitura || ocupado}
           title={tituloNo}
-          aria-label={`${tituloNo ?? "Passo"}: ${passo.titulo}`}
+          aria-label={`${tituloNo ?? "Passo"}: ${passo.titulo}${atraso > 0 ? ` (atrasado há ${atraso} ${atraso === 1 ? "dia" : "dias"})` : ""}`}
           onClick={(e) => { e.stopPropagation(); onAlternar(); }}
           className={cn(
             "relative flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
@@ -406,12 +407,11 @@ function NoDaTrilha({
       <div className="mt-2.5 flex w-[120px] flex-col items-center gap-0.5 text-center">
         <button
           type="button"
-          disabled={somenteLeitura}
           onClick={(e) => { e.stopPropagation(); onAbrir(); }}
           title={passo.titulo}
           className={cn(
             "line-clamp-2 w-full break-words rounded-sm text-xs font-medium leading-snug transition-colors",
-            !somenteLeitura && "hover:text-primary",
+            "hover:text-primary",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default",
             estado === "concluido" && "text-muted-foreground",
           )}
@@ -432,14 +432,14 @@ function NoDaTrilha({
         {roadmap && (
           <button
             type="button"
-            disabled={somenteLeitura || !onAbrirRoadmap}
+            disabled={!onAbrirRoadmap}
             onClick={(e) => { e.stopPropagation(); if (onAbrirRoadmap) onAbrirRoadmap(roadmap.id); }}
             className={cn(
               "mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-medium transition-colors",
               roadmap.progresso >= 100
                 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                 : "bg-primary/10 text-primary",
-              !somenteLeitura && onAbrirRoadmap && "hover:bg-primary/20",
+              onAbrirRoadmap && "hover:bg-primary/20",
               "disabled:cursor-default",
             )}
           >

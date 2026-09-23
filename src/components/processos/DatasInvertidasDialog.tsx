@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ordemValida } from "@/lib/processos";
+import { ordemValida, ordenarPassos, renumerar } from "@/lib/processos";
 import { formatarDataCurta } from "@/lib/entrega";
 import type { Passo } from "@/lib/processosService";
 
@@ -42,7 +42,9 @@ export function DatasInvertidasDialog({ aberto, passos, idsEmConflito, onSalvar,
     () => passos.map((p) => (p.id in datas ? { ...p, data: datas[p.id] } : p)),
     [passos, datas],
   );
-  const valida = ordemValida(comDatasNovas);
+  // Sem data pode ficar em qualquer lugar: ao gravar ele vai para o fim, então valida já normalizado
+  // (renumerar antes, para não desfazer a ordem arrastada)
+  const valida = ordemValida(ordenarPassos(renumerar(comDatasNovas)));
 
   // Vizinhos com data (fora do conflito) ajudam a escolher uma data que caiba na sequência
   const referencia = (id: string) => {
@@ -128,7 +130,7 @@ export function DatasInvertidasDialog({ aberto, passos, idsEmConflito, onSalvar,
             aria-live="polite"
           >
             <AlertTriangle size={14} className="mt-px shrink-0" />
-            <span>As datas ainda estão fora de ordem. Passos sem data precisam ficar depois dos que têm data.</span>
+            <span>As datas ainda estão fora de ordem. Ajuste para que cada data não venha antes da anterior (ou use "sem data": o passo vai para o fim).</span>
           </div>
         )}
 

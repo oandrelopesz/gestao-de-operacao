@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CalendarDays, Check, Info, Loader2, Map as MapIcon, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,23 +20,34 @@ import {
 import { cn } from "@/lib/utils";
 import { useConfig } from "@/lib/appConfig";
 import { diasDeAtraso, formatarDataCurta, hojeBrasilia } from "@/lib/entrega";
-import type { TipoProcesso } from "@/lib/processos";
-import { alternarConclusaoPasso, atualizarPasso, excluirPasso, type Passo, type RoadmapLigado } from "@/lib/processosService";
+import { ordenarPassos, posicaoParaNovoPasso, renumerar, type TipoProcesso } from "@/lib/processos";
+import {
+  alternarConclusaoPasso,
+  atualizarPasso,
+  excluirPasso,
+  salvarOrdem,
+  type Passo,
+  type RoadmapLigado,
+} from "@/lib/processosService";
 
 interface PassoPainelProps {
   passo: Passo | null;
   tipo: TipoProcesso;
   roadmap: RoadmapLigado | null;
+  /** Todos os passos do processo: usados para reposicionar o passo quando a data muda. */
+  passos?: Passo[];
   somenteLeitura?: boolean;
   onClose: () => void;
   onSalvo: () => void;
   onAbrirRoadmap?: (roadmapId: string) => void;
 }
 
+type Patch = { titulo?: string; data?: string | null; observacoes?: string | null };
+
 const erroMsg = (e: unknown) => (e && typeof e === "object" && "message" in e ? String((e as any).message) : "Erro ao salvar");
 
 /** Painel lateral de um passo da trilha: título, data, observações, status, roadmap ligado e excluir. */
-export function PassoPainel({ passo, tipo, roadmap, somenteLeitura, onClose, onSalvo, onAbrirRoadmap }: PassoPainelProps) {
+export function PassoPainel({ passo: passoProp, tipo, roadmap, passos, somenteLeitura, onClose, onSalvo, onAbrirRoadmap }: PassoPainelProps) {
   const [janelaDias] = useConfig<number>("onboarding_janela_dias", 2);
   const [titulo, setTitulo] = useState("");
   const [data, setData] = useState("");
@@ -45,45 +56,100 @@ export function PassoPainel({ passo, tipo, roadmap, somenteLeitura, onClose, onS
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
 
+  // Mantém o último passo para o conteúdo continuar na tela durante a animação de saída
+  const ultimoPasso = useRef<Passo | null>(passoProp);
+  if (passoProp) ultimoPasso.current = passoProp;
+  const passo = passoProp ?? ultimoPasso.current;
+
+  // Últimos valores gravados (para comparar e não gravar duas vezes o mesmo campo)
+  const gravado = useRef<{ titulo: string; data: string | null; observacoes: string | null }>({ titulo: "", data: null, observacoes: null });
+  const dataRef = useRef<HTMLInputElement>(null);
+
   // Recarrega os campos só ao trocar de passo (não a cada recarga, para não atropelar o que está sendo digitado)
   useEffect(() => {
-    setTitulo(passo?.titulo ?? "");
-    setData(passo?.data ?? "");
-    setObservacoes(passo?.observacoes ?? "");
+    if (!passoProp) return;
+    setTitulo(passoProp.titulo);
+    setData(passoProp.data ?? "");
+    setObservacoes(passoProp.observacoes ?? "");
+    gravado.current = { titulo: passoProp.titulo, data: passoProp.data, observacoes: passoProp.observacoes ?? null };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [passo?.id]);
+  }, [passoProp?.id]);
 
   // A data pode mudar por fora (popup de datas ao arrastar): acompanha o valor gravado
   useEffect(() => {
-    setData(passo?.data ?? "");
-  }, [passo?.data]);
+    if (!passoProp) return;
+    setData(passoProp.data ?? "");
+    gravado.current = { ...gravado.current, data: passoProp.data };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passoProp?.data]);
 
-  const salvar = async (patch: { titulo?: string; data?: string | null; observacoes?: string | null }) => {
-    if (!passo) return;
+  /** Tira o passo da lista normalizada e o recoloca na posição cronológica da nova data (sem data → fim). */
+  const reposicionar = async (id: string, novaData: string | null) => {
+    if (!passos?.length) return;
+    const atual = passos.find((p) => p.id === id);
+    if (!atual) return;
+    const outros = renumerar(ordenarPassos(passos.filter((p) => p.id !== id)));
+    const lista = [...outros];
+    lista.splice(posicaoParaNovoPasso(outros, novaData), 0, { ...atual, data: novaData });
+    await salvarOrdem(renumerar(lista).map((p) => ({ id: p.id, ordem: p.ordem })));
+  };
+
+  const gravar = async (patch: Patch) => {
+    if (!passo || !Object.keys(patch).length) return;
+    const id = passo.id;
+    const antes = gravado.current;
+    gravado.current = { ...gravado.current, ...patch } as typeof gravado.current;
     try {
-      await atualizarPasso(passo.id, patch);
-      onSalvo();
+      await atualizarPasso(id, patch);
+      if ("data" in patch) await reposicionar(id, patch.data ?? null);
     } catch (e) {
+      gravado.current = antes;
       toast.error(erroMsg(e));
+    } finally {
       onSalvo();
     }
   };
 
-  const salvarTitulo = () => {
-    if (!passo) return;
+  /** Mudanças ainda não gravadas (data vazia ou incompleta nunca apaga a data: só o "Limpar" apaga). */
+  const pendencias = (): Patch => {
+    const patch: Patch = {};
     const t = titulo.trim();
-    if (!t) { setTitulo(passo.titulo); return; }
-    if (t !== passo.titulo) salvar({ titulo: t });
+    if (t && t !== gravado.current.titulo) patch.titulo = t;
+    const o = observacoes.trim() || null;
+    if (o !== gravado.current.observacoes) patch.observacoes = o;
+    if (data && !dataRef.current?.validity.badInput && data !== gravado.current.data) patch.data = data;
+    return patch;
   };
-  const salvarData = (nova: string) => {
-    if (!passo) return;
-    const valor = nova || null;
-    if (valor !== passo.data) salvar({ data: valor });
+
+  const salvarTitulo = () => {
+    if (!titulo.trim()) { setTitulo(gravado.current.titulo); return; }
+    const { titulo: t } = pendencias();
+    if (t) void gravar({ titulo: t });
   };
   const salvarObservacoes = () => {
-    if (!passo) return;
-    const valor = observacoes.trim() || null;
-    if (valor !== (passo.observacoes ?? null)) salvar({ observacoes: valor });
+    const p = pendencias();
+    if ("observacoes" in p) void gravar({ observacoes: p.observacoes });
+  };
+  const salvarData = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (e.target.validity.badInput || !e.target.value) {
+      // Data digitada pela metade ou apagada no teclado: volta para a gravada (apagar é pelo "Limpar")
+      setData(gravado.current.data ?? "");
+      return;
+    }
+    if (e.target.value !== gravado.current.data) void gravar({ data: e.target.value });
+  };
+  const limparData = () => {
+    setData("");
+    if (gravado.current.data !== null) void gravar({ data: null });
+  };
+
+  /** Fechar (Esc, clique fora, X): grava o que ainda estava em edição antes de desmontar. */
+  const fechar = () => {
+    if (!somenteLeitura) {
+      const patch = pendencias();
+      if (Object.keys(patch).length) void gravar(patch);
+    }
+    onClose();
   };
 
   const alternar = async () => {
@@ -125,7 +191,7 @@ export function PassoPainel({ passo, tipo, roadmap, somenteLeitura, onClose, onS
 
   return (
     <>
-      <Sheet open={!!passo} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Sheet open={!!passoProp} onOpenChange={(o) => { if (!o) fechar(); }}>
         <SheetContent className="sm:max-w-md overflow-y-auto p-0 gap-0">
           {passo && (
             <div className="flex min-h-full flex-col">
@@ -195,11 +261,12 @@ export function PassoPainel({ passo, tipo, roadmap, somenteLeitura, onClose, onS
                   <div className="flex items-center gap-1.5">
                     <Input
                       id="passo-data"
+                      ref={dataRef}
                       type="date"
                       value={data}
                       disabled={somenteLeitura}
                       onChange={(e) => setData(e.target.value)}
-                      onBlur={(e) => salvarData(e.target.value)}
+                      onBlur={salvarData}
                     />
                     {!somenteLeitura && data && (
                       <Button
@@ -207,7 +274,9 @@ export function PassoPainel({ passo, tipo, roadmap, somenteLeitura, onClose, onS
                         variant="ghost"
                         size="sm"
                         className="h-9 shrink-0 px-2.5 text-xs"
-                        onClick={() => { setData(""); salvarData(""); }}
+                        // Evita que o campo perca o foco (e grave pelo blur) antes do clique
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={limparData}
                       >
                         Limpar
                       </Button>
