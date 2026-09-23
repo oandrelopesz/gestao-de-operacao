@@ -78,3 +78,13 @@ test("escolherMidiaDaPagina: somenteVideo não aceita imagem (miniatura não é 
   const r = escolherMidiaDaPagina({ videos: [], imagens: [i("https://cdn/thumb.jpg", 400_000)], embeds: [] }, { somenteVideo: true });
   assert.equal(r, null);
 });
+
+test("capturarMidiaDaPagina: vídeo do YouTube que não baixa explica o motivo e o que fazer", async () => {
+  await assert.rejects(
+    () => capturarMidiaDaPagina({ link: "https://adstransparency.google.com/x", dir: "/tmp/j" }, {
+      abrirPagina: async () => ({ colhido: () => ({ videos: [], imagens: [], embeds: ["https://www.youtube.com/embed/abc"] }), fechar: async () => {} }),
+      baixarComYtDlp: async () => [],
+    }),
+    /YouTube.*Enviar arquivo/,
+  );
+});

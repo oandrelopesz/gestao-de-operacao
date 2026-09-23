@@ -48,13 +48,13 @@ conversão falhar, fica o original).
 `internet`, `outro` (lista e detecção pelo link em `src/lib/swipeRedes.ts`). Cookies por plataforma
 (`ARQUIVO_DE_COOKIES` em `src/jobs/download.js`): Meta Ads usa o do Facebook, TikTok Ads o do TikTok,
 Threads o do Instagram. Configs montados: `swipe_cookies_instagram_v2`, `_tiktok_v2`, `_facebook`,
-`_youtube`, `_linkedin`.
+`_linkedin`.
 
 - **Cookies são copiados para a pasta do job** (`.cookies.txt`, 0600): yt-dlp e gallery-dl regravam o
   arquivo e o config do Swarm é só leitura — sem a cópia o yt-dlp quebra com `Read-only file system`.
-- **YouTube**: a VPS toma "Sign in to confirm you're not a bot" sem cookie. O cookie tem que ser
-  exportado de uma **janela anônima** (logar, exportar, fechar sem sair): exportado de uma aba em uso,
-  o YouTube rotaciona a sessão e o yt-dlp responde "The page needs to be reloaded".
+- **YouTube**: fora do escopo (23/09/2026). A VPS toma "Sign in to confirm you're not a bot" sem cookie e,
+  com cookie exportado de uma aba em uso, "The page needs to be reloaded" (o YouTube rotaciona a sessão).
+  O config `swipe_cookies_youtube` foi removido da VPS.
 - **LinkedIn** (`src/jobs/linkedin.js`): lido como visitante (JSON-LD do post = imagens na ordem;
   `data-native-document-config` no `<article>` = documento em slides, pelo manifesto na maior
   resolução). Logado, o LinkedIn devolve a página montada por JS; a sessão só é usada se o post pedir

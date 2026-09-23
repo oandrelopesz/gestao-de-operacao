@@ -53,7 +53,11 @@ export async function capturarMidiaDaPagina({ link, dir, cookies = null, somente
     }
     if (escolha.tipo === "ytdlp") {
       const arquivos = await baixarComYtDlp(escolha.url);
-      if (!arquivos.length) throw new Error("A página tem um player de vídeo, mas o yt-dlp não conseguiu baixar");
+      if (!arquivos.length) {
+        throw new Error(/youtube\.com|youtu\.be/i.test(escolha.url)
+          ? "O vídeo é do YouTube, que bloqueia downloads do servidor. Baixe manualmente e use \"Enviar arquivo\" no card"
+          : "A página tem um player de vídeo, mas o yt-dlp não conseguiu baixar");
+      }
       return { arquivos, modo: arquivos.length > 1 ? "carrossel" : "unico" };
     }
     const { corpo, tipo } = await pagina.baixar(escolha.url);
