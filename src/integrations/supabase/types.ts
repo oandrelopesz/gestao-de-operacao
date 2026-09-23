@@ -158,6 +158,7 @@ export type Database = {
           nicho: string | null
           nome: string
           observacoes: string | null
+          onboarding_desde: string | null
           plataformas_config: Json | null
           status_operacional:
             | Database["public"]["Enums"]["status_operacional_type"]
@@ -181,6 +182,7 @@ export type Database = {
           nicho?: string | null
           nome: string
           observacoes?: string | null
+          onboarding_desde?: string | null
           plataformas_config?: Json | null
           status_operacional?:
             | Database["public"]["Enums"]["status_operacional_type"]
@@ -204,6 +206,7 @@ export type Database = {
           nicho?: string | null
           nome?: string
           observacoes?: string | null
+          onboarding_desde?: string | null
           plataformas_config?: Json | null
           status_operacional?:
             | Database["public"]["Enums"]["status_operacional_type"]
@@ -424,8 +427,10 @@ export type Database = {
           ordem: number
           prazo: string | null
           prioridade: Database["public"]["Enums"]["demanda_prioridade"]
+          processo_passo_id: string | null
           prospeccao_id: string | null
           proxima_execucao: string | null
+          roadmap_id: string | null
           recorrente: boolean
           recorrente_pai_id: string | null
           status: string
@@ -450,8 +455,10 @@ export type Database = {
           ordem?: number
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          processo_passo_id?: string | null
           prospeccao_id?: string | null
           proxima_execucao?: string | null
+          roadmap_id?: string | null
           recorrente?: boolean
           recorrente_pai_id?: string | null
           status?: string
@@ -476,8 +483,10 @@ export type Database = {
           ordem?: number
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          processo_passo_id?: string | null
           prospeccao_id?: string | null
           proxima_execucao?: string | null
+          roadmap_id?: string | null
           recorrente?: boolean
           recorrente_pai_id?: string | null
           status?: string
@@ -1167,6 +1176,138 @@ export type Database = {
           id?: string
           nome?: string
           ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      processo_passos: {
+        Row: {
+          concluido_em: string | null
+          created_at: string
+          data: string | null
+          id: string
+          observacoes: string | null
+          ordem: number
+          processo_id: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          concluido_em?: string | null
+          created_at?: string
+          data?: string | null
+          id?: string
+          observacoes?: string | null
+          ordem?: number
+          processo_id: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          concluido_em?: string | null
+          created_at?: string
+          data?: string | null
+          id?: string
+          observacoes?: string | null
+          ordem?: number
+          processo_id?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      processo_template_passos: {
+        Row: {
+          created_at: string
+          id: string
+          observacoes: string | null
+          ordem: number
+          template_id: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          ordem?: number
+          template_id: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          ordem?: number
+          template_id?: string
+          titulo?: string
+        }
+        Relationships: []
+      }
+      processo_templates: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      processos: {
+        Row: {
+          cliente_id: string
+          concluido_em: string | null
+          created_at: string
+          id: string
+          iniciado_em: string
+          nome: string
+          passo_onboarding_id: string | null
+          prazo_final: string | null
+          status: string
+          template_id: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          concluido_em?: string | null
+          created_at?: string
+          id?: string
+          iniciado_em?: string
+          nome: string
+          passo_onboarding_id?: string | null
+          prazo_final?: string | null
+          status?: string
+          template_id?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          concluido_em?: string | null
+          created_at?: string
+          id?: string
+          iniciado_em?: string
+          nome?: string
+          passo_onboarding_id?: string | null
+          prazo_final?: string | null
+          status?: string
+          template_id?: string | null
+          tipo?: string
           updated_at?: string
         }
         Relationships: []
