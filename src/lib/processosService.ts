@@ -199,11 +199,11 @@ export async function aplicarTemplate(processoId: string, templateId: string, mo
     }
   } else {
     const { data: existentes, error: erroExistentes } = await (supabase.from("processo_passos") as any)
-      .select("id, data, ordem, concluido_em")
+      .select("id, ordem")
       .eq("processo_id", processoId);
     if (erroExistentes) throw erroExistentes;
-    const normalizados = renumerar(ordenarPassos((existentes || []) as PassoLogico[]));
-    const base = normalizados.length;
+    // Base = maior ordem persistida + 1 (não a contagem: excluirPasso pode deixar buracos)
+    const base = Math.max(-1, ...((existentes || []) as { ordem: number }[]).map((p) => p.ordem)) + 1;
     if (template.passos.length) {
       const { error } = await (supabase.from("processo_passos") as any).insert(
         template.passos.map((p, idx) => ({ processo_id: processoId, titulo: p.titulo, observacoes: p.observacoes, data: null, ordem: base + idx })),
@@ -282,8 +282,22 @@ export async function alternarConclusaoPasso(id: string, concluir: boolean): Pro
 }
 
 export async function excluirPasso(id: string): Promise<void> {
+  const { data: passo, error: erroPasso } = await (supabase.from("processo_passos") as any)
+    .select("processo_id")
+    .eq("id", id)
+    .single();
+  if (erroPasso) throw erroPasso;
+
   const { error } = await (supabase.from("processo_passos") as any).delete().eq("id", id);
   if (error) throw error;
+
+  // Sem isso, exclusões acumulam buracos no `ordem` (aplicarTemplate/adicionarPasso dependem dele)
+  const { data: restantes, error: erroRestantes } = await (supabase.from("processo_passos") as any)
+    .select("id, data, ordem, concluido_em")
+    .eq("processo_id", passo.processo_id);
+  if (erroRestantes) throw erroRestantes;
+  const renumerados = renumerar(ordenarPassos((restantes || []) as PassoLogico[]));
+  if (renumerados.length) await salvarOrdem(renumerados);
 }
 
 export async function salvarOrdem(passos: { id: string; ordem: number; data?: string | null }[]): Promise<void> {
