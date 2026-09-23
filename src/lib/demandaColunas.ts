@@ -15,6 +15,7 @@ export const DEFAULT_COLUMNS: KanbanColumnDef[] = [
   { id: "fazer_hoje", title: "Fazer hoje", color: "red-500", hex: "#ef4444", sistema: false },
   { id: "fazer_amanha", title: "Fazer amanhã", color: "yellow-500", hex: "#eab308", sistema: false },
   { id: "fazer_depois_amanha", title: "Fazer depois de amanhã", color: "orange-500", hex: "#f97316", sistema: false },
+  { id: "fazer_fim_de_semana", title: "Fazer no fim de semana", color: "violet-500", hex: "#8b5cf6", sistema: true },
   { id: "standby", title: "Standby", color: "blue-500", hex: "#3b82f6", sistema: false },
   { id: "feito", title: "Feito", color: "green-500", hex: "#22c55e", sistema: true },
 ];

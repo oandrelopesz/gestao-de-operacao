@@ -388,6 +388,7 @@ export type Database = {
           cliente_id: string | null
           created_at: string
           descricao: string | null
+          dia_fim_de_semana: string | null
           dia_referencia: string | null
           frequencia: Database["public"]["Enums"]["demanda_frequencia"] | null
           frequencia_dia_mes: number | null
@@ -412,6 +413,7 @@ export type Database = {
           cliente_id?: string | null
           created_at?: string
           descricao?: string | null
+          dia_fim_de_semana?: string | null
           dia_referencia?: string | null
           frequencia?: Database["public"]["Enums"]["demanda_frequencia"] | null
           frequencia_dia_mes?: number | null
@@ -436,6 +438,7 @@ export type Database = {
           cliente_id?: string | null
           created_at?: string
           descricao?: string | null
+          dia_fim_de_semana?: string | null
           dia_referencia?: string | null
           frequencia?: Database["public"]["Enums"]["demanda_frequencia"] | null
           frequencia_dia_mes?: number | null
