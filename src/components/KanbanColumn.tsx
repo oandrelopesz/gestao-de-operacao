@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { type DiaFds } from "@/lib/fimDeSemana";
 
 interface Demanda {
   id: string;
@@ -31,6 +32,7 @@ interface Demanda {
   proxima_execucao?: string;
   recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
+  dia_fim_de_semana?: string | null;
 }
 
 interface KanbanColumnProps {
@@ -50,6 +52,8 @@ interface KanbanColumnProps {
   onDeleteColumn?: () => void;
   /** Colunas de sistema (recorrentes, feito) podem ser renomeadas, mas não excluídas */
   isSystem?: boolean;
+  onSetDia?: (id: string, dia: DiaFds) => void;
+  secoes?: { id: string; titulo: string; demandas: Demanda[] }[];
 }
 
 const VISIBLE_BATCH = 40;
@@ -59,6 +63,7 @@ const emptyMessages: Record<string, string> = {
   fazer_hoje: "Nada pra hoje",
   fazer_amanha: "Vazio",
   fazer_depois_amanha: "Vazio",
+  fazer_fim_de_semana: "Nada pro fim de semana",
   standby: "Sem pendências",
   feito: "Nenhuma tarefa concluída",
 };
@@ -79,8 +84,10 @@ export function KanbanColumn({
   onClearColumn,
   onDeleteColumn,
   isSystem,
+  onSetDia,
+  secoes,
 }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: !!secoes });
   const [isAdding, setIsAdding] = useState(false);
   // Colunas muito longas (ex.: Feito com centenas de cards) travavam a troca de aba:
   // renderiza um lote por vez e o restante sob demanda.
@@ -122,11 +129,23 @@ export function KanbanColumn({
     }
   };
 
+  const renderCard = (demanda: Demanda) => (
+    <KanbanCard
+      key={demanda.id}
+      demanda={demanda}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      onComplete={onComplete}
+      onMoveToDone={onMoveToDone}
+      onSetDia={onSetDia}
+    />
+  );
+
   return (
     <div className={cn(
       "flex flex-col w-[280px] shrink-0 rounded-xl p-0 h-full transition-colors border border-border/60",
       "bg-muted/40",
-      isOver && "bg-accent/50 border-primary/30"
+      !secoes && isOver && "bg-accent/50 border-primary/30"
     )}>
       {/* Top indicator line */}
       <div 
@@ -190,36 +209,35 @@ export function KanbanColumn({
         ref={setNodeRef}
         className="flex-1 overflow-y-auto overflow-x-hidden min-h-[150px] px-2 py-1 scrollbar-hide"
       >
-        <SortableContext
-          id={id}
-          items={visibleDemandas.map((d) => d.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {visibleDemandas.map((demanda) => (
-            <KanbanCard
-              key={demanda.id}
-              demanda={demanda}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onComplete={onComplete}
-              onMoveToDone={onMoveToDone}
-            />
-          ))}
-          {demandas.length === 0 && !isAdding && (
-            <div className="h-20 flex items-center justify-center text-[13px] text-zinc-400 dark:text-zinc-600">
-              {emptyMessages[id] || "Vazio"}
-            </div>
-          )}
-        </SortableContext>
+        {secoes ? (
+          secoes.map((secao) => (
+            <SecaoColuna key={secao.id} secao={secao} renderCard={renderCard} />
+          ))
+        ) : (
+          <>
+            <SortableContext
+              id={id}
+              items={visibleDemandas.map((d) => d.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {visibleDemandas.map(renderCard)}
+              {demandas.length === 0 && !isAdding && (
+                <div className="h-20 flex items-center justify-center text-[13px] text-zinc-400 dark:text-zinc-600">
+                  {emptyMessages[id] || "Vazio"}
+                </div>
+              )}
+            </SortableContext>
 
-        {hiddenCount > 0 && (
-          <button
-            type="button"
-            onClick={() => setVisibleLimit((l) => l + VISIBLE_BATCH)}
-            className="w-full mb-2 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-md transition-colors"
-          >
-            Mostrar mais {Math.min(VISIBLE_BATCH, hiddenCount)} de {hiddenCount}
-          </button>
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setVisibleLimit((l) => l + VISIBLE_BATCH)}
+                className="w-full mb-2 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-md transition-colors"
+              >
+                Mostrar mais {Math.min(VISIBLE_BATCH, hiddenCount)} de {hiddenCount}
+              </button>
+            )}
+          </>
         )}
 
         {isAdding && (
@@ -258,6 +276,27 @@ export function KanbanColumn({
           Novo
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** Uma das seções (Sábado/Domingo) da coluna de fim de semana: área de drop e ordem próprias. */
+function SecaoColuna({ secao, renderCard }: { secao: { id: string; titulo: string; demandas: Demanda[] }; renderCard: (d: Demanda) => React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: secao.id });
+  return (
+    <div ref={setNodeRef} className={cn("rounded-lg mb-2 pb-1 transition-colors", isOver && "bg-accent/50")}>
+      <div className="flex items-center justify-between px-1 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span>{secao.titulo}</span>
+        <span className="text-[10px] font-medium">{secao.demandas.length}</span>
+      </div>
+      <SortableContext id={secao.id} items={secao.demandas.map((d) => d.id)} strategy={verticalListSortingStrategy}>
+        {secao.demandas.map(renderCard)}
+        {secao.demandas.length === 0 && (
+          <div className="h-14 flex items-center justify-center text-[12px] text-zinc-400 dark:text-zinc-600 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-md">
+            Arraste para cá
+          </div>
+        )}
+      </SortableContext>
     </div>
   );
 }

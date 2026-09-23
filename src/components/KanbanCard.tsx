@@ -2,7 +2,7 @@ import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
-import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { COLUNA_FDS, DIAS_FDS, ROTULO_DIA, type DiaFds } from "@/lib/fimDeSemana";
 
 interface Demanda {
   id: string;
@@ -29,6 +30,7 @@ interface Demanda {
   proxima_execucao?: string;
   recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
+  dia_fim_de_semana?: string | null;
 }
 
 interface KanbanCardProps {
@@ -37,6 +39,7 @@ interface KanbanCardProps {
   onDelete: (id: string, name: string) => void;
   onComplete?: (id: string) => void;
   onMoveToDone?: (id: string) => void;
+  onSetDia?: (id: string, dia: DiaFds) => void;
 }
 
 interface SortableBindings {
@@ -62,7 +65,7 @@ export function KanbanCard(props: KanbanCardProps) {
 }
 
 /** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
-export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
+export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
   const isRecorrenteMae = demanda.status === "recorrentes";
   const isDragging = sortable?.isDragging ?? false;
 
@@ -159,6 +162,16 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(demanda); }} className="gap-2 py-1.5">
                     <Pencil size={12} /> Detalhes
                   </DropdownMenuItem>
+                  {demanda.status === COLUNA_FDS && onSetDia && DIAS_FDS.map((dia) => (
+                    <DropdownMenuItem
+                      key={dia}
+                      disabled={(demanda.dia_fim_de_semana ?? "sabado") === dia}
+                      onClick={(e) => { e.stopPropagation(); onSetDia(demanda.id, dia); }}
+                      className="gap-2 py-1.5"
+                    >
+                      <CalendarDays size={12} /> Fazer no {ROTULO_DIA[dia].toLowerCase()}
+                    </DropdownMenuItem>
+                  ))}
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); }} className="gap-2 py-1.5">
                     <Copy size={12} /> Duplicar
                   </DropdownMenuItem>
@@ -173,7 +186,7 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
             </div>
           </div>
 
-          {(demanda.descricao || isRecorrenteMae) && (
+          {(demanda.descricao || isRecorrenteMae || demanda.status === COLUNA_FDS) && (
             <div className="flex items-center gap-2 pt-0.5">
               {demanda.descricao && (
                 <span
@@ -183,7 +196,13 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                   <FileText size={9} /> observação
                 </span>
               )}
-              
+
+              {demanda.status === COLUNA_FDS && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-300">
+                  <CalendarDays size={10} /> {ROTULO_DIA[demanda.dia_fim_de_semana === "domingo" ? "domingo" : "sabado"]}
+                </span>
+              )}
+
               {isRecorrenteMae && (
                 <div className="flex items-center gap-1 ml-auto shrink-0">
                   {demanda.proxima_execucao && !isDueToday && !isOverdue && (
