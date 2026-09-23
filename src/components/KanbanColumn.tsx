@@ -177,7 +177,7 @@ export function KanbanColumn({
             <DropdownMenuContent align="end" className="w-[190px] text-xs">
               {onRenameColumn && (
                 <DropdownMenuItem onClick={onRenameColumn} className="gap-2 py-1.5">
-                  <Pencil size={12} /> Editar nome
+                  <Pencil size={12} /> Editar coluna
                 </DropdownMenuItem>
               )}
               {onClearColumn && (

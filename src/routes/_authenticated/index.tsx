@@ -57,7 +57,8 @@ import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { KanbanCardView } from "@/components/KanbanCard";
 import { useKanbanDnd } from "@/lib/useKanbanDnd";
 import { cn } from "@/lib/utils";
-import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId } from "@/lib/demandaColunas";
+import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId, RegraData } from "@/lib/demandaColunas";
+import { RegraDataCampos } from "@/components/demandas/RegraDataCampos";
 import { msAteProximaVirada } from "@/lib/viradaDia";
 import {
   mapaDias as montarMapaDias,
@@ -73,8 +74,8 @@ import {
 import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
 
 type ColumnDialogState =
-  | { mode: "create"; title: string; hex: string }
-  | { mode: "rename"; id: string; title: string; hex: string };
+  | { mode: "create"; title: string; hex: string; regra: RegraData; dias: number[] }
+  | { mode: "rename"; id: string; title: string; hex: string; regra: RegraData; dias: number[] };
 
 type ColumnConfirmState = { type: "clear" | "delete"; column: KanbanColumnDef };
 
@@ -179,12 +180,16 @@ function DemandasPage() {
       toast.error("Informe o nome da coluna");
       return;
     }
+    if (columnDialog.regra === "dias_semana" && columnDialog.dias.length === 0) {
+      toast.error("Marque pelo menos um dia");
+      return;
+    }
     setColumnSaving(true);
     try {
       if (columnDialog.mode === "rename") {
         const { error } = await supabase
           .from("demanda_colunas")
-          .update({ titulo: title, hex: columnDialog.hex })
+          .update({ titulo: title, hex: columnDialog.hex, regra_data: columnDialog.regra, dias_semana: columnDialog.dias })
           .eq("id", columnDialog.id);
         if (error) throw error;
         toast.success("Coluna atualizada");
@@ -194,7 +199,7 @@ function DemandasPage() {
         const ordem = feitoIdx >= 0 ? feitoIdx : columns.length;
         const { error } = await supabase
           .from("demanda_colunas")
-          .insert([{ id: slugifyColumnId(title), titulo: title, hex: columnDialog.hex, ordem }]);
+          .insert([{ id: slugifyColumnId(title), titulo: title, hex: columnDialog.hex, ordem, regra_data: columnDialog.regra, dias_semana: columnDialog.dias }]);
         if (error) throw error;
         // Empurra as colunas seguintes para manter a ordem consistente
         await Promise.all(
@@ -206,6 +211,7 @@ function DemandasPage() {
       }
       setColumnDialog(null);
       fetchColumns();
+      fetchDemandas();
     } catch (error: any) {
       toast.error(error.message || "Erro ao salvar coluna");
     } finally {
@@ -687,7 +693,7 @@ function DemandasPage() {
                     color={col.color}
                     hex={col.hex}
                     isSystem={col.sistema}
-                    onRenameColumn={() => setColumnDialog({ mode: "rename", id: col.id, title: col.title, hex: col.hex })}
+                    onRenameColumn={() => setColumnDialog({ mode: "rename", id: col.id, title: col.title, hex: col.hex, regra: col.regra, dias: col.dias })}
                     onClearColumn={() => setColumnConfirm({ type: "clear", column: col })}
                     onDeleteColumn={() => setColumnConfirm({ type: "delete", column: col })}
                     demandas={cards}
@@ -729,7 +735,7 @@ function DemandasPage() {
 
                 <button
                   type="button"
-                  onClick={() => setColumnDialog({ mode: "create", title: "", hex: COLUMN_COLORS[columns.length % COLUMN_COLORS.length] })}
+                  onClick={() => setColumnDialog({ mode: "create", title: "", hex: COLUMN_COLORS[columns.length % COLUMN_COLORS.length], regra: "nenhuma", dias: [] })}
                   className="flex flex-col items-center justify-center gap-2 w-[200px] shrink-0 h-full max-h-[160px] rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors text-sm"
                   title="Nova coluna"
                 >
@@ -837,6 +843,11 @@ function DemandasPage() {
                   ))}
                 </div>
               </div>
+              <RegraDataCampos
+                regra={columnDialog.regra}
+                dias={columnDialog.dias}
+                onChange={(regra, dias) => setColumnDialog({ ...columnDialog, regra, dias })}
+              />
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setColumnDialog(null)} disabled={columnSaving}>Cancelar</Button>
                 <Button type="submit" disabled={columnSaving}>

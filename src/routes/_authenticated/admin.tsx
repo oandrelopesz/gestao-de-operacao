@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
@@ -21,7 +22,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAgencias, AGENCIA_COLORS, slugifyAgenciaId, type AgenciaDef } from "@/lib/agencias";
-import { useDemandaColunas, COLUMN_COLORS, slugifyColumnId, type KanbanColumnDef } from "@/lib/demandaColunas";
+import { useDemandaColunas, COLUMN_COLORS, slugifyColumnId, type KanbanColumnDef, type RegraData } from "@/lib/demandaColunas";
+import { RegraDataCampos } from "@/components/demandas/RegraDataCampos";
+import { NOMES_DIA_CURTO } from "@/lib/colunasDias";
+import { useConfig } from "@/lib/appConfig";
 import { usePlataformas, slugifyPlataformaId, type PlataformaDef } from "@/lib/plataformas";
 import { useTheme } from "@/lib/theme";
 import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, CATEGORIA_COLORS, type CursoCategoriaDef } from "@/lib/cursoCategorias";
@@ -39,8 +43,8 @@ type AgenciaDialog =
   | { mode: "edit"; id: string; nome: string; hex: string };
 
 type ColunaDialog =
-  | { mode: "create"; titulo: string; hex: string }
-  | { mode: "edit"; id: string; titulo: string; hex: string };
+  | { mode: "create"; titulo: string; hex: string; regra: RegraData; dias: number[] }
+  | { mode: "edit"; id: string; titulo: string; hex: string; regra: RegraData; dias: number[] };
 
 type PlataformaDialog =
   | { mode: "create"; nome: string }
@@ -67,6 +71,15 @@ function traduzErroPlataforma(e: any): string {
   return msg || "Erro ao salvar plataforma";
 }
 
+// Texto da regra de data de uma coluna, exibido na lista do Admin
+function textoRegra(regra: RegraData, dias: number[]): string {
+  if (regra === "hoje") return "Entrega: hoje";
+  if (regra === "amanha") return "Entrega: amanhã";
+  if (regra === "depois_amanha") return "Entrega: depois de amanhã";
+  if (regra === "dias_semana") return `Dias: ${dias.map((d) => NOMES_DIA_CURTO[d]).join(", ")}`;
+  return "";
+}
+
 // Erro típico quando a migration de ordem das categorias ainda não foi aplicada no banco
 function traduzErroCategoria(e: any): string {
   const msg: string = e?.message || "";
@@ -81,6 +94,7 @@ function AdminPage() {
   const { colunas, reload: reloadColunas } = useDemandaColunas();
   const { todasPlataformas, reload: reloadPlataformas } = usePlataformas();
   const { theme, setTheme } = useTheme();
+  const [viradaAtiva, salvarViradaAtiva] = useConfig<boolean>("virada_ativa", true);
 
   const [clientesPorAgencia, setClientesPorAgencia] = useState<Record<string, number>>({});
   const [counts, setCounts] = useState<Record<string, number | null>>({});
@@ -395,12 +409,16 @@ function AdminPage() {
       toast.error("Informe o nome da coluna");
       return;
     }
+    if (colunaDialog.regra === "dias_semana" && colunaDialog.dias.length === 0) {
+      toast.error("Marque pelo menos um dia");
+      return;
+    }
     setSaving(true);
     try {
       if (colunaDialog.mode === "edit") {
         const { error } = await supabase
           .from("demanda_colunas")
-          .update({ titulo, hex: colunaDialog.hex })
+          .update({ titulo, hex: colunaDialog.hex, regra_data: colunaDialog.regra, dias_semana: colunaDialog.dias })
           .eq("id", colunaDialog.id);
         if (error) throw error;
         toast.success("Coluna atualizada");
@@ -410,7 +428,7 @@ function AdminPage() {
         const ordem = feitoIdx >= 0 ? feitoIdx : colunas.length;
         const { error } = await supabase
           .from("demanda_colunas")
-          .insert([{ id: slugifyColumnId(titulo), titulo, hex: colunaDialog.hex, ordem }]);
+          .insert([{ id: slugifyColumnId(titulo), titulo, hex: colunaDialog.hex, ordem, regra_data: colunaDialog.regra, dias_semana: colunaDialog.dias }]);
         if (error) throw error;
         // Empurra as colunas seguintes para manter a ordem consistente
         await Promise.all(
@@ -707,8 +725,15 @@ function AdminPage() {
           <div>
             <CardTitle className="flex items-center gap-2"><Columns3 size={18} /> Colunas do Kanban (Demandas)</CardTitle>
             <CardDescription>Crie, renomeie e escolha a cor das colunas. Para mover demandas entre colunas, use a aba Demandas.</CardDescription>
+            <div className="flex items-center gap-2 pt-2">
+              <Switch
+                checked={viradaAtiva}
+                onCheckedChange={(v) => { salvarViradaAtiva(v).catch(() => toast.error("Erro ao salvar")); }}
+              />
+              <span className="text-xs text-muted-foreground">Virada automática à meia-noite (amanhã → hoje, depois de amanhã → amanhã)</span>
+            </div>
           </div>
-          <Button size="sm" className="gap-2 shrink-0" onClick={() => setColunaDialog({ mode: "create", titulo: "", hex: COLUMN_COLORS[colunas.length % COLUMN_COLORS.length] })}>
+          <Button size="sm" className="gap-2 shrink-0" onClick={() => setColunaDialog({ mode: "create", titulo: "", hex: COLUMN_COLORS[colunas.length % COLUMN_COLORS.length], regra: "nenhuma", dias: [] })}>
             <Plus size={14} /> Nova coluna
           </Button>
         </CardHeader>
@@ -723,8 +748,9 @@ function AdminPage() {
                     {c.sistema && <Badge variant="outline" className="text-[10px]">Fixa</Badge>}
                   </div>
                   <p className="text-xs text-muted-foreground font-mono">{c.id}</p>
+                  {textoRegra(c.regra, c.dias) && <p className="text-xs text-muted-foreground">{textoRegra(c.regra, c.dias)}</p>}
                 </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setColunaDialog({ mode: "edit", id: c.id, titulo: c.title, hex: c.hex })} title="Editar">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setColunaDialog({ mode: "edit", id: c.id, titulo: c.title, hex: c.hex, regra: c.regra, dias: c.dias })} title="Editar">
                   <Pencil size={14} />
                 </Button>
                 <Button
@@ -1000,6 +1026,11 @@ function AdminPage() {
                 />
               </div>
               <ColorPicker colors={COLUMN_COLORS} value={colunaDialog.hex} onChange={(hex) => setColunaDialog({ ...colunaDialog, hex })} />
+              <RegraDataCampos
+                regra={colunaDialog.regra}
+                dias={colunaDialog.dias}
+                onChange={(regra, dias) => setColunaDialog({ ...colunaDialog, regra, dias })}
+              />
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setColunaDialog(null)} disabled={saving}>Cancelar</Button>
                 <Button type="submit" disabled={saving}>{saving ? "Salvando..." : colunaDialog.mode === "edit" ? "Salvar" : "Criar coluna"}</Button>
