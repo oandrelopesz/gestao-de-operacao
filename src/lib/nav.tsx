@@ -69,7 +69,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
       { label: "Swipe file", icon: <Images size={17} />, to: "/swipe" },
       { label: "Links", icon: <Link2 size={17} />, to: "/links" },
       { label: "Notas", icon: <StickyNote size={17} />, to: "/notas" },
-      { label: "PDFs", icon: <FileText size={17} />, to: "/pdfs" },
+      { label: "Arquivos", icon: <FileText size={17} />, to: "/arquivos" },
     ],
   },
   {

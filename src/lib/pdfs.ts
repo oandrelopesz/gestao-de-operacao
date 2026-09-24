@@ -1,5 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
-import { idsDescendentes, nomeParaDownload, nomeSemExtensao, proximaOrdem, type PdfPasta } from "@/lib/pdfsArvore";
+// Aba "Arquivos" (antes só PDFs): os nomes internos (tabelas pdfs/pdf_pastas, bucket "pdfs")
+// ficaram os mesmos para não mexer nos dados; hoje guardam qualquer documento (sem imagem/vídeo).
+import {
+  contentTypeDe, extensaoDe, idsDescendentes, nomeParaDownload, nomeSemExtensao, proximaOrdem, tipoDoArquivo, type PdfPasta,
+} from "@/lib/pdfsArvore";
 
 export type { PdfPasta } from "@/lib/pdfsArvore";
 
@@ -37,11 +41,11 @@ const RODAR_MIGRATION = "Rode supabase/migrations/20260923120000_pdfs.sql no SQL
 export function mensagemErroPdf(error: unknown, limiteMb: number = PDF_TAMANHO_MAX_PADRAO_MB): string {
   const msg = (error as { message?: string })?.message || String(error || "Erro desconhecido");
   if (/pdf_pastas|pdfs/i.test(msg) && /schema cache|does not exist|not find/i.test(msg)) {
-    return `As tabelas da aba PDFs ainda não existem. ${RODAR_MIGRATION}`;
+    return `As tabelas da aba Arquivos ainda não existem. ${RODAR_MIGRATION}`;
   }
-  if (/bucket not found/i.test(msg)) return `O armazenamento de PDFs ainda não foi criado. ${RODAR_MIGRATION}`;
+  if (/bucket not found/i.test(msg)) return `O armazenamento de arquivos ainda não foi criado. ${RODAR_MIGRATION}`;
   if (/maximum allowed size|too large|413/i.test(msg)) return msgLimite(limiteMb);
-  if (/mime type/i.test(msg)) return "Só é possível guardar arquivos PDF.";
+  if (/mime type/i.test(msg)) return "Esse tipo de arquivo não é aceito pelo armazenamento (rode a migration 20260924200000_arquivos.sql).";
   return msg;
 }
 
@@ -117,27 +121,17 @@ async function removerDoStorage(caminhos: string[]): Promise<void> {
   }
 }
 
-function novoCaminho(): string {
+/** Caminho novo no bucket, com a extensão do arquivo original (ou sem, se ele não tiver). */
+function novoCaminho(nomeOriginal: string): string {
   const id = typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return `${id}.pdf`;
+  const ext = extensaoDe(nomeOriginal);
+  return ext ? `${id}.${ext}` : id;
 }
 
-/**
- * Envia o arquivo direto do navegador para o Storage (XHR, para ter progresso)
- * e registra o PDF na pasta. Se o registro falhar, o arquivo enviado é apagado.
- */
-export async function enviarPdf(
-  arquivo: File,
-  pastaId: string,
-  meta: { nome?: string; player?: string },
-  onProgresso?: (fracao: number) => void,
-  limiteMb: number = PDF_TAMANHO_MAX_PADRAO_MB,
-): Promise<PdfArquivo> {
-  if (arquivo.size > mbParaBytes(limiteMb)) throw new Error(msgLimite(limiteMb));
-  const caminho = novoCaminho();
-
+/** Sobe o conteúdo para o Storage (XHR, para ter progresso). */
+async function subirObjeto(arquivo: File, caminho: string, onProgresso?: (fracao: number) => void, limiteMb: number = PDF_TAMANHO_MAX_PADRAO_MB): Promise<void> {
   const url = import.meta.env.VITE_SUPABASE_URL as string;
   const chave = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
   const { data: sessao } = await supabase.auth.getSession();
@@ -148,7 +142,7 @@ export async function enviarPdf(
     xhr.open("POST", `${url}/storage/v1/object/${PDF_BUCKET}/${caminho}`);
     xhr.setRequestHeader("apikey", chave);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    xhr.setRequestHeader("Content-Type", "application/pdf");
+    xhr.setRequestHeader("Content-Type", contentTypeDe(arquivo));
     xhr.setRequestHeader("x-upsert", "false");
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgresso?.(e.loaded / e.total);
@@ -168,6 +162,22 @@ export async function enviarPdf(
     xhr.onerror = () => reject(new Error("Falha de rede ao enviar o arquivo"));
     xhr.send(arquivo);
   });
+}
+
+/**
+ * Envia o arquivo direto do navegador para o Storage e registra na pasta.
+ * Se o registro falhar, o arquivo enviado é apagado.
+ */
+export async function enviarPdf(
+  arquivo: File,
+  pastaId: string,
+  meta: { nome?: string; player?: string },
+  onProgresso?: (fracao: number) => void,
+  limiteMb: number = PDF_TAMANHO_MAX_PADRAO_MB,
+): Promise<PdfArquivo> {
+  if (arquivo.size > mbParaBytes(limiteMb)) throw new Error(msgLimite(limiteMb));
+  const caminho = novoCaminho(arquivo.name);
+  await subirObjeto(arquivo, caminho, onProgresso, limiteMb);
 
   const { data, error } = await supabase
     .from("pdfs")
@@ -186,6 +196,41 @@ export async function enviarPdf(
     await supabase.storage.from(PDF_BUCKET).remove([caminho]).catch(() => {});
     throw error;
   }
+  return data as PdfArquivo;
+}
+
+/**
+ * Troca o arquivo de um card: sobe o novo, aponta o registro para ele e só então apaga o antigo.
+ * Nunca ficam dois arquivos no mesmo card. Se o nome do card era o do arquivo antigo, vira o do novo.
+ */
+export async function trocarArquivo(
+  atual: PdfArquivo,
+  arquivo: File,
+  onProgresso?: (fracao: number) => void,
+  limiteMb: number = PDF_TAMANHO_MAX_PADRAO_MB,
+): Promise<PdfArquivo> {
+  if (arquivo.size > mbParaBytes(limiteMb)) throw new Error(msgLimite(limiteMb));
+  const caminho = novoCaminho(arquivo.name);
+  await subirObjeto(arquivo, caminho, onProgresso, limiteMb);
+  const nomeEraDoArquivo = atual.nome.trim() === nomeSemExtensao(atual.arquivo_nome).trim();
+  const patch = {
+    storage_path: caminho,
+    arquivo_nome: arquivo.name,
+    tamanho: arquivo.size,
+    ...(nomeEraDoArquivo ? { nome: nomeSemExtensao(arquivo.name).trim() || atual.nome } : {}),
+  };
+  const { data, error } = await supabase
+    .from("pdfs")
+    .update(patch)
+    .eq("id", atual.id)
+    .select("id, pasta_id, nome, arquivo_nome, player, storage_path, tamanho, created_at")
+    .single();
+  if (error) {
+    await supabase.storage.from(PDF_BUCKET).remove([caminho]).catch(() => {});
+    throw error;
+  }
+  // O antigo sai por último: se falhar, sobra só um objeto órfão no Storage, nunca um card vazio
+  await supabase.storage.from(PDF_BUCKET).remove([atual.storage_path]).catch(() => {});
   return data as PdfArquivo;
 }
 
@@ -208,7 +253,8 @@ export async function baixarConteudo(pdf: PdfArquivo): Promise<Blob> {
   const { data, error } = await supabase.storage.from(PDF_BUCKET).download(pdf.storage_path);
   if (error) throw error;
   // Garante o tipo certo para o visualizador do navegador
-  return data.type === "application/pdf" ? data : new Blob([data], { type: "application/pdf" });
+  const tipo = tipoDoArquivo(pdf.arquivo_nome) === "pdf" ? "application/pdf" : contentTypeDe({ name: pdf.arquivo_nome, type: "" });
+  return data.type === tipo ? data : new Blob([data], { type: tipo });
 }
 
 /** Salva o PDF no computador com o nome dado na aba. `blob` evita baixar de novo se já estiver aberto. */
@@ -217,7 +263,7 @@ export async function salvarNoComputador(pdf: PdfArquivo, blob?: Blob): Promise<
   const href = URL.createObjectURL(conteudo);
   const a = document.createElement("a");
   a.href = href;
-  a.download = nomeParaDownload(pdf.nome);
+  a.download = nomeParaDownload(pdf.nome, pdf.arquivo_nome);
   document.body.appendChild(a);
   a.click();
   a.remove();

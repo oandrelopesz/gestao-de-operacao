@@ -55,7 +55,7 @@ const SECOES = [
   { id: "roadmap", label: "Roadmap" },
   { id: "links", label: "Links" },
   { id: "notas", label: "Notas" },
-  { id: "pdfs", label: "PDFs" },
+  { id: "pdfs", label: "Arquivos" },
   { id: "ver-depois", label: "Ver depois" },
   { id: "livros", label: "Livros" },
   { id: "cursos", label: "Cursos" },

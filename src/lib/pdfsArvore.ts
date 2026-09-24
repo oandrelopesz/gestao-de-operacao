@@ -123,14 +123,72 @@ export function ehPdf(arquivo: { name: string; type: string }): boolean {
   return arquivo.type === "application/pdf" || /\.pdf$/i.test(arquivo.name);
 }
 
-export function nomeSemExtensao(arquivo: string): string {
-  return arquivo.replace(/\.pdf$/i, "");
+// ---------------------------------------------------------------- Tipos de arquivo (aba Arquivos)
+
+export type TipoArquivo = "pdf" | "texto" | "planilha" | "apresentacao" | "documento" | "compactado" | "outro";
+
+const EXTENSOES: Record<Exclude<TipoArquivo, "outro">, string[]> = {
+  pdf: ["pdf"],
+  texto: ["txt", "md", "markdown", "json", "log", "rtf", "xml", "yaml", "yml", "html", "htm"],
+  planilha: ["csv", "tsv", "xls", "xlsx", "ods", "numbers"],
+  apresentacao: ["ppt", "pptx", "odp", "key"],
+  documento: ["doc", "docx", "odt", "pages", "epub"],
+  compactado: ["zip", "rar", "7z", "tar", "gz"],
+};
+const EXT_IMAGEM = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "heic", "heif", "tif", "tiff", "avif", "ico"];
+const EXT_VIDEO = ["mp4", "mov", "avi", "mkv", "webm", "m4v", "wmv", "flv", "mpeg", "mpg", "3gp"];
+
+/** Tipos de conteúdo para quando o navegador não informa (arrastar do Windows às vezes vem sem tipo). */
+const CONTENT_TYPES: Record<string, string> = {
+  pdf: "application/pdf", txt: "text/plain", md: "text/markdown", markdown: "text/markdown", csv: "text/csv",
+  json: "application/json", html: "text/html", htm: "text/html", xml: "application/xml", rtf: "application/rtf",
+  doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  odt: "application/vnd.oasis.opendocument.text", ods: "application/vnd.oasis.opendocument.spreadsheet",
+  odp: "application/vnd.oasis.opendocument.presentation", epub: "application/epub+zip", zip: "application/zip",
+};
+
+/** "Relatório.PDF" → "pdf"; sem extensão → "". */
+export function extensaoDe(nome: string): string {
+  const m = /\.([a-z0-9]{1,8})$/i.exec(nome.trim());
+  return m ? m[1].toLowerCase() : "";
 }
 
-/** Nome seguro para salvar no computador, sempre terminando em .pdf. */
-export function nomeParaDownload(nome: string): string {
+export function tipoDoArquivo(nome: string): TipoArquivo {
+  const ext = extensaoDe(nome);
+  for (const [tipo, lista] of Object.entries(EXTENSOES)) if (lista.includes(ext)) return tipo as TipoArquivo;
+  return "outro";
+}
+
+/** A aba guarda documentos: imagem e vídeo ficam de fora (pelo tipo ou pela extensão). */
+export function arquivoAceito(arquivo: { name: string; type: string }): { ok: true } | { ok: false; motivo: "imagem" | "video" } {
+  const ext = extensaoDe(arquivo.name);
+  if (arquivo.type.startsWith("image/") || EXT_IMAGEM.includes(ext)) return { ok: false, motivo: "imagem" };
+  if (arquivo.type.startsWith("video/") || EXT_VIDEO.includes(ext)) return { ok: false, motivo: "video" };
+  return { ok: true };
+}
+
+export function contentTypeDe(arquivo: { name: string; type: string }): string {
+  return arquivo.type || CONTENT_TYPES[extensaoDe(arquivo.name)] || "application/octet-stream";
+}
+
+export function nomeSemExtensao(arquivo: string): string {
+  // Só tira quando é uma extensão de verdade ("v1.2 relatório" fica como está)
+  return /\.[a-z0-9]{1,8}$/i.test(arquivo.trim()) && !/\s/.test(arquivo.trim().split(".").pop() || "")
+    ? arquivo.trim().replace(/\.[a-z0-9]{1,8}$/i, "")
+    : arquivo;
+}
+
+/**
+ * Nome seguro para salvar no computador, com a extensão do arquivo original (`arquivoOriginal`;
+ * sem ele, vale .pdf, o formato antigo da aba).
+ */
+export function nomeParaDownload(nome: string, arquivoOriginal = "arquivo.pdf"): string {
   const limpo = nome.replace(/[\\/:*?"<>|]/g, "-").trim() || "arquivo";
-  return /\.pdf$/i.test(limpo) ? limpo : `${limpo}.pdf`;
+  const ext = extensaoDe(arquivoOriginal);
+  if (!ext || extensaoDe(limpo) === ext) return limpo;
+  return `${limpo}.${ext}`;
 }
 
 export function formatarTamanho(bytes: number): string {

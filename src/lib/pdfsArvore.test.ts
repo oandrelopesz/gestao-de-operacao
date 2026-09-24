@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   montarArvore, caminhoDaPasta, idsDescendentes, contarPdfsPorPasta, podeMoverPasta, opcoesDePasta,
-  ehPdf, nomeSemExtensao, nomeParaDownload, formatarTamanho, filtrarPdfs, proximaOrdem, corDaPasta, PASTA_CORES,
+  ehPdf, arquivoAceito, tipoDoArquivo, extensaoDe, contentTypeDe, nomeSemExtensao, nomeParaDownload, formatarTamanho, filtrarPdfs, proximaOrdem, corDaPasta, PASTA_CORES,
   type PdfPasta,
 } from "./pdfsArvore.ts";
 
@@ -74,12 +74,48 @@ test("ehPdf: aceita pelo tipo ou pela extensão (arrastar do Windows às vezes v
   assert.equal(ehPdf({ name: "planilha.xlsx", type: "" }), false);
 });
 
-test("nomeSemExtensao e nomeParaDownload", () => {
+test("arquivoAceito: documentos sim, imagem e vídeo não (pelo tipo ou pela extensão)", () => {
+  for (const nome of ["a.pdf", "notas.txt", "LEIAME.md", "deck.pptx", "velho.ppt", "contrato.docx", "planilha.xlsx", "dados.csv", "livro.epub", "pacote.zip", "sem-extensao"]) {
+    assert.equal(arquivoAceito({ name: nome, type: "" }).ok, true, nome);
+  }
+  assert.deepEqual(arquivoAceito({ name: "foto.png", type: "image/png" }), { ok: false, motivo: "imagem" });
+  assert.deepEqual(arquivoAceito({ name: "print.JPG", type: "" }), { ok: false, motivo: "imagem" });
+  assert.deepEqual(arquivoAceito({ name: "aula.mp4", type: "video/mp4" }), { ok: false, motivo: "video" });
+  assert.deepEqual(arquivoAceito({ name: "clip.mov", type: "" }), { ok: false, motivo: "video" });
+});
+
+test("tipoDoArquivo decide ícone e visualização", () => {
+  assert.equal(tipoDoArquivo("a.pdf"), "pdf");
+  assert.equal(tipoDoArquivo("x.md"), "texto");
+  assert.equal(tipoDoArquivo("x.TXT"), "texto");
+  assert.equal(tipoDoArquivo("x.csv"), "planilha");
+  assert.equal(tipoDoArquivo("x.xlsx"), "planilha");
+  assert.equal(tipoDoArquivo("x.pptx"), "apresentacao");
+  assert.equal(tipoDoArquivo("x.docx"), "documento");
+  assert.equal(tipoDoArquivo("x.zip"), "compactado");
+  assert.equal(tipoDoArquivo("x.bin"), "outro");
+  assert.equal(extensaoDe("Relatório Final.PDF"), "pdf");
+  assert.equal(extensaoDe("sem-extensao"), "");
+});
+
+test("contentTypeDe usa o tipo do arquivo ou deduz pela extensão", () => {
+  assert.equal(contentTypeDe({ name: "a.pdf", type: "application/pdf" }), "application/pdf");
+  assert.equal(contentTypeDe({ name: "b.md", type: "" }), "text/markdown");
+  assert.equal(contentTypeDe({ name: "c.pptx", type: "" }), "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+  assert.equal(contentTypeDe({ name: "d.qualquer", type: "" }), "application/octet-stream");
+});
+
+test("nomeSemExtensao e nomeParaDownload (mantém a extensão do arquivo original)", () => {
   assert.equal(nomeSemExtensao("Guia Meta Ads.pdf"), "Guia Meta Ads");
+  assert.equal(nomeSemExtensao("deck final.pptx"), "deck final");
   assert.equal(nomeSemExtensao("sem-extensao"), "sem-extensao");
+  assert.equal(nomeSemExtensao("v1.2 relatório"), "v1.2 relatório");
   assert.equal(nomeParaDownload("Guia: Meta/Ads?"), "Guia- Meta-Ads-.pdf");
   assert.equal(nomeParaDownload("ja.pdf"), "ja.pdf");
   assert.equal(nomeParaDownload("   "), "arquivo.pdf");
+  assert.equal(nomeParaDownload("Apresentação", "deck.pptx"), "Apresentação.pptx");
+  assert.equal(nomeParaDownload("Notas.md", "notas.md"), "Notas.md");
+  assert.equal(nomeParaDownload("Sem ext", "arquivo"), "Sem ext");
 });
 
 test("formatarTamanho", () => {

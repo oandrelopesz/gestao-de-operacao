@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, ExternalLink, FileText, FolderPlus, Loader2, X } from "lucide-react";
+import { Download, ExternalLink, FolderPlus, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { atualizarPdf, baixarConteudo, criarPasta, salvarNoComputador, mensagemErroPdf, type PdfArquivo } from "@/lib/pdfs";
-import { opcoesDePasta, formatarTamanho, nomeSemExtensao, PASTA_CORES, type PdfPasta } from "@/lib/pdfsArvore";
+import { opcoesDePasta, formatarTamanho, nomeSemExtensao, extensaoDe, tipoDoArquivo, PASTA_CORES, type PdfPasta } from "@/lib/pdfsArvore";
+import { IconeArquivo, IconeArquivoSimples } from "@/components/pdfs/IconeArquivo";
+
+/** Como mostrar o arquivo na tela: PDF no visualizador do navegador, texto como texto, o resto só baixando. */
+type ModoVisualizacao = "pdf" | "texto" | "nenhum";
+function modoDe(arquivoNome: string): ModoVisualizacao {
+  const tipo = tipoDoArquivo(arquivoNome);
+  if (tipo === "pdf") return "pdf";
+  if (tipo === "texto" || ["csv", "tsv"].includes(extensaoDe(arquivoNome))) return "texto";
+  return "nenhum";
+}
+const LIMITE_TEXTO = 2 * 1024 * 1024; // texto maior que isso: só baixando
 
 function SelectPasta({ pastas, value, onChange, id }: { pastas: PdfPasta[]; value: string; onChange: (v: string) => void; id?: string }) {
   const opcoes = useMemo(() => opcoesDePasta(pastas), [pastas]);
@@ -39,20 +50,27 @@ interface PdfViewerProps {
 /** Visualização em tela cheia com botões de baixar, abrir em nova aba e fechar. */
 export function PdfViewer({ pdf, local, onClose }: PdfViewerProps) {
   const [url, setUrl] = useState<string | null>(null);
+  const [texto, setTexto] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [baixando, setBaixando] = useState(false);
   const blobRef = useRef<Blob | null>(null);
+  const modo: ModoVisualizacao = pdf ? (pdf.tamanho > LIMITE_TEXTO && modoDe(pdf.arquivo_nome) === "texto" ? "nenhum" : modoDe(pdf.arquivo_nome)) : "nenhum";
 
   useEffect(() => {
     if (!pdf) return;
     let cancelado = false;
     let objectUrl: string | null = null;
     setUrl(null);
+    setTexto(null);
     setErro(null);
+    blobRef.current = null;
+    if (modo === "nenhum") return; // sem pré-visualização: nem baixa até clicar em Baixar
     baixarConteudo(pdf)
-      .then((blob) => {
+      .then(async (blob) => {
         if (cancelado) return;
         blobRef.current = blob;
+        // Texto aparece como texto puro (HTML/markdown não são interpretados: nada roda aqui)
+        if (modo === "texto") { const t = await blob.text(); if (!cancelado) setTexto(t); return; }
         objectUrl = URL.createObjectURL(blob);
         setUrl(objectUrl);
       })
@@ -62,6 +80,7 @@ export function PdfViewer({ pdf, local, onClose }: PdfViewerProps) {
       blobRef.current = null;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdf]);
 
   const baixar = async () => {
@@ -83,7 +102,7 @@ export function PdfViewer({ pdf, local, onClose }: PdfViewerProps) {
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="flex items-center gap-3 border-b px-3 py-2 sm:px-4">
-          <FileText size={18} className="shrink-0 text-red-500" />
+          <IconeArquivo nome={pdf?.arquivo_nome || "arquivo.pdf"} tamanho={30} />
           <div className="min-w-0 flex-1">
             <DialogTitle className="truncate text-sm font-semibold leading-tight">{pdf?.nome}</DialogTitle>
             <DialogDescription className="truncate text-[11px]">
@@ -116,11 +135,26 @@ export function PdfViewer({ pdf, local, onClose }: PdfViewerProps) {
               <p className="text-sm text-destructive">{erro}</p>
               <Button variant="outline" size="sm" onClick={onClose}>Fechar</Button>
             </div>
+          ) : modo === "nenhum" ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+              <IconeArquivo nome={pdf?.arquivo_nome || ""} tamanho={64} />
+              <p className="text-sm font-medium">{pdf?.arquivo_nome}</p>
+              <p className="max-w-sm text-xs text-muted-foreground">
+                O navegador não mostra esse formato aqui dentro. Baixe para abrir no programa certo (PowerPoint, Word, Excel…).
+              </p>
+              <Button className="gap-1.5" onClick={baixar} disabled={baixando}>
+                {baixando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Baixar
+              </Button>
+            </div>
+          ) : texto !== null ? (
+            <div className="absolute inset-0 overflow-auto bg-background">
+              <pre className="mx-auto max-w-4xl whitespace-pre-wrap break-words p-6 font-mono text-[13px] leading-relaxed">{texto}</pre>
+            </div>
           ) : url ? (
             <iframe key={url} src={url} title={pdf?.nome} className="absolute inset-0 h-full w-full border-0" />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 size={18} className="animate-spin" /> Carregando PDF...
+              <Loader2 size={18} className="animate-spin" /> Carregando…
             </div>
           )}
         </div>
@@ -153,14 +187,14 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
 
   const save = async () => {
     if (!pdf) return;
-    if (!nome.trim()) { toast.error("Dê um nome para o PDF"); return; }
+    if (!nome.trim()) { toast.error("Dê um nome para o arquivo"); return; }
     if (!pastaId) { toast.error("Escolha a pasta"); return; }
     setSaving(true);
     try {
       const patch = { nome: nome.trim(), pasta_id: pastaId, player: player.trim() || null };
       await atualizarPdf(pdf.id, patch);
       onSaved(patch);
-      toast.success("PDF atualizado");
+      toast.success("Arquivo atualizado");
       onClose();
     } catch (e) {
       toast.error(mensagemErroPdf(e));
@@ -173,7 +207,7 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
     <Dialog open={!!pdf} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-[440px]">
         <DialogHeader>
-          <DialogTitle>Editar PDF</DialogTitle>
+          <DialogTitle>Editar arquivo</DialogTitle>
           <DialogDescription>Arquivo original: {pdf?.arquivo_nome}</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save(); }}>
@@ -208,7 +242,7 @@ export interface PdfParaEnviar {
 }
 
 interface EnviarPdfsDialogProps {
-  /** Arquivos já validados (só PDFs, dentro do limite de tamanho); null = fechado */
+  /** Arquivos já validados (sem imagem/vídeo, dentro do limite de tamanho); null = fechado */
   arquivos: File[] | null;
   /** Pasta aberta ou pasta onde os arquivos foram soltos */
   pastaInicial: string | null;
@@ -219,7 +253,7 @@ interface EnviarPdfsDialogProps {
 }
 
 /**
- * Ao adicionar PDFs: nome (opcional — vazio mantém o nome do documento), player e o tema/pasta.
+ * Ao adicionar arquivos: nome (opcional — vazio mantém o nome do documento), player e o tema/pasta.
  * Dá para criar um tema ou uma subpasta ali mesmo, sem sair do popup.
  */
 export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPastaCriada, onConfirmar }: EnviarPdfsDialogProps) {
@@ -276,7 +310,7 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
   const confirmar = () => {
     if (!arquivos) return;
     if (criando) { criarPastaAqui(); return; }
-    if (!pastaId) { toast.error("Escolha o tema ou a pasta do PDF"); return; }
+    if (!pastaId) { toast.error("Escolha o tema ou a pasta do arquivo"); return; }
     onConfirmar(arquivos.map((arquivo, i) => ({ arquivo, nome: campos[i]?.nome ?? "", player: campos[i]?.player ?? "" })), pastaId);
   };
 
@@ -285,7 +319,7 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
     <Dialog open={!!arquivos} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{n === 1 ? "Adicionar PDF" : `Adicionar ${n} PDFs`}</DialogTitle>
+          <DialogTitle>{n === 1 ? "Adicionar arquivo" : `Adicionar ${n} arquivos`}</DialogTitle>
           <DialogDescription>O nome é opcional: se ficar em branco, fica o nome do documento original.</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); confirmar(); }}>
@@ -293,7 +327,7 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
             {arquivos?.map((arquivo, i) => (
               <div key={`${arquivo.name}-${i}`} className="rounded-lg border p-3 space-y-2">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <FileText size={14} className="shrink-0 text-red-500" />
+                  <IconeArquivoSimples nome={arquivo.name} />
                   <span className="truncate">{arquivo.name}</span>
                   <span className="shrink-0">· {formatarTamanho(arquivo.size)}</span>
                 </div>
@@ -375,7 +409,7 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
             <Button type="submit" disabled={!pastaId || !!criando}>
-              {n === 1 ? "Guardar PDF" : `Guardar ${n} PDFs`}
+              {n === 1 ? "Guardar arquivo" : `Guardar ${n} arquivos`}
             </Button>
           </DialogFooter>
         </form>

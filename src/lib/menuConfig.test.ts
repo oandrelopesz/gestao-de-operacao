@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { aplicarMenu, moverNoGrupo, alternarOculta, MENU_FIXOS } from "./menuConfig.ts";
+import { aplicarMenu, moverNoGrupo, alternarOculta, normalizarMenu, MENU_FIXOS } from "./menuConfig.ts";
+
+test("endereço antigo (/pdfs → /arquivos) mantém ordem e oculta", () => {
+  const g = [{ title: "Ferramentas", links: [{ to: "/links" }, { to: "/notas" }, { to: "/arquivos" }] }];
+  assert.deepEqual(aplicarMenu(g, { ocultas: [], ordem: { Ferramentas: ["/pdfs", "/links", "/notas"] } })[0].links.map((l) => l.to), ["/arquivos", "/links", "/notas"]);
+  assert.deepEqual(aplicarMenu(g, { ocultas: ["/pdfs"], ordem: {} })[0].links.map((l) => l.to), ["/links", "/notas"]);
+  assert.deepEqual(normalizarMenu({ ocultas: ["/pdfs", "/arquivos"], ordem: {} }), { ocultas: ["/arquivos"], ordem: {} });
+  assert.equal(normalizarMenu(null), null);
+});
 
 const grupos = [
   { title: "Operação", links: [{ to: "/" }, { to: "/onboarding" }, { to: "/roadmap" }, { to: "/ideias" }] },

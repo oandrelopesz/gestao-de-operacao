@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useConfig } from "@/lib/appConfig";
 import { NAV_GROUPS } from "@/lib/nav";
-import { MENU_FIXOS, moverNoGrupo, alternarOculta, type MenuConfig } from "@/lib/menuConfig";
+import { MENU_FIXOS, moverNoGrupo, alternarOculta, normalizarMenu, type MenuConfig } from "@/lib/menuConfig";
 
 const CFG_VAZIA: MenuConfig = { ocultas: [], ordem: {} };
 
@@ -26,7 +26,7 @@ function ordenarGrupo<L extends { to: string }>(links: L[], ordem: string[]): L[
  */
 export function MenuAdminCard() {
   const [cfg, salvarCfg, carregando] = useConfig<MenuConfig | null>("menu", null);
-  const atual = cfg ?? CFG_VAZIA;
+  const atual = normalizarMenu(cfg) ?? CFG_VAZIA;
 
   const salvar = async (novo: MenuConfig) => {
     try {

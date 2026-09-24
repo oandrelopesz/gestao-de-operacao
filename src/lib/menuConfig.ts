@@ -4,10 +4,24 @@ export interface MenuConfig { ocultas: string[]; ordem: Record<string, string[]>
 /** Demandas e Admin nunca somem do menu. */
 export const MENU_FIXOS = ["/", "/admin"];
 
+/** Abas que mudaram de endereço: a ordem e o "oculta" salvos com o endereço antigo continuam valendo. */
+const ENDERECOS_ANTIGOS: Record<string, string> = { "/pdfs": "/arquivos" };
+
+export function normalizarMenu(cfg: MenuConfig | null): MenuConfig | null {
+  if (!cfg) return cfg;
+  const novo = (to: string) => ENDERECOS_ANTIGOS[to] ?? to;
+  const semRepetir = (lista: string[]) => [...new Set(lista.map(novo))];
+  return {
+    ocultas: semRepetir(cfg.ocultas ?? []),
+    ordem: Object.fromEntries(Object.entries(cfg.ordem ?? {}).map(([g, tos]) => [g, semRepetir(tos)])),
+  };
+}
+
 export function aplicarMenu<L extends { to: string }>(
   grupos: { title: string; links: L[] }[],
-  cfg: MenuConfig | null,
+  cfgBruta: MenuConfig | null,
 ): { title: string; links: L[] }[] {
+  const cfg = normalizarMenu(cfgBruta);
   if (!cfg) return grupos;
   return grupos
     .map((g) => {

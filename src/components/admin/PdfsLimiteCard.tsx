@@ -11,7 +11,7 @@ import { PDF_TAMANHO_MAX_PADRAO_MB } from "@/lib/pdfs";
 const MIN_MB = 1;
 const MAX_MB = 200;
 
-/** Card da seção PDFs do Admin: tamanho máximo por arquivo (app_config.pdf_tamanho_max_mb). */
+/** Card da seção Arquivos do Admin: tamanho máximo por arquivo (app_config.pdf_tamanho_max_mb). */
 export function PdfsLimiteCard() {
   const [limite, salvarLimite, carregando] = useConfig<number>("pdf_tamanho_max_mb", PDF_TAMANHO_MAX_PADRAO_MB);
   const [valor, setValor] = useState(String(limite));
@@ -44,7 +44,7 @@ export function PdfsLimiteCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><HardDrive size={18} /> Tamanho máximo por arquivo</CardTitle>
         <CardDescription>
-          PDFs maiores que o limite são recusados antes do envio. Vale para novos envios; os arquivos já guardados continuam.
+          Arquivos maiores que o limite são recusados antes do envio. Vale para novos envios; os arquivos já guardados continuam.
         </CardDescription>
       </CardHeader>
       <CardContent>

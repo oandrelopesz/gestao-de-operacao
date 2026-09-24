@@ -9,7 +9,7 @@ import { montarArvore, contarPdfsPorPasta, corDaPasta, type PastaNo, type PdfPas
 import { PastaDialog, ExcluirPastaDialog, type PastaDialogState } from "@/components/pdfs/PastaDialogs";
 
 /**
- * Card da aba Admin para gerenciar os temas (pastas da raiz) e subpastas da aba PDFs.
+ * Card da aba Admin para gerenciar os temas (pastas da raiz) e subpastas da aba Arquivos.
  * Os arquivos em si são enviados na própria aba.
  */
 export function PdfsAdminCard() {
@@ -58,7 +58,7 @@ export function PdfsAdminCard() {
           <div className="min-w-0 flex-1">
             <span className={nivel === 0 ? "font-medium" : "text-sm"}>{no.nome}</span>
             <span className="ml-2 text-xs text-muted-foreground">
-              {c?.total ?? 0} {c?.total === 1 ? "PDF" : "PDFs"}
+              {c?.total ?? 0} {c?.total === 1 ? "arquivo" : "arquivos"}
             </span>
           </div>
           <div className="flex items-center">
@@ -78,10 +78,10 @@ export function PdfsAdminCard() {
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
           <div>
-            <CardTitle className="flex items-center gap-2"><FileText size={18} /> PDFs (temas e pastas)</CardTitle>
+            <CardTitle className="flex items-center gap-2"><FileText size={18} /> Arquivos (temas e pastas)</CardTitle>
             <CardDescription>
-              Temas e subpastas da aba PDFs, em quantos níveis quiser. Os arquivos você envia{" "}
-              <Link to="/pdfs" className="underline underline-offset-2 inline-flex items-center gap-1">na própria aba <ExternalLink size={11} /></Link>.
+              Temas e subpastas da aba Arquivos, em quantos níveis quiser. Os arquivos você envia{" "}
+              <Link to="/arquivos" className="underline underline-offset-2 inline-flex items-center gap-1">na própria aba <ExternalLink size={11} /></Link>.
             </CardDescription>
           </div>
           <Button size="sm" className="gap-2 shrink-0" onClick={() => setDialog({ mode: "create", parentId: null })}>
