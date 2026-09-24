@@ -27,7 +27,7 @@ export interface NavLink {
   to: string;
 }
 
-// Navegação agrupada por contexto: operação do dia, comercial, pessoal e sistema
+// Navegação agrupada por contexto: operação do dia, comercial, pessoal, ferramentas e sistema
 export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
   {
     title: "Operação",
@@ -57,6 +57,11 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
       { label: "Livros", icon: <Book size={17} />, to: "/livros" },
       { label: "Habilidades", icon: <Gauge size={17} />, to: "/habilidades" },
       { label: "Ver depois", icon: <Bookmark size={17} />, to: "/ver-depois" },
+    ],
+  },
+  {
+    title: "Ferramentas",
+    links: [
       { label: "Swipe file", icon: <Images size={17} />, to: "/swipe" },
       { label: "PDFs", icon: <FileText size={17} />, to: "/pdfs" },
     ],
