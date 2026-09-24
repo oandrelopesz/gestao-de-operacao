@@ -1,5 +1,5 @@
 // Grade da Agenda (FullCalendar). Carregado só no navegador (import dinâmico na rota).
-import type { RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -26,13 +26,26 @@ interface AgendaGradeProps {
 }
 
 export default function AgendaGrade({ visao, eventos, calRef, onPeriodo, onSelecionar, onClicar, onMover, onArrastando }: AgendaGradeProps) {
+  // O FullCalendar só se remede quando a janela muda; aqui ele acompanha o espaço real
+  // (carregou com a aba em segundo plano, menu lateral recolhido, coluna das agendas...)
+  const caixa = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = caixa.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => calRef.current?.getApi().updateSize());
+    ro.observe(el);
+    const aoVoltar = () => { if (document.visibilityState === "visible") calRef.current?.getApi().updateSize(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => { ro.disconnect(); document.removeEventListener("visibilitychange", aoVoltar); };
+  }, [calRef]);
+
   const mover = (a: { event: EventApi; revert: () => void }) => {
     if (!a.event.start) { a.revert(); return; }
     onMover(a.event.id, a.event.start, a.event.end, a.event.allDay, a.revert);
   };
 
   return (
-    <div className="agenda-fc h-full">
+    <div ref={caixa} className="agenda-fc h-full">
       <FullCalendar
         ref={calRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -49,7 +62,7 @@ export default function AgendaGrade({ visao, eventos, calRef, onPeriodo, onSelec
         allDayText="dia todo"
         slotDuration="00:30:00"
         scrollTime="07:00:00"
-        eventMinHeight={22}
+        eventMinHeight={18}
         eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
         slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
         datesSet={(a) => onPeriodo(a.start, a.end, a.view.title)}

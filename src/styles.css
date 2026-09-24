@@ -360,6 +360,6 @@ html[data-hidden] [data-state="closed"] {
 }
 .agenda-fc .fc-daygrid-more-link { color: var(--muted-foreground); font-weight: 500; }
 .agenda-fc .fc-popover { background: var(--popover); border-color: var(--border); border-radius: 10px; }
-.agenda-fc .fc-evento-curto { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 5px; overflow: hidden; white-space: nowrap; line-height: 1.15; }
-.agenda-fc .fc-evento-curto-titulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
-.agenda-fc .fc-evento-curto-hora { flex-shrink: 0; font-size: 0.68rem; opacity: 0.75; }
+.agenda-fc .fc-evento-curto { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px; line-height: 17px; }
+.agenda-fc .fc-evento-curto-titulo { font-weight: 600; }
+.agenda-fc .fc-evento-curto-hora { margin-left: 5px; font-size: 0.68rem; opacity: 0.75; }
