@@ -49,8 +49,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useCachedState, hasCached } from "@/lib/pageCache";
+import { useConfig } from "@/lib/appConfig";
 import { CACHE_KEYS, loadLivros } from "@/lib/data";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -111,6 +113,8 @@ function LivrosPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  const [metaAnual] = useConfig<number>("livros_meta_anual", 12);
 
   const metrics = useMemo(() => {
     const total = livros.length;
@@ -283,7 +287,23 @@ function LivrosPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-blue-600">{metrics.esteAno}</div>
+            {metaAnual > 0 ? (
+              <div className="space-y-2">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {metrics.esteAno} <span className="text-sm font-medium text-blue-600/70">de {metaAnual}</span>
+                  </div>
+                  {metrics.esteAno >= metaAnual && <span className="text-xs font-semibold text-blue-600">Meta batida 🎉</span>}
+                </div>
+                <Progress
+                  value={Math.min(100, (metrics.esteAno / metaAnual) * 100)}
+                  className="h-1.5 bg-blue-500/20"
+                  indicatorClassName="bg-blue-600"
+                />
+              </div>
+            ) : (
+              <div className="text-2xl font-bold text-blue-600">{metrics.esteAno}</div>
+            )}
           </CardContent>
         </Card>
       </div>

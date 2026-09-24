@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Building2, Plus, Pencil, Trash2, ArrowUp, ArrowDown, Sun, Moon,
   Columns3, Database, Download, AlertTriangle, EyeOff, Eye, RefreshCw,
-  Megaphone, GraduationCap, Lightbulb, Book,
+  Megaphone, GraduationCap, Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,7 @@ import { RoadmapAdminSecao } from "@/components/admin/RoadmapAdminSecao";
 import { PdfsLimiteCard } from "@/components/admin/PdfsLimiteCard";
 import { ColorPicker } from "@/components/admin/ColorPicker";
 import { VerDepoisTiposCard } from "@/components/admin/VerDepoisTiposCard";
+import { LivrosMetaCard } from "@/components/admin/LivrosMetaCard";
 
 // Seções do Admin, uma por aba do sistema (?secao= na URL)
 const SECOES = [
@@ -885,12 +886,7 @@ function AdminPage() {
           </TabsContent>
 
           <TabsContent value="livros" className="mt-0 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Book size={18} /> Livros</CardTitle>
-                  <CardDescription>Em breve.</CardDescription>
-                </CardHeader>
-              </Card>
+            <LivrosMetaCard />
           </TabsContent>
 
           <TabsContent value="cursos" className="mt-0 space-y-6">
