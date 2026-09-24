@@ -90,6 +90,7 @@ function DashboardPage() {
   const [hoje, setHoje] = useState(() => hojeBrasilia());
   const [conclusoes, setConclusoes] = useState<ConclusaoRow[]>([]);
   const [clientes, setClientes] = useState<{ id: string; nome: string }[]>([]);
+  const [clientesArquivados, setClientesArquivados] = useState<{ id: string; nome: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [selecionado, setSelecionado] = useState<string | null>(null);
@@ -136,13 +137,28 @@ function DashboardPage() {
         .order("nome");
       if (errCli) throw errCli;
 
-      if (minha !== seq.current) return;
       const noPeriodo = linhas.filter((c) => {
         const d = dataLocalBrasilia(c.concluida_em);
         return (!intervalo.de || d >= intervalo.de) && (!intervalo.ate || d <= intervalo.ate);
       });
+
+      // Clientes arquivados com conclusões no período também ganham linha (e barra/detalhe)
+      const ativos = cli ?? [];
+      const idsAtivos = new Set(ativos.map((c) => c.id));
+      const idsFaltantes = [
+        ...new Set(noPeriodo.map((c) => c.cliente_id).filter((id): id is string => !!id && !idsAtivos.has(id))),
+      ];
+      let arquivados: { id: string; nome: string }[] = [];
+      if (idsFaltantes.length > 0) {
+        const { data: arq, error: errArq } = await supabase.from("clientes").select("id, nome").in("id", idsFaltantes);
+        if (errArq) throw errArq;
+        arquivados = (arq ?? []).map((c) => ({ id: c.id, nome: `${c.nome} (arquivado)` }));
+      }
+
+      if (minha !== seq.current) return;
       setConclusoes(noPeriodo);
-      setClientes(cli ?? []);
+      setClientes(ativos);
+      setClientesArquivados(arquivados);
       setErro(null);
     } catch (e: any) {
       if (minha !== seq.current) return;
@@ -177,7 +193,10 @@ function DashboardPage() {
     };
   }, []);
 
-  const { total, linhas } = useMemo(() => agregar(conclusoes, clientes), [conclusoes, clientes]);
+  const { total, linhas } = useMemo(
+    () => agregar(conclusoes, [...clientes, ...clientesArquivados]),
+    [conclusoes, clientes, clientesArquivados],
+  );
 
   const idsClientes = useMemo(() => new Set(clientes.map((c) => c.id)), [clientes]);
   const clientesAtendidos = linhas.filter((l) => l.total > 0 && idsClientes.has(l.chave)).length;
@@ -187,12 +206,6 @@ function DashboardPage() {
 
   const top10 = useMemo(() => linhas.filter((l) => l.total > 0).slice(0, 10), [linhas]);
   const maxPct = linhas.reduce((m, l) => Math.max(m, l.percentual), 0);
-
-  // Conclusões de clientes arquivados (ou removidos) não têm linha própria: agregar soma no total
-  const semLinha = useMemo(() => {
-    const chaves = new Set(linhas.map((l) => l.chave));
-    return conclusoes.filter((c) => !chaves.has(chaveDaConclusao(c))).length;
-  }, [conclusoes, linhas]);
 
   const linhaSelecionada = linhas.find((l) => l.chave === selecionado) ?? null;
   const detalhe = useMemo(
@@ -368,7 +381,7 @@ function DashboardPage() {
           <Card className="lg:col-span-3">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Por cliente</CardTitle>
-              <CardDescription>Todos os clientes ativos, mesmo sem demandas. Clique numa linha para ver as demandas.</CardDescription>
+              <CardDescription>Todos os clientes ativos, mesmo sem demandas (e arquivados com demandas no período). Clique numa linha para ver as demandas.</CardDescription>
             </CardHeader>
             <CardContent className="px-0 pb-2">
               <div className="max-h-[480px] overflow-y-auto">
@@ -416,11 +429,6 @@ function DashboardPage() {
                   </TableBody>
                 </Table>
               </div>
-              {semLinha > 0 && (
-                <p className="px-6 pt-2 text-xs text-muted-foreground">
-                  {semLinha} demanda{semLinha === 1 ? "" : "s"} de cliente{semLinha === 1 ? "" : "s"} arquivado{semLinha === 1 ? "" : "s"} entra{semLinha === 1 ? "" : "m"} no total, sem linha própria.
-                </p>
-              )}
             </CardContent>
           </Card>
         </div>
