@@ -26,7 +26,7 @@ import {
   PDF_TAMANHO_MAX_PADRAO_MB, mbParaBytes, type PdfArquivo, type PdfBiblioteca,
 } from "@/lib/pdfs";
 import {
-  montarArvore, caminhoDaPasta, contarPdfsPorPasta, corDaPasta, filtrarPdfs, arquivoAceito, formatarTamanho,
+  montarArvore, caminhoDaPasta, contarPdfsPorPasta, corDaPasta, filtrarPdfs, arquivoAceito, formatarTamanho, nomeSemExtensao,
   type PastaNo, type PdfPasta,
 } from "@/lib/pdfsArvore";
 import { PastaDialog, ExcluirPastaDialog, type PastaDialogState } from "@/components/pdfs/PastaDialogs";
@@ -494,7 +494,7 @@ function PdfsPage() {
             <AlertDialogTitle>Trocar o arquivo de "{trocaAlvo?.nome}"?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p>O arquivo atual é apagado e o novo entra no lugar. O card continua com o mesmo nome, player e pasta.</p>
+                <p>{trocaAlvo && trocaAlvo.nome.trim() === nomeSemExtensao(trocaAlvo.arquivo_nome).trim() ? "O arquivo atual é apagado e o novo entra no lugar. O card fica na mesma pasta, com o mesmo player, e passa a ter o nome do arquivo novo." : "O arquivo atual é apagado e o novo entra no lugar. O card continua com o mesmo nome, player e pasta."}</p>
                 <div className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs">
                   <span className="truncate line-through opacity-70">{trocaAlvo?.arquivo_nome}</span>
                   <span>→</span>
