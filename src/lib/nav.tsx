@@ -17,6 +17,7 @@ import {
   FileText,
   Rocket,
   Map as MapIcon,
+  BarChart3,
 } from "lucide-react";
 
 export interface NavLink {
@@ -60,6 +61,9 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
   },
   {
     title: "Sistema",
-    links: [{ label: "Admin", icon: <Settings size={17} />, to: "/admin" }],
+    links: [
+      { label: "Dashboard", icon: <BarChart3 size={17} />, to: "/dashboard" },
+      { label: "Admin", icon: <Settings size={17} />, to: "/admin" },
+    ],
   },
 ];
