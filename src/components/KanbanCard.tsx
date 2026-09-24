@@ -127,7 +127,8 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
         )}
         onClick={(e) => {
           e.stopPropagation();
-          if (demanda.roadmap_id) {
+          // Demanda de passo de onboarding ligada a roadmap abre o roadmap; as demais abrem o card (a tag Roadmap leva ao roadmap)
+          if (demanda.roadmap_id && demanda.processo_passo_id) {
             navigate({ to: "/roadmap", search: { id: demanda.roadmap_id } });
             return;
           }

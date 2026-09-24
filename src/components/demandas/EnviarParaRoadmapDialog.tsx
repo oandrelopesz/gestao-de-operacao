@@ -149,6 +149,8 @@ export function EnviarParaRoadmapDialog({ demanda, clientes, onClose, onDefinirR
         action: { label: "Abrir", onClick: () => abrirRoadmap(escolhido) },
       });
       onClose();
+    } catch (e) {
+      toast.error(erroMsg(e));
     } finally {
       setSalvando(false);
     }
