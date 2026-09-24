@@ -113,7 +113,11 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
     setCarregandoPassos(true);
     fetchPassosLivres(clienteId)
       .then((d) => { if (minha === reqPassos.current) setPassos(d); })
-      .catch(() => { if (minha === reqPassos.current) setPassos({ onboarding: null, livres: [] }); })
+      .catch(() => {
+        if (minha !== reqPassos.current) return;
+        toast.error("Não foi possível carregar os passos do onboarding");
+        setPassos({ onboarding: null, livres: [] });
+      })
       .finally(() => { if (minha === reqPassos.current) setCarregandoPassos(false); });
   }, [aberto, clienteId]);
 

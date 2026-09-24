@@ -343,6 +343,7 @@ function PrazoFinal({ roadmap, passo, onMudou }: { roadmap: Processo; passo: Pas
       onMudou();
     } catch (e) {
       toast.error(erroMsg(e));
+      onMudou();
     } finally {
       setSalvando(false);
     }
@@ -391,7 +392,7 @@ function PrazoFinal({ roadmap, passo, onMudou }: { roadmap: Processo; passo: Pas
               <PopoverTrigger asChild>{gatilho}</PopoverTrigger>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-64 text-xs">
-              Ligado ao passo {passo ? <strong>"{passo.titulo}"</strong> : ""} do onboarding. Mudar o prazo aqui muda a data do passo (e vice-versa).
+              {passo ? <>Ligado ao passo <strong>"{passo.titulo}"</strong> do onboarding.</> : "Ligado a um passo do onboarding."} Mudar o prazo aqui muda a data do passo (e vice-versa).
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -401,7 +402,7 @@ function PrazoFinal({ roadmap, passo, onMudou }: { roadmap: Processo; passo: Pas
       <PopoverContent className="w-auto p-0" align="end">
         {ligado && (
           <p className="max-w-[17rem] border-b px-3 py-2 text-xs text-muted-foreground">
-            Esta data é a do passo {passo ? `"${passo.titulo}"` : ""} do onboarding — mudar aqui muda lá também.
+            {passo ? `Esta data é a do passo "${passo.titulo}" do onboarding` : "Ligado a um passo do onboarding"} — mudar aqui muda lá também.
           </p>
         )}
         <Calendar
