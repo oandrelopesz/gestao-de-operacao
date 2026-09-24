@@ -13,8 +13,11 @@ import {
   Check,
   ChevronDown,
   Repeat,
-  History
+  History,
+  Map as MapIcon,
+  Unlink
 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { 
   DropdownMenu, 
@@ -65,15 +68,19 @@ interface Demanda {
   recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
   pessoal?: boolean;
+  processo_passo_id?: string | null;
+  roadmap_id?: string | null;
 }
 
 interface DemandaDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   demanda: Demanda | null;
-  onUpdate: (id: string, values: Partial<Demanda>) => Promise<void>;
+  onUpdate: (id: string, values: Partial<Demanda>) => Promise<unknown>;
   onDelete: (id: string) => Promise<void>;
   onDuplicate: (demanda: Demanda) => Promise<void>;
+  /** Abre o diálogo "Enviar para o Roadmap" (criar ou ligar). */
+  onEnviarRoadmap?: (demanda: Demanda) => void;
   clientes: { id: string; nome: string; agencia?: string }[];
   columns: { id: string; title: string; color: string; hex: string }[];
 }
@@ -85,9 +92,11 @@ export function DemandaDrawer({
   onUpdate,
   onDelete,
   onDuplicate,
+  onEnviarRoadmap,
   clientes,
   columns,
 }: DemandaDrawerProps) {
+  const navigate = useNavigate();
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -336,6 +345,45 @@ export function DemandaDrawer({
                 )}
               </div>
             </div>
+
+            {/* Roadmap — demanda de passo de onboarding herda o roadmap do passo, sem envio manual */}
+            {!demanda.processo_passo_id && demanda.status !== "recorrentes" && (demanda.roadmap_id || onEnviarRoadmap) && (
+              <div className="grid grid-cols-[120px,1fr] items-center gap-2">
+                <div className="flex items-center gap-2 text-zinc-400">
+                  <MapIcon size={14} />
+                  <span>Roadmap</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {demanda.roadmap_id ? (
+                    <>
+                      <button
+                        type="button"
+                        className="text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 px-1.5 py-0.5 rounded transition-colors text-left"
+                        onClick={() => navigate({ to: "/roadmap", search: { id: demanda.roadmap_id ?? undefined } })}
+                      >
+                        Abrir roadmap
+                      </button>
+                      <button
+                        type="button"
+                        title="Desligar do roadmap"
+                        className="inline-flex items-center gap-1 text-xs text-zinc-300 hover:text-destructive transition-colors"
+                        onClick={() => saveUpdate({ roadmap_id: null })}
+                      >
+                        <Unlink size={12} /> Desligar
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 px-1.5 py-0.5 rounded transition-colors text-left"
+                      onClick={() => onEnviarRoadmap?.(demanda)}
+                    >
+                      Enviar para o Roadmap
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Add field placeholder button */}
             <div className="pt-2 flex flex-wrap gap-2">

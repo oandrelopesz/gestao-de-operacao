@@ -32,6 +32,9 @@ import { fetchPassosLivres, PassoOnboardingSelect, type PassosDoOnboarding } fro
 type Filtro = "onboarding" | "andamento";
 type Base = "template" | "zero";
 
+/** Valor do Select para roadmap pessoal (sem cliente). */
+const PESSOAL = "__pessoal__";
+
 const erroMsg = (e: unknown) => (e && typeof e === "object" && "message" in e ? String((e as any).message) : "Erro ao salvar");
 
 /** Parseia "YYYY-MM-DD" como data local, evitando o deslocamento de dia do fuso. */
@@ -57,6 +60,7 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
   const [erro, setErro] = useState<string | null>(null);
 
   const [filtro, setFiltro] = useState<Filtro>("onboarding");
+  /** Id do cliente, ou PESSOAL para roadmap pessoal. */
   const [clienteId, setClienteId] = useState("");
   const [nome, setNome] = useState("");
   const [base, setBase] = useState<Base>("zero");
@@ -109,7 +113,7 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
     const minha = ++reqPassos.current;
     setPassoId("");
     setPassos(null);
-    if (!aberto || !clienteId) return;
+    if (!aberto || !clienteId || clienteId === PESSOAL) return;
     setCarregandoPassos(true);
     fetchPassosLivres(clienteId)
       .then((d) => { if (minha === reqPassos.current) setPassos(d); })
@@ -122,6 +126,7 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
   }, [aberto, clienteId]);
 
   const lista = filtro === "onboarding" ? emOnboarding : emAndamento;
+  const ehPessoal = clienteId === PESSOAL;
   const clienteSelecionado = useMemo(
     () => [...emOnboarding, ...emAndamento].find((c) => c.id === clienteId) ?? null,
     [emOnboarding, emAndamento, clienteId],
@@ -134,7 +139,7 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
   const trocarFiltro = (f: Filtro) => {
     if (f === filtro) return;
     setFiltro(f);
-    setClienteId("");
+    if (clienteId !== PESSOAL) setClienteId("");
   };
 
   const escolherTemplate = (t: Template) => {
@@ -152,13 +157,14 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
     try {
       const id = await criarProcesso({
         tipo: "roadmap",
-        cliente_id: clienteId,
+        cliente_id: ehPessoal ? null : clienteId,
+        pessoal: ehPessoal,
         nome: nome.trim(),
         template_id: base === "template" ? templateId : null,
         prazo_final: prazoEfetivo,
         passo_onboarding_id: passoId || null,
       });
-      toast.success(`Roadmap "${nome.trim()}" criado para ${clienteSelecionado?.nome ?? "o cliente"}`);
+      toast.success(`Roadmap "${nome.trim()}" criado ${ehPessoal ? "como pessoal" : `para ${clienteSelecionado?.nome ?? "o cliente"}`}`);
       onClose();
       onCriado(id);
     } catch (e) {
@@ -209,11 +215,12 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
                   ))}
                 </div>
               </div>
-              <Select value={clienteId} onValueChange={setClienteId} disabled={lista.length === 0}>
+              <Select value={clienteId} onValueChange={setClienteId}>
                 <SelectTrigger>
                   <SelectValue placeholder={lista.length ? "Escolha o cliente" : filtro === "onboarding" ? "Nenhum cliente em onboarding" : "Nenhum cliente em andamento"} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={PESSOAL}>Pessoal</SelectItem>
                   {lista.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
                   ))}
@@ -293,7 +300,7 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
             </div>
 
             {/* Ligar a um passo */}
-            {clienteId && (carregandoPassos || passos?.onboarding) && (
+            {clienteId && !ehPessoal && (carregandoPassos || passos?.onboarding) && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5 text-xs">
                   <Link2 size={12} /> Ligar a um passo do onboarding <span className="font-normal text-muted-foreground">(opcional)</span>

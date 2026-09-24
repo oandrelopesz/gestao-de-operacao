@@ -117,7 +117,7 @@ function EmAndamento({ clienteFoco }: { clienteFoco?: string }) {
 
   const processoDoCliente = useMemo(() => {
     const m = new Map<string, Processo>();
-    processos.forEach((p) => { if (!m.has(p.cliente_id)) m.set(p.cliente_id, p); });
+    processos.forEach((p) => { if (p.cliente_id && !m.has(p.cliente_id)) m.set(p.cliente_id, p); });
     return m;
   }, [processos]);
 

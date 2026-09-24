@@ -56,6 +56,8 @@ interface KanbanColumnProps {
   isSystem?: boolean;
   onSetDia?: (id: string, dia: number) => void;
   onAtribuirCliente?: (id: string, valor: { cliente_id: string | null; pessoal: boolean }) => void;
+  onEnviarRoadmap?: (demanda: Demanda) => void;
+  onDesligarRoadmap?: (id: string) => void;
   diasDaColuna?: number[];
   secoes?: { id: string; titulo: string; demandas: Demanda[] }[];
   clientes?: { id: string; nome: string; agencia?: string }[];
@@ -91,6 +93,8 @@ export function KanbanColumn({
   isSystem,
   onSetDia,
   onAtribuirCliente,
+  onEnviarRoadmap,
+  onDesligarRoadmap,
   diasDaColuna,
   secoes,
   clientes: clientesDisponiveis,
@@ -147,6 +151,8 @@ export function KanbanColumn({
       onMoveToDone={onMoveToDone}
       onSetDia={onSetDia}
       onAtribuirCliente={onAtribuirCliente}
+      onEnviarRoadmap={onEnviarRoadmap}
+      onDesligarRoadmap={onDesligarRoadmap}
       diasDaColuna={diasDaColuna}
       clientes={clientesDisponiveis}
     />

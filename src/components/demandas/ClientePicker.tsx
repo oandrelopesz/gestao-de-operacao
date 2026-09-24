@@ -18,6 +18,8 @@ interface ClientePickerProps {
   onEscolher: (valor: { cliente_id: string | null; pessoal: boolean }) => void;
   children: React.ReactNode;
   align?: "start" | "center" | "end";
+  /** false esconde "Sem cliente" (ex.: dono de um roadmap: cliente ou Pessoal). */
+  permitirSemCliente?: boolean;
 }
 
 /** Popover + Command (busca) para atribuir cliente, "Pessoal" ou "Sem cliente" a uma demanda. */
@@ -28,6 +30,7 @@ export function ClientePicker({
   onEscolher,
   children,
   align = "start",
+  permitirSemCliente = true,
 }: ClientePickerProps) {
   const [open, setOpen] = useState(false);
 
@@ -62,10 +65,12 @@ export function ClientePicker({
                 <span className="flex-1">Pessoal</span>
                 {pessoalAtual && <Check size={14} />}
               </CommandItem>
-              <CommandItem value="Sem cliente" onSelect={() => escolher({ cliente_id: null, pessoal: false })}>
-                <span className={cn("flex-1", semCliente ? "" : "text-zinc-500")}>Sem cliente</span>
-                {semCliente && <Check size={14} />}
-              </CommandItem>
+              {permitirSemCliente && (
+                <CommandItem value="Sem cliente" onSelect={() => escolher({ cliente_id: null, pessoal: false })}>
+                  <span className={cn("flex-1", semCliente ? "" : "text-zinc-500")}>Sem cliente</span>
+                  {semCliente && <Check size={14} />}
+                </CommandItem>
+              )}
             </CommandGroup>
             <CommandGroup heading="Clientes">
               {clientesOrdenados.map((c) => (

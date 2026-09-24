@@ -65,7 +65,7 @@ export function HistoricoView({ tipo }: HistoricoViewProps) {
     const buscaNorm = busca.trim().toLowerCase();
     const hoje = hojeBrasilia();
     return processos.filter((p) => {
-      if (buscaNorm && !p.cliente?.nome?.toLowerCase().includes(buscaNorm)) return false;
+      if (buscaNorm && !(p.pessoal ? "pessoal" : p.cliente?.nome?.toLowerCase() ?? "").includes(buscaNorm)) return false;
       const dataRef = p.concluido_em ?? p.iniciado_em;
       if (!naJanela(dataRef, periodo, hoje)) return false;
       return true;
@@ -126,7 +126,7 @@ export function HistoricoView({ tipo }: HistoricoViewProps) {
                 const feitos = p.passos.filter((x) => x.concluido_em).length;
                 return (
                   <TableRow key={p.id} className="cursor-pointer" onClick={() => setSelecionado(p)}>
-                    <TableCell className="font-medium">{p.cliente?.nome ?? "—"}</TableCell>
+                    <TableCell className="font-medium">{p.pessoal ? "Pessoal" : p.cliente?.nome ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.nome}</TableCell>
                     <TableCell className="text-muted-foreground">{format(new Date(p.iniciado_em), "dd/MM/yyyy")}</TableCell>
                     <TableCell className="text-muted-foreground">
@@ -160,7 +160,7 @@ export function HistoricoView({ tipo }: HistoricoViewProps) {
       <Dialog open={!!selecionado} onOpenChange={(o) => { if (!o) setSelecionado(null); }}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{selecionado?.cliente?.nome} — {selecionado?.nome}</DialogTitle>
+            <DialogTitle>{selecionado?.pessoal ? "Pessoal" : selecionado?.cliente?.nome} — {selecionado?.nome}</DialogTitle>
             <DialogDescription className="sr-only">Trilha do processo, somente leitura</DialogDescription>
           </DialogHeader>
           {selecionado && (

@@ -20,11 +20,12 @@ export interface Passo { id: string; processo_id: string; titulo: string; observ
 export interface ClienteResumo { id: string; nome: string; agencia: string | null; em_onboarding: boolean | null; trafego_ativo: boolean | null; onboarding_desde: string | null }
 export interface RoadmapLigado { id: string; nome: string; status: string; passo_onboarding_id: string; progresso: number }
 export interface Processo {
-  id: string; tipo: TipoProcesso; cliente_id: string; nome: string; template_id: string | null;
+  /** null só em roadmap pessoal (`pessoal`); onboarding sempre tem cliente (CHECK no banco). */
+  id: string; tipo: TipoProcesso; cliente_id: string | null; pessoal: boolean; nome: string; template_id: string | null;
   status: "ativo" | "concluido" | "encerrado"; iniciado_em: string; concluido_em: string | null;
   prazo_final: string | null; passo_onboarding_id: string | null;
   passos: Passo[]; // já ordenados (ordenarPassosCronologico)
-  cliente: ClienteResumo;
+  cliente: ClienteResumo | null;
 }
 
 const TEMPLATE_SELECT = "id, tipo, nome, created_at, passos:processo_template_passos(id, titulo, observacoes, ordem)";
@@ -123,7 +124,8 @@ export async function fetchProcessos(tipo: TipoProcesso, situacao: "ativos" | "h
     tipo: p.tipo as TipoProcesso,
     status: p.status as Processo["status"],
     passos: ordenarPassosCronologico((p.passos || []) as Passo[]),
-    cliente: p.cliente as ClienteResumo,
+    pessoal: !!p.pessoal,
+    cliente: (p.cliente ?? null) as ClienteResumo | null,
   })) as Processo[];
 }
 
@@ -169,13 +171,14 @@ export async function fetchClientesAtivos(): Promise<ClienteResumo[]> {
 }
 
 export async function criarProcesso(i: {
-  tipo: TipoProcesso; cliente_id: string; nome: string; template_id?: string | null;
+  tipo: TipoProcesso; cliente_id: string | null; pessoal?: boolean; nome: string; template_id?: string | null;
   prazo_final?: string | null; passo_onboarding_id?: string | null; iniciado_em?: string | null;
 }): Promise<string> {
   const { data, error } = await (supabase.from("processos") as any)
     .insert([{
       tipo: i.tipo,
-      cliente_id: i.cliente_id,
+      cliente_id: i.pessoal ? null : i.cliente_id,
+      pessoal: !!i.pessoal,
       nome: i.nome,
       template_id: i.template_id ?? null,
       prazo_final: i.prazo_final ?? null,
@@ -332,6 +335,7 @@ export async function concluirOnboarding(processo: Processo, ativarTrafego: bool
     .update({ status: "concluido", concluido_em: new Date().toISOString() })
     .eq("id", processo.id);
   if (erroProcesso) throw erroProcesso;
+  if (!processo.cliente_id) return; // onboarding sempre tem cliente; defensivo
 
   const patchCliente: Record<string, unknown> = { em_onboarding: false };
   if (ativarTrafego) patchCliente.trafego_ativo = true;

@@ -109,6 +109,8 @@ export function LigarPassoDialog({ aberto, roadmap, onClose, onMudou }: LigarPas
     setDados(null);
     setErro(null);
     setPassoId("");
+    // Roadmap pessoal não tem cliente, logo não tem onboarding
+    if (!roadmap.cliente_id) { setDados({ onboarding: null, livres: [] }); return; }
     fetchPassosLivres(roadmap.cliente_id, roadmap.id)
       .then((d) => { if (minha === requisicao.current) setDados(d); })
       .catch((e) => { if (minha === requisicao.current) setErro(erroMsg(e)); });
@@ -151,7 +153,7 @@ export function LigarPassoDialog({ aberto, roadmap, onClose, onMudou }: LigarPas
           <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed bg-muted/20 px-4 py-6 text-center">
             <Rocket size={22} className="text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              {roadmap?.cliente?.nome ?? "Este cliente"} não tem um onboarding ativo.
+              {roadmap?.pessoal ? "Roadmap pessoal não tem onboarding." : `${roadmap?.cliente?.nome ?? "Este cliente"} não tem um onboarding ativo.`}
             </p>
           </div>
         ) : dados.livres.length === 0 ? (

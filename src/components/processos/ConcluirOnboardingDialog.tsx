@@ -88,7 +88,7 @@ export function ConcluirOnboardingDialog({ aberto, processo, onClose, onMudou }:
           {linha("Entrou em", formatarDataCurta(inicio))}
           {linha("Concluído", `Hoje, ${formatarDataCurta(hoje)}`)}
           {linha("Duração", dias === 1 ? "1 dia" : `${dias} dias`)}
-          {linha("Verba mensal", <VerbaOnboarding clienteId={processo.cliente_id} variante="linha" />)}
+          {processo.cliente_id && linha("Verba mensal", <VerbaOnboarding clienteId={processo.cliente_id} variante="linha" />)}
         </dl>
 
         <DialogFooter>

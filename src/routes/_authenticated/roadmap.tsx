@@ -88,6 +88,8 @@ function RoadmapPage() {
 
 interface Grupo { clienteId: string; clienteNome: string; roadmaps: Processo[] }
 
+const GRUPO_PESSOAL = "__pessoal__";
+
 function EmAndamento({ roadmapFoco, onIrHistorico }: { roadmapFoco?: string; onIrHistorico: () => void }) {
   const navigate = useNavigate();
   const [roadmaps, setRoadmaps] = useState<Processo[]>([]);
@@ -133,14 +135,20 @@ function EmAndamento({ roadmapFoco, onIrHistorico }: { roadmapFoco?: string; onI
   const grupos = useMemo<Grupo[]>(() => {
     const m = new Map<string, Grupo>();
     roadmaps.forEach((r) => {
-      const g = m.get(r.cliente_id) ?? { clienteId: r.cliente_id, clienteNome: r.cliente?.nome ?? "Cliente", roadmaps: [] };
+      // Roadmaps pessoais (sem cliente) formam o grupo "Pessoal"
+      const chave = r.pessoal || !r.cliente_id ? GRUPO_PESSOAL : r.cliente_id;
+      const g = m.get(chave) ?? { clienteId: chave, clienteNome: chave === GRUPO_PESSOAL ? "Pessoal" : r.cliente?.nome ?? "Cliente", roadmaps: [] };
       g.roadmaps.push(r);
-      m.set(r.cliente_id, g);
+      m.set(chave, g);
     });
     const lista = [...m.values()];
     lista.forEach((g) => g.roadmaps.sort((a, b) => a.iniciado_em.localeCompare(b.iniciado_em)));
-    return lista.sort((a, b) => a.clienteNome.localeCompare(b.clienteNome, "pt-BR"));
+    // "Pessoal" primeiro, depois os clientes em ordem alfabética
+    return lista.sort((a, b) =>
+      a.clienteId === GRUPO_PESSOAL ? -1 : b.clienteId === GRUPO_PESSOAL ? 1 : a.clienteNome.localeCompare(b.clienteNome, "pt-BR"));
   }, [roadmaps]);
+
+  const qtdClientes = grupos.filter((g) => g.clienteId !== GRUPO_PESSOAL).length;
 
   // ?id=<roadmap>: rola até o card e destaca por 3s
   const cardsRef = useRef<Record<string, HTMLDivElement | null>>({});
@@ -274,8 +282,9 @@ function EmAndamento({ roadmapFoco, onIrHistorico }: { roadmapFoco?: string; onI
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          {roadmaps.length} {roadmaps.length === 1 ? "roadmap em andamento" : "roadmaps em andamento"} · {grupos.length}{" "}
-          {grupos.length === 1 ? "cliente" : "clientes"}
+          {roadmaps.length} {roadmaps.length === 1 ? "roadmap em andamento" : "roadmaps em andamento"} · {qtdClientes}{" "}
+          {qtdClientes === 1 ? "cliente" : "clientes"}
+          {grupos.some((g) => g.clienteId === GRUPO_PESSOAL) && " + pessoal"}
         </p>
         {novoBotao}
       </div>
@@ -299,7 +308,7 @@ function EmAndamento({ roadmapFoco, onIrHistorico }: { roadmapFoco?: string; onI
                   destaque={destacado === r.id}
                   extraCabecalho={<PrazoFinal roadmap={r} passo={passo} onMudou={carregar} />}
                   acoesMenu={
-                    r.passo_onboarding_id ? (
+                    !r.cliente_id ? null : r.passo_onboarding_id ? (
                       <>
                         <DropdownMenuItem onSelect={() => navigate({ to: "/onboarding" as any, search: { cliente: r.cliente_id } as any })}>
                           <Rocket size={14} className="mr-2" /> Ver no onboarding

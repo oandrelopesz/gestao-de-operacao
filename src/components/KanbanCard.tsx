@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
-import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, UserPlus, AlertTriangle, Rocket, Map as MapIcon } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, UserPlus, AlertTriangle, Rocket, Map as MapIcon, Unlink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -47,6 +47,8 @@ interface KanbanCardProps {
   onMoveToDone?: (id: string) => void;
   onSetDia?: (id: string, dia: number) => void;
   onAtribuirCliente?: (id: string, valor: { cliente_id: string | null; pessoal: boolean }) => void;
+  onEnviarRoadmap?: (demanda: Demanda) => void;
+  onDesligarRoadmap?: (id: string) => void;
   diasDaColuna?: number[];
   clientes?: { id: string; nome: string; agencia?: string }[];
 }
@@ -74,7 +76,7 @@ export function KanbanCard(props: KanbanCardProps) {
 }
 
 /** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
-export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, onAtribuirCliente, diasDaColuna, clientes, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
+export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, onAtribuirCliente, onEnviarRoadmap, onDesligarRoadmap, diasDaColuna, clientes, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
   const navigate = useNavigate();
   const isRecorrenteMae = demanda.status === "recorrentes";
   const isDragging = sortable?.isDragging ?? false;
@@ -84,6 +86,8 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
     ? (demanda.dia_semana != null && diasDaColuna.includes(demanda.dia_semana) ? demanda.dia_semana : diasDaColuna[0])
     : null;
   const atraso = !isDone && !isRecorrenteMae ? diasDeAtraso(demanda.prazo, hojeBrasilia()) : 0;
+  // Demanda de passo de onboarding: o roadmap vem do passo, não se envia/desliga à mão
+  const podeRoadmap = !demanda.processo_passo_id && !isRecorrenteMae;
 
   // Get preview of description (first 2 lines)
   const descriptionPreview = demanda.descricao ? demanda.descricao.split('\n').slice(0, 2).join('\n') : "";
@@ -203,7 +207,7 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                     <MoreVertical size={14} />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[140px] text-xs">
+                <DropdownMenuContent align="end" className="w-[180px] text-xs">
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(demanda); }} className="gap-2 py-1.5">
                     <Pencil size={12} /> Detalhes
                   </DropdownMenuItem>
@@ -217,6 +221,26 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                       <CalendarDays size={12} /> {rotuloFazerNoDia(dia)}
                     </DropdownMenuItem>
                   ))}
+                  {podeRoadmap && !demanda.roadmap_id && onEnviarRoadmap && (
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEnviarRoadmap(demanda); }} className="gap-2 py-1.5">
+                      <MapIcon size={12} /> Enviar para o Roadmap
+                    </DropdownMenuItem>
+                  )}
+                  {podeRoadmap && demanda.roadmap_id && (
+                    <>
+                      <DropdownMenuItem
+                        onClick={(e) => { e.stopPropagation(); navigate({ to: "/roadmap", search: { id: demanda.roadmap_id ?? undefined } }); }}
+                        className="gap-2 py-1.5"
+                      >
+                        <MapIcon size={12} /> Abrir roadmap
+                      </DropdownMenuItem>
+                      {onDesligarRoadmap && (
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDesligarRoadmap(demanda.id); }} className="gap-2 py-1.5">
+                          <Unlink size={12} /> Desligar do roadmap
+                        </DropdownMenuItem>
+                      )}
+                    </>
+                  )}
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); }} className="gap-2 py-1.5">
                     <Copy size={12} /> Duplicar
                   </DropdownMenuItem>

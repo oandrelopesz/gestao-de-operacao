@@ -32,6 +32,7 @@ import {
 import { DemandaForm, DemandaFormValues } from "@/components/DemandaForm";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { DemandaDrawer } from "@/components/demandas/DemandaDrawer";
+import { EnviarParaRoadmapDialog } from "@/components/demandas/EnviarParaRoadmapDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useCachedState, hasCached } from "@/lib/pageCache";
 import { CACHE_KEYS, loadDemandas, loadClientesLite, loadColunas } from "@/lib/data";
@@ -105,6 +106,8 @@ function DemandasPage() {
   const [deletingName, setDeletingName] = useState<string>("");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedDemanda, setSelectedDemanda] = useState<any | null>(null);
+  // Demanda em "Enviar para o Roadmap" (diálogo aberto quando não é null)
+  const [enviarRoadmap, setEnviarRoadmap] = useState<any | null>(null);
   const [showCalendar, setShowCalendar] = useState(() => {
     if (typeof window === "undefined") return true;
     const saved = window.localStorage.getItem("demandas_calendar_visible");
@@ -319,7 +322,8 @@ function DemandasPage() {
     }
   };
 
-  const handleUpdateDemanda = async (id: string, values: any) => {
+  /** Devolve true se salvou (erros já viram toast). */
+  const handleUpdateDemanda = async (id: string, values: any): Promise<boolean> => {
     try {
       // Devolve a linha atualizada: gatilhos do banco podem recalcular prazo/dia_semana (ex.: ao
       // mudar o status pelo menu "Mover para"), e o join com clientes mantém nome/agência em dia
@@ -339,10 +343,16 @@ function DemandasPage() {
 
       // Silently sync
       fetchDemandas();
+      return true;
     } catch (error: any) {
-      if (ehEsquemaDesatualizado(error) && recarregarUmaVez()) return;
+      if (ehEsquemaDesatualizado(error) && recarregarUmaVez()) return false;
       toast.error("Erro ao salvar alterações");
+      return false;
     }
+  };
+
+  const handleDesligarRoadmap = async (id: string) => {
+    if (await handleUpdateDemanda(id, { roadmap_id: null })) toast.success("Demanda desligada do roadmap");
   };
 
   const handleDuplicateDemanda = async (demanda: any) => {
@@ -718,6 +728,8 @@ function DemandasPage() {
                     diasDaColuna={col.dias}
                     onSetDia={mudarDia}
                     onAtribuirCliente={(id, valor) => handleUpdateDemanda(id, valor)}
+                    onEnviarRoadmap={setEnviarRoadmap}
+                    onDesligarRoadmap={handleDesligarRoadmap}
                     clientes={clientes}
                     onQuickAdd={handleQuickAdd}
                     onFullAdd={(status) => {
@@ -925,8 +937,16 @@ function DemandasPage() {
           }
         }}
         onDuplicate={handleDuplicateDemanda}
+        onEnviarRoadmap={setEnviarRoadmap}
         clientes={clientes}
         columns={columns}
+      />
+
+      <EnviarParaRoadmapDialog
+        demanda={enviarRoadmap}
+        clientes={clientes}
+        onClose={() => setEnviarRoadmap(null)}
+        onDefinirRoadmap={(demandaId, roadmapId) => handleUpdateDemanda(demandaId, { roadmap_id: roadmapId })}
       />
 
       <Dialog open={isModalOpen} onOpenChange={(open) => {

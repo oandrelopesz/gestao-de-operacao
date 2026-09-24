@@ -140,7 +140,7 @@ export function ProcessoCard({ processo, roadmaps, destaque, extraCabecalho, aco
     setEncerrando(true);
     try {
       await encerrarProcesso(processo.id);
-      if (ehOnboarding) {
+      if (ehOnboarding && processo.cliente_id) {
         const { error } = await supabase.from("clientes").update({ em_onboarding: false } as any).eq("id", processo.cliente_id);
         if (error) throw error;
       }
@@ -166,7 +166,7 @@ export function ProcessoCard({ processo, roadmaps, destaque, extraCabecalho, aco
       <div className="flex flex-col gap-4 p-5 pb-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1 space-y-2.5">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-lg font-semibold tracking-tight">{processo.cliente?.nome ?? "Cliente"}</h2>
+            <h2 className="truncate text-lg font-semibold tracking-tight">{processo.pessoal ? "Pessoal" : processo.cliente?.nome ?? "Cliente"}</h2>
             <Badge variant="secondary" className="gap-1 font-normal">
               <Layers size={11} /> {processo.nome || "Personalizado"}
             </Badge>
