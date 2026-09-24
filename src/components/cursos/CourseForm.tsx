@@ -50,6 +50,8 @@ const courseSchema = z.object({
   senha: z.string().optional().or(z.literal("")),
   em_andamento: z.boolean(),
   observacoes: z.string().optional().or(z.literal("")),
+  /** "AAAA-MM-DD" ou vazio (sem expiração) */
+  expira_em: z.string().optional().or(z.literal("")),
 });
 
 type CourseFormValues = z.infer<typeof courseSchema>;
@@ -82,6 +84,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       senha: "",
       em_andamento: false,
       observacoes: "",
+      expira_em: "",
     },
   });
 
@@ -143,6 +146,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
           senha: editingCourse.senha || "",
           em_andamento: !!editingCourse.em_andamento,
           observacoes: editingCourse.observacoes || "",
+          expira_em: editingCourse.expira_em ? String(editingCourse.expira_em).slice(0, 10) : "",
         });
       } else {
         form.reset({
@@ -156,6 +160,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
           senha: "",
           em_andamento: false,
           observacoes: "",
+          expira_em: "",
         });
       }
     }
@@ -203,6 +208,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
         senha: values.senha,
         em_andamento: values.em_andamento,
         observacoes: values.observacoes,
+        expira_em: values.expira_em || null,
         user_id: userId
       };
 
@@ -370,6 +376,28 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
               />
             </div>
 
+
+            <FormField
+              control={form.control}
+              name="expira_em"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Acesso expira em <span className="font-normal text-muted-foreground">(opcional)</span></FormLabel>
+                  <div className="flex items-center gap-2">
+                    <FormControl>
+                      <Input type="date" className="w-[180px]" {...field} />
+                    </FormControl>
+                    {field.value && (
+                      <Button type="button" variant="ghost" size="sm" className="h-9 gap-1 text-muted-foreground" onClick={() => field.onChange("")}>
+                        <X size={14} /> Sem data
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">O último dia de acesso. Depois disso o card fica cinza com "Expirado" — nada é apagado.</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

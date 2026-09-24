@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { CourseForm } from "@/components/cursos/CourseForm";
 import { corDaCategoria, type CursoCategoriaDef } from "@/lib/cursoCategorias";
 import { parseAulas, tipoAcessoDe } from "@/lib/cursoAcesso";
+import { estadoExpiracao, type NivelExpiracao } from "@/lib/cursoExpiracao";
 
 type Tema = string; // enum legado; a classificação agora é por categoria_id
 
@@ -59,9 +60,18 @@ interface Curso {
   curso_categorias?: Categoria | null;
   tipo_acesso?: string | null;
   aulas?: unknown;
+  expira_em?: string | null;
 }
 
 const SEM_CATEGORIA = { id: "sem_categoria", label: "Sem categoria", hex: "#94a3b8" };
+
+// Cor da etiqueta de expiração: verde longe, âmbar em até 30 dias, vermelho na última semana
+const COR_EXPIRACAO: Record<NivelExpiracao, string> = {
+  ok: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  atencao: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  urgente: "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400",
+  expirado: "border-transparent bg-slate-500 text-white",
+};
 
 export const Route = createFileRoute("/_authenticated/cursos")({
   component: CursosPage,
@@ -376,6 +386,8 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
 }) {
   const tipoAcesso = tipoAcessoDe(curso.tipo_acesso);
   const aulas = parseAulas(curso.aulas);
+  const expiracao = estadoExpiracao(curso.expira_em);
+  const expirado = expiracao?.nivel === "expirado";
   const [showPassword, setShowPassword] = useState(false);
   const [copiedLogin, setCopiedLogin] = useState(false);
   const [copiedPass, setCopiedPass] = useState(false);
@@ -410,15 +422,24 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
   return (
     <Card className={cn(
       "overflow-hidden transition-all duration-300",
-      curso.em_andamento ? "border-l-4 border-l-emerald-500 shadow-sm" : "opacity-75"
+      curso.em_andamento && !expirado ? "border-l-4 border-l-emerald-500 shadow-sm" : "opacity-75",
+      // Expirado: cinza, mas tudo continua clicável (nada é apagado)
+      expirado && "bg-muted/60 grayscale opacity-80"
     )}>
       <CardHeader className="p-4 space-y-0">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1">
             <h3 className="font-bold text-base leading-tight">{curso.nome}</h3>
-            <Badge className="text-[10px] h-5 text-white border-transparent" style={{ backgroundColor: theme.hex }}>
-              {theme.label}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-1">
+              <Badge className="text-[10px] h-5 text-white border-transparent" style={{ backgroundColor: theme.hex }}>
+                {theme.label}
+              </Badge>
+              {expiracao && (
+                <Badge variant="outline" className={cn("h-5 gap-1 text-[10px] font-semibold", COR_EXPIRACAO[expiracao.nivel])} title={expiracao.rotulo}>
+                  {expirado ? "Expirado" : expiracao.rotulo}
+                </Badge>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <Switch 
