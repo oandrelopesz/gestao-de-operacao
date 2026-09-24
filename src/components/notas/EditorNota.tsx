@@ -61,7 +61,10 @@ export function EditorNota({ doc, textoAntigo, onChange, autoFocus }: Props) {
   const editor = useEditor({
     extensions: extensoesNota(),
     content: conteudoInicial,
-    immediatelyRender: false, // o app renderiza no servidor (SSR)
+    // O editor só existe dentro do popup, aberto por clique: nunca renderiza no servidor. Criar já na
+    // primeira renderização evita depender da atualização pós-montagem (que se perdia com a aba em
+    // segundo plano e deixava o popup preso em "Abrindo o editor…").
+    immediatelyRender: true,
     autofocus: autoFocus ? "end" : false,
     editorProps: {
       attributes: { class: "nota-editor-conteudo focus:outline-none", spellcheck: "true" },
