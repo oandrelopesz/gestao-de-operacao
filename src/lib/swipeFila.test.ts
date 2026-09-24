@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { separarFila, novasPosicoes, moverNaFila, posicaoNoTopo, podeTentarDeNovo, type JobFila } from "./swipeFila.ts";
+import { separarFila, novasPosicoes, moverNaFila, moverVariosNaFila, posicaoNoTopo, podeTentarDeNovo, type JobFila } from "./swipeFila.ts";
 
 const j = (id: string, status: JobFila["status"], posicao: number, created_at = "2026-09-23T10:00:00Z"): JobFila =>
   ({ id, item_id: `i-${id}`, status, posicao, created_at, iniciado_em: null, tipo: "download" });
@@ -39,4 +39,11 @@ test("podeTentarDeNovo: só falhou com link", () => {
   assert.equal(podeTentarDeNovo({ status: "falhou", link: "https://x" }), true);
   assert.equal(podeTentarDeNovo({ status: "falhou", link: null }), false);
   assert.equal(podeTentarDeNovo({ status: "pronto", link: "https://x" }), false);
+});
+
+test("moverVariosNaFila: selecionados vão juntos para o topo ou o fim, mantendo a ordem entre eles", () => {
+  const ids = ["a", "b", "c", "d", "e"];
+  assert.deepEqual(moverVariosNaFila(ids, ["d", "b"], "topo"), ["b", "d", "a", "c", "e"]);
+  assert.deepEqual(moverVariosNaFila(ids, ["a", "c"], "fim"), ["b", "d", "e", "a", "c"]);
+  assert.deepEqual(moverVariosNaFila(ids, ["x"], "topo"), ids);
 });

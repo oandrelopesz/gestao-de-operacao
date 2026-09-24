@@ -1,5 +1,6 @@
 // Menu lateral: grupos e links (a ordem/visibilidade configurável vem do menuConfig)
 import {
+  AudioLines,
   LayoutDashboard,
   Lightbulb,
   Users,
@@ -63,6 +64,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
   {
     title: "Ferramentas",
     links: [
+      { label: "Transcritor", icon: <AudioLines size={17} />, to: "/transcritor" },
       { label: "Swipe file", icon: <Images size={17} />, to: "/swipe" },
       { label: "Links", icon: <Link2 size={17} />, to: "/links" },
       { label: "PDFs", icon: <FileText size={17} />, to: "/pdfs" },

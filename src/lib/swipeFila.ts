@@ -52,3 +52,11 @@ export function posicaoNoTopo(aguardando: JobFila[]): number {
 export function podeTentarDeNovo(item: { status: string; link: string | null }): boolean {
   return item.status === "falhou" && !!item.link;
 }
+
+/** Seleção em massa: os `selecionados` vão juntos para o topo ou o fim, na ordem em que já estavam. */
+export function moverVariosNaFila(ids: string[], selecionados: string[], destino: "topo" | "fim"): string[] {
+  const marcados = new Set(selecionados);
+  const grupo = ids.filter((id) => marcados.has(id));
+  const resto = ids.filter((id) => !marcados.has(id));
+  return destino === "topo" ? [...grupo, ...resto] : [...resto, ...grupo];
+}

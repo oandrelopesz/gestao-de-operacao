@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ensureFolder, getSwipeKey, trashFile, pastaTemArquivos, type DriveFile } from "@/lib/googleDrive";
-import { novasPosicoes, posicaoNoTopo, podeTentarDeNovo, type JobFila } from "@/lib/swipeFila";
+import { moverVariosNaFila, novasPosicoes, posicaoNoTopo, podeTentarDeNovo, type JobFila } from "@/lib/swipeFila";
 
 export type SwipeCategoria =
   | "oferta" | "video_organico" | "video_anuncio" | "anuncio_estatico"
@@ -408,4 +408,29 @@ export function erroAmigavel(e: unknown): string {
     return "As tabelas do swipe file ainda não existem. Rode supabase/migrations/20260918120000_swipe_file.sql no SQL Editor.";
   }
   return msg;
+}
+
+// ---------------------------------------------------------------- Seleção em massa na fila
+
+/**
+ * Cancelar (irreversível): o item sai do catálogo junto com o job (cascade). Se estiver baixando,
+ * o serviço percebe o job sumir em segundos, derruba o download e limpa o disco. Se o item já
+ * tiver algo no Drive (`drive_file_id`), vai para a Lixeira, como em excluirItem.
+ */
+export async function cancelarItens(itens: Pick<SwipeItem, "id" | "drive_file_id">[]): Promise<void> {
+  for (const item of itens) await excluirItem(item);
+}
+
+export async function pausarItens(itemIds: string[]): Promise<void> {
+  await Promise.all(itemIds.map((id) => pausarItem(id)));
+}
+
+/** Retoma na ordem recebida (cada um vai para o fim da fila, um depois do outro). */
+export async function retomarItens(itemIds: string[]): Promise<void> {
+  for (const id of itemIds) await retomarItem(id);
+}
+
+/** Leva vários jobs que esperam para o topo ou o fim da fila, mantendo a ordem entre eles. */
+export async function moverJobs(aguardando: JobFila[], jobIds: string[], destino: "topo" | "fim"): Promise<void> {
+  await reordenarFila(aguardando, moverVariosNaFila(aguardando.map((j) => j.id), jobIds, destino));
 }

@@ -30,6 +30,7 @@ import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authentic
 import { Route as AuthenticatedRoadmapRouteImport } from './routes/_authenticated/roadmap'
 import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
 import { Route as AuthenticatedSwipeRouteImport } from './routes/_authenticated/swipe'
+import { Route as AuthenticatedTranscritorRouteImport } from './routes/_authenticated/transcritor'
 import { Route as AuthenticatedVerDepoisRouteImport } from './routes/_authenticated/ver-depois'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -137,6 +138,12 @@ const AuthenticatedSwipeRoute = AuthenticatedSwipeRouteImport.update({
   path: '/swipe',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedTranscritorRoute =
+  AuthenticatedTranscritorRouteImport.update({
+    id: '/transcritor',
+    path: '/transcritor',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedVerDepoisRoute = AuthenticatedVerDepoisRouteImport.update({
   id: '/ver-depois',
   path: '/ver-depois',
@@ -164,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/roadmap': typeof AuthenticatedRoadmapRoute
   '/saldo': typeof AuthenticatedSaldoRoute
   '/swipe': typeof AuthenticatedSwipeRoute
+  '/transcritor': typeof AuthenticatedTranscritorRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
 }
 export interface FileRoutesByTo {
@@ -186,6 +194,7 @@ export interface FileRoutesByTo {
   '/roadmap': typeof AuthenticatedRoadmapRoute
   '/saldo': typeof AuthenticatedSaldoRoute
   '/swipe': typeof AuthenticatedSwipeRoute
+  '/transcritor': typeof AuthenticatedTranscritorRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/': typeof AuthenticatedIndexRoute
 }
@@ -211,6 +220,7 @@ export interface FileRoutesById {
   '/_authenticated/roadmap': typeof AuthenticatedRoadmapRoute
   '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
   '/_authenticated/swipe': typeof AuthenticatedSwipeRoute
+  '/_authenticated/transcritor': typeof AuthenticatedTranscritorRoute
   '/_authenticated/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
@@ -237,6 +247,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/saldo'
     | '/swipe'
+    | '/transcritor'
     | '/ver-depois'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -259,6 +270,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/saldo'
     | '/swipe'
+    | '/transcritor'
     | '/ver-depois'
     | '/'
   id:
@@ -283,6 +295,7 @@ export interface FileRouteTypes {
     | '/_authenticated/roadmap'
     | '/_authenticated/saldo'
     | '/_authenticated/swipe'
+    | '/_authenticated/transcritor'
     | '/_authenticated/ver-depois'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
@@ -441,6 +454,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSwipeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/transcritor': {
+      id: '/_authenticated/transcritor'
+      path: '/transcritor'
+      fullPath: '/transcritor'
+      preLoaderRoute: typeof AuthenticatedTranscritorRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/ver-depois': {
       id: '/_authenticated/ver-depois'
       path: '/ver-depois'
@@ -470,6 +490,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedRoadmapRoute: typeof AuthenticatedRoadmapRoute
   AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
   AuthenticatedSwipeRoute: typeof AuthenticatedSwipeRoute
+  AuthenticatedTranscritorRoute: typeof AuthenticatedTranscritorRoute
   AuthenticatedVerDepoisRoute: typeof AuthenticatedVerDepoisRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
@@ -493,6 +514,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedRoadmapRoute: AuthenticatedRoadmapRoute,
   AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,
   AuthenticatedSwipeRoute: AuthenticatedSwipeRoute,
+  AuthenticatedTranscritorRoute: AuthenticatedTranscritorRoute,
   AuthenticatedVerDepoisRoute: AuthenticatedVerDepoisRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
