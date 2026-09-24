@@ -62,8 +62,13 @@ export function SwipeAddDialog({ open, onClose, onSaved, rootFolderId, nichos, c
   const nichoSelecionado = useMemo(() => encontrarNicho(nichoNome, nichosRaiz).exato, [nichoNome, nichosRaiz]);
   const subnichosDoNicho = useMemo(() => (nichoSelecionado ? nichos.filter((n) => n.pai_id === nichoSelecionado.id) : []), [nichos, nichoSelecionado]);
 
+  // Preenche só ao abrir (ou ao trocar o item a completar). A página recarrega `nichos` a cada 5 s
+  // enquanto a fila roda; se isso zerasse o formulário, apagaria o que está sendo digitado.
+  const preenchido = useRef<{ open: boolean; completar: SwipeItem | null | undefined }>({ open: false, completar: null });
   useEffect(() => {
-    if (!open) return;
+    const antes = preenchido.current;
+    preenchido.current = { open, completar };
+    if (!open || (antes.open && antes.completar === completar)) return;
     if (completar) {
       const n = nichos.find((x) => x.id === completar.nicho_id);
       const s = completar.subnicho_id ? nichos.find((x) => x.id === completar.subnicho_id) : null;
@@ -91,7 +96,20 @@ export function SwipeAddDialog({ open, onClose, onSaved, rootFolderId, nichos, c
     }
     setArquivos([]);
     setProgresso(null);
-  }, [open, completar, preset, nichos]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, completar]);
+
+  /** Depois de salvar com "adicionar outro": mantém categoria/nicho/subnicho e limpa o resto. */
+  const limparParaOutro = () => {
+    setRede("instagram");
+    setRedeManual(false);
+    setLink("");
+    setPlayer("");
+    setNota("");
+    setTagsTexto("");
+    setArquivos([]);
+    requestAnimationFrame(() => document.getElementById("sw-link")?.focus());
+  };
 
   const onLinkChange = (v: string) => {
     setLink(v);
@@ -117,7 +135,7 @@ export function SwipeAddDialog({ open, onClose, onSaved, rootFolderId, nichos, c
   const confirmarUso = (tipo: "nicho" | "subnicho", digitado: string, existente: SwipeNicho) =>
     new Promise<boolean>((resolve) => setConfirmarParecido({ tipo, digitado, existente, resolve }));
 
-  const salvar = async () => {
+  const salvar = async (outro = false) => {
     if (!rootFolderId) {
       toast.error('Crie a pasta "Swipe File" no Admin antes de adicionar.');
       return;
@@ -196,7 +214,8 @@ export function SwipeAddDialog({ open, onClose, onSaved, rootFolderId, nichos, c
         toast.success("Na fila: o serviço baixa e sobe no Drive; se falhar, salva o link num Docs");
       }
       await onSaved();
-      onClose();
+      if (outro && !completar) limparParaOutro();
+      else onClose();
     } catch (e: any) {
       if (e instanceof SwipeKeyError) toast.error(e.message);
       else toast.error(erroAmigavel(e));
@@ -325,6 +344,11 @@ export function SwipeAddDialog({ open, onClose, onSaved, rootFolderId, nichos, c
 
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={onClose} disabled={salvando}>Cancelar</Button>
+              {!completar && (
+                <Button type="button" variant="outline" onClick={() => salvar(true)} disabled={salvando}>
+                  Salvar e adicionar outro
+                </Button>
+              )}
               <Button type="submit" disabled={salvando}>
                 {salvando ? "Salvando..." : arquivos.length > 0 ? "Enviar para o Drive" : "Salvar e baixar"}
               </Button>
