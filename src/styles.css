@@ -363,3 +363,41 @@ html[data-hidden] [data-state="closed"] {
 .agenda-fc .fc-evento-curto { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px; line-height: 17px; }
 .agenda-fc .fc-evento-curto-titulo { font-weight: 600; }
 .agenda-fc .fc-evento-curto-hora { margin-left: 5px; font-size: 0.68rem; opacity: 0.75; }
+
+/* Notas: editor no estilo documento (TipTap). O Tailwind zera títulos e listas; aqui voltam. */
+.nota-editor-conteudo { font-size: 0.9375rem; line-height: 1.65; color: var(--foreground); min-height: 100%; padding: 0.25rem 0.75rem 3rem; }
+.nota-editor-conteudo > * + * { margin-top: 0.6em; }
+.nota-editor-conteudo h1 { font-size: 1.6rem; font-weight: 700; line-height: 1.25; margin-top: 1em; }
+.nota-editor-conteudo h2 { font-size: 1.3rem; font-weight: 700; line-height: 1.3; margin-top: 0.9em; }
+.nota-editor-conteudo h3 { font-size: 1.1rem; font-weight: 600; line-height: 1.35; margin-top: 0.8em; }
+.nota-editor-conteudo > :first-child { margin-top: 0; }
+.nota-editor-conteudo ul { list-style: disc; padding-left: 1.5rem; }
+.nota-editor-conteudo ol { list-style: decimal; padding-left: 1.5rem; }
+.nota-editor-conteudo li > p { margin: 0; }
+.nota-editor-conteudo li + li { margin-top: 0.2em; }
+.nota-editor-conteudo ul[data-type="taskList"] { list-style: none; padding-left: 0.25rem; }
+.nota-editor-conteudo ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
+.nota-editor-conteudo ul[data-type="taskList"] li > label { margin-top: 0.3em; flex-shrink: 0; }
+.nota-editor-conteudo ul[data-type="taskList"] li > label input { width: 1rem; height: 1rem; accent-color: var(--primary); cursor: pointer; }
+.nota-editor-conteudo ul[data-type="taskList"] li > div { flex: 1; min-width: 0; }
+.nota-editor-conteudo ul[data-type="taskList"] li[data-checked="true"] > div { text-decoration: line-through; color: var(--muted-foreground); }
+.nota-editor-conteudo blockquote { border-left: 3px solid var(--border); padding-left: 1rem; color: var(--muted-foreground); font-style: italic; }
+.nota-editor-conteudo hr { border: none; border-top: 1px solid var(--border); margin: 1.2em 0; }
+.nota-editor-conteudo a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.nota-editor-conteudo code { background: var(--muted); border-radius: 4px; padding: 0.1em 0.35em; font-size: 0.85em; }
+.nota-editor-conteudo pre { background: var(--muted); border-radius: 8px; padding: 0.75rem 1rem; overflow-x: auto; font-size: 0.85em; }
+.nota-editor-conteudo img.nota-imagem { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); display: block; }
+.nota-editor-conteudo img.nota-imagem.ProseMirror-selectednode { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* Colunas: largura igual para qualquer quantidade (2 a 4); no celular ficam uma embaixo da outra */
+.nota-editor-conteudo .nota-colunas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.75rem; }
+.nota-editor-conteudo .nota-coluna { border: 1px dashed var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; min-width: 0; }
+.nota-editor-conteudo .nota-coluna > * + * { margin-top: 0.5em; }
+.nota-editor-conteudo .nota-coluna:focus-within { border-color: color-mix(in oklch, var(--primary) 55%, transparent); }
+@media (max-width: 640px) { .nota-editor-conteudo .nota-colunas { grid-auto-flow: row; } }
+/* Texto de exemplo (placeholder) */
+.nota-editor-conteudo p.is-empty::before,
+.nota-editor-conteudo h1.is-empty::before,
+.nota-editor-conteudo h2.is-empty::before,
+.nota-editor-conteudo h3.is-empty::before { content: attr(data-placeholder); color: var(--muted-foreground); opacity: 0.6; float: left; height: 0; pointer-events: none; }
+.nota-editor-conteudo .nota-coluna p.is-empty:not(:first-child)::before { content: none; }
+.nota-editor-conteudo .ProseMirror-gapcursor::after { border-top-color: var(--foreground); }

@@ -3,9 +3,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "@/integrations/supabase/client";
 import type { NotaBase } from "@/lib/notasTexto";
+import { BUCKET_IMAGENS_NOTAS, caminhoNoBucket, imagensDoDoc, type NoDoc } from "@/lib/notasDoc";
 import type { ApiTemas, Tema } from "@/components/temas/TemasLista";
 
-export interface Nota extends NotaBase { created_at: string }
+export interface Nota extends NotaBase {
+  created_at: string;
+  /** Documento formatado (editor); null nas notas antigas, que só têm texto */
+  doc: NoDoc | null;
+}
 
 /** Disparado a cada mudança nos temas, para a aba e o Admin recarregarem. */
 export const EVENTO_TEMAS_NOTAS = "notas-temas";
@@ -33,17 +38,17 @@ export async function fetchTemasNotas(): Promise<Tema[]> {
 }
 
 export async function fetchNotas(): Promise<Nota[]> {
-  const { data, error } = await notas().select("id, titulo, conteudo, tema_id, created_at, updated_at");
+  const { data, error } = await notas().select("id, titulo, conteudo, doc, tema_id, created_at, updated_at");
   if (error) throw error;
   return (data || []) as Nota[];
 }
 
-type Campos = { titulo: string; conteudo: string; tema_id: string | null };
+type Campos = { titulo: string; conteudo: string; tema_id: string | null; doc?: NoDoc | null };
 
 export async function criarNota(c: Campos): Promise<Nota> {
   const { data, error } = await notas()
-    .insert([{ titulo: c.titulo.trim(), conteudo: c.conteudo, tema_id: c.tema_id }])
-    .select("id, titulo, conteudo, tema_id, created_at, updated_at")
+    .insert([{ titulo: c.titulo.trim(), conteudo: c.conteudo, tema_id: c.tema_id, doc: c.doc ?? null }])
+    .select("id, titulo, conteudo, doc, tema_id, created_at, updated_at")
     .single();
   if (error) throw error;
   return data as Nota;
@@ -51,7 +56,7 @@ export async function criarNota(c: Campos): Promise<Nota> {
 
 export async function atualizarNota(id: string, c: Campos): Promise<void> {
   const { error } = await notas()
-    .update({ titulo: c.titulo.trim(), conteudo: c.conteudo, tema_id: c.tema_id, updated_at: new Date().toISOString() })
+    .update({ titulo: c.titulo.trim(), conteudo: c.conteudo, tema_id: c.tema_id, ...(c.doc !== undefined ? { doc: c.doc } : {}), updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
 }
@@ -63,10 +68,61 @@ export async function moverNotas(ids: string[], tema_id: string | null): Promise
   if (error) throw error;
 }
 
+/** Apaga as notas e as imagens delas (as que estão no nosso armazenamento). */
 export async function excluirNotas(ids: string[]): Promise<void> {
   if (!ids.length) return;
+  const { data } = await notas().select("doc").in("id", ids);
+  const caminhos = ((data || []) as { doc: NoDoc | null }[])
+    .flatMap((n) => imagensDoDoc(n.doc))
+    .map((src) => caminhoNoBucket(src))
+    .filter((c): c is string => !!c);
   const { error } = await notas().delete().in("id", ids);
   if (error) throw error;
+  await removerImagensNotas(caminhos);
+}
+
+// ---------------------------------------------------------------- Imagens das notas
+
+const LADO_MAXIMO = 1920;
+
+/** Reduz para no máximo 1920 px e converte para WebP (GIF animado e SVG vão como estão). */
+async function comprimir(arquivo: File): Promise<{ blob: Blob; ext: string; tipo: string }> {
+  const original = { blob: arquivo as Blob, ext: (arquivo.name.split(".").pop() || "png").toLowerCase(), tipo: arquivo.type || "image/png" };
+  if (/gif|svg/.test(arquivo.type) || typeof createImageBitmap === "undefined") return original;
+  try {
+    const bmp = await createImageBitmap(arquivo);
+    const escala = Math.min(1, LADO_MAXIMO / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * escala);
+    canvas.height = Math.round(bmp.height * escala);
+    canvas.getContext("2d")?.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close();
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/webp", 0.85));
+    // Se o WebP ficar maior que o original (print pequeno), fica o original
+    if (!blob || blob.size >= arquivo.size) return original;
+    return { blob, ext: "webp", tipo: "image/webp" };
+  } catch {
+    return original;
+  }
+}
+
+/** Sobe a imagem colada/arrastada e devolve o endereço público para o editor. */
+export async function enviarImagemNota(arquivo: File): Promise<string> {
+  if (!arquivo.type.startsWith("image/")) throw new Error("Só imagens podem entrar na nota");
+  const { blob, ext, tipo } = await comprimir(arquivo);
+  const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const caminho = `${id}.${ext}`;
+  const { error } = await supabase.storage.from(BUCKET_IMAGENS_NOTAS).upload(caminho, blob, { contentType: tipo, upsert: false });
+  if (error) {
+    if (/bucket not found/i.test(error.message)) throw new Error("O armazenamento das imagens das notas ainda não existe (migration 20260924210000_notas_editor.sql).");
+    throw error;
+  }
+  return supabase.storage.from(BUCKET_IMAGENS_NOTAS).getPublicUrl(caminho).data.publicUrl;
+}
+
+export async function removerImagensNotas(caminhos: string[]): Promise<void> {
+  if (!caminhos.length) return;
+  await supabase.storage.from(BUCKET_IMAGENS_NOTAS).remove(caminhos).catch(() => {});
 }
 
 /** Operações de tema usadas pelo gerenciador de temas (aba Notas e Admin). */

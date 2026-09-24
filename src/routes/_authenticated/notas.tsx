@@ -5,7 +5,6 @@ import { Check, CheckSquare, Copy, FolderInput, Plus, Search, StickyNote, Tags, 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,10 +18,12 @@ import {
 import { cn } from "@/lib/utils";
 import { useCachedState } from "@/lib/pageCache";
 import {
-  EVENTO_TEMAS_NOTAS, atualizarNota, criarNota, excluirNotas, fetchNotas, fetchTemasNotas, moverNotas, traduzErroNotas,
+  EVENTO_TEMAS_NOTAS, atualizarNota, criarNota, excluirNotas, fetchNotas, fetchTemasNotas, moverNotas, removerImagensNotas, traduzErroNotas,
   type Nota,
 } from "@/lib/notas";
 import { SEM_TEMA, TODOS, contarPorTema, filtrarNotas, previaSemTitulo, tituloOuPrimeiraLinha } from "@/lib/notasTexto";
+import { imagensRemovidas, primeiraImagem, type NoDoc } from "@/lib/notasDoc";
+import { EditorNota } from "@/components/notas/EditorNota";
 import type { Tema } from "@/components/temas/TemasLista";
 import { TemasNotasDialog } from "@/components/notas/TemasNotas";
 
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/_authenticated/notas")({ component: Notas
 
 const SEM = "__sem__"; // valor do Select para "Sem tema"
 
-type Edicao = { id?: string; titulo: string; conteudo: string; tema_id: string | null };
+type Edicao = { id?: string; titulo: string; conteudo: string; tema_id: string | null; doc: NoDoc | null };
 
 function quando(iso: string): string {
   const d = new Date(iso);
@@ -107,7 +108,17 @@ function NotasPage() {
   }, [selecaoAtiva, limparSelecao]);
 
   const abrir = (e: Edicao) => { original.current = e; setEdicao(e); };
-  const novo = () => abrir({ titulo: "", conteudo: "", tema_id: temaDoFiltro });
+  const novo = () => abrir({ titulo: "", conteudo: "", tema_id: temaDoFiltro, doc: null });
+  const abrirNota = (n: Nota) => abrir({ id: n.id, titulo: n.titulo, conteudo: n.conteudo, tema_id: n.tema_id, doc: n.doc });
+
+  /** Imagens que entraram nesta edição e não vão ficar salvas (nota descartada): saem do armazenamento. */
+  const limparImagensNovas = (e: Edicao | null) => {
+    if (e) removerImagensNotas(imagensRemovidas(e.doc, original.current?.doc));
+  };
+  const descartar = () => {
+    limparImagensNovas(edicao);
+    setEdicao(null);
+  };
 
   // Anotação rápida: Enter salva o texto como título, no tema do filtro
   const salvarRapida = async () => {
@@ -125,20 +136,22 @@ function NotasPage() {
 
   const mudou = (e: Edicao) => {
     const o = original.current;
-    return !o || e.titulo !== o.titulo || e.conteudo !== o.conteudo || e.tema_id !== o.tema_id;
+    return !o || e.titulo !== o.titulo || e.conteudo !== o.conteudo || e.tema_id !== o.tema_id || JSON.stringify(e.doc) !== JSON.stringify(o.doc);
   };
 
   /** Salva e fecha. `aoFechar`: fechou o popup sem clicar em Salvar (salva só se mudou algo). */
   const salvar = async (aoFechar = false) => {
     if (!edicao || salvando) return;
     const titulo = tituloOuPrimeiraLinha(edicao.titulo, edicao.conteudo);
-    if (aoFechar && (!mudou(edicao) || (!edicao.id && !titulo))) { setEdicao(null); return; }
+    if (aoFechar && (!mudou(edicao) || (!edicao.id && !titulo))) { descartar(); return; }
     if (!titulo) { toast.error("Escreva um título ou algum texto"); return; }
     setSalvando(true);
     try {
-      const campos = { titulo, conteudo: edicao.conteudo.replace(/\s+$/, ""), tema_id: edicao.tema_id };
+      const campos = { titulo, conteudo: edicao.conteudo.replace(/\s+$/, ""), tema_id: edicao.tema_id, doc: edicao.doc };
       if (edicao.id) await atualizarNota(edicao.id, campos);
       else await criarNota(campos);
+      // Imagens que estavam na nota e foram tiradas agora saem do armazenamento
+      if (edicao.id) removerImagensNotas(imagensRemovidas(original.current?.doc, edicao.doc));
       toast.success(edicao.id ? "Nota atualizada" : "Nota salva");
       setEdicao(null);
       await carregar();
@@ -175,9 +188,26 @@ function NotasPage() {
     }
   };
 
-  const copiar = async (n: Pick<Nota, "titulo" | "conteudo">) => {
+  /** Copia com formatação (cola no Docs/e-mail com títulos, listas e links) e em texto puro. */
+  const copiar = async (n: Pick<Nota, "titulo" | "conteudo" | "doc">) => {
     const texto = n.conteudo.trim() ? `${n.titulo}\n\n${n.conteudo}` : n.titulo;
-    try { await navigator.clipboard.writeText(texto); toast.success("Nota copiada"); } catch { toast.error("Não foi possível copiar"); }
+    try {
+      if (n.doc && typeof ClipboardItem !== "undefined") {
+        const [{ generateHTML }, { extensoesNota }] = await Promise.all([import("@tiptap/core"), import("@/components/notas/extensoesNota")]);
+        const titulo = document.createElement("h2");
+        titulo.textContent = n.titulo;
+        const html = `${titulo.outerHTML}${generateHTML(n.doc as Parameters<typeof generateHTML>[0], extensoesNota())}`;
+        await navigator.clipboard.write([new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([texto], { type: "text/plain" }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(texto);
+      }
+      toast.success("Nota copiada");
+    } catch {
+      try { await navigator.clipboard.writeText(texto); toast.success("Nota copiada (só o texto)"); } catch { toast.error("Não foi possível copiar"); }
+    }
   };
 
   const filtros = [
@@ -264,6 +294,7 @@ function NotasPage() {
             const tema = n.tema_id ? temaDe.get(n.tema_id) : undefined;
             const marcado = selecionados.has(n.id);
             const previa = previaSemTitulo(n.titulo, n.conteudo);
+            const capa = primeiraImagem(n.doc);
             return (
               <div
                 key={n.id}
@@ -271,9 +302,9 @@ function NotasPage() {
                 tabIndex={0}
                 onClick={(e) => {
                   if (modoSelecao || e.ctrlKey || e.metaKey) { alternar(n.id); return; }
-                  abrir({ id: n.id, titulo: n.titulo, conteudo: n.conteudo, tema_id: n.tema_id });
+                  abrirNota(n);
                 }}
-                onKeyDown={(e) => { if (e.key === "Enter") abrir({ id: n.id, titulo: n.titulo, conteudo: n.conteudo, tema_id: n.tema_id }); }}
+                onKeyDown={(e) => { if (e.key === "Enter") abrirNota(n); }}
                 className={cn(
                   "group relative flex cursor-pointer flex-col rounded-xl border bg-card p-3 transition-[box-shadow,border-color] hover:border-primary/40 hover:shadow-md",
                   marcado && "border-primary bg-primary/5 ring-2 ring-primary/50",
@@ -296,8 +327,11 @@ function NotasPage() {
                   </button>
                   <p className="min-w-0 flex-1 break-words text-sm font-semibold leading-snug">{n.titulo}</p>
                 </div>
+                {capa && (
+                  <img src={capa} alt="" loading="lazy" className="mt-2 h-28 w-full rounded-lg border object-cover" />
+                )}
                 {previa && (
-                  <p className="mt-1.5 line-clamp-6 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">{previa}</p>
+                  <p className={cn("mt-1.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground", capa ? "line-clamp-3" : "line-clamp-6")}>{previa}</p>
                 )}
                 <div className="mt-2.5 flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
@@ -363,21 +397,28 @@ function NotasPage() {
       )}
 
       <Dialog open={!!edicao} onOpenChange={(o) => { if (!o) salvar(true); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
+        <DialogContent className="flex h-[92vh] max-h-[92vh] flex-col gap-3 sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>{edicao?.id ? "Editar nota" : "Nova nota"}</DialogTitle>
-            <DialogDescription className="text-xs">Ctrl+Enter salva. Fechar também salva o que mudou.</DialogDescription>
+            <DialogDescription className="text-xs">Ctrl+Enter salva. Fechar também salva o que mudou. Cole prints com Ctrl+V.</DialogDescription>
           </DialogHeader>
           {edicao && (
             <form
-              className="space-y-3"
+              className="flex min-h-0 flex-1 flex-col gap-3"
               onSubmit={(e) => { e.preventDefault(); salvar(); }}
               onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); salvar(); } }}
             >
               <Input autoFocus={!edicao.id} placeholder="Título" value={edicao.titulo} autoComplete="off" className="text-base font-semibold"
                 onChange={(e) => setEdicao({ ...edicao, titulo: e.target.value })} />
-              <Textarea placeholder="Escreva aqui…" value={edicao.conteudo} rows={10} className="min-h-[200px] resize-y text-sm leading-relaxed"
-                onChange={(e) => setEdicao({ ...edicao, conteudo: e.target.value })} />
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border">
+                <EditorNota
+                  key={edicao.id ?? "nova"}
+                  doc={edicao.doc}
+                  textoAntigo={edicao.conteudo}
+                  autoFocus={!!edicao.id}
+                  onChange={(doc, texto) => setEdicao((atual) => (atual ? { ...atual, doc, conteudo: texto } : atual))}
+                />
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Select value={edicao.tema_id ?? SEM} onValueChange={(v) => setEdicao({ ...edicao, tema_id: v === SEM ? null : v })}>
                   <SelectTrigger className="h-9 w-[200px]"><SelectValue /></SelectTrigger>
@@ -395,7 +436,7 @@ function NotasPage() {
               <DialogFooter className="gap-2 sm:justify-between">
                 {edicao.id ? (
                   <div className="flex gap-1">
-                    <Button type="button" variant="ghost" size="sm" className="gap-1.5" onClick={() => copiar({ titulo: edicao.titulo, conteudo: edicao.conteudo })}>
+                    <Button type="button" variant="ghost" size="sm" className="gap-1.5" onClick={() => copiar({ titulo: edicao.titulo, conteudo: edicao.conteudo, doc: edicao.doc })}>
                       <Copy size={14} /> Copiar
                     </Button>
                     <Button type="button" variant="ghost" size="sm" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => edicao.id && setParaExcluir([edicao.id])}>
@@ -404,7 +445,7 @@ function NotasPage() {
                   </div>
                 ) : <span />}
                 <div className="flex gap-2">
-                  <Button type="button" variant="ghost" onClick={() => setEdicao(null)} disabled={salvando}>Descartar</Button>
+                  <Button type="button" variant="ghost" onClick={descartar} disabled={salvando}>Descartar</Button>
                   <Button type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button>
                 </div>
               </DialogFooter>
