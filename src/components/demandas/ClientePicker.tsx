@@ -47,13 +47,15 @@ export function ClientePicker({
   const semCliente = !pessoalAtual && !clienteIdAtual;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent
         className="w-[240px] p-0"
         align={align}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
+        // Teclas (espaço, Enter, setas) não podem chegar ao card: iniciariam o arrastar pelo teclado
+        onKeyDown={(e) => e.stopPropagation()}
       >
         <Command>
           <CommandInput placeholder="Buscar cliente…" />
@@ -74,7 +76,7 @@ export function ClientePicker({
             </CommandGroup>
             <CommandGroup heading="Clientes">
               {clientesOrdenados.map((c) => (
-                <CommandItem key={c.id} value={c.nome} onSelect={() => escolher({ cliente_id: c.id, pessoal: false })}>
+                <CommandItem key={c.id} value={`${c.nome} ${c.id}`} onSelect={() => escolher({ cliente_id: c.id, pessoal: false })}>
                   <span className="flex-1 truncate">{c.nome}</span>
                   {!pessoalAtual && clienteIdAtual === c.id && <Check size={14} />}
                 </CommandItem>

@@ -126,7 +126,12 @@ export function EnviarParaRoadmapDialog({ demanda, clientes, onClose, onDefinirR
         template_id: templateId === SEM_TEMPLATE ? null : templateId,
       });
       const ok = await onDefinirRoadmap(demanda.id, id);
-      if (!ok) return;
+      if (!ok) {
+        toast.error('Roadmap criado, mas não foi possível ligar a demanda — use "Ligar a existente"', {
+          action: { label: "Abrir", onClick: () => abrirRoadmap(id) },
+        });
+        return;
+      }
       toast.success("Roadmap criado — defina os passos quando quiser", {
         action: { label: "Abrir", onClick: () => abrirRoadmap(id) },
       });

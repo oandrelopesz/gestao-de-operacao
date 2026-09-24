@@ -176,8 +176,8 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
             </div>
 
             <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-              {onAtribuirCliente && (
-                <div onPointerDown={(e) => e.stopPropagation()}>
+              {onAtribuirCliente && !demanda.processo_passo_id && (
+                <div onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                   <ClientePicker
                     clientes={clientes ?? []}
                     clienteIdAtual={demanda.cliente_id}
