@@ -817,7 +817,7 @@ function DemandasPage() {
 
       <div className="flex-1 min-h-0 overflow-hidden">
         {view === "kanban" ? (
-          <div className="h-full overflow-x-auto pb-4">
+          <div className={cn("h-full overflow-x-auto pb-4", selecaoAtiva && "pb-20")}>
             <DndContext
               sensors={sensors}
               collisionDetection={collisionDetection}

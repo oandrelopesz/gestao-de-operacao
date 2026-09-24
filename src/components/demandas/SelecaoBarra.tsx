@@ -112,7 +112,7 @@ export function SelecaoBarra({
             </PopoverContent>
           </Popover>
 
-          <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 text-xs text-white hover:bg-emerald-600/90" disabled={semSelecao || ocupado} onClick={onConcluir}>
+          <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 bg-none text-xs text-white shadow-none hover:bg-emerald-700" disabled={semSelecao || ocupado} onClick={onConcluir}>
             <Check size={13} /> Concluir
           </Button>
 
