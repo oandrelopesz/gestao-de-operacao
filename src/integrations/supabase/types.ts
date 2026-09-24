@@ -378,6 +378,33 @@ export type Database = {
         }
         Relationships: []
       }
+      demanda_conclusoes: {
+        Row: {
+          cliente_id: string | null
+          concluida_em: string
+          demanda_id: string | null
+          id: string
+          pessoal: boolean
+          titulo: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          concluida_em?: string
+          demanda_id?: string | null
+          id?: string
+          pessoal?: boolean
+          titulo?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          concluida_em?: string
+          demanda_id?: string | null
+          id?: string
+          pessoal?: boolean
+          titulo?: string | null
+        }
+        Relationships: []
+      }
       demanda_execucoes: {
         Row: {
           concluida: boolean | null
@@ -425,6 +452,7 @@ export type Database = {
           frequencia_tipo: string | null
           id: string
           ordem: number
+          pessoal: boolean
           prazo: string | null
           prioridade: Database["public"]["Enums"]["demanda_prioridade"]
           processo_passo_id: string | null
@@ -453,6 +481,7 @@ export type Database = {
           frequencia_tipo?: string | null
           id?: string
           ordem?: number
+          pessoal?: boolean
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
           processo_passo_id?: string | null
@@ -481,6 +510,7 @@ export type Database = {
           frequencia_tipo?: string | null
           id?: string
           ordem?: number
+          pessoal?: boolean
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
           processo_passo_id?: string | null
@@ -1296,13 +1326,14 @@ export type Database = {
       }
       processos: {
         Row: {
-          cliente_id: string
+          cliente_id: string | null
           concluido_em: string | null
           created_at: string
           id: string
           iniciado_em: string
           nome: string
           passo_onboarding_id: string | null
+          pessoal: boolean
           prazo_final: string | null
           status: string
           template_id: string | null
@@ -1310,13 +1341,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          cliente_id: string
+          cliente_id?: string | null
           concluido_em?: string | null
           created_at?: string
           id?: string
           iniciado_em?: string
           nome: string
           passo_onboarding_id?: string | null
+          pessoal?: boolean
           prazo_final?: string | null
           status?: string
           template_id?: string | null
@@ -1324,13 +1356,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          cliente_id?: string
+          cliente_id?: string | null
           concluido_em?: string | null
           created_at?: string
           id?: string
           iniciado_em?: string
           nome?: string
           passo_onboarding_id?: string | null
+          pessoal?: boolean
           prazo_final?: string | null
           status?: string
           template_id?: string | null
