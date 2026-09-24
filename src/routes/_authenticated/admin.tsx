@@ -44,6 +44,7 @@ import { IdeiasCategoriasCard } from "@/components/admin/IdeiasCategoriasCard";
 import { LivrosMetaCard } from "@/components/admin/LivrosMetaCard";
 import { LinksTemasCard } from "@/components/links/TemasLinks";
 import { GlossarioCard } from "@/components/transcritor/GlossarioCard";
+import { NotasTemasCard } from "@/components/notas/TemasNotas";
 
 // Seções do Admin, uma por aba do sistema (?secao= na URL)
 const SECOES = [
@@ -53,6 +54,7 @@ const SECOES = [
   { id: "onboarding", label: "Onboarding" },
   { id: "roadmap", label: "Roadmap" },
   { id: "links", label: "Links" },
+  { id: "notas", label: "Notas" },
   { id: "pdfs", label: "PDFs" },
   { id: "ver-depois", label: "Ver depois" },
   { id: "livros", label: "Livros" },
@@ -889,6 +891,10 @@ function AdminPage() {
 
           <TabsContent value="links" className="mt-0 space-y-6">
             <LinksTemasCard />
+          </TabsContent>
+
+          <TabsContent value="notas" className="mt-0 space-y-6">
+            <NotasTemasCard />
           </TabsContent>
 
           <TabsContent value="pdfs" className="mt-0 space-y-6">

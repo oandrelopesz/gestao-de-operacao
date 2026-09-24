@@ -9,37 +9,38 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedAcessosRouteImport } from './routes/_authenticated/acessos'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
-import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
-import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
-import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenticated/habilidades'
-import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
-import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
-import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated/livros'
-import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
-import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
-import { Route as AuthenticatedPdfsRouteImport } from './routes/_authenticated/pdfs'
-import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
-import { Route as AuthenticatedRoadmapRouteImport } from './routes/_authenticated/roadmap'
-import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
-import { Route as AuthenticatedSwipeRouteImport } from './routes/_authenticated/swipe'
-import { Route as AuthenticatedTranscritorRouteImport } from './routes/_authenticated/transcritor'
 import { Route as AuthenticatedVerDepoisRouteImport } from './routes/_authenticated/ver-depois'
+import { Route as AuthenticatedTranscritorRouteImport } from './routes/_authenticated/transcritor'
+import { Route as AuthenticatedSwipeRouteImport } from './routes/_authenticated/swipe'
+import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
+import { Route as AuthenticatedRoadmapRouteImport } from './routes/_authenticated/roadmap'
+import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
+import { Route as AuthenticatedPdfsRouteImport } from './routes/_authenticated/pdfs'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
+import { Route as AuthenticatedNotasRouteImport } from './routes/_authenticated/notas'
+import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated/livros'
+import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
+import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
+import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenticated/habilidades'
+import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
+import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
+import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAcessosRouteImport } from './routes/_authenticated/acessos'
 
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -47,95 +48,9 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAcessosRoute = AuthenticatedAcessosRouteImport.update({
-  id: '/acessos',
-  path: '/acessos',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedAgendaRoute = AuthenticatedAgendaRouteImport.update({
-  id: '/agenda',
-  path: '/agenda',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
-  id: '/clientes',
-  path: '/clientes',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedCursosRoute = AuthenticatedCursosRouteImport.update({
-  id: '/cursos',
-  path: '/cursos',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedFinanceiroRoute = AuthenticatedFinanceiroRouteImport.update({
-  id: '/financeiro',
-  path: '/financeiro',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedHabilidadesRoute =
-  AuthenticatedHabilidadesRouteImport.update({
-    id: '/habilidades',
-    path: '/habilidades',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedIdeiasRoute = AuthenticatedIdeiasRouteImport.update({
-  id: '/ideias',
-  path: '/ideias',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedLinksRoute = AuthenticatedLinksRouteImport.update({
-  id: '/links',
-  path: '/links',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedLivrosRoute = AuthenticatedLivrosRouteImport.update({
-  id: '/livros',
-  path: '/livros',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedNpsRoute = AuthenticatedNpsRouteImport.update({
-  id: '/nps',
-  path: '/nps',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedPdfsRoute = AuthenticatedPdfsRouteImport.update({
-  id: '/pdfs',
-  path: '/pdfs',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedProspeccaoRoute = AuthenticatedProspeccaoRouteImport.update({
-  id: '/prospeccao',
-  path: '/prospeccao',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedRoadmapRoute = AuthenticatedRoadmapRouteImport.update({
-  id: '/roadmap',
-  path: '/roadmap',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSaldoRoute = AuthenticatedSaldoRouteImport.update({
-  id: '/saldo',
-  path: '/saldo',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSwipeRoute = AuthenticatedSwipeRouteImport.update({
-  id: '/swipe',
-  path: '/swipe',
+const AuthenticatedVerDepoisRoute = AuthenticatedVerDepoisRouteImport.update({
+  id: '/ver-depois',
+  path: '/ver-depois',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedTranscritorRoute =
@@ -144,9 +59,100 @@ const AuthenticatedTranscritorRoute =
     path: '/transcritor',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedVerDepoisRoute = AuthenticatedVerDepoisRouteImport.update({
-  id: '/ver-depois',
-  path: '/ver-depois',
+const AuthenticatedSwipeRoute = AuthenticatedSwipeRouteImport.update({
+  id: '/swipe',
+  path: '/swipe',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSaldoRoute = AuthenticatedSaldoRouteImport.update({
+  id: '/saldo',
+  path: '/saldo',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRoadmapRoute = AuthenticatedRoadmapRouteImport.update({
+  id: '/roadmap',
+  path: '/roadmap',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedProspeccaoRoute = AuthenticatedProspeccaoRouteImport.update({
+  id: '/prospeccao',
+  path: '/prospeccao',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPdfsRoute = AuthenticatedPdfsRouteImport.update({
+  id: '/pdfs',
+  path: '/pdfs',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedNpsRoute = AuthenticatedNpsRouteImport.update({
+  id: '/nps',
+  path: '/nps',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedNotasRoute = AuthenticatedNotasRouteImport.update({
+  id: '/notas',
+  path: '/notas',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLivrosRoute = AuthenticatedLivrosRouteImport.update({
+  id: '/livros',
+  path: '/livros',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLinksRoute = AuthenticatedLinksRouteImport.update({
+  id: '/links',
+  path: '/links',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedIdeiasRoute = AuthenticatedIdeiasRouteImport.update({
+  id: '/ideias',
+  path: '/ideias',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedHabilidadesRoute =
+  AuthenticatedHabilidadesRouteImport.update({
+    id: '/habilidades',
+    path: '/habilidades',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedFinanceiroRoute = AuthenticatedFinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCursosRoute = AuthenticatedCursosRouteImport.update({
+  id: '/cursos',
+  path: '/cursos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAgendaRoute = AuthenticatedAgendaRouteImport.update({
+  id: '/agenda',
+  path: '/agenda',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAcessosRoute = AuthenticatedAcessosRouteImport.update({
+  id: '/acessos',
+  path: '/acessos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/links': typeof AuthenticatedLinksRoute
   '/livros': typeof AuthenticatedLivrosRoute
+  '/notas': typeof AuthenticatedNotasRoute
   '/nps': typeof AuthenticatedNpsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/pdfs': typeof AuthenticatedPdfsRoute
@@ -187,6 +194,7 @@ export interface FileRoutesByTo {
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/links': typeof AuthenticatedLinksRoute
   '/livros': typeof AuthenticatedLivrosRoute
+  '/notas': typeof AuthenticatedNotasRoute
   '/nps': typeof AuthenticatedNpsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/pdfs': typeof AuthenticatedPdfsRoute
@@ -213,6 +221,7 @@ export interface FileRoutesById {
   '/_authenticated/ideias': typeof AuthenticatedIdeiasRoute
   '/_authenticated/links': typeof AuthenticatedLinksRoute
   '/_authenticated/livros': typeof AuthenticatedLivrosRoute
+  '/_authenticated/notas': typeof AuthenticatedNotasRoute
   '/_authenticated/nps': typeof AuthenticatedNpsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/pdfs': typeof AuthenticatedPdfsRoute
@@ -240,6 +249,7 @@ export interface FileRouteTypes {
     | '/ideias'
     | '/links'
     | '/livros'
+    | '/notas'
     | '/nps'
     | '/onboarding'
     | '/pdfs'
@@ -263,6 +273,7 @@ export interface FileRouteTypes {
     | '/ideias'
     | '/links'
     | '/livros'
+    | '/notas'
     | '/nps'
     | '/onboarding'
     | '/pdfs'
@@ -288,6 +299,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ideias'
     | '/_authenticated/links'
     | '/_authenticated/livros'
+    | '/_authenticated/notas'
     | '/_authenticated/nps'
     | '/_authenticated/onboarding'
     | '/_authenticated/pdfs'
@@ -307,18 +319,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -328,130 +340,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/acessos': {
-      id: '/_authenticated/acessos'
-      path: '/acessos'
-      fullPath: '/acessos'
-      preLoaderRoute: typeof AuthenticatedAcessosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/agenda': {
-      id: '/_authenticated/agenda'
-      path: '/agenda'
-      fullPath: '/agenda'
-      preLoaderRoute: typeof AuthenticatedAgendaRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/clientes': {
-      id: '/_authenticated/clientes'
-      path: '/clientes'
-      fullPath: '/clientes'
-      preLoaderRoute: typeof AuthenticatedClientesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/cursos': {
-      id: '/_authenticated/cursos'
-      path: '/cursos'
-      fullPath: '/cursos'
-      preLoaderRoute: typeof AuthenticatedCursosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/financeiro': {
-      id: '/_authenticated/financeiro'
-      path: '/financeiro'
-      fullPath: '/financeiro'
-      preLoaderRoute: typeof AuthenticatedFinanceiroRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/habilidades': {
-      id: '/_authenticated/habilidades'
-      path: '/habilidades'
-      fullPath: '/habilidades'
-      preLoaderRoute: typeof AuthenticatedHabilidadesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/ideias': {
-      id: '/_authenticated/ideias'
-      path: '/ideias'
-      fullPath: '/ideias'
-      preLoaderRoute: typeof AuthenticatedIdeiasRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/links': {
-      id: '/_authenticated/links'
-      path: '/links'
-      fullPath: '/links'
-      preLoaderRoute: typeof AuthenticatedLinksRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/livros': {
-      id: '/_authenticated/livros'
-      path: '/livros'
-      fullPath: '/livros'
-      preLoaderRoute: typeof AuthenticatedLivrosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/nps': {
-      id: '/_authenticated/nps'
-      path: '/nps'
-      fullPath: '/nps'
-      preLoaderRoute: typeof AuthenticatedNpsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/onboarding': {
-      id: '/_authenticated/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/pdfs': {
-      id: '/_authenticated/pdfs'
-      path: '/pdfs'
-      fullPath: '/pdfs'
-      preLoaderRoute: typeof AuthenticatedPdfsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/prospeccao': {
-      id: '/_authenticated/prospeccao'
-      path: '/prospeccao'
-      fullPath: '/prospeccao'
-      preLoaderRoute: typeof AuthenticatedProspeccaoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/roadmap': {
-      id: '/_authenticated/roadmap'
-      path: '/roadmap'
-      fullPath: '/roadmap'
-      preLoaderRoute: typeof AuthenticatedRoadmapRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/saldo': {
-      id: '/_authenticated/saldo'
-      path: '/saldo'
-      fullPath: '/saldo'
-      preLoaderRoute: typeof AuthenticatedSaldoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/swipe': {
-      id: '/_authenticated/swipe'
-      path: '/swipe'
-      fullPath: '/swipe'
-      preLoaderRoute: typeof AuthenticatedSwipeRouteImport
+    '/_authenticated/ver-depois': {
+      id: '/_authenticated/ver-depois'
+      path: '/ver-depois'
+      fullPath: '/ver-depois'
+      preLoaderRoute: typeof AuthenticatedVerDepoisRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/transcritor': {
@@ -461,11 +354,137 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTranscritorRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/ver-depois': {
-      id: '/_authenticated/ver-depois'
-      path: '/ver-depois'
-      fullPath: '/ver-depois'
-      preLoaderRoute: typeof AuthenticatedVerDepoisRouteImport
+    '/_authenticated/swipe': {
+      id: '/_authenticated/swipe'
+      path: '/swipe'
+      fullPath: '/swipe'
+      preLoaderRoute: typeof AuthenticatedSwipeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/saldo': {
+      id: '/_authenticated/saldo'
+      path: '/saldo'
+      fullPath: '/saldo'
+      preLoaderRoute: typeof AuthenticatedSaldoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/roadmap': {
+      id: '/_authenticated/roadmap'
+      path: '/roadmap'
+      fullPath: '/roadmap'
+      preLoaderRoute: typeof AuthenticatedRoadmapRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/prospeccao': {
+      id: '/_authenticated/prospeccao'
+      path: '/prospeccao'
+      fullPath: '/prospeccao'
+      preLoaderRoute: typeof AuthenticatedProspeccaoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/pdfs': {
+      id: '/_authenticated/pdfs'
+      path: '/pdfs'
+      fullPath: '/pdfs'
+      preLoaderRoute: typeof AuthenticatedPdfsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/nps': {
+      id: '/_authenticated/nps'
+      path: '/nps'
+      fullPath: '/nps'
+      preLoaderRoute: typeof AuthenticatedNpsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/notas': {
+      id: '/_authenticated/notas'
+      path: '/notas'
+      fullPath: '/notas'
+      preLoaderRoute: typeof AuthenticatedNotasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/livros': {
+      id: '/_authenticated/livros'
+      path: '/livros'
+      fullPath: '/livros'
+      preLoaderRoute: typeof AuthenticatedLivrosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/links': {
+      id: '/_authenticated/links'
+      path: '/links'
+      fullPath: '/links'
+      preLoaderRoute: typeof AuthenticatedLinksRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ideias': {
+      id: '/_authenticated/ideias'
+      path: '/ideias'
+      fullPath: '/ideias'
+      preLoaderRoute: typeof AuthenticatedIdeiasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/habilidades': {
+      id: '/_authenticated/habilidades'
+      path: '/habilidades'
+      fullPath: '/habilidades'
+      preLoaderRoute: typeof AuthenticatedHabilidadesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/financeiro': {
+      id: '/_authenticated/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof AuthenticatedFinanceiroRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/cursos': {
+      id: '/_authenticated/cursos'
+      path: '/cursos'
+      fullPath: '/cursos'
+      preLoaderRoute: typeof AuthenticatedCursosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/clientes': {
+      id: '/_authenticated/clientes'
+      path: '/clientes'
+      fullPath: '/clientes'
+      preLoaderRoute: typeof AuthenticatedClientesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/agenda': {
+      id: '/_authenticated/agenda'
+      path: '/agenda'
+      fullPath: '/agenda'
+      preLoaderRoute: typeof AuthenticatedAgendaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/acessos': {
+      id: '/_authenticated/acessos'
+      path: '/acessos'
+      fullPath: '/acessos'
+      preLoaderRoute: typeof AuthenticatedAcessosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
   }
@@ -483,6 +502,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedIdeiasRoute: typeof AuthenticatedIdeiasRoute
   AuthenticatedLinksRoute: typeof AuthenticatedLinksRoute
   AuthenticatedLivrosRoute: typeof AuthenticatedLivrosRoute
+  AuthenticatedNotasRoute: typeof AuthenticatedNotasRoute
   AuthenticatedNpsRoute: typeof AuthenticatedNpsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPdfsRoute: typeof AuthenticatedPdfsRoute
@@ -507,6 +527,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIdeiasRoute: AuthenticatedIdeiasRoute,
   AuthenticatedLinksRoute: AuthenticatedLinksRoute,
   AuthenticatedLivrosRoute: AuthenticatedLivrosRoute,
+  AuthenticatedNotasRoute: AuthenticatedNotasRoute,
   AuthenticatedNpsRoute: AuthenticatedNpsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPdfsRoute: AuthenticatedPdfsRoute,
