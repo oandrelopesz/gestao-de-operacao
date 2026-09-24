@@ -6,11 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCachedState } from "@/lib/pageCache";
+import { statusDoDrive } from "@/lib/googleDrive";
+import { idTokenEmCache, loginSilencioso } from "@/lib/googleAuth";
+import { BotaoGoogleLogin } from "@/components/swipe/BotaoGoogleLogin";
 import { FilaComSelecao, type LinhaDaFila } from "@/components/fila/FilaComSelecao";
 import { TranscreverDialog } from "@/components/transcritor/TranscreverDialog";
 import { ListaTranscricoes } from "@/components/transcritor/ListaTranscricoes";
 import {
-  URL_TRANSCRITOR, criarDeArquivo, criarDeLinks, enviarArquivo, excluir, fetchTranscricoes, moverPara, pausar, reordenar, retomar,
+  SemLoginGoogle, URL_TRANSCRITOR, criarDeArquivo, criarDeLinks, enviarArquivo, excluir, fetchTranscricoes, moverPara, pausar, reordenar, retomar,
   traduzErroTranscritor, type Transcricao,
 } from "@/lib/transcritor";
 import { formatarDuracao, nomeExibido, rotuloPlataforma, separarTranscricoes } from "@/lib/transcritorTexto";
@@ -25,6 +28,9 @@ function TranscritorPage() {
   const [dialogo, setDialogo] = useState(false);
   const [envios, setEnvios] = useState<Record<string, Envio>>({});
   const [servidorOk, setServidorOk] = useState<boolean | null>(null);
+  // Enviar arquivos exige o login do Google (o servidor só aceita a sua conta); links não
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [logado, setLogado] = useState(() => !!idTokenEmCache());
   const enviosRef = useRef(envios);
   enviosRef.current = envios;
 
@@ -42,6 +48,16 @@ function TranscritorPage() {
   // O servidor da VPS está de pé? (só um aviso; a fila fica no banco de qualquer jeito)
   useEffect(() => {
     fetch(`${URL_TRANSCRITOR}/health`).then((r) => setServidorOk(r.ok)).catch(() => setServidorOk(false));
+  }, []);
+
+  useEffect(() => {
+    statusDoDrive()
+      .then(async (st) => {
+        if (!st.client_id) return;
+        setClientId(st.client_id);
+        if (await loginSilencioso(st.client_id)) setLogado(true);
+      })
+      .catch(() => {});
   }, []);
 
   const partes = useMemo(() => separarTranscricoes(lista ?? []), [lista]);
@@ -76,10 +92,17 @@ function TranscritorPage() {
       })
       .catch((e) => {
         if (controle.signal.aborted) return;
+        if (e instanceof SemLoginGoogle) setLogado(false);
         const msg = traduzErroTranscritor(e);
         setEnvios((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], erro: msg } } : prev));
-        toast.error(`Envio de "${arquivo.name}" parou: ${msg}`);
+        if (!(e instanceof SemLoginGoogle)) toast.error(`Envio de "${arquivo.name}" parou: ${msg}`);
       });
+  };
+
+  // Entrou com o Google: os envios que pararam continuam de onde o servidor estava
+  const aoEntrar = () => {
+    setLogado(true);
+    for (const [id, envio] of Object.entries(enviosRef.current)) if (envio.erro) iniciarEnvio(id, envio.arquivo);
   };
 
   const adicionarLinks = async (itens: { link: string; nome?: string }[]) => {
@@ -114,6 +137,7 @@ function TranscritorPage() {
     const sub = [rotuloPlataforma(t), t.duracao_seg != null ? formatarDuracao(t.duracao_seg) : ""].filter(Boolean).join(" · ");
     const base = { id: t.id, titulo: nomeExibido(t), subtitulo: sub };
     if (t.status === "enviando") {
+      if (envio?.erro && !logado) return { ...base, etapa: "Aguardando você entrar com o Google (botão acima) — o envio continua sozinho", progresso: envio.progresso, semPausa: true };
       if (envio?.erro) return { ...base, etapa: `Envio parou (${envio.erro}) — cancele e envie de novo`, progresso: envio.progresso, semPausa: true };
       if (!envio) return { ...base, etapa: "Envio interrompido (a página foi recarregada) — cancele e envie de novo", progresso: null, semPausa: true };
       return { ...base, etapa: `Enviando ${Math.round(envio.progresso * 100)}%`, progresso: envio.progresso, semPausa: true };
@@ -149,6 +173,15 @@ function TranscritorPage() {
           <CardContent className="flex items-center gap-3 p-4 text-sm">
             <ServerCrash size={18} className="shrink-0 text-amber-500" />
             O servidor de transcrição não respondeu agora. Os pedidos ficam na fila e começam assim que ele voltar.
+          </CardContent>
+        </Card>
+      )}
+
+      {!logado && clientId && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+            <span className="text-muted-foreground">Para enviar <b className="text-foreground">arquivos</b>, entre com a sua conta Google (links funcionam sem isso).</span>
+            <BotaoGoogleLogin clientId={clientId} onEntrou={aoEntrar} />
           </CardContent>
         </Card>
       )}

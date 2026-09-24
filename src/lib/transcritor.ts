@@ -89,13 +89,20 @@ export async function criarDeArquivo(arquivo: File, nome?: string): Promise<stri
   return data.id as string;
 }
 
+/** Sem login do Google na aba: a página mostra o botão e retoma o envio depois. */
+export class SemLoginGoogle extends Error {
+  constructor() {
+    super("Falta entrar com o Google (botão acima da fila)");
+  }
+}
+
 /** ID token do "Entrar com Google" (o orquestrador só aceita a conta permitida). */
 async function idToken(): Promise<string> {
   const emCache = idTokenEmCache();
   if (emCache) return emCache;
   const st = await statusDoDrive();
   const token = st.client_id ? await loginSilencioso(st.client_id) : null;
-  if (!token) throw new Error("Entre com o Google (botão no topo da aba) para enviar arquivos");
+  if (!token) throw new SemLoginGoogle();
   return token;
 }
 
@@ -138,7 +145,7 @@ export async function enviarArquivo(
       falhasSeguidas = 0;
       onProgresso?.(recebido / arquivo.size);
     } catch (e) {
-      if (signal?.aborted) throw e;
+      if (signal?.aborted || e instanceof SemLoginGoogle) throw e;
       if (++falhasSeguidas > 6) throw e;
       await espera(Math.min(30_000, 1000 * 2 ** falhasSeguidas));
       const consulta = await pedir(url, { method: "POST" }).catch(() => null);
