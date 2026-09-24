@@ -44,7 +44,11 @@ function AuthenticatedLayout() {
   useEffect(() => {
     let vivo = true;
     const carregarMenuCfg = () => {
-      getConfig<MenuConfig | null>("menu", null).then((v) => { if (vivo) setMenuCfg(v); });
+      getConfig<MenuConfig | null>("menu", null).then((v: any) => {
+        if (!vivo) return;
+        // Normaliza a forma: um valor malformado salvo em app_config nunca pode derrubar o sidebar.
+        setMenuCfg(v ? { ocultas: Array.isArray(v?.ocultas) ? v.ocultas : [], ordem: v?.ordem && typeof v.ordem === "object" ? v.ordem : {} } : null);
+      });
     };
     carregarMenuCfg();
     window.addEventListener("menu-config", carregarMenuCfg);

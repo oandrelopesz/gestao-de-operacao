@@ -36,6 +36,7 @@ export function CategoriasIdeiasLista() {
   const [edicao, setEdicao] = useState<CategoriaEdicao | null>(null);
   const [toDelete, setToDelete] = useState<CategoriaIdeia | null>(null);
   const [saving, setSaving] = useState(false);
+  const [movendo, setMovendo] = useState(false);
 
   const carregar = async () => {
     try {
@@ -88,11 +89,15 @@ export function CategoriasIdeiasLista() {
   };
 
   const mover = async (id: string, delta: -1 | 1) => {
+    if (movendo) return; // ignora cliques enquanto um reorder anterior ainda está em andamento
+    setMovendo(true);
     try {
       await moverCategoriaIdeia(categorias, id, delta);
     } catch (e) {
       toast.error(traduzErroCategoria(e));
       await carregar();
+    } finally {
+      setMovendo(false);
     }
   };
 
@@ -133,10 +138,10 @@ export function CategoriasIdeiasLista() {
                 <p className="text-xs text-muted-foreground">{qtd} {qtd === 1 ? "ideia" : "ideias"}</p>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => mover(c.id, -1)} title="Subir">
+                <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0 || movendo} onClick={() => mover(c.id, -1)} title="Subir">
                   <ArrowUp size={14} />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === categorias.length - 1} onClick={() => mover(c.id, 1)} title="Descer">
+                <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === categorias.length - 1 || movendo} onClick={() => mover(c.id, 1)} title="Descer">
                   <ArrowDown size={14} />
                 </Button>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEdicao({ id: c.id, label: c.label, hex: c.hex })} title="Editar">

@@ -22,8 +22,9 @@ export interface PdfBiblioteca {
 
 export const PDF_BUCKET = "pdfs";
 /**
- * Limite padrão por arquivo. O valor em uso vem de app_config.pdf_tamanho_max_mb (Admin → PDFs).
- * O bucket (migration 20260923120000_pdfs.sql) aceita até 50 MB: acima disso, ajuste também o Storage.
+ * Limite padrão por arquivo. O valor em uso vem de app_config.pdf_tamanho_max_mb (Admin → PDFs),
+ * que é a guarda real. O bucket (migration 20260923120000_pdfs.sql) aceita até 200 MB: acima
+ * disso, ajuste também o Storage.
  */
 export const PDF_TAMANHO_MAX_PADRAO_MB = 50;
 

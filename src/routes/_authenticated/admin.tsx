@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Building2, Plus, Pencil, Trash2, ArrowUp, ArrowDown, Sun, Moon,
   Columns3, Database, Download, AlertTriangle, EyeOff, Eye, RefreshCw,
-  Megaphone, GraduationCap, Lightbulb,
+  Megaphone, GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

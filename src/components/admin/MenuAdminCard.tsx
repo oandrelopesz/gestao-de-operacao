@@ -25,7 +25,7 @@ function ordenarGrupo<L extends { to: string }>(links: L[], ordem: string[]): L[
  * ordem dentro de cada grupo. Demandas e Admin (MENU_FIXOS) nunca somem.
  */
 export function MenuAdminCard() {
-  const [cfg, salvarCfg] = useConfig<MenuConfig | null>("menu", null);
+  const [cfg, salvarCfg, carregando] = useConfig<MenuConfig | null>("menu", null);
   const atual = cfg ?? CFG_VAZIA;
 
   const salvar = async (novo: MenuConfig) => {
@@ -61,7 +61,7 @@ export function MenuAdminCard() {
                       <span className="flex-1 text-sm font-medium truncate">{link.label}</span>
                       <Switch
                         checked={visivel}
-                        disabled={fixo}
+                        disabled={carregando || fixo}
                         onCheckedChange={() => salvar(alternarOculta(atual, link.to))}
                         title={fixo ? "Sempre visível" : visivel ? "Ocultar do menu" : "Mostrar no menu"}
                       />
@@ -70,7 +70,7 @@ export function MenuAdminCard() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          disabled={idx === 0}
+                          disabled={carregando || idx === 0}
                           onClick={() => salvar(moverNoGrupo(atual, group.title, tos, link.to, -1))}
                           title="Subir"
                         >
@@ -80,7 +80,7 @@ export function MenuAdminCard() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          disabled={idx === links.length - 1}
+                          disabled={carregando || idx === links.length - 1}
                           onClick={() => salvar(moverNoGrupo(atual, group.title, tos, link.to, 1))}
                           title="Descer"
                         >
