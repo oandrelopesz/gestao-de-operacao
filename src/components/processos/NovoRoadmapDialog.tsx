@@ -95,6 +95,11 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
         setEmAndamento(andamento);
         setTemplates(t);
         if (t.length) setBase("template");
+        // Só um template: já vem escolhido (antes ficava na lista sem seleção e o botão não liberava)
+        if (t.length === 1) {
+          setTemplateId(t[0].id);
+          setNome(t[0].nome);
+        }
         const inicial = clienteIdInicial ? [...onb, ...andamento].find((c) => c.id === clienteIdInicial) : undefined;
         if (inicial) {
           setFiltro(idsOnb.has(inicial.id) ? "onboarding" : "andamento");
@@ -149,7 +154,15 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
     if (!nome.trim() || (anterior && nome === anterior.nome)) setNome(t.nome);
   };
 
-  const podeCriar = !!clienteId && !!nome.trim() && (base === "zero" || !!templateId) && !criando;
+  // O que ainda falta para criar — mostrado ao lado do botão, que fica desabilitado
+  const falta = !clienteId
+    ? "Escolha o cliente"
+    : base === "template" && !templateId
+      ? templates.length ? "Clique em um template da lista" : "Escolha \"Começar do zero\""
+      : !nome.trim()
+        ? "Dê um nome ao roadmap"
+        : null;
+  const podeCriar = !falta && !criando;
 
   const criar = async () => {
     if (!podeCriar) return;
@@ -296,6 +309,7 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
                 onChange={(e) => setNome(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); criar(); } }}
                 placeholder="Ex.: Landing page"
+                autoComplete="off"
               />
             </div>
 
@@ -357,7 +371,10 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="sm:items-center">
+          {!carregando && !erro && falta && (
+            <p className="text-xs text-muted-foreground sm:mr-auto">{falta}</p>
+          )}
           <Button variant="ghost" onClick={onClose} disabled={criando}>Cancelar</Button>
           <Button onClick={criar} disabled={!podeCriar} className="gap-1.5">
             {criando ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
