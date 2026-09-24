@@ -276,7 +276,7 @@ export function ListaTranscricoes({ concluidas, onMudou }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{paraExcluir?.length === 1 ? "Excluir esta transcrição?" : `Excluir ${paraExcluir?.length} transcrições?`}</AlertDialogTitle>
-            <AlertDialogDescription>É apagada de vez, sem lixeira.</AlertDialogDescription>
+            <AlertDialogDescription>{paraExcluir?.length === 1 ? "É apagada de vez, sem lixeira." : "São apagadas de vez, sem lixeira."}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
