@@ -1,8 +1,9 @@
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useNavigate } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
-import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, AlertTriangle } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, AlertTriangle, Rocket, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -32,6 +33,8 @@ interface Demanda {
   recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
   dia_semana?: number | null;
+  processo_passo_id?: string | null;
+  roadmap_id?: string | null;
 }
 
 interface KanbanCardProps {
@@ -68,6 +71,7 @@ export function KanbanCard(props: KanbanCardProps) {
 
 /** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
 export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, diasDaColuna, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
+  const navigate = useNavigate();
   const isRecorrenteMae = demanda.status === "recorrentes";
   const isDragging = sortable?.isDragging ?? false;
 
@@ -115,6 +119,10 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
         )}
         onClick={(e) => {
           e.stopPropagation();
+          if (demanda.roadmap_id) {
+            navigate({ to: "/roadmap", search: { id: demanda.roadmap_id } });
+            return;
+          }
           onEdit(demanda);
         }}
       >
@@ -193,8 +201,38 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
             </div>
           </div>
 
-          {(demanda.clientes?.nome || demanda.descricao || isRecorrenteMae || diaCard != null || demanda.prazo) && (
+          {(demanda.clientes?.nome || demanda.descricao || isRecorrenteMae || diaCard != null || demanda.prazo || demanda.processo_passo_id || demanda.roadmap_id) && (
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              {demanda.processo_passo_id && (
+                <button
+                  type="button"
+                  title="Ir para o Onboarding"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate({ to: "/onboarding", search: { cliente: demanda.cliente_id ?? undefined } });
+                  }}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500 text-white hover:brightness-110"
+                >
+                  <Rocket size={10} /> Onboarding
+                </button>
+              )}
+
+              {demanda.roadmap_id && (
+                <button
+                  type="button"
+                  title="Ir para o Roadmap"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate({ to: "/roadmap", search: { id: demanda.roadmap_id ?? undefined } });
+                  }}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500 text-white hover:brightness-110"
+                >
+                  <MapIcon size={10} /> Roadmap
+                </button>
+              )}
+
               {demanda.clientes?.nome && (
                 <span
                   title={`Cliente: ${demanda.clientes.nome}`}

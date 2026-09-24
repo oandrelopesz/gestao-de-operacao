@@ -32,6 +32,8 @@ interface Demanda {
   recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
   dia_semana?: number | null;
+  processo_passo_id?: string | null;
+  roadmap_id?: string | null;
 }
 
 interface KanbanColumnProps {
