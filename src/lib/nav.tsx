@@ -18,6 +18,7 @@ import {
   Rocket,
   Map as MapIcon,
   BarChart3,
+  CalendarDays,
 } from "lucide-react";
 
 export interface NavLink {
@@ -32,6 +33,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     title: "Operação",
     links: [
       { label: "Demandas", icon: <LayoutDashboard size={17} />, to: "/" },
+      { label: "Agenda", icon: <CalendarDays size={17} />, to: "/agenda" },
       { label: "Onboarding", icon: <Rocket size={17} />, to: "/onboarding" },
       { label: "Roadmap", icon: <MapIcon size={17} />, to: "/roadmap" },
       { label: "Ideias", icon: <Lightbulb size={17} />, to: "/ideias" },

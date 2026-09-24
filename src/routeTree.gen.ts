@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAcessosRouteImport } from './routes/_authenticated/acessos'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -52,6 +53,11 @@ const AuthenticatedAcessosRoute = AuthenticatedAcessosRouteImport.update({
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAgendaRoute = AuthenticatedAgendaRouteImport.update({
+  id: '/agenda',
+  path: '/agenda',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/acessos': typeof AuthenticatedAcessosRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/agenda': typeof AuthenticatedAgendaRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/cursos': typeof AuthenticatedCursosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/acessos': typeof AuthenticatedAcessosRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/agenda': typeof AuthenticatedAgendaRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/cursos': typeof AuthenticatedCursosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/acessos': typeof AuthenticatedAcessosRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/cursos': typeof AuthenticatedCursosRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/acessos'
     | '/admin'
+    | '/agenda'
     | '/clientes'
     | '/cursos'
     | '/dashboard'
@@ -223,6 +233,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/acessos'
     | '/admin'
+    | '/agenda'
     | '/clientes'
     | '/cursos'
     | '/dashboard'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/acessos'
     | '/_authenticated/admin'
+    | '/_authenticated/agenda'
     | '/_authenticated/clientes'
     | '/_authenticated/cursos'
     | '/_authenticated/dashboard'
@@ -303,6 +315,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/agenda': {
+      id: '/_authenticated/agenda'
+      path: '/agenda'
+      fullPath: '/agenda'
+      preLoaderRoute: typeof AuthenticatedAgendaRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/clientes': {
@@ -416,6 +435,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedAcessosRoute: typeof AuthenticatedAcessosRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedCursosRoute: typeof AuthenticatedCursosRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -437,6 +457,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAcessosRoute: AuthenticatedAcessosRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAgendaRoute: AuthenticatedAgendaRoute,
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedCursosRoute: AuthenticatedCursosRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
