@@ -24,6 +24,7 @@ import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/np
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedPdfsRouteImport } from './routes/_authenticated/pdfs'
 import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
+import { Route as AuthenticatedRoadmapRouteImport } from './routes/_authenticated/roadmap'
 import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
 import { Route as AuthenticatedSwipeRouteImport } from './routes/_authenticated/swipe'
 import { Route as AuthenticatedVerDepoisRouteImport } from './routes/_authenticated/ver-depois'
@@ -103,6 +104,11 @@ const AuthenticatedProspeccaoRoute = AuthenticatedProspeccaoRouteImport.update({
   path: '/prospeccao',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedRoadmapRoute = AuthenticatedRoadmapRouteImport.update({
+  id: '/roadmap',
+  path: '/roadmap',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedSaldoRoute = AuthenticatedSaldoRouteImport.update({
   id: '/saldo',
   path: '/saldo',
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/pdfs': typeof AuthenticatedPdfsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
+  '/roadmap': typeof AuthenticatedRoadmapRoute
   '/saldo': typeof AuthenticatedSaldoRoute
   '/swipe': typeof AuthenticatedSwipeRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
@@ -152,6 +159,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/pdfs': typeof AuthenticatedPdfsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
+  '/roadmap': typeof AuthenticatedRoadmapRoute
   '/saldo': typeof AuthenticatedSaldoRoute
   '/swipe': typeof AuthenticatedSwipeRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/pdfs': typeof AuthenticatedPdfsRoute
   '/_authenticated/prospeccao': typeof AuthenticatedProspeccaoRoute
+  '/_authenticated/roadmap': typeof AuthenticatedRoadmapRoute
   '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
   '/_authenticated/swipe': typeof AuthenticatedSwipeRoute
   '/_authenticated/ver-depois': typeof AuthenticatedVerDepoisRoute
@@ -195,6 +204,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pdfs'
     | '/prospeccao'
+    | '/roadmap'
     | '/saldo'
     | '/swipe'
     | '/ver-depois'
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pdfs'
     | '/prospeccao'
+    | '/roadmap'
     | '/saldo'
     | '/swipe'
     | '/ver-depois'
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding'
     | '/_authenticated/pdfs'
     | '/_authenticated/prospeccao'
+    | '/_authenticated/roadmap'
     | '/_authenticated/saldo'
     | '/_authenticated/swipe'
     | '/_authenticated/ver-depois'
@@ -351,6 +363,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProspeccaoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/roadmap': {
+      id: '/_authenticated/roadmap'
+      path: '/roadmap'
+      fullPath: '/roadmap'
+      preLoaderRoute: typeof AuthenticatedRoadmapRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/saldo': {
       id: '/_authenticated/saldo'
       path: '/saldo'
@@ -388,6 +407,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPdfsRoute: typeof AuthenticatedPdfsRoute
   AuthenticatedProspeccaoRoute: typeof AuthenticatedProspeccaoRoute
+  AuthenticatedRoadmapRoute: typeof AuthenticatedRoadmapRoute
   AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
   AuthenticatedSwipeRoute: typeof AuthenticatedSwipeRoute
   AuthenticatedVerDepoisRoute: typeof AuthenticatedVerDepoisRoute
@@ -407,6 +427,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPdfsRoute: AuthenticatedPdfsRoute,
   AuthenticatedProspeccaoRoute: AuthenticatedProspeccaoRoute,
+  AuthenticatedRoadmapRoute: AuthenticatedRoadmapRoute,
   AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,
   AuthenticatedSwipeRoute: AuthenticatedSwipeRoute,
   AuthenticatedVerDepoisRoute: AuthenticatedVerDepoisRoute,
