@@ -36,6 +36,8 @@ test("rotuloValidade", () => {
   assert.equal(rotuloValidade("2026-09-25T09:00:00-03:00", agora), "expira amanhã às 09:00");
   assert.equal(rotuloValidade("2026-09-27T12:00:00-03:00", agora), "expira em 3 dias (27/09)");
   assert.equal(rotuloValidade(null, agora), "");
+  // já passou do prazo: a limpeza (a cada hora) apaga em seguida
+  assert.equal(rotuloValidade("2026-09-24T09:00:00-03:00", agora), "venceu · some em até 1 h");
 });
 
 test("expiraEmDias soma a partir de agora", () => {

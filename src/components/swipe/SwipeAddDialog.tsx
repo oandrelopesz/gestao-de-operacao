@@ -145,6 +145,11 @@ export function SwipeAddDialog({ open, onClose, onSaved, rootFolderId, nichos, c
     if (!link.trim() && arquivos.length === 0) return toast.error("Cole um link ou arraste um arquivo");
     if (!link.trim() && (categoria === "landing_page" || categoria === "site") && arquivos.length === 0) return toast.error("Para LP/site, cole o link");
 
+    // "Adicionar outro": o formulário limpa já no clique (dá para digitar o próximo enquanto este
+    // salva). Os valores deste item já estão capturados aqui; se der erro, voltam para o formulário.
+    const anterior = { rede, redeManual, link, player, nota, tagsTexto, arquivos };
+    const limpouAntes = outro && !completar;
+    if (limpouAntes) limparParaOutro();
     setSalvando(true);
     try {
       // 1) Nicho: usa o existente (mesmo nome), pergunta se for parecido, cria se for novo
@@ -214,9 +219,17 @@ export function SwipeAddDialog({ open, onClose, onSaved, rootFolderId, nichos, c
         toast.success("Na fila: o serviço baixa e sobe no Drive; se falhar, salva o link num Docs");
       }
       await onSaved();
-      if (outro && !completar) limparParaOutro();
-      else onClose();
+      if (!limpouAntes) onClose();
     } catch (e: any) {
+      if (limpouAntes) {
+        setRede(anterior.rede);
+        setRedeManual(anterior.redeManual);
+        setLink(anterior.link);
+        setPlayer(anterior.player);
+        setNota(anterior.nota);
+        setTagsTexto(anterior.tagsTexto);
+        setArquivos(anterior.arquivos);
+      }
       if (e instanceof SwipeKeyError) toast.error(e.message);
       else toast.error(erroAmigavel(e));
     } finally {

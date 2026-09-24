@@ -53,18 +53,30 @@ function expDoJwt(token: string): number {
   }
 }
 
+// O ID token vale ~1 h. Fica também na sessão da aba: recarregar a página não pede login de novo
+// (mesmo tratamento do token do Drive; some ao fechar a aba).
+const CHAVE_SESSAO = "google_id_token";
+
 function guardar(token: string): void {
   idTokenCache = { token, exp: expDoJwt(token) };
+  try { sessionStorage.setItem(CHAVE_SESSAO, token); } catch { /* sem storage */ }
 }
 
 /** ID token ainda válido (com folga de 2 min), ou null. */
 export function idTokenEmCache(): string | null {
+  if (!idTokenCache && typeof window !== "undefined") {
+    try {
+      const salvo = sessionStorage.getItem(CHAVE_SESSAO);
+      if (salvo) idTokenCache = { token: salvo, exp: expDoJwt(salvo) };
+    } catch { /* sem storage */ }
+  }
   if (idTokenCache && idTokenCache.exp - Date.now() > 120_000) return idTokenCache.token;
   return null;
 }
 
 export function limparIdToken(): void {
   idTokenCache = null;
+  try { sessionStorage.removeItem(CHAVE_SESSAO); } catch { /* sem storage */ }
   const g = gis();
   try {
     g?.disableAutoSelect?.();

@@ -54,6 +54,7 @@ function diaLocal(d: Date): number {
 export function rotuloValidade(expiraEm: string | null, agora: Date = new Date()): string {
   if (!expiraEm) return "";
   const fim = new Date(expiraEm);
+  if (fim.getTime() <= agora.getTime()) return "venceu · some em até 1 h";
   const dias = Math.round((new Date(fim.getFullYear(), fim.getMonth(), fim.getDate()).getTime() - new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).getTime()) / 86_400_000);
   const { data, hora } = dataHora(expiraEm);
   if (dias <= 0 || diaLocal(fim) === diaLocal(agora)) return `expira hoje às ${hora}`;
