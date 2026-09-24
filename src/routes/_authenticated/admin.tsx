@@ -62,10 +62,18 @@ type Secao = (typeof SECOES)[number]["id"];
 
 const ehSecao = (v: unknown): v is Secao => SECOES.some((s) => s.id === v);
 
+type AdminSearch = { secao?: Secao; google_connected?: string; google_error?: string };
+
 export const Route = createFileRoute("/_authenticated/admin")({
-  validateSearch: (search: Record<string, unknown>): { secao?: Secao } => ({
-    secao: ehSecao(search.secao) ? search.secao : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): AdminSearch => {
+    // Retorno do OAuth do Google Drive (/admin?google_connected=1 ou ?google_error=...):
+    // abre a seção Swipe file, onde o SwipeAdminCard trata esses parâmetros ao montar
+    const texto = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : undefined);
+    const google_connected = texto(search.google_connected);
+    const google_error = texto(search.google_error);
+    const secao = ehSecao(search.secao) ? search.secao : google_connected || google_error ? "swipe" : undefined;
+    return { secao, google_connected, google_error };
+  },
   component: AdminPage,
 });
 

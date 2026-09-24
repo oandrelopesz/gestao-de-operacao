@@ -44,7 +44,7 @@ export function PdfsLimiteCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><HardDrive size={18} /> Tamanho máximo por arquivo</CardTitle>
         <CardDescription>
-          PDFs maiores que o limite são recusados antes do envio. O armazenamento aceita até 50 MB; para ir além, o limite do bucket "pdfs" no Storage também precisa ser aumentado.
+          PDFs maiores que o limite são recusados antes do envio. Vale para novos envios; os arquivos já guardados continuam.
         </CardDescription>
       </CardHeader>
       <CardContent>

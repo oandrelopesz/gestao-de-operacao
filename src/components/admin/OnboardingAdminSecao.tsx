@@ -51,7 +51,7 @@ export function OnboardingAdminSecao() {
               id="onboarding-ativa-trafego"
               checked={ativaTrafego}
               disabled={carregandoTrafego}
-              onCheckedChange={(v) => { salvarAtivaTrafego(v).catch(() => toast.error("Erro ao salvar")); }}
+              onCheckedChange={(v) => { salvarAtivaTrafego(v).then(() => toast.success("Configuração salva")).catch(() => toast.error("Erro ao salvar")); }}
             />
           </div>
         </CardContent>

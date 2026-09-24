@@ -223,7 +223,7 @@ function SwipePage() {
               ) : (
                 <p className="text-muted-foreground">
                   {!config?.root_folder_id ? 'Conecte o Google e crie a pasta "Swipe File" ' : "Informe a chave do swipe file "}
-                  em <Link to="/admin" className="underline underline-offset-2">Admin → Google Drive</Link>. Os itens já salvos continuam visíveis abaixo.
+                  em <Link to="/admin" search={{ secao: "swipe" }} className="underline underline-offset-2">Admin → Swipe file</Link>. Os itens já salvos continuam visíveis abaixo.
                 </p>
               )}
             </div>

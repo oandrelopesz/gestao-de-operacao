@@ -117,7 +117,7 @@ export async function getAccessToken(): Promise<string> {
     throw new DriveAuthError(
       st?.google_login
         ? "Entre com o Google para usar o swipe file."
-        : "Informe a chave do swipe file (Admin → Google Drive).",
+        : "Informe a chave do swipe file (Admin → Swipe file).",
     );
   }
 
@@ -144,7 +144,7 @@ async function driveFetch(path: string, init: RequestInit = {}, base = DRIVE): P
   });
   if (r.status === 401) {
     tokenCache = null;
-    throw new Error("Token do Google expirou ou foi revogado. Reconecte o Drive no Admin.");
+    throw new Error("Token do Google expirou ou foi revogado. Reconecte o Drive em Admin → Swipe file.");
   }
   return r;
 }

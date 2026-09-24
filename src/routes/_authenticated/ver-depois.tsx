@@ -350,6 +350,7 @@ function ItemDialog({ state, tipos, onClose, onSaved }: { state: { item?: Item }
               <SelectTrigger id="vd-tipo"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {tipos.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+                {!tipos.some((t) => t.id === tipo) && <SelectItem value={tipo}>{tipo}</SelectItem>}
               </SelectContent>
             </Select>
           </div>

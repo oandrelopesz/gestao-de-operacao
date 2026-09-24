@@ -33,6 +33,8 @@ function traduzErro(e: any): string {
 export function VerDepoisTiposCard() {
   const [tipos, setTipos] = useState<TipoVerDepois[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [movendo, setMovendo] = useState(false);
   const [linksPorTipo, setLinksPorTipo] = useState<Record<string, number>>({});
   const [dialog, setDialog] = useState<TipoDialog | null>(null);
   const [toDelete, setToDelete] = useState<TipoVerDepois | null>(null);
@@ -48,8 +50,9 @@ export function VerDepoisTiposCard() {
       const porTipo: Record<string, number> = {};
       (itens || []).forEach((i) => { porTipo[i.tipo] = (porTipo[i.tipo] || 0) + 1; });
       setLinksPorTipo(porTipo);
+      setErro(null);
     } catch (e) {
-      toast.error(traduzErro(e));
+      setErro(traduzErro(e));
     } finally {
       setCarregando(false);
     }
@@ -82,12 +85,15 @@ export function VerDepoisTiposCard() {
   };
 
   const mover = async (id: string, delta: -1 | 1) => {
+    if (movendo) return;
+    setMovendo(true);
     try {
       await moverTipoVerDepois(tipos, id, delta);
     } catch (e) {
       toast.error(traduzErro(e));
     }
     await carregar();
+    setMovendo(false);
   };
 
   const excluir = async () => {
@@ -139,10 +145,10 @@ export function VerDepoisTiposCard() {
                   <p className="text-xs text-muted-foreground">{qtd} {qtd === 1 ? "link" : "links"}</p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => mover(t.id, -1)} title="Subir">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled={movendo || idx === 0} onClick={() => mover(t.id, -1)} title="Subir">
                     <ArrowUp size={14} />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === tipos.length - 1} onClick={() => mover(t.id, 1)} title="Descer">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled={movendo || idx === tipos.length - 1} onClick={() => mover(t.id, 1)} title="Descer">
                     <ArrowDown size={14} />
                   </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDialog({ id: t.id, label: t.label, hex: t.hex })} title="Editar">
@@ -162,7 +168,13 @@ export function VerDepoisTiposCard() {
               </div>
             );
           })}
-          {!carregando && tipos.length === 0 && (
+          {erro && (
+            <div className="flex flex-col items-center gap-2 px-3 py-6 text-center">
+              <p className="text-sm text-destructive">{erro}</p>
+              <Button variant="outline" size="sm" onClick={() => { setCarregando(true); carregar(); }}>Tentar de novo</Button>
+            </div>
+          )}
+          {!carregando && !erro && tipos.length === 0 && (
             <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhum tipo. Clique em "Novo tipo" para criar o primeiro.</p>
           )}
         </div>

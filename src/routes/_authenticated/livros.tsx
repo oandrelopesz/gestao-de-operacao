@@ -114,7 +114,7 @@ function LivrosPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const [metaAnual] = useConfig<number>("livros_meta_anual", 12);
+  const [metaAnual, , carregandoMeta] = useConfig<number>("livros_meta_anual", 12);
 
   const metrics = useMemo(() => {
     const total = livros.length;
@@ -287,7 +287,7 @@ function LivrosPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            {metaAnual > 0 ? (
+            {!carregandoMeta && metaAnual > 0 ? (
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between gap-2">
                   <div className="text-2xl font-bold text-blue-600">

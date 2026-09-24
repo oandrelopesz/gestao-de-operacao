@@ -82,7 +82,7 @@ function PdfsPage() {
   const [pastaToDelete, setPastaToDelete] = useState<PdfPasta | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const contadorArrasto = useRef(0);
-  const [limiteMb] = useConfig<number>("pdf_tamanho_max_mb", PDF_TAMANHO_MAX_PADRAO_MB);
+  const [limiteMb, , carregandoLimite] = useConfig<number>("pdf_tamanho_max_mb", PDF_TAMANHO_MAX_PADRAO_MB);
   const limiteBytes = mbParaBytes(limiteMb);
 
   const load = async () => {
@@ -563,7 +563,7 @@ function PdfsPage() {
                     <span>
                       <span className="font-medium text-foreground">Arraste PDFs aqui</span> ou clique para escolher do computador
                     </span>
-                    {!pdfsDaPasta.length && <span className="text-xs">Até {limiteMb} MB por arquivo. Pode soltar vários de uma vez.</span>}
+                    {!pdfsDaPasta.length && <span className="text-xs">{carregandoLimite ? "" : `Até ${limiteMb} MB por arquivo.`} Pode soltar vários de uma vez.</span>}
                   </button>
                 </section>
               ) : (
