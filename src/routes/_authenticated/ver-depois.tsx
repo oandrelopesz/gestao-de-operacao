@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Plus, Search, ExternalLink, Trash2, Check, RotateCcw, Globe, Youtube, Instagram, LayoutTemplate, Link2, Pencil, Copy,
+  Plus, Search, ExternalLink, Trash2, Check, RotateCcw, Youtube, Link2, Pencil, Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,23 +18,27 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { fetchTiposVerDepois, iconeDoTipo, TIPOS_VER_DEPOIS_PADRAO, TIPO_OUTRO, type TipoVerDepois } from "@/lib/verDepoisTipos";
 
 export const Route = createFileRoute("/_authenticated/ver-depois")({
   component: VerDepoisPage,
 });
 
-type Tipo = "lp" | "site" | "youtube" | "reel" | "post" | "outro";
+/** Id de um tipo da tabela ver_depois_tipos (editáveis no Admin → Ver depois) */
+type Tipo = string;
 
-const TIPOS: { id: Tipo; label: string; icon: React.ReactNode; hex: string }[] = [
-  { id: "youtube", label: "Vídeo do YouTube", icon: <Youtube size={14} />, hex: "#ef4444" },
-  { id: "reel", label: "Reel", icon: <Instagram size={14} />, hex: "#ec4899" },
-  { id: "post", label: "Post", icon: <Instagram size={14} />, hex: "#a855f7" },
-  { id: "lp", label: "Landing page", icon: <LayoutTemplate size={14} />, hex: "#f59e0b" },
-  { id: "site", label: "Site", icon: <Globe size={14} />, hex: "#3b82f6" },
-  { id: "outro", label: "Outro link", icon: <Link2 size={14} />, hex: "#64748b" },
-];
+const OUTRO_PADRAO = TIPOS_VER_DEPOIS_PADRAO.find((t) => t.id === TIPO_OUTRO)!;
 
-const tipoMeta = (id: string) => TIPOS.find((t) => t.id === id) || TIPOS[TIPOS.length - 1];
+/** Label, cor e ícone do tipo; tipo desconhecido cai em "Outro link" */
+function tipoMeta(tipos: TipoVerDepois[], id: string) {
+  const t = tipos.find((x) => x.id === id) || tipos.find((x) => x.id === TIPO_OUTRO) || OUTRO_PADRAO;
+  return { ...t, icon: iconeDoTipo(t.id) };
+}
+
+/** Tipo inicial de um link novo: YouTube se existir, senão o primeiro da lista */
+function tipoInicial(tipos: TipoVerDepois[]): Tipo {
+  return tipos.some((t) => t.id === "youtube") ? "youtube" : tipos[0]?.id ?? TIPO_OUTRO;
+}
 
 interface Item {
   id: string;
@@ -84,6 +88,7 @@ function VerDepoisPage() {
   const [mostrarVistos, setMostrarVistos] = useState(false);
   const [dialog, setDialog] = useState<{ item?: Item } | null>(null);
   const [toDelete, setToDelete] = useState<Item | null>(null);
+  const [tipos, setTipos] = useState<TipoVerDepois[]>(TIPOS_VER_DEPOIS_PADRAO);
 
   const load = async () => {
     const { data, error } = await supabase.from("ver_depois").select("*").order("visto").order("created_at", { ascending: false });
@@ -99,6 +104,13 @@ function VerDepoisPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Tipos configuráveis; se a tabela falhar, ficam os 6 padrões
+  useEffect(() => {
+    fetchTiposVerDepois()
+      .then((lista) => { if (lista.length) setTipos(lista); })
+      .catch(() => {});
+  }, []);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -180,7 +192,7 @@ function VerDepoisPage() {
             <TabsTrigger value="todos" className="gap-2 shrink-0">
               Todos <Badge variant="secondary" className="px-1.5 h-4 text-[10px] leading-none">{contagem.todos || 0}</Badge>
             </TabsTrigger>
-            {TIPOS.map((t) => (
+            {tipos.map((t) => (
               <TabsTrigger key={t.id} value={t.id} className="gap-2 shrink-0">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.hex }} />
                 {t.label}
@@ -210,7 +222,7 @@ function VerDepoisPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtrados.map((item) => {
-            const meta = tipoMeta(item.tipo);
+            const meta = tipoMeta(tipos, item.tipo);
             const yt = item.tipo === "youtube" ? youtubeId(item.link) : null;
             return (
               <Card key={item.id} className={cn("overflow-hidden group flex flex-col transition-all", item.visto && "opacity-60")}>
@@ -256,7 +268,7 @@ function VerDepoisPage() {
         </div>
       )}
 
-      <ItemDialog state={dialog} onClose={() => setDialog(null)} onSaved={load} />
+      <ItemDialog state={dialog} tipos={tipos} onClose={() => setDialog(null)} onSaved={load} />
 
       <AlertDialog open={!!toDelete} onOpenChange={(o) => { if (!o) setToDelete(null); }}>
         <AlertDialogContent>
@@ -274,8 +286,8 @@ function VerDepoisPage() {
   );
 }
 
-function ItemDialog({ state, onClose, onSaved }: { state: { item?: Item } | null; onClose: () => void; onSaved: () => Promise<void> | void }) {
-  const [tipo, setTipo] = useState<Tipo>("youtube");
+function ItemDialog({ state, tipos, onClose, onSaved }: { state: { item?: Item } | null; tipos: TipoVerDepois[]; onClose: () => void; onSaved: () => Promise<void> | void }) {
+  const [tipo, setTipo] = useState<Tipo>(() => tipoInicial(tipos));
   const [tipoManual, setTipoManual] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [link, setLink] = useState("");
@@ -284,7 +296,7 @@ function ItemDialog({ state, onClose, onSaved }: { state: { item?: Item } | null
 
   useEffect(() => {
     if (!state) return;
-    setTipo(state.item?.tipo || "youtube");
+    setTipo(state.item?.tipo || tipoInicial(tipos));
     setTipoManual(!!state.item);
     setTitulo(state.item?.titulo || "");
     setLink(state.item?.link || "");
@@ -295,7 +307,7 @@ function ItemDialog({ state, onClose, onSaved }: { state: { item?: Item } | null
     setLink(v);
     if (!tipoManual) {
       const d = detectarTipo(v);
-      if (d) setTipo(d);
+      if (d && tipos.some((t) => t.id === d)) setTipo(d);
     }
   };
 
@@ -337,7 +349,7 @@ function ItemDialog({ state, onClose, onSaved }: { state: { item?: Item } | null
             <Select value={tipo} onValueChange={(v) => { setTipo(v as Tipo); setTipoManual(true); }}>
               <SelectTrigger id="vd-tipo"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {TIPOS.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+                {tipos.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

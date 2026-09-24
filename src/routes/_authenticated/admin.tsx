@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Building2, Plus, Pencil, Trash2, ArrowUp, ArrowDown, Check, Sun, Moon,
+  Building2, Plus, Pencil, Trash2, ArrowUp, ArrowDown, Sun, Moon,
   Columns3, Database, Download, AlertTriangle, EyeOff, Eye, RefreshCw,
-  Megaphone, GraduationCap, Lightbulb, Bookmark, Book,
+  Megaphone, GraduationCap, Lightbulb, Book,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,8 @@ import { MenuAdminCard } from "@/components/admin/MenuAdminCard";
 import { OnboardingAdminSecao } from "@/components/admin/OnboardingAdminSecao";
 import { RoadmapAdminSecao } from "@/components/admin/RoadmapAdminSecao";
 import { PdfsLimiteCard } from "@/components/admin/PdfsLimiteCard";
+import { ColorPicker } from "@/components/admin/ColorPicker";
+import { VerDepoisTiposCard } from "@/components/admin/VerDepoisTiposCard";
 
 // Seções do Admin, uma por aba do sistema (?secao= na URL)
 const SECOES = [
@@ -856,12 +858,12 @@ function AdminPage() {
           </TabsContent>
 
           <TabsContent value="ideias" className="mt-0 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Lightbulb size={18} /> Categorias de ideias</CardTitle>
-                  <CardDescription>Categorias de ideias chegam em seguida.</CardDescription>
-                </CardHeader>
-              </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Lightbulb size={18} /> Categorias de ideias</CardTitle>
+                <CardDescription>Categorias de ideias chegam em seguida.</CardDescription>
+              </CardHeader>
+            </Card>
           </TabsContent>
 
           <TabsContent value="onboarding" className="mt-0 space-y-6">
@@ -879,12 +881,7 @@ function AdminPage() {
           </TabsContent>
 
           <TabsContent value="ver-depois" className="mt-0 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Bookmark size={18} /> Ver depois</CardTitle>
-                  <CardDescription>Em breve.</CardDescription>
-                </CardHeader>
-              </Card>
+            <VerDepoisTiposCard />
           </TabsContent>
 
           <TabsContent value="livros" className="mt-0 space-y-6">
@@ -1172,31 +1169,6 @@ function AdminPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
-}
-
-function ColorPicker({ colors, value, onChange }: { colors: string[]; value: string; onChange: (hex: string) => void }) {
-  return (
-    <div className="space-y-2">
-      <Label>Cor</Label>
-      <div className="flex flex-wrap gap-2">
-        {colors.map((hex) => (
-          <button
-            key={hex}
-            type="button"
-            onClick={() => onChange(hex)}
-            className={cn(
-              "h-7 w-7 rounded-full flex items-center justify-center transition-transform hover:scale-110",
-              value === hex && "ring-2 ring-offset-2 ring-offset-background ring-zinc-900 dark:ring-zinc-100"
-            )}
-            style={{ backgroundColor: hex }}
-            title={hex}
-          >
-            {value === hex && <Check size={14} className="text-white" />}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
