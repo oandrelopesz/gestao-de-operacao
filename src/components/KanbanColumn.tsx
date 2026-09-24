@@ -61,6 +61,10 @@ interface KanbanColumnProps {
   diasDaColuna?: number[];
   secoes?: { id: string; titulo: string; demandas: Demanda[] }[];
   clientes?: { id: string; nome: string; agencia?: string }[];
+  /** Seleção em massa (ver DemandasPage) */
+  selecionadas?: Set<string>;
+  modoSelecao?: boolean;
+  onAlternarSelecao?: (id: string) => void;
 }
 
 const VISIBLE_BATCH = 40;
@@ -98,6 +102,9 @@ export function KanbanColumn({
   diasDaColuna,
   secoes,
   clientes: clientesDisponiveis,
+  selecionadas,
+  modoSelecao,
+  onAlternarSelecao,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id, disabled: !!secoes });
   const [isAdding, setIsAdding] = useState(false);
@@ -155,6 +162,9 @@ export function KanbanColumn({
       onDesligarRoadmap={onDesligarRoadmap}
       diasDaColuna={diasDaColuna}
       clientes={clientesDisponiveis}
+      selecionada={selecionadas?.has(demanda.id)}
+      modoSelecao={modoSelecao}
+      onAlternarSelecao={onAlternarSelecao}
     />
   );
 

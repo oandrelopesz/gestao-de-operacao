@@ -51,6 +51,12 @@ interface KanbanCardProps {
   onDesligarRoadmap?: (id: string) => void;
   diasDaColuna?: number[];
   clientes?: { id: string; nome: string; agencia?: string }[];
+  /** Seleção em massa: card marcado, modo "Selecionar" ligado e alternar a marcação */
+  selecionada?: boolean;
+  modoSelecao?: boolean;
+  onAlternarSelecao?: (id: string) => void;
+  /** Só no card que segue o ponteiro: quantos cards vão juntos no arrasto */
+  qtdNoArrasto?: number;
 }
 
 interface SortableBindings {
@@ -76,7 +82,7 @@ export function KanbanCard(props: KanbanCardProps) {
 }
 
 /** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
-export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, onAtribuirCliente, onEnviarRoadmap, onDesligarRoadmap, diasDaColuna, clientes, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
+export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, onAtribuirCliente, onEnviarRoadmap, onDesligarRoadmap, diasDaColuna, clientes, selecionada, modoSelecao, onAlternarSelecao, qtdNoArrasto, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
   const navigate = useNavigate();
   const isRecorrenteMae = demanda.status === "recorrentes";
   const isDragging = sortable?.isDragging ?? false;
@@ -97,6 +103,9 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
   const isOverdue = isRecorrenteMae && demanda.proxima_execucao && demanda.proxima_execucao < today;
   const isDoneForNow = isRecorrenteMae && demanda.proxima_execucao && demanda.proxima_execucao > today;
   const canCompleteRecorrente = isRecorrenteMae && (isDueToday || isOverdue);
+  // Recorrentes (mãe) ficam fora da seleção em massa: já são travados no arrasto
+  const podeSelecionar = !!onAlternarSelecao && !isRecorrenteMae;
+  const mostrarConcluir = !isDone && !isDoneForNow && !!(onMoveToDone || onComplete);
 
   const formatProxima = (iso?: string) => {
     if (!iso) return "";
@@ -117,16 +126,27 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
         isRecorrenteMae && !isDueToday && !isDoneForNow && "opacity-70"
       )}
     >
+      {!!qtdNoArrasto && qtdNoArrasto > 1 && (
+        <span className="absolute -right-2 -top-2 z-10 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-bold text-primary-foreground shadow-md">
+          {qtdNoArrasto}
+        </span>
+      )}
       <Card
         className={cn(
           "transition-[transform,box-shadow,border-color] duration-150 bg-card border border-border/70 shadow-xs hover:shadow-md hover:-translate-y-px hover:border-primary/30 overflow-hidden rounded-lg",
           isDone && "opacity-60",
           isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20",
           isDoneForNow && "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50",
-          atraso > 0 && "border-red-500/70 bg-red-500/5 ring-1 ring-red-500/30"
+          atraso > 0 && "border-red-500/70 bg-red-500/5 ring-1 ring-red-500/30",
+          selecionada && "border-primary ring-2 ring-primary/60 bg-primary/5"
         )}
         onClick={(e) => {
           e.stopPropagation();
+          // Modo "Selecionar" (ou Ctrl/Cmd + clique): o clique marca/desmarca em vez de abrir
+          if (podeSelecionar && (modoSelecao || e.ctrlKey || e.metaKey)) {
+            onAlternarSelecao?.(demanda.id);
+            return;
+          }
           // Demanda de passo de onboarding ligada a roadmap abre o roadmap; as demais abrem o card (a tag Roadmap leva ao roadmap)
           if (demanda.roadmap_id && demanda.processo_passo_id) {
             navigate({ to: "/roadmap", search: { id: demanda.roadmap_id } });
@@ -138,31 +158,23 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
         <div className="p-2.5 space-y-1.5 relative">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-2 flex-1 min-w-0">
-              {!isDone && !isDoneForNow && (onMoveToDone || onComplete) && (
+              {podeSelecionar && (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isRecorrenteMae) {
-                      if (!canCompleteRecorrente) return;
-                      onComplete?.(demanda.id);
-                    } else {
-                      onMoveToDone?.(demanda.id);
-                    }
-                  }}
-                  disabled={isRecorrenteMae && !canCompleteRecorrente}
-                  title={
-                    isRecorrenteMae && !canCompleteRecorrente
-                      ? `Liberada em ${formatProxima(demanda.proxima_execucao)}`
-                      : "Concluir"
-                  }
+                  type="button"
+                  role="checkbox"
+                  aria-checked={!!selecionada}
+                  aria-label={selecionada ? "Desmarcar" : "Selecionar"}
+                  title={selecionada ? "Desmarcar" : "Selecionar (ou Ctrl + clique no card)"}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); onAlternarSelecao?.(demanda.id); }}
                   className={cn(
-                    "transition-opacity mt-1 h-4 w-4 rounded-sm border flex items-center justify-center shrink-0",
-                    isRecorrenteMae && !canCompleteRecorrente
-                      ? "opacity-40 cursor-not-allowed border-zinc-300 dark:border-zinc-700"
-                      : "opacity-0 group-hover:opacity-100 border-zinc-300 dark:border-zinc-700 hover:bg-emerald-500 hover:border-emerald-500 hover:text-white cursor-pointer"
+                    "transition-opacity mt-1 h-4 w-4 rounded-sm border flex items-center justify-center shrink-0 cursor-pointer",
+                    selecionada
+                      ? "bg-primary border-primary text-primary-foreground opacity-100"
+                      : cn("border-zinc-300 dark:border-zinc-700 hover:border-primary", modoSelecao ? "opacity-100" : "opacity-0 group-hover:opacity-100")
                   )}
                 >
-                  <Check size={10} />
+                  {selecionada && <Check size={10} />}
                 </button>
               )}
               
@@ -256,8 +268,9 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
             </div>
           </div>
 
-          {(demanda.clientes?.nome || demanda.pessoal || demanda.descricao || isRecorrenteMae || diaCard != null || demanda.prazo || demanda.processo_passo_id || demanda.roadmap_id) && (
-            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+          {(demanda.clientes?.nome || demanda.pessoal || demanda.descricao || isRecorrenteMae || diaCard != null || demanda.prazo || demanda.processo_passo_id || demanda.roadmap_id || mostrarConcluir) && (
+            <div className="flex items-end gap-2 pt-0.5">
+            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
               {demanda.processo_passo_id && (
                 <button
                   type="button"
@@ -346,6 +359,37 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                   </span>
                 </div>
               )}
+            </div>
+            {/* Concluir: canto inferior direito (o canto superior esquerdo é da seleção) */}
+            {mostrarConcluir && (
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isRecorrenteMae) {
+                    if (!canCompleteRecorrente) return;
+                    onComplete?.(demanda.id);
+                  } else {
+                    onMoveToDone?.(demanda.id);
+                  }
+                }}
+                disabled={isRecorrenteMae && !canCompleteRecorrente}
+                title={
+                  isRecorrenteMae && !canCompleteRecorrente
+                    ? `Liberada em ${formatProxima(demanda.proxima_execucao)}`
+                    : "Concluir"
+                }
+                className={cn(
+                  "transition-opacity ml-auto h-4 w-4 rounded-sm border flex items-center justify-center shrink-0",
+                  isRecorrenteMae && !canCompleteRecorrente
+                    ? "opacity-40 cursor-not-allowed border-zinc-300 dark:border-zinc-700"
+                    : "opacity-0 group-hover:opacity-100 border-zinc-300 dark:border-zinc-700 hover:bg-emerald-500 hover:border-emerald-500 hover:text-white cursor-pointer"
+                )}
+              >
+                <Check size={10} />
+              </button>
+            )}
             </div>
           )}
         </div>

@@ -75,3 +75,40 @@ export function moverParaDia<T extends ItemDia>(lista: T[], id: string, dia: num
 export function camposParaSalvar(d: ItemDia, mapa: MapaDias) {
   return { status: d.status, ordem: d.ordem ?? 0, dia_semana: diaEfetivo(d, mapa) };
 }
+
+/**
+ * Leva vários cards para o container `destino` (coluna ou seção "coluna:dia"), na ordem de `ids`,
+ * logo depois de `depoisDe` (o card solto no arrasto) ou no fim do destino. Renumera o destino e as
+ * origens. Usado na seleção em massa (arrastar o grupo ou "Mover para").
+ */
+export function moverVariosPara<T extends ItemDia>(lista: T[], ids: string[], destino: string, mapa: MapaDias, depoisDe?: string): T[] {
+  const mover = new Set(ids.filter((id) => id !== depoisDe));
+  const porId = new Map(lista.map((d) => [d.id, d]));
+  const grupo = ids.filter((id) => mover.has(id)).map((id) => porId.get(id)).filter((d): d is T => !!d);
+  if (!grupo.length) return lista;
+  const origens = new Set(grupo.map((d) => containerDe(d, mapa)));
+  const restoDestino = lista.filter((d) => !mover.has(d.id) && containerDe(d, mapa) === destino).sort(porOrdem);
+  const idx = depoisDe ? restoDestino.findIndex((d) => d.id === depoisDe) : -1;
+  const pos = idx >= 0 ? idx + 1 : restoDestino.length;
+  const ordem = new Map<string, number>();
+  [...restoDestino.slice(0, pos), ...grupo, ...restoDestino.slice(pos)].forEach((d, i) => ordem.set(d.id, i));
+  for (const o of origens) {
+    if (o === destino) continue;
+    lista.filter((d) => !mover.has(d.id) && containerDe(d, mapa) === o).sort(porOrdem).forEach((d, i) => ordem.set(d.id, i));
+  }
+  return lista.map((d) => {
+    const base = mover.has(d.id) ? aplicarContainer(d, destino) : d;
+    return ordem.has(d.id) ? { ...base, ordem: ordem.get(d.id) } : base;
+  });
+}
+
+/** Ordena ids como aparecem no quadro: pela posição do container, depois pela ordem dentro dele. */
+export function ordenarPeloQuadro(lista: ItemDia[], ids: string[], containers: string[], mapa: MapaDias): string[] {
+  const porId = new Map(lista.map((d) => [d.id, d]));
+  const pos = (d: ItemDia) => containers.indexOf(containerDe(d, mapa));
+  return ids
+    .map((id) => porId.get(id))
+    .filter((d): d is ItemDia => !!d)
+    .sort((a, b) => pos(a) - pos(b) || porOrdem(a, b))
+    .map((d) => d.id);
+}

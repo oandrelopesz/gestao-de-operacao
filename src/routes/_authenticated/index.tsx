@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Plus, List, Kanban as KanbanIcon, Search, MoreVertical, Pencil, Trash2, Repeat, Calendar as CalendarIcon, ChevronDown, ChevronUp, X, Check } from "lucide-react";
+import { Plus, List, Kanban as KanbanIcon, Search, MoreVertical, Pencil, Trash2, Repeat, Calendar as CalendarIcon, ChevronDown, ChevronUp, X, Check, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,9 +71,12 @@ import {
   parseSecao,
   secaoId,
   NOMES_DIA,
+  moverVariosPara,
+  ordenarPeloQuadro,
 } from "@/lib/colunasDias";
 import { ehEsquemaDesatualizado, recarregarUmaVez } from "@/lib/recuperacaoErro";
 import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
+import { SelecaoBarra } from "@/components/demandas/SelecaoBarra";
 
 type ColumnDialogState =
   | { mode: "create"; title: string; hex: string; regra: RegraData; dias: number[] }
@@ -553,6 +556,14 @@ function DemandasPage() {
     onCancel: () => setActiveDemanda(null),
     onDrop: async (finalList, activeId, origin, target) => {
       setActiveDemanda(null);
+      // Arrastou um card selecionado: o grupo todo vai junto, logo depois dele (na seção em que caiu)
+      if (selecionadas.has(activeId) && selecionadas.size > 1) {
+        const ids = idsSelecionados(antesDoArrastoRef.current).filter((id) => id !== activeId);
+        if (ids.length) {
+          await moverGrupo(finalList, ids, target, activeId, origin);
+          return;
+        }
+      }
       // Entrou numa coluna por dias vinda de outra coluna: pergunta o dia antes de salvar
       // (a menos que a coluna só tenha um dia possível — o card já caiu na seção certa)
       const alvo = parseSecao(target);
@@ -575,6 +586,105 @@ function DemandasPage() {
   const cancelarEscolhaDia = () => {
     setDemandas(antesDoArrastoRef.current);
     setEscolhaDia(null);
+  };
+
+  // ---------------------------------------------------------------- Seleção em massa
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const [salvandoMassa, setSalvandoMassa] = useState(false);
+  const alternarSelecao = useCallback((id: string) => {
+    setSelecionadas((prev) => {
+      const nova = new Set(prev);
+      if (nova.has(id)) nova.delete(id); else nova.add(id);
+      return nova;
+    });
+  }, []);
+  const limparSelecao = useCallback(() => { setSelecionadas(new Set()); setModoSelecao(false); }, []);
+  const selecaoAtiva = modoSelecao || selecionadas.size > 0;
+
+  // Esc sai da seleção (se nenhum diálogo estiver aberto por cima)
+  useEffect(() => {
+    if (!selecaoAtiva) return;
+    const aoTeclar = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !document.querySelector('[role="dialog"], [role="alertdialog"]')) limparSelecao();
+    };
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [selecaoAtiva, limparSelecao]);
+
+  /** Ids selecionados que ainda existem, na ordem em que aparecem no quadro (recorrentes ficam de fora). */
+  const idsSelecionados = (lista: any[] = demandas) =>
+    ordenarPeloQuadro(lista.filter((d) => selecionadas.has(d.id) && d.status !== "recorrentes"), [...selecionadas], containerIds, mapa);
+
+  // "Selecionar todas": as abertas que aparecem no quadro (sem recorrentes nem concluídas)
+  const selecionaveis = useMemo(
+    () => filteredDemandas.filter((d) => d.status !== "recorrentes" && d.status !== "feito"),
+    [filteredDemandas],
+  );
+
+  /** Move o grupo para o destino e renumera as colunas de onde saiu; `depoisDe` = card solto no arrasto. */
+  const moverGrupo = async (base: any[], ids: string[], destino: string, depoisDe?: string, origemExtra?: string) => {
+    const porId = new Map(base.map((d) => [d.id, d]));
+    const afetados = new Set([destino, ...ids.map((id) => getContainer(porId.get(id))), ...(origemExtra ? [origemExtra] : [])]);
+    const lista = moverVariosPara(base, ids, destino, mapa, depoisDe);
+    setDemandas(lista);
+    await salvarContainers(lista, [...afetados]);
+  };
+
+  const moverSelecionadas = async (destino: string, rotulo: string) => {
+    const ids = idsSelecionados();
+    if (!ids.length) return;
+    setSalvandoMassa(true);
+    try {
+      await moverGrupo(demandas, ids, destino);
+      toast.success(`${ids.length} ${ids.length === 1 ? "demanda movida" : "demandas movidas"} para ${rotulo}`);
+      limparSelecao();
+    } finally {
+      setSalvandoMassa(false);
+    }
+  };
+
+  const concluirSelecionadas = async () => {
+    const feito = columns.find((c) => c.id === "feito");
+    await moverSelecionadas("feito", feito?.title ?? "Feito");
+  };
+
+  /** Mesmos campos em várias demandas de uma vez (cliente, entrega). Devolve quantas mudaram. */
+  const atualizarSelecionadas = async (campos: Record<string, unknown>, filtro: (d: any) => boolean = () => true) => {
+    const ids = idsSelecionados().filter((id) => filtro(demandas.find((d) => d.id === id)));
+    if (!ids.length) return 0;
+    setSalvandoMassa(true);
+    try {
+      const { error } = await supabase.from("demandas").update(campos as any).in("id", ids);
+      if (error) throw error;
+      await fetchDemandas();
+      return ids.length;
+    } catch (erro) {
+      if (ehEsquemaDesatualizado(erro) && recarregarUmaVez()) return 0;
+      toast.error("Erro ao salvar nas demandas selecionadas");
+      return 0;
+    } finally {
+      setSalvandoMassa(false);
+    }
+  };
+
+  const clienteSelecionadas = async (valor: { cliente_id: string | null; pessoal: boolean }) => {
+    // Cards de passo de onboarding ficam com o cliente do onboarding
+    const total = idsSelecionados().length;
+    const n = await atualizarSelecionadas(valor, (d) => !d?.processo_passo_id);
+    if (!n) {
+      if (total) toast.info("As selecionadas são de onboarding: o cliente vem do passo");
+      return;
+    }
+    const nome = valor.pessoal ? "Pessoal" : valor.cliente_id ? clientes.find((c) => c.id === valor.cliente_id)?.nome ?? "cliente" : "sem cliente";
+    toast.success(`${n} ${n === 1 ? "demanda" : "demandas"} → ${nome}${total > n ? ` (${total - n} de onboarding mantidas)` : ""}`);
+  };
+
+  const entregaSelecionadas = async (prazo: string | null) => {
+    const n = await atualizarSelecionadas({ prazo });
+    if (!n) return;
+    const qtd = `${n} ${n === 1 ? "demanda" : "demandas"}`;
+    toast.success(prazo ? `Entrega ${prazo.split("-").reverse().slice(0, 2).join("/")} em ${qtd}` : `Entrega removida de ${qtd}`);
   };
 
   const mudarDia = async (id: string, dia: number) => {
@@ -692,6 +802,17 @@ function DemandasPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+        {view === "kanban" && (
+          <Button
+            size="sm"
+            variant={selecaoAtiva ? "default" : "outline"}
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => (selecaoAtiva ? limparSelecao() : setModoSelecao(true))}
+            title="Selecionar várias demandas para mover, concluir, atribuir cliente ou data de entrega"
+          >
+            <CheckSquare size={13} /> {selecaoAtiva ? "Sair da seleção" : "Selecionar"}
+          </Button>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
@@ -731,6 +852,9 @@ function DemandasPage() {
                     onEnviarRoadmap={setEnviarRoadmap}
                     onDesligarRoadmap={handleDesligarRoadmap}
                     clientes={clientes}
+                    selecionadas={selecionadas}
+                    modoSelecao={modoSelecao}
+                    onAlternarSelecao={alternarSelecao}
                     onQuickAdd={handleQuickAdd}
                     onFullAdd={(status) => {
                       setEditingDemanda({ status });
@@ -791,10 +915,27 @@ function DemandasPage() {
                     onEdit={() => {}}
                     onDelete={() => {}}
                     diasDaColuna={columns.find((c) => c.id === activeDemanda.status)?.dias}
+                    selecionada={selecionadas.has(activeDemanda.id)}
+                    qtdNoArrasto={selecionadas.has(activeDemanda.id) ? idsSelecionados().length : 0}
                   />
                 ) : null}
               </DragOverlay>
             </DndContext>
+            {selecaoAtiva && (
+              <SelecaoBarra
+                qtd={idsSelecionados().length}
+                qtdSelecionaveis={selecionaveis.length}
+                colunas={columns}
+                clientes={clientes}
+                ocupado={salvandoMassa}
+                onMover={moverSelecionadas}
+                onConcluir={concluirSelecionadas}
+                onCliente={clienteSelecionadas}
+                onEntrega={entregaSelecionadas}
+                onSelecionarTodas={() => setSelecionadas(new Set(selecionaveis.map((d) => d.id)))}
+                onLimpar={limparSelecao}
+              />
+            )}
           </div>
         ) : (
           <div className="overflow-y-auto h-full border rounded-lg bg-card">
