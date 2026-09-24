@@ -1,5 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
-import { ordenarPassos, posicaoParaNovoPasso, progresso, renumerar, type PassoLogico, type TipoProcesso } from "@/lib/processos";
+import {
+  ordemAlterada,
+  ordenarPassosCronologico,
+  posicaoParaNovoPasso,
+  progresso,
+  renumerar,
+  type LinhaOrdem,
+  type PassoLogico,
+  type TipoProcesso,
+} from "@/lib/processos";
 
 // As tabelas novas (processos, processo_passos, processo_templates, processo_template_passos) têm FK
 // reais no banco, mas o types.ts gerado não registra os Relationships delas — o embed via select
@@ -14,7 +23,7 @@ export interface Processo {
   id: string; tipo: TipoProcesso; cliente_id: string; nome: string; template_id: string | null;
   status: "ativo" | "concluido" | "encerrado"; iniciado_em: string; concluido_em: string | null;
   prazo_final: string | null; passo_onboarding_id: string | null;
-  passos: Passo[]; // já ordenados (ordenarPassos)
+  passos: Passo[]; // já ordenados (ordenarPassosCronologico)
   cliente: ClienteResumo;
 }
 
@@ -113,19 +122,22 @@ export async function fetchProcessos(tipo: TipoProcesso, situacao: "ativos" | "h
     ...p,
     tipo: p.tipo as TipoProcesso,
     status: p.status as Processo["status"],
-    passos: ordenarPassos((p.passos || []) as Passo[]),
+    passos: ordenarPassosCronologico((p.passos || []) as Passo[]),
     cliente: p.cliente as ClienteResumo,
   })) as Processo[];
 }
 
-export async function fetchRoadmapsLigados(passoIds: string[]): Promise<RoadmapLigado[]> {
-  if (!passoIds.length) return [];
+/** Roadmaps ligados a algum passo de onboarding; com `passoIds`, só os ligados a esses passos (filtro local,
+ * para não mandar centenas de ids na URL). */
+export async function fetchRoadmapsLigados(passoIds?: string[]): Promise<RoadmapLigado[]> {
+  if (passoIds && !passoIds.length) return [];
   const { data, error } = await (supabase.from("processos") as any)
     .select("id, nome, status, passo_onboarding_id, passos:processo_passos!processo_passos_processo_id_fkey(id, data, ordem, concluido_em)")
     .eq("tipo", "roadmap")
-    .in("passo_onboarding_id", passoIds);
+    .not("passo_onboarding_id", "is", null);
   if (error) throw error;
-  return ((data || []) as any[]).map((p) => ({
+  const filtro = passoIds ? new Set(passoIds) : null;
+  return ((data || []) as any[]).filter((p) => !filtro || filtro.has(p.passo_onboarding_id)).map((p) => ({
     id: p.id,
     nome: p.nome,
     status: p.status as string,
@@ -221,7 +233,7 @@ export async function aplicarTemplate(processoId: string, templateId: string, mo
 }
 
 export async function salvarComoTemplate(processo: Processo, nome: string): Promise<string> {
-  const ordenados = renumerar(ordenarPassos(processo.passos));
+  const ordenados = renumerar(ordenarPassosCronologico(processo.passos));
   const { data, error } = await (supabase.from("processo_templates") as any)
     .insert([{ tipo: processo.tipo, nome }])
     .select("id")
@@ -256,9 +268,11 @@ export async function encerrarProcesso(id: string): Promise<void> {
 // ------------------------------------------------------------------ Passos
 
 export async function adicionarPasso(processo: Processo, i: { titulo: string; data?: string | null; observacoes?: string | null }): Promise<void> {
-  const ordenados = renumerar(ordenarPassos(processo.passos));
+  const ordenados = ordenarPassosCronologico(processo.passos);
   const pos = posicaoParaNovoPasso(ordenados, i.data ?? null);
-  const afetados = ordenados.slice(pos).map((p, idx) => ({ id: p.id, ordem: pos + idx + 1, data: p.data }));
+  // Abre espaço na posição `pos` e grava só quem mudou de ordem (inclui ajustes de ordem vindos de datas mudadas no Kanban)
+  const novaOrdem = ordenados.map((p, idx) => ({ ...p, ordem: idx < pos ? idx : idx + 1 }));
+  const afetados = ordemAlterada(processo.passos, novaOrdem);
   if (afetados.length) await salvarOrdem(afetados);
 
   const { error } = await (supabase.from("processo_passos") as any).insert([{
@@ -298,11 +312,12 @@ export async function excluirPasso(id: string): Promise<void> {
     .select("id, data, ordem, concluido_em")
     .eq("processo_id", passo.processo_id);
   if (erroRestantes) throw erroRestantes;
-  const renumerados = renumerar(ordenarPassos((restantes || []) as PassoLogico[]));
-  if (renumerados.length) await salvarOrdem(renumerados);
+  const atuais = (restantes || []) as PassoLogico[];
+  const alterados = ordemAlterada(atuais, renumerar(ordenarPassosCronologico(atuais)));
+  if (alterados.length) await salvarOrdem(alterados);
 }
 
-export async function salvarOrdem(passos: { id: string; ordem: number; data?: string | null }[]): Promise<void> {
+export async function salvarOrdem(passos: LinhaOrdem[]): Promise<void> {
   const results = await Promise.all(passos.map((p) => {
     const patch: Record<string, unknown> = { ordem: p.ordem };
     if (p.data !== undefined) patch.data = p.data;

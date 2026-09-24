@@ -15,7 +15,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { diasDeAtraso, formatarDataCurta, hojeBrasilia } from "@/lib/entrega";
-import { ordenarPassos, passosEmConflito, proximoPasso, renumerar } from "@/lib/processos";
+import { ordemAlterada, ordenarPassos, ordenarPassosCronologico, passosEmConflito, proximoPasso, renumerar } from "@/lib/processos";
 import {
   adicionarPasso,
   alternarConclusaoPasso,
@@ -43,7 +43,8 @@ type Estado = "concluido" | "atrasado" | "proximo" | "pendente";
 
 /** Trilha horizontal de passos: nós ligados por linhas, com reordenação por arrastar, painel do passo e "+ passo". */
 export function Trilha({ processo, roadmaps, somenteLeitura = false, onMudou, onAbrirRoadmap }: TrilhaProps) {
-  const ordenados = useMemo(() => ordenarPassos(processo.passos), [processo.passos]);
+  // Cronológica: a data pode ter mudado pelo Kanban sem reordenar; a ordem persistida se ajusta no próximo gravarOrdem
+  const ordenados = useMemo(() => ordenarPassosCronologico(processo.passos), [processo.passos]);
 
   // Ordem otimista: mostra a nova ordem enquanto grava/escolhe datas; volta ao banco quando o processo recarrega
   const [ordemLocal, setOrdemLocal] = useState<Passo[] | null>(null);
@@ -121,11 +122,13 @@ export function Trilha({ processo, roadmaps, somenteLeitura = false, onMudou, on
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
-  const gravarOrdem = async (lista: Passo[], comData: boolean) => {
+  const gravarOrdem = async (lista: Passo[]) => {
     const final = renumerar(ordenarPassos(renumerar(lista)));
     setOrdemLocal(final);
     try {
-      await salvarOrdem(final.map((p) => (comData ? { id: p.id, ordem: p.ordem, data: p.data } : { id: p.id, ordem: p.ordem })));
+      // Só quem mudou de ordem ou de data em relação ao que está gravado
+      const alterados = ordemAlterada(processo.passos, final);
+      if (alterados.length) await salvarOrdem(alterados);
     } catch (e) {
       toast.error(erroMsg(e));
       setOrdemLocal(null);
@@ -143,7 +146,7 @@ export function Trilha({ processo, roadmaps, somenteLeitura = false, onMudou, on
     const depois = arrayMove(passos, de, para);
     const ids = passosEmConflito(depois, String(active.id));
     if (!ids.length) {
-      void gravarOrdem(depois, false);
+      void gravarOrdem(depois);
       return;
     }
     setOrdemLocal(depois);
@@ -154,7 +157,7 @@ export function Trilha({ processo, roadmaps, somenteLeitura = false, onMudou, on
     if (!conflito) return;
     const comDatas = conflito.depois.map((p) => (p.id in datas ? { ...p, data: datas[p.id] } : p));
     setConflito(null);
-    await gravarOrdem(comDatas, true);
+    await gravarOrdem(comDatas);
   };
 
   const cancelarDatas = () => {

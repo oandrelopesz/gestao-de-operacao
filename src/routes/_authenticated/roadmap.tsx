@@ -67,7 +67,11 @@ function RoadmapPage() {
         </TabsList>
 
         <TabsContent value="andamento" className="mt-0">
-          <EmAndamento roadmapFoco={roadmapFoco} />
+          <EmAndamento
+            roadmapFoco={roadmapFoco}
+            // Tira o ?id= para a volta a "Em andamento" não redirecionar de novo
+            onIrHistorico={() => navigate({ search: (s: SearchParams) => ({ ...s, id: undefined, aba: "historico" }), replace: true })}
+          />
         </TabsContent>
         <TabsContent value="templates" className="mt-0">
           <TemplatesView tipo="roadmap" />
@@ -84,7 +88,7 @@ function RoadmapPage() {
 
 interface Grupo { clienteId: string; clienteNome: string; roadmaps: Processo[] }
 
-function EmAndamento({ roadmapFoco }: { roadmapFoco?: string }) {
+function EmAndamento({ roadmapFoco, onIrHistorico }: { roadmapFoco?: string; onIrHistorico: () => void }) {
   const navigate = useNavigate();
   const [roadmaps, setRoadmaps] = useState<Processo[]>([]);
   const [passosOnboarding, setPassosOnboarding] = useState<Map<string, Passo>>(new Map());
@@ -156,6 +160,26 @@ function EmAndamento({ roadmapFoco }: { roadmapFoco?: string }) {
     if (loading || !roadmapFoco || focado.current === roadmapFoco) return;
     if (destacar(roadmapFoco)) focado.current = roadmapFoco;
   }, [loading, roadmapFoco, roadmaps, destacar]);
+
+  // ?id= de um roadmap que não está em andamento (tag/card antigo): se já foi concluído/encerrado, abre o Histórico
+  const verificado = useRef<string | null>(null);
+  const irHistorico = useRef(onIrHistorico);
+  const montado = useRef(true);
+  useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
+  irHistorico.current = onIrHistorico;
+  useEffect(() => {
+    if (loading || erro || !roadmapFoco || verificado.current === roadmapFoco) return;
+    if (roadmaps.some((r) => r.id === roadmapFoco)) return;
+    verificado.current = roadmapFoco;
+    (async () => {
+      const { data } = await (supabase.from("processos") as any).select("status").eq("id", roadmapFoco).maybeSingle();
+      if (!montado.current || !data) return;
+      if (data.status === "concluido" || data.status === "encerrado") {
+        toast.info("Esse roadmap já foi concluído — está no Histórico");
+        irHistorico.current();
+      }
+    })();
+  }, [loading, erro, roadmapFoco, roadmaps]);
   useEffect(() => () => { if (timerDestaque.current) clearTimeout(timerDestaque.current); }, []);
 
   // Recém-criado: recarrega e destaca quando o card aparecer

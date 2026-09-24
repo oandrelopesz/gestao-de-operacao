@@ -14,6 +14,28 @@ export function ordenarPassos<T extends PassoLogico>(p: T[]): T[] {
   return [...p.filter((x) => x.data).sort(porOrdem), ...p.filter((x) => !x.data).sort(porOrdem)];
 }
 
+/** Ordem de exibição: com data em ordem cronológica (empate pela ordem manual), sem data no fim.
+ * A data pode mudar pelo Kanban sem reordenar a trilha; aqui a trilha acompanha a data. */
+export function ordenarPassosCronologico<T extends PassoLogico>(p: T[]): T[] {
+  const comData = p.filter((x) => x.data).sort((a, b) => a.data!.localeCompare(b.data!) || a.ordem - b.ordem);
+  return [...comData, ...p.filter((x) => !x.data).sort(porOrdem)];
+}
+
+export type LinhaOrdem = { id: string; ordem: number; data?: string | null };
+
+/** Só as linhas cuja ordem ou data mudou em relação à lista atual (a data só vai no patch quando mudou). */
+export function ordemAlterada(atual: PassoLogico[], nova: PassoLogico[]): LinhaOrdem[] {
+  const antes = new Map(atual.map((x) => [x.id, x]));
+  const r: LinhaOrdem[] = [];
+  for (const x of nova) {
+    const a = antes.get(x.id);
+    const dataMudou = !a || (a.data ?? null) !== (x.data ?? null);
+    if (a && a.ordem === x.ordem && !dataMudou) continue;
+    r.push(dataMudou ? { id: x.id, ordem: x.ordem, data: x.data } : { id: x.id, ordem: x.ordem });
+  }
+  return r;
+}
+
 export function renumerar<T extends PassoLogico>(p: T[]): T[] {
   return p.map((x, i) => ({ ...x, ordem: i }));
 }

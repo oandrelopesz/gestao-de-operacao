@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useConfig } from "@/lib/appConfig";
 import { diasDeAtraso, formatarDataCurta, hojeBrasilia } from "@/lib/entrega";
-import { ordenarPassos, posicaoParaNovoPasso, renumerar, type TipoProcesso } from "@/lib/processos";
+import { ordemAlterada, ordenarPassosCronologico, posicaoParaNovoPasso, renumerar, type TipoProcesso } from "@/lib/processos";
 import {
   alternarConclusaoPasso,
   atualizarPasso,
@@ -88,10 +88,13 @@ export function PassoPainel({ passo: passoProp, tipo, roadmap, passos, somenteLe
     if (!passos?.length) return;
     const atual = passos.find((p) => p.id === id);
     if (!atual) return;
-    const outros = renumerar(ordenarPassos(passos.filter((p) => p.id !== id)));
+    const outros = renumerar(ordenarPassosCronologico(passos.filter((p) => p.id !== id)));
     const lista = [...outros];
     lista.splice(posicaoParaNovoPasso(outros, novaData), 0, { ...atual, data: novaData });
-    await salvarOrdem(renumerar(lista).map((p) => ({ id: p.id, ordem: p.ordem })));
+    // A data do passo já foi gravada: compara com ela para mandar só quem mudou de ordem
+    const gravados = passos.map((p) => (p.id === id ? { ...p, data: novaData } : p));
+    const alterados = ordemAlterada(gravados, renumerar(lista));
+    if (alterados.length) await salvarOrdem(alterados);
   };
 
   const gravar = async (patch: Patch) => {

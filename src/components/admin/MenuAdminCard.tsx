@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useConfig } from "@/lib/appConfig";
-import { NAV_GROUPS } from "@/routes/_authenticated";
+import { NAV_GROUPS } from "@/lib/nav";
 import { MENU_FIXOS, moverNoGrupo, alternarOculta, type MenuConfig } from "@/lib/menuConfig";
 
 const CFG_VAZIA: MenuConfig = { ocultas: [], ordem: {} };
