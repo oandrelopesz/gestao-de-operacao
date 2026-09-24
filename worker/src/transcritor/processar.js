@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { rodar as rodarPadrao } from "../exec.js";
 import { JobPausado, checarParada, registrar } from "../parada.js";
 import { cookiesDe } from "../jobs/download.js";
-import { glossarioParaHotwords, glossarioParaPrompt, montarTexto } from "./texto.js";
+import { glossarioParaPrompt, montarTexto } from "./texto.js";
 import { deslocarSegmentos, escolherCortes, lerSilencios, promptComContexto, trechos } from "./cortes.js";
 import { caminhoUpload } from "./uploads.js";
 
@@ -59,7 +59,9 @@ async function duracaoDe(arquivo, rodar) {
   return Number.parseFloat(String(stdout).trim());
 }
 
-async function transcreverTrecho({ arquivo, idioma, prompt, hotwords }, { config, fetch: _fetch, abrirBlob }) {
+// Sem `hotwords`: junto com o prompt, faz o Whisper entrar em laço e, sozinho, tira a pontuação
+// (testado na VPS em 24/09/2026). O glossário vai só no prompt.
+async function transcreverTrecho({ arquivo, idioma, prompt }, { config, fetch: _fetch, abrirBlob }) {
   const form = new FormData();
   form.set("file", await abrirBlob(arquivo, { type: "audio/ogg" }), "audio.ogg");
   form.set("model", config.modelo);
@@ -68,7 +70,6 @@ async function transcreverTrecho({ arquivo, idioma, prompt, hotwords }, { config
   form.set("temperature", "0");
   if (idioma) form.set("language", idioma);
   if (prompt) form.set("prompt", prompt);
-  if (hotwords) form.set("hotwords", hotwords);
   const ac = new AbortController();
   let pausado = false;
   const soltar = registrar(() => { pausado = true; ac.abort(); });
@@ -126,7 +127,6 @@ export async function processar(t, deps) {
     const partes = trechos(cortes, duracao);
 
     const promptGlossario = glossarioParaPrompt(glossario);
-    const hotwords = glossarioParaHotwords(glossario);
     const segmentos = [];
     let idioma = null;
     let codigo = null;
@@ -140,7 +140,7 @@ export async function processar(t, deps) {
         await rodar("ffmpeg", ["-hide_banner", "-nostdin", "-y", "-ss", String(p.inicio), "-to", String(p.fim), "-i", audio, "-c", "copy", arquivo], { timeout: 10 * 60 * 1000 });
       }
       const r = await transcreverTrecho(
-        { arquivo, idioma: codigo, prompt: promptComContexto(promptGlossario, textoAnterior), hotwords },
+        { arquivo, idioma: codigo, prompt: promptComContexto(promptGlossario, textoAnterior) },
         { config, fetch: _fetch, abrirBlob },
       );
       idioma = idioma || r.language || null;

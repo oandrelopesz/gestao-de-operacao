@@ -18,8 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # O pip no Debian já instala o console script do gallery-dl em /usr/local/bin; o `if` só cobre o
 # caso de ele ir para outro lugar — linkar o caminho nele mesmo criaria um symlink pendurado.
 # Os `test -x` no fim falham o build aqui, em vez de o worker descobrir no primeiro job.
-RUN curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+# yt-dlp_linux (build oficial) já traz o curl_cffi: o TikTok exige "impersonation" e o yt-dlp em
+# zipapp, sem essa dependência, falha com "Unexpected response from webpage request".
+RUN curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp \
  && chmod a+rx /usr/local/bin/yt-dlp \
+ && /usr/local/bin/yt-dlp --list-impersonate-targets | grep -i chrome | grep -vqi unavailable \
  && pip3 install --break-system-packages --no-cache-dir gallery-dl \
  && if [ ! -x /usr/local/bin/gallery-dl ]; then ln -s "$(command -v gallery-dl)" /usr/local/bin/gallery-dl; fi \
  && test -x /usr/local/bin/gallery-dl && test -x /usr/local/bin/yt-dlp

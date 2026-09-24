@@ -20,8 +20,8 @@ test("montarTexto não quebra no meio da frase, mesmo com pausa", () => {
 });
 
 test("montarTexto quebra textos longos sem pausa a cada ~120 palavras, sempre em fim de frase", () => {
-  const frase = "Uma frase com exatamente dez palavras para o teste aqui.";
-  const segs = Array.from({ length: 30 }, (_, i) => seg(i, i + 1, frase));
+  // frases diferentes (a mesma repetida 30 vezes seria um laço do Whisper e sairia uma vez só)
+  const segs = Array.from({ length: 30 }, (_, i) => seg(i, i + 1, `Frase número ${i} com exatamente dez palavras para o teste.`));
   const paragrafos = montarTexto(segs).split("\n\n");
   assert.ok(paragrafos.length >= 2, "texto de 300 palavras deveria ter parágrafos");
   for (const p of paragrafos) {
@@ -42,4 +42,26 @@ test("glossário vira prompt (frase de contexto) e hotwords (lista curta)", () =
   assert.equal(glossarioParaPrompt([]), undefined);
   const muitos = Array.from({ length: 400 }, (_, i) => `termo${i}`);
   assert.ok(glossarioParaPrompt(muitos).length <= 800, "prompt fica curto para não atrapalhar o modelo");
+});
+
+test("montarTexto tira o laço do Whisper (mesma frase ou bloco repetido 3+ vezes seguidas)", () => {
+  const laco = "Então você pode segmentar por interesses, idade e etc. Com isso você consegue atingir o seu público correto.";
+  const t = montarTexto([
+    seg(0, 5, "O principal ponto positivo é que você consegue segmentar os seus anúncios."),
+    seg(5, 10, laco),
+    seg(10, 15, laco),
+    seg(15, 20, " " + laco + " "),
+    seg(20, 25, "O lado negativo é que você precisa pagar por isso."),
+  ]);
+  assert.equal(t, "O principal ponto positivo é que você consegue segmentar os seus anúncios. " + laco + " O lado negativo é que você precisa pagar por isso.");
+});
+
+test("montarTexto tira o laço dentro de um mesmo segmento", () => {
+  const t = montarTexto([seg(0, 30, "Com isso você consegue segmentar. Com isso você consegue segmentar. Com isso você consegue segmentar. Com isso você consegue segmentar. Fim.")]);
+  assert.equal(t, "Com isso você consegue segmentar. Fim.");
+});
+
+test("montarTexto mantém repetições naturais (duas vezes) e frases curtas iguais separadas", () => {
+  const t = montarTexto([seg(0, 2, "De forma bem resumida, de forma bem resumida."), seg(2, 3, "Sim."), seg(3, 4, "Não."), seg(4, 5, "Sim."), seg(5, 6, "Não.")]);
+  assert.equal(t, "De forma bem resumida, de forma bem resumida. Sim. Não. Sim. Não.");
 });

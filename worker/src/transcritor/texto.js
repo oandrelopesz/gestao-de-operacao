@@ -8,8 +8,45 @@ const FIM_DE_FRASE = /[.!?…]["'”’)\]]*$/;
 
 const limpar = (s) => String(s ?? "").replace(/\s+/g, " ").trim();
 
+const REPETICOES_DE_LACO = 3;
+const MAX_FRASES_NO_BLOCO = 3;
+const normalizar = (s) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/**
+ * O Whisper às vezes entra em laço e repete a mesma frase (ou bloco de até 3 frases) várias vezes
+ * seguidas. Um bloco que aparece 3+ vezes em sequência fica uma vez só; repetir 2 vezes é fala
+ * normal e fica. Trabalha frase a frase (dentro e entre segmentos) e devolve os segmentos com o
+ * texto já limpo, mantendo os tempos para a divisão em parágrafos.
+ */
+function tirarLacos(segmentos) {
+  const frases = [];
+  segmentos.forEach((s, i) => {
+    for (const f of limpar(s.text).split(/(?<=[.!?…])\s+/)) if (f) frases.push({ i, f, n: normalizar(f) });
+  });
+  const mesmoBloco = (a, b, k) => {
+    for (let j = 0; j < k; j++) if (frases[a + j]?.n !== frases[b + j]?.n || !frases[a + j].n) return false;
+    return true;
+  };
+  for (let k = 1; k <= MAX_FRASES_NO_BLOCO; k++) {
+    for (let i = 0; i + k * REPETICOES_DE_LACO <= frases.length; i++) {
+      let fim = i + k;
+      while (mesmoBloco(i, fim, k)) fim += k;
+      if ((fim - i) / k >= REPETICOES_DE_LACO) frases.splice(i + k, fim - i - k);
+    }
+  }
+  // Segmento que ficou vazio some; o anterior "cobre" o tempo dele (senão o buraco vira parágrafo)
+  const saida = [];
+  segmentos.forEach((s, i) => {
+    const text = frases.filter((x) => x.i === i).map((x) => x.f).join(" ");
+    if (text) saida.push({ ...s, text });
+    else if (saida.length && Number.isFinite(s.end)) saida.at(-1).end = s.end;
+  });
+  return saida;
+}
+
 /** Segmentos `{ start, end, text }` → texto com parágrafos separados por uma linha em branco. */
 export function montarTexto(segmentos) {
+  segmentos = tirarLacos(segmentos || []);
   const paragrafos = [];
   let atual = [];
   let palavras = 0;

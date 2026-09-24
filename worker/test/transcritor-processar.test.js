@@ -59,7 +59,8 @@ test("link: baixa com yt-dlp, corta no silêncio perto de 5 min, transcreve em t
     assert.equal(c.formularios[1].get("language"), "pt", "os seguintes fixam o idioma detectado");
     assert.match(c.formularios[0].get("prompt"), /ROAS, CTR/);
     assert.match(c.formularios[1].get("prompt"), /Trecho/, "o 2º trecho recebe o final do 1º como contexto");
-    assert.equal(c.formularios[0].get("hotwords"), "ROAS CTR");
+    // hotwords + prompt fazem o Whisper entrar em laço (testado na VPS, 24/09/2026): só o prompt vai
+    assert.equal(c.formularios[0].get("hotwords"), null);
     assert.equal(c.formularios[0].get("response_format"), "verbose_json");
     const corte = c.chamadas.find((x) => x.cmd === "ffmpeg" && x.args.includes("-ss") && x.args.includes("-to"));
     assert.deepEqual([corte.args[corte.args.indexOf("-ss") + 1], corte.args[corte.args.indexOf("-to") + 1]], ["0", "300"]);
