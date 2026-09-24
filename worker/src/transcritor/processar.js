@@ -41,8 +41,9 @@ async function baixarLink(t, dir, { rodar, existe }) {
   } catch (e) {
     if (e instanceof JobPausado) throw e;
     const msg = `${e.stderr || ""}\n${e.message || ""}`;
-    if (plataforma === "youtube" || /Sign in to confirm/i.test(msg)) {
-      throw new ErroTranscricao("O YouTube bloqueia downloads pelo servidor. Baixe o vídeo e envie como arquivo.");
+    // YouTube pedindo login = cookies da conta secundária venceram (config swipe_cookies_youtube)
+    if (/Sign in to confirm/i.test(msg)) {
+      throw new ErroTranscricao("O YouTube pediu login: os cookies do YouTube no servidor venceram (renove o config swipe_cookies_youtube no Portainer). Enquanto isso, baixe o vídeo e envie como arquivo.");
     }
     if (/private|login required|log in|not available|rate-limit|requested content is not available/i.test(msg)) {
       throw new ErroTranscricao("A plataforma pediu login ou o post é privado/indisponível. Baixe e envie como arquivo.");

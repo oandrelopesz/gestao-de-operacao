@@ -87,7 +87,7 @@ export function TranscreverDialog({ aberto, onClose, onLinks, onArquivos }: Prop
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-2">
-          {([["link", "Link", "Instagram, TikTok, anúncio, site…", Link2], ["arquivo", "Arquivo", "mp3, mp4, mov, m4a, wav…", Upload]] as const).map(([valor, titulo, sub, Icone]) => (
+          {([["link", "Link", "Instagram, TikTok, YouTube, anúncio…", Link2], ["arquivo", "Arquivo", "mp3, mp4, mov, m4a, wav…", Upload]] as const).map(([valor, titulo, sub, Icone]) => (
             <button key={valor} type="button" onClick={() => setModo(valor)}
               className={cn("flex items-start gap-2.5 rounded-xl border p-3 text-left transition-colors", modo === valor ? "border-primary bg-primary/5" : "border-border/70 hover:bg-muted/40")}>
               <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", modo === valor ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>
@@ -132,7 +132,6 @@ export function TranscreverDialog({ aberto, onClose, onLinks, onArquivos }: Prop
             <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={() => setLinks((prev) => [...prev, { link: "", nome: "" }])}>
               <Plus size={14} /> Outro link
             </Button>
-            <p className="text-[11px] text-muted-foreground">YouTube costuma bloquear o servidor: se falhar, baixe o vídeo e envie como arquivo.</p>
           </div>
         ) : (
           <div className="space-y-3">

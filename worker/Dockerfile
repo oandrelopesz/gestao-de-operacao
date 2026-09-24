@@ -27,6 +27,14 @@ RUN curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_
  && if [ ! -x /usr/local/bin/gallery-dl ]; then ln -s "$(command -v gallery-dl)" /usr/local/bin/gallery-dl; fi \
  && test -x /usr/local/bin/gallery-dl && test -x /usr/local/bin/yt-dlp
 
+# YouTube pelo servidor: o yt-dlp resolve os desafios do player com um motor JavaScript (usa o Node
+# da imagem) e pega o "PO token" no bgutil (serviço `bgutil` na rede ALDigitalNet, stack transcritor).
+# Os cookies da conta secundária vêm do config do Swarm swipe_cookies_youtube (/cookies/youtube.txt).
+RUN mkdir -p /etc/yt-dlp/plugins \
+ && curl -fsSL https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/latest/download/bgutil-ytdlp-pot-provider.zip -o /etc/yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip \
+ && printf '%s\n' '--js-runtimes node' '--extractor-args "youtubepot-bgutilhttp:base_url=http://bgutil:4416"' > /etc/yt-dlp.conf \
+ && /usr/local/bin/yt-dlp --version
+
 WORKDIR /app
 COPY package.json ./
 # O npm já cria o shim executável em node_modules/.bin/single-file (o arquivo real do pacote
