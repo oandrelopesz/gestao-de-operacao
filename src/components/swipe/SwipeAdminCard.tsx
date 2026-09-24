@@ -40,7 +40,7 @@ export function SwipeAdminCard() {
     // Retorno do OAuth (?google_connected=1 / ?google_error=...)
     const params = new URLSearchParams(window.location.search);
     if (params.get("google_connected")) {
-      toast.success("Google Drive conectado");
+      toast.success("Google conectado (Drive e Agenda)");
       saveSwipeConfig({ conectado_em: new Date().toISOString() }).catch(() => {});
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("google_error")) {

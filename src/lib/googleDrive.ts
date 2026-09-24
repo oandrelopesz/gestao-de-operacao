@@ -13,6 +13,12 @@ const FOLDER_MIME = "application/vnd.google-apps.folder";
 const KEY_STORAGE = "swipe_key";
 
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+export const CALENDAR_SCOPES = [
+  "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+];
+/** Tudo que a conexão do Google pede: Drive (swipe file) + Agenda. */
+export const GOOGLE_SCOPES = [DRIVE_SCOPE, ...CALENDAR_SCOPES];
 
 /**
  * Link de configuração: abrir `/qualquer-rota#swipe_key=XXX` grava a chave neste navegador e
@@ -74,7 +80,7 @@ export function oauthUrl(clientId: string, redirectUri: string, userId: string, 
   u.searchParams.set("client_id", clientId);
   u.searchParams.set("redirect_uri", redirectUri);
   u.searchParams.set("response_type", "code");
-  u.searchParams.set("scope", DRIVE_SCOPE);
+  u.searchParams.set("scope", GOOGLE_SCOPES.join(" "));
   u.searchParams.set("access_type", "offline");
   u.searchParams.set("prompt", "consent");
   u.searchParams.set("include_granted_scopes", "true");
@@ -84,6 +90,11 @@ export function oauthUrl(clientId: string, redirectUri: string, userId: string, 
 
 let tokenCache: { token: string; expiresAt: number } | null = null;
 let statusCache: { data: DriveStatus; at: number } | null = null;
+
+/** Força buscar um access token novo na próxima chamada (ex.: o Google respondeu 401). */
+export function invalidarTokenGoogle(): void {
+  tokenCache = null;
+}
 
 export class SwipeKeyError extends Error {}
 /**
