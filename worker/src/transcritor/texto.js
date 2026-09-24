@@ -44,9 +44,20 @@ function tirarLacos(segmentos) {
   return saida;
 }
 
+// Frases que o Whisper "inventa" em trecho sem fala (música, ruído, silêncio): herança das
+// legendas com que ele foi treinado. Só saem quando o próprio Whisper achou provável não ser fala.
+const ALUCINACOES = [
+  "thank you", "thanks for watching", "thank you for watching", "you", "bye",
+  "obrigado", "obrigada", "obrigado por assistir", "tchau",
+  "legendas pela comunidade amara org", "inscreva se no canal", "e aí", "música",
+];
+const NAO_E_FALA = 0.5;
+const ehAlucinacao = (s) =>
+  Number(s.no_speech_prob) >= NAO_E_FALA && ALUCINACOES.includes(normalizar(limpar(s.text)));
+
 /** Segmentos `{ start, end, text }` → texto com parágrafos separados por uma linha em branco. */
 export function montarTexto(segmentos) {
-  segmentos = tirarLacos(segmentos || []);
+  segmentos = tirarLacos((segmentos || []).filter((s) => !ehAlucinacao(s)));
   const paragrafos = [];
   let atual = [];
   let palavras = 0;

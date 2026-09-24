@@ -7,7 +7,7 @@ import { ErroTranscricao, processar } from "../src/transcritor/processar.js";
 import { rodarUma } from "../src/transcritor/main.js";
 import { JobPausado, pedirParada, reiniciarParada } from "../src/parada.js";
 
-const SILENCIOS = "[silencedetect] silence_start: 299\n[silencedetect] silence_end: 301 | silence_duration: 2\n";
+const SILENCIOS = "[silencedetect] silence_start: 178\n[silencedetect] silence_end: 180 | silence_duration: 2\n";
 
 function cenario({ duracao = 700, respostas, falhaYtDlp } = {}) {
   const chamadas = [];
@@ -45,7 +45,7 @@ async function comPasta(fn) {
 const config = (pasta) => ({ pasta, speachesUrl: "http://speaches:8000", modelo: "turbo" });
 const abrirBlob = async () => new Blob(["audio"]);
 
-test("link: baixa com yt-dlp, corta no silêncio perto de 5 min, transcreve em trechos com contexto e glossário", async () => {
+test("link: baixa com yt-dlp, corta no silêncio perto de 3 min, transcreve em trechos com contexto e glossário", async () => {
   await comPasta(async (pasta) => {
     const c = cenario();
     const r = await processar(
@@ -54,7 +54,7 @@ test("link: baixa com yt-dlp, corta no silêncio perto de 5 min, transcreve em t
     );
     assert.equal(r.duracao, 700);
     assert.equal(r.idioma, "pt");
-    assert.equal(c.formularios.length, 3, "700 s viram 3 trechos (cortes em 300 e 600)");
+    assert.equal(c.formularios.length, 4, "700 s viram 4 trechos (corte no silêncio de 179 s, depois em 360 e 540)");
     assert.equal(c.formularios[0].get("language"), null, "o 1º trecho detecta o idioma sozinho");
     assert.equal(c.formularios[1].get("language"), "pt", "os seguintes fixam o idioma detectado");
     assert.match(c.formularios[0].get("prompt"), /ROAS, CTR/);
@@ -63,11 +63,11 @@ test("link: baixa com yt-dlp, corta no silêncio perto de 5 min, transcreve em t
     assert.equal(c.formularios[0].get("hotwords"), null);
     assert.equal(c.formularios[0].get("response_format"), "verbose_json");
     const corte = c.chamadas.find((x) => x.cmd === "ffmpeg" && x.args.includes("-ss") && x.args.includes("-to"));
-    assert.deepEqual([corte.args[corte.args.indexOf("-ss") + 1], corte.args[corte.args.indexOf("-to") + 1]], ["0", "300"]);
+    assert.deepEqual([corte.args[corte.args.indexOf("-ss") + 1], corte.args[corte.args.indexOf("-to") + 1]], ["0", "179"]);
     assert.ok(c.atualizacoes.some((a) => a.campos.status === "transcrevendo" && a.campos.duracao_seg === 700));
-    assert.ok(c.atualizacoes.some((a) => a.campos.progresso > 0.4 && a.campos.progresso < 0.5));
+    assert.ok(c.atualizacoes.some((a) => a.campos.progresso > 0.5 && a.campos.progresso < 0.6));
     // Cada trecho falso tem 4 s de fala e ~296 s de silêncio: pausa longa depois de fim de frase abre parágrafo
-    assert.equal(r.texto, "Trecho 1.\n\nTrecho 2.\n\nTrecho 3.");
+    assert.equal(r.texto, "Trecho 1.\n\nTrecho 2.\n\nTrecho 3.\n\nTrecho 4.");
     assert.deepEqual(await readdir(join(pasta, "jobs")), [], "a pasta temporária é apagada");
   });
 });
@@ -91,6 +91,16 @@ test("YouTube bloqueado vira mensagem clara (ErroTranscricao)", async () => {
     await assert.rejects(
       () => processar({ id: "t3", origem: "link", link: "https://youtu.be/x", plataforma: "youtube" }, { banco: c.banco, config: config(pasta), rodar: c.rodar, fetch: c.fetchFake, abrirBlob, existe: () => false }),
       (e) => e instanceof ErroTranscricao && /envie como arquivo/.test(e.message),
+    );
+  });
+});
+
+test("post apagado do Instagram (400 na extração) vira mensagem clara", async () => {
+  await comPasta(async (pasta) => {
+    const c = cenario({ falhaYtDlp: "ERROR: [Instagram] C_x: Video info extraction failed: HTTP Error 400: Bad Request" });
+    await assert.rejects(
+      () => processar({ id: "t4", origem: "link", link: "https://www.instagram.com/reel/C_x/", plataforma: "instagram" }, { banco: c.banco, config: config(pasta), rodar: c.rodar, fetch: c.fetchFake, abrirBlob, existe: () => false }),
+      (e) => e instanceof ErroTranscricao && /não está disponível/.test(e.message),
     );
   });
 });

@@ -42,7 +42,8 @@ interface Props {
   aguardando: LinhaDaFila[]; // já na ordem da fila
   pausados: LinhaDaFila[];
   /** Nome da coisa na confirmação ("download", "transcrição") */
-  nomeItem: { singular: string; plural: string };
+  /** `feminino` acerta o gênero dos avisos ("esta transcrição", "pausadas") */
+  nomeItem: { singular: string; plural: string; feminino?: boolean };
   onReordenar: (ids: string[]) => Promise<void>;
   onPausar: (ids: string[]) => Promise<void>;
   onRetomar: (ids: string[]) => Promise<void>;
@@ -112,6 +113,8 @@ export function FilaComSelecao({
   const retomaveis = marcados.filter((id) => idsPausados.has(id));
   const moviveis = marcados.filter((id) => idsAguardando.has(id));
   const qtd = (n: number) => `${n} ${n === 1 ? nomeItem.singular : nomeItem.plural}`;
+  const gen = (masculino: string, feminino: string) => (nomeItem.feminino ? feminino : masculino);
+  const pausadosTxt = (n: number) => gen(n > 1 ? "pausados" : "pausado", n > 1 ? "pausadas" : "pausada");
 
   const Caixa = ({ id }: { id: string }) => {
     const marcado = selecionados.has(id);
@@ -148,7 +151,7 @@ export function FilaComSelecao({
           {icone ?? <ListOrdered size={16} className="text-primary" />}
           <h3 className="text-sm font-semibold">{titulo}</h3>
           <span className="text-xs text-muted-foreground">
-            {aguardando.length} na fila{pausados.length ? ` · ${pausados.length} pausado${pausados.length > 1 ? "s" : ""}` : ""}
+            {aguardando.length} na fila{pausados.length ? ` · ${pausados.length} ${pausadosTxt(pausados.length)}` : ""}
           </span>
           {ocupado === "__ordem" && <Loader2 size={13} className="animate-spin text-muted-foreground" />}
           <button type="button" className="ml-auto text-xs text-primary hover:underline"
@@ -162,7 +165,7 @@ export function FilaComSelecao({
             <span className="px-1 text-xs font-semibold">{qtd(marcados.length)}</span>
             <div className="ml-auto flex flex-wrap items-center gap-1">
               <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" disabled={!pausaveis.length || !!ocupado}
-                onClick={() => acao("__massa", () => onPausar(pausaveis), `${qtd(pausaveis.length)} pausado${pausaveis.length > 1 ? "s" : ""}`, true)}>
+                onClick={() => acao("__massa", () => onPausar(pausaveis), `${qtd(pausaveis.length)} ${pausadosTxt(pausaveis.length)}`, true)}>
                 <Pause size={12} /> Pausar
               </Button>
               <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" disabled={!retomaveis.length || !!ocupado}
@@ -170,11 +173,11 @@ export function FilaComSelecao({
                 <Play size={12} /> Retomar
               </Button>
               <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" disabled={!moviveis.length || !!ocupado}
-                onClick={() => acao("__massa", () => onMover(moviveis, "topo"), "Movidos para o topo da fila", true)}>
+                onClick={() => acao("__massa", () => onMover(moviveis, "topo"), gen("Movidos para o topo da fila", "Movidas para o topo da fila"), true)}>
                 <ArrowUpToLine size={12} /> Topo
               </Button>
               <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" disabled={!moviveis.length || !!ocupado}
-                onClick={() => acao("__massa", () => onMover(moviveis, "fim"), "Movidos para o fim da fila", true)}>
+                onClick={() => acao("__massa", () => onMover(moviveis, "fim"), gen("Movidos para o fim da fila", "Movidas para o fim da fila"), true)}>
                 <ArrowDownToLine size={12} /> Fim
               </Button>
               <Button size="sm" variant="outline" className="h-7 gap-1 text-xs text-destructive hover:text-destructive" disabled={!!ocupado}
@@ -200,7 +203,7 @@ export function FilaComSelecao({
             </div>
             {!l.semPausa && (
               <Button size="sm" variant="outline" className="shrink-0 gap-1.5" disabled={ocupado === l.id}
-                onClick={() => acao(l.id, () => onPausar([l.id]), "Pausado: sai da vez até você retomar")}>
+                onClick={() => acao(l.id, () => onPausar([l.id]), gen("Pausado", "Pausada") + ": sai da vez até você retomar")}>
                 {ocupado === l.id ? <Loader2 size={14} className="animate-spin" /> : <Pause size={14} />} Pausar
               </Button>
             )}
@@ -231,7 +234,7 @@ export function FilaComSelecao({
                         onSubir={() => gravarOrdem(moverNaFila(ordem, id, -1))}
                         onDescer={() => gravarOrdem(moverNaFila(ordem, id, 1))}
                         onTopo={() => acao(id, () => onMover([id], "topo"), "Vai ser o próximo")}
-                        onPausar={() => acao(id, () => onPausar([id]), "Pausado: sai da vez até você retomar")}
+                        onPausar={() => acao(id, () => onPausar([id]), gen("Pausado", "Pausada") + ": sai da vez até você retomar")}
                       />
                     );
                   })}
@@ -244,7 +247,7 @@ export function FilaComSelecao({
         {/* Pausados */}
         {pausados.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Pausados</p>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{gen("Pausados", "Pausadas")}</p>
             {pausados.map((l) => (
               <div key={l.id} className="flex items-center gap-3 rounded-lg border border-dashed px-3 py-1.5">
                 <Caixa id={l.id} />
@@ -267,7 +270,7 @@ export function FilaComSelecao({
       <AlertDialog open={!!confirmarCancelar} onOpenChange={(o) => { if (!o) setConfirmarCancelar(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancelar {confirmarCancelar && confirmarCancelar.length > 1 ? qtd(confirmarCancelar.length) : `este ${nomeItem.singular}`}?</AlertDialogTitle>
+            <AlertDialogTitle>Cancelar {confirmarCancelar && confirmarCancelar.length > 1 ? qtd(confirmarCancelar.length) : `${gen("este", "esta")} ${nomeItem.singular}`}?</AlertDialogTitle>
             <AlertDialogDescription>
               Sai da fila e é apagado de vez (se estiver rodando, para na hora). Não dá para desfazer — para só esperar, use Pausar.
             </AlertDialogDescription>
@@ -279,7 +282,7 @@ export function FilaComSelecao({
               onClick={() => {
                 const ids = confirmarCancelar ?? [];
                 setConfirmarCancelar(null);
-                acao("__massa", () => onCancelar(ids), ids.length > 1 ? `${qtd(ids.length)} cancelados` : "Cancelado", true);
+                acao("__massa", () => onCancelar(ids), ids.length > 1 ? `${qtd(ids.length)} ${gen("cancelados", "canceladas")}` : gen("Cancelado", "Cancelada"), true);
               }}
             >
               Cancelar de vez

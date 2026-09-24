@@ -2,6 +2,7 @@ process.env.TZ = "America/Sao_Paulo";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  nomeIdioma,
   plataformaDoLink, tipoDeArquivo, nomeExibido, rotuloValidade, ordenarProntas, formatarDuracao, rotuloPlataforma,
   separarTranscricoes, expiraEmDias,
 } from "./transcritorTexto.ts";
@@ -75,4 +76,11 @@ test("separarTranscricoes: fila (em andamento, aguardando por posição, pausada
   assert.deepEqual(r.aguardando.map((x) => x.id), ["d", "b"]);
   assert.deepEqual(r.pausadas.map((x) => x.id), ["e"]);
   assert.deepEqual(r.concluidas.map((x) => x.id).sort(), ["a", "f"]);
+});
+
+test("nomeIdioma mostra o nome do idioma", () => {
+  assert.equal(nomeIdioma("pt"), "Português");
+  assert.equal(nomeIdioma("en"), "Inglês");
+  assert.equal(nomeIdioma("ko"), "KO");
+  assert.equal(nomeIdioma(null), "");
 });

@@ -7,8 +7,9 @@ import { rodar as rodarPadrao } from "../exec.js";
 import { JobPausado, checarParada, registrar } from "../parada.js";
 import { cookiesDe } from "../jobs/download.js";
 import { glossarioParaPrompt, montarTexto } from "./texto.js";
-import { deslocarSegmentos, escolherCortes, lerSilencios, promptComContexto, trechos } from "./cortes.js";
+import { TRECHO_ALVO_S, deslocarSegmentos, escolherCortes, lerSilencios, promptComContexto, trechos } from "./cortes.js";
 import { caminhoUpload } from "./uploads.js";
+import { postarLongo } from "./http.js";
 
 /** Erro com mensagem para mostrar na aba (não adianta tentar de novo). */
 export class ErroTranscricao extends Error {
@@ -47,6 +48,10 @@ async function baixarLink(t, dir, { rodar, existe }) {
       throw new ErroTranscricao("A plataforma pediu login ou o post é privado/indisponível. Baixe e envie como arquivo.");
     }
     if (/Unsupported URL/i.test(msg)) throw new ErroTranscricao("Esse link não é de vídeo/áudio que dê para baixar. Envie o arquivo.");
+    // Post apagado ou fora do ar: o Instagram responde 400 na extração, os outros costumam dar 404
+    if (/HTTP Error (400|404)|Video info extraction failed|content isn.t available|page not found/i.test(msg)) {
+      throw new ErroTranscricao("Esse post não está disponível (pode ter sido apagado ou ser privado). Confira o link.");
+    }
     throw new ErroTranscricao(`Não consegui baixar esse link (${primeiraLinha(e.stderr || e.message)})`);
   }
   const achados = (await readdir(dir)).filter((n) => n.startsWith("origem.") && !n.endsWith(".part"));
@@ -98,7 +103,7 @@ const codigoIdioma = (l) => (typeof l === "string" && /^[a-z]{2,3}$/.test(l) ? l
  * JobPausado (pausa/cancelamento) ou outro erro (tenta de novo).
  */
 export async function processar(t, deps) {
-  const { banco, config, glossario = [], rodar = rodarPadrao, fetch: _fetch = fetch, abrirBlob = openAsBlob, existe } = deps;
+  const { banco, config, glossario = [], rodar = rodarPadrao, fetch: _fetch = postarLongo, abrirBlob = openAsBlob, existe } = deps;
   const dir = join(config.pasta, "jobs", t.id);
   await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
@@ -120,7 +125,7 @@ export async function processar(t, deps) {
     checarParada();
 
     let cortes = [];
-    if (duracao > 330) {
+    if (duracao > TRECHO_ALVO_S * 1.1) {
       const { stderr } = await rodar("ffmpeg", ["-hide_banner", "-nostdin", "-i", audio, "-af", "silencedetect=noise=-35dB:d=0.4", "-f", "null", "-"], { timeout: 60 * 60 * 1000 });
       cortes = escolherCortes(lerSilencios(stderr), duracao);
     }

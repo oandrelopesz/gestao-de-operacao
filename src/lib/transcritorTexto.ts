@@ -74,6 +74,16 @@ export function ordenarProntas<T extends { nome: string | null; created_at: stri
   return modo === "za" ? r.reverse() : r;
 }
 
+const IDIOMAS: Record<string, string> = {
+  pt: "Português", en: "Inglês", es: "Espanhol", fr: "Francês", it: "Italiano", de: "Alemão", ja: "Japonês", zh: "Chinês",
+};
+
+/** Código do Whisper ("pt") → nome para mostrar ("Português"). */
+export function nomeIdioma(codigo: string | null | undefined): string {
+  if (!codigo) return "";
+  return IDIOMAS[codigo.toLowerCase()] ?? codigo.toUpperCase();
+}
+
 export function formatarDuracao(seg: number | null | undefined): string {
   if (seg == null || !Number.isFinite(seg)) return "";
   const s = Math.round(seg);

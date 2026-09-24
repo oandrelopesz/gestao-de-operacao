@@ -15,16 +15,16 @@ test("lerSilencios devolve o meio de cada silêncio", () => {
   assert.deepEqual(lerSilencios(STDERR), [12.95, 295.7, 598.4]);
 });
 
-test("escolherCortes corta no silêncio mais perto de cada 5 min (janela de 30 s)", () => {
-  assert.deepEqual(escolherCortes([12.95, 295.7, 598.4], 900), [295.7, 598.4]);
+test("escolherCortes corta no silêncio mais perto de cada 3 min (janela de 20 s)", () => {
+  assert.deepEqual(escolherCortes([12.95, 175.7, 368.4, 540.2], 650), [175.7, 368.4, 540.2]);
 });
 
 test("escolherCortes sem silêncio perto corta no tempo exato", () => {
-  assert.deepEqual(escolherCortes([12.95], 700), [300, 600]);
+  assert.deepEqual(escolherCortes([12.95], 700), [180, 360, 540]);
 });
 
 test("escolherCortes em áudio curto não corta", () => {
-  assert.deepEqual(escolherCortes([100], 320), []);
+  assert.deepEqual(escolherCortes([100], 190), []);
 });
 
 test("trechos transforma cortes em intervalos que cobrem o áudio todo", () => {

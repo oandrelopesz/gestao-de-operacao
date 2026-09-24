@@ -1,8 +1,8 @@
-// Áudio longo é transcrito em trechos de ~5 min cortados em silêncios (não corta palavra no meio):
+// Áudio longo é transcrito em trechos de ~3 min cortados em silêncios (não corta palavra no meio):
 // dá progresso real, usa pouca memória e cada trecho recebe o final do anterior como contexto.
 
-export const TRECHO_ALVO_S = 300;
-const JANELA_S = 30;
+export const TRECHO_ALVO_S = 180;
+const JANELA_S = 20;
 const CONTEXTO_CARACTERES = 200;
 const PROMPT_MAX = 900;
 

@@ -10,6 +10,7 @@ import { criarVerificador } from "./auth.js";
 import { aplicarCors, caminhoUpload, criarRotasUpload } from "./uploads.js";
 import { ErroTranscricao, processar } from "./processar.js";
 import { JobPausado, reiniciarParada, vigiarPausa } from "../parada.js";
+import { postarLongo } from "./http.js";
 
 export const MAX_TENTATIVAS = 2;
 const EM_ANDAMENTO = ["baixando", "transcrevendo"];
@@ -89,7 +90,7 @@ async function main() {
   let modeloPronto = false;
   const garantirModelo = async () => {
     try {
-      const r = await fetch(`${config.speachesUrl}/v1/models/${encodeURIComponent(config.modelo)}`, { method: "POST" });
+      const r = await postarLongo(`${config.speachesUrl}/v1/models/${encodeURIComponent(config.modelo)}`, {});
       if (r.ok || r.status === 409) {
         modeloPronto = true;
         log("modelo.pronto", { modelo: config.modelo });

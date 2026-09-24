@@ -14,8 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import {
-  VALIDADE_MAX, formatarDuracao, nomeExibido, ordenarProntas, rotuloPlataforma, rotuloValidade, type OrdemProntas,
-} from "@/lib/transcritorTexto";
+  VALIDADE_MAX, formatarDuracao, nomeExibido, ordenarProntas, rotuloPlataforma, rotuloValidade, nomeIdioma, type OrdemProntas } from "@/lib/transcritorTexto";
 import { definirValidade, excluir, renomear, tentarDeNovo, textos, traduzErroTranscritor, type Transcricao } from "@/lib/transcritor";
 
 const CHAVE_ORDEM = "transcritor_ordem";
@@ -203,7 +202,7 @@ export function ListaTranscricoes({ concluidas, onMudou }: Props) {
                   <p className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground">
                     <span>{rotuloPlataforma(t)}</span>
                     {t.duracao_seg != null && <><span>·</span><span>{formatarDuracao(t.duracao_seg)}</span></>}
-                    {t.idioma && <><span>·</span><span className="capitalize">{t.idioma}</span></>}
+                    {t.idioma && <><span>·</span><span>{nomeIdioma(t.idioma)}</span></>}
                     {falhou && t.erro && <><span>·</span><span className="text-destructive">{t.erro}</span></>}
                   </p>
                 </div>

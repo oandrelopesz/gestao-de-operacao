@@ -195,7 +195,7 @@ function TranscritorPage() {
           <FilaComSelecao
             titulo="Fila de transcrição"
             icone={<AudioLines size={16} className="text-primary" />}
-            nomeItem={{ singular: "transcrição", plural: "transcrições" }}
+            nomeItem={{ singular: "transcrição", plural: "transcrições", feminino: true }}
             andamento={partes.andamento.map(linha)}
             aguardando={partes.aguardando.map(linha)}
             pausados={partes.pausadas.map(linha)}

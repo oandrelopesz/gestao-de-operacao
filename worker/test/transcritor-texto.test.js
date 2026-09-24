@@ -65,3 +65,13 @@ test("montarTexto mantém repetições naturais (duas vezes) e frases curtas igu
   const t = montarTexto([seg(0, 2, "De forma bem resumida, de forma bem resumida."), seg(2, 3, "Sim."), seg(3, 4, "Não."), seg(4, 5, "Sim."), seg(5, 6, "Não.")]);
   assert.equal(t, "De forma bem resumida, de forma bem resumida. Sim. Não. Sim. Não.");
 });
+
+test("montarTexto descarta as frases que o Whisper inventa em trecho sem fala", () => {
+  const semFala = (text) => ({ start: 0, end: 30, text, no_speech_prob: 0.8 });
+  assert.equal(montarTexto([semFala(" Thank you.")]), "");
+  assert.equal(montarTexto([semFala("Obrigado."), semFala("Legendas pela comunidade Amara.org")]), "");
+  // com fala de verdade (no_speech_prob baixo) a mesma frase fica
+  assert.equal(montarTexto([{ start: 0, end: 2, text: "Obrigado.", no_speech_prob: 0.05 }]), "Obrigado.");
+  // frase comum em trecho duvidoso fica (só as típicas de alucinação saem)
+  assert.equal(montarTexto([semFala("Vamos revisar o ROAS.")]), "Vamos revisar o ROAS.");
+});
