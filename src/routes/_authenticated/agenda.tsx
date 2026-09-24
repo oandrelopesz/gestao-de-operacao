@@ -165,12 +165,23 @@ function AgendaPage() {
     novo(ini, new Date(ini.getTime() + 60 * 60_000), false);
   };
 
+  // A cópia da grade pode estar velha: o Google mexe no evento sozinho logo depois de criar
+  // (Meet, convites) e a versão (etag) muda. Editar sempre a partir da versão atual evita
+  // o falso "foi alterado no Google enquanto você editava".
+  const versaoAtual = async (o: Ocorrencia) => {
+    const [evento, mestre] = await Promise.all([
+      obterEvento(o.calendarId, o.evento.id as string),
+      o.evento.recurringEventId ? obterEvento(o.calendarId, o.evento.recurringEventId) : Promise.resolve(null),
+    ]);
+    return { evento, mestre };
+  };
+
   const abrir = async (id: string) => {
     const o = ocorrencias.find((x) => `${x.calendarId}::${x.evento.id}` === id);
     if (!o) return;
     try {
-      const mestre = o.evento.recurringEventId ? await obterEvento(o.calendarId, o.evento.recurringEventId) : null;
-      setAbertura({ tipo: "editar", aberto: { calendarId: o.calendarId, evento: o.evento, mestre } });
+      const { evento, mestre } = await versaoAtual(o);
+      setAbertura({ tipo: "editar", aberto: { calendarId: o.calendarId, evento, mestre } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível abrir o evento");
     }
@@ -182,8 +193,8 @@ function AgendaPage() {
     if (!o) { reverter(); return; }
     ocupado.current = true;
     try {
-      const mestre = o.evento.recurringEventId ? await obterEvento(o.calendarId, o.evento.recurringEventId) : null;
-      const form = moverPorArrasto(eventoParaForm(o.evento, o.calendarId, mestre?.recurrence), inicio, fim, diaInteiro);
+      const { evento, mestre } = await versaoAtual(o);
+      const form = moverPorArrasto(eventoParaForm(evento, o.calendarId, mestre?.recurrence), inicio, fim, diaInteiro);
       let escopo: Escopo = "todos";
       if (mestre) {
         const e = await perguntar("Mover evento recorrente", [
@@ -195,7 +206,7 @@ function AgendaPage() {
         escopo = e as Escopo;
       }
       let enviar = false;
-      if (temParticipantes(o.evento)) {
+      if (temParticipantes(evento)) {
         const r = await perguntar("Avisar os participantes da mudança?", [
           { valor: "nao", rotulo: "Não enviar" },
           { valor: "sim", rotulo: "Enviar" },
@@ -203,7 +214,7 @@ function AgendaPage() {
         if (r === null) { reverter(); return; }
         enviar = r === "sim";
       }
-      await salvarComEscopo(form, { calendarId: o.calendarId, evento: o.evento, mestre }, escopo, enviar);
+      await salvarComEscopo(form, { calendarId: o.calendarId, evento, mestre }, escopo, enviar);
       toast.success("Evento movido no Google Agenda");
       carregarEventos();
     } catch (e) {
