@@ -82,7 +82,7 @@ services:
         target: /cookies/facebook.txt
         mode: 0444
       # Conta secundária do YouTube (cookies exportados pelo usuário; renovar quando o YouTube pedir login)
-      - source: swipe_cookies_youtube
+      - source: swipe_cookies_youtube_v2
         target: /cookies/youtube.txt
         mode: 0444
     networks:
@@ -120,7 +120,7 @@ configs:
     external: true
   swipe_cookies_facebook:
     external: true
-  swipe_cookies_youtube:
+  swipe_cookies_youtube_v2:
     external: true
 
 networks:

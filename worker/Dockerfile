@@ -29,7 +29,7 @@ RUN curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_
 
 # YouTube pelo servidor: o yt-dlp resolve os desafios do player com um motor JavaScript (usa o Node
 # da imagem) e pega o "PO token" no bgutil (serviço `bgutil` na rede ALDigitalNet, stack transcritor).
-# Os cookies da conta secundária vêm do config do Swarm swipe_cookies_youtube (/cookies/youtube.txt).
+# Os cookies da conta secundária vêm do config do Swarm swipe_cookies_youtube_v2 (/cookies/youtube.txt).
 RUN mkdir -p /etc/yt-dlp/plugins \
  && curl -fsSL https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/latest/download/bgutil-ytdlp-pot-provider.zip -o /etc/yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip \
  && printf '%s\n' '--js-runtimes node' '--extractor-args "youtubepot-bgutilhttp:base_url=http://bgutil:4416"' > /etc/yt-dlp.conf \
