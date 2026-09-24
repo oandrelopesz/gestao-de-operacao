@@ -1850,6 +1850,30 @@ export type Database = {
         }
         Relationships: []
       }
+      ver_depois_tipos: {
+        Row: {
+          created_at: string
+          hex: string
+          id: string
+          label: string
+          ordem: number
+        }
+        Insert: {
+          created_at?: string
+          hex?: string
+          id: string
+          label: string
+          ordem?: number
+        }
+        Update: {
+          created_at?: string
+          hex?: string
+          id?: string
+          label?: string
+          ordem?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       clientes_view: {
