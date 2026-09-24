@@ -19,10 +19,11 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCachedState } from "@/lib/pageCache";
+import { useConfig } from "@/lib/appConfig";
 import { CACHE_KEYS } from "@/lib/data";
 import {
   fetchPdfBiblioteca, enviarPdf, atualizarPdf, excluirPdf, salvarNoComputador, mensagemErroPdf,
-  PDF_TAMANHO_MAX, type PdfArquivo, type PdfBiblioteca,
+  PDF_TAMANHO_MAX_PADRAO_MB, mbParaBytes, type PdfArquivo, type PdfBiblioteca,
 } from "@/lib/pdfs";
 import {
   montarArvore, caminhoDaPasta, contarPdfsPorPasta, corDaPasta, filtrarPdfs, ehPdf, formatarTamanho,
@@ -81,6 +82,8 @@ function PdfsPage() {
   const [pastaToDelete, setPastaToDelete] = useState<PdfPasta | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const contadorArrasto = useRef(0);
+  const [limiteMb] = useConfig<number>("pdf_tamanho_max_mb", PDF_TAMANHO_MAX_PADRAO_MB);
+  const limiteBytes = mbParaBytes(limiteMb);
 
   const load = async () => {
     try {
@@ -168,13 +171,14 @@ function PdfsPage() {
       try {
         const novo = await enviarPdf(item.arquivo, pastaId, { nome: item.nome, player: item.player }, (fracao) =>
           atualizar(envio.id, { progresso: Math.round(fracao * 100) }),
+          limiteMb,
         );
         setBiblioteca((prev) => ({ ...(prev ?? VAZIA), pdfs: [novo, ...(prev ?? VAZIA).pdfs] }));
         atualizar(envio.id, { status: "ok", progresso: 100 });
         ok += 1;
         window.setTimeout(() => setEnvios((prev) => prev.filter((e) => e.id !== envio.id)), 2500);
       } catch (e) {
-        atualizar(envio.id, { status: "erro", erro: mensagemErroPdf(e) });
+        atualizar(envio.id, { status: "erro", erro: mensagemErroPdf(e, limiteMb) });
       }
     }
     if (ok) toast.success(`${ok} ${ok === 1 ? "PDF guardado" : "PDFs guardados"} em "${destino?.nome ?? "pasta"}"`);
@@ -186,9 +190,9 @@ function PdfsPage() {
     const pdfs = arquivos.filter(ehPdf);
     const ignorados = arquivos.length - pdfs.length;
     if (ignorados) toast.warning(`${ignorados} ${ignorados === 1 ? "arquivo ignorado" : "arquivos ignorados"}: só PDFs podem ser guardados aqui`);
-    const grandes = pdfs.filter((f) => f.size > PDF_TAMANHO_MAX);
-    if (grandes.length) toast.error(`Maior que 50 MB, não enviado: ${grandes.map((f) => f.name).join(", ")}`);
-    const validos = pdfs.filter((f) => f.size <= PDF_TAMANHO_MAX);
+    const grandes = pdfs.filter((f) => f.size > limiteBytes);
+    if (grandes.length) toast.error(`Maior que o limite de ${limiteMb} MB, não enviado: ${grandes.map((f) => f.name).join(", ")}`);
+    const validos = pdfs.filter((f) => f.size <= limiteBytes);
     if (!validos.length) return;
     // Sempre passa pelo popup: nome (opcional), player e tema — já com a pasta aberta/de destino escolhida
     setPendentes({ arquivos: validos, pastaId });
@@ -559,7 +563,7 @@ function PdfsPage() {
                     <span>
                       <span className="font-medium text-foreground">Arraste PDFs aqui</span> ou clique para escolher do computador
                     </span>
-                    {!pdfsDaPasta.length && <span className="text-xs">Até 50 MB por arquivo. Pode soltar vários de uma vez.</span>}
+                    {!pdfsDaPasta.length && <span className="text-xs">Até {limiteMb} MB por arquivo. Pode soltar vários de uma vez.</span>}
                   </button>
                 </section>
               ) : (

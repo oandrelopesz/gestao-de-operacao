@@ -21,18 +21,25 @@ export interface PdfBiblioteca {
 }
 
 export const PDF_BUCKET = "pdfs";
-/** Mesmo limite configurado no bucket (migration 20260923120000_pdfs.sql) */
-export const PDF_TAMANHO_MAX = 50 * 1024 * 1024;
+/**
+ * Limite padrão por arquivo. O valor em uso vem de app_config.pdf_tamanho_max_mb (Admin → PDFs).
+ * O bucket (migration 20260923120000_pdfs.sql) aceita até 50 MB: acima disso, ajuste também o Storage.
+ */
+export const PDF_TAMANHO_MAX_PADRAO_MB = 50;
+
+export const mbParaBytes = (mb: number) => mb * 1024 * 1024;
+
+const msgLimite = (limiteMb: number) => `Arquivo maior que o limite de ${limiteMb} MB.`;
 
 const RODAR_MIGRATION = "Rode supabase/migrations/20260923120000_pdfs.sql no SQL Editor.";
 
-export function mensagemErroPdf(error: unknown): string {
+export function mensagemErroPdf(error: unknown, limiteMb: number = PDF_TAMANHO_MAX_PADRAO_MB): string {
   const msg = (error as { message?: string })?.message || String(error || "Erro desconhecido");
   if (/pdf_pastas|pdfs/i.test(msg) && /schema cache|does not exist|not find/i.test(msg)) {
     return `As tabelas da aba PDFs ainda não existem. ${RODAR_MIGRATION}`;
   }
   if (/bucket not found/i.test(msg)) return `O armazenamento de PDFs ainda não foi criado. ${RODAR_MIGRATION}`;
-  if (/maximum allowed size|too large|413/i.test(msg)) return "Arquivo maior que o limite de 50 MB.";
+  if (/maximum allowed size|too large|413/i.test(msg)) return msgLimite(limiteMb);
   if (/mime type/i.test(msg)) return "Só é possível guardar arquivos PDF.";
   return msg;
 }
@@ -125,8 +132,9 @@ export async function enviarPdf(
   pastaId: string,
   meta: { nome?: string; player?: string },
   onProgresso?: (fracao: number) => void,
+  limiteMb: number = PDF_TAMANHO_MAX_PADRAO_MB,
 ): Promise<PdfArquivo> {
-  if (arquivo.size > PDF_TAMANHO_MAX) throw new Error("Arquivo maior que o limite de 50 MB.");
+  if (arquivo.size > mbParaBytes(limiteMb)) throw new Error(msgLimite(limiteMb));
   const caminho = novoCaminho();
 
   const url = import.meta.env.VITE_SUPABASE_URL as string;
@@ -153,7 +161,7 @@ export async function enviarPdf(
       } catch {
         // resposta sem JSON: fica a mensagem com o status
       }
-      if (xhr.status === 413) msg = "Arquivo maior que o limite de 50 MB.";
+      if (xhr.status === 413) msg = msgLimite(limiteMb);
       reject(new Error(msg));
     };
     xhr.onerror = () => reject(new Error("Falha de rede ao enviar o arquivo"));

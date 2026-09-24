@@ -208,7 +208,7 @@ export interface PdfParaEnviar {
 }
 
 interface EnviarPdfsDialogProps {
-  /** Arquivos já validados (só PDFs, até 50 MB); null = fechado */
+  /** Arquivos já validados (só PDFs, dentro do limite de tamanho); null = fechado */
   arquivos: File[] | null;
   /** Pasta aberta ou pasta onde os arquivos foram soltos */
   pastaInicial: string | null;

@@ -1,9 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Building2, Plus, Pencil, Trash2, ArrowUp, ArrowDown, Check, Sun, Moon,
   Columns3, Database, Download, AlertTriangle, EyeOff, Eye, RefreshCw,
-  Megaphone, GraduationCap,
+  Megaphone, GraduationCap, Lightbulb, Bookmark, Book,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -34,8 +35,33 @@ import { SwipeAdminCard } from "@/components/swipe/SwipeAdminCard";
 import { SwipeNichosAdminCard } from "@/components/swipe/SwipeNichosAdminCard";
 import { PdfsAdminCard } from "@/components/pdfs/PdfsAdminCard";
 import { MenuAdminCard } from "@/components/admin/MenuAdminCard";
+import { OnboardingAdminSecao } from "@/components/admin/OnboardingAdminSecao";
+import { RoadmapAdminSecao } from "@/components/admin/RoadmapAdminSecao";
+import { PdfsLimiteCard } from "@/components/admin/PdfsLimiteCard";
+
+// Seções do Admin, uma por aba do sistema (?secao= na URL)
+const SECOES = [
+  { id: "geral", label: "Geral" },
+  { id: "demandas", label: "Demandas" },
+  { id: "ideias", label: "Ideias" },
+  { id: "onboarding", label: "Onboarding" },
+  { id: "roadmap", label: "Roadmap" },
+  { id: "pdfs", label: "PDFs" },
+  { id: "ver-depois", label: "Ver depois" },
+  { id: "livros", label: "Livros" },
+  { id: "cursos", label: "Cursos" },
+  { id: "swipe", label: "Swipe file" },
+  { id: "habilidades", label: "Habilidades" },
+] as const;
+
+type Secao = (typeof SECOES)[number]["id"];
+
+const ehSecao = (v: unknown): v is Secao => SECOES.some((s) => s.id === v);
 
 export const Route = createFileRoute("/_authenticated/admin")({
+  validateSearch: (search: Record<string, unknown>): { secao?: Secao } => ({
+    secao: ehSecao(search.secao) ? search.secao : undefined,
+  }),
   component: AdminPage,
 });
 
@@ -91,6 +117,8 @@ function traduzErroCategoria(e: any): string {
 }
 
 function AdminPage() {
+  const navigate = useNavigate({ from: "/admin" });
+  const secao: Secao = Route.useSearch().secao ?? "geral";
   const { todasAgencias, reload: reloadAgencias } = useAgencias();
   const { colunas, reload: reloadColunas } = useDemandaColunas();
   const { todasPlataformas, reload: reloadPlataformas } = usePlataformas();
@@ -548,324 +576,385 @@ function AdminPage() {
   const plataformasOrdenadas = [...todasPlataformas].sort((a, b) => a.ordem - b.ordem);
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
-        <p className="text-muted-foreground">Configurações gerais: agências, plataformas, categorias de cursos, habilidades, colunas do Kanban, aparência e dados.</p>
+        <p className="text-muted-foreground">Configurações do sistema, organizadas pela aba que cada uma afeta.</p>
       </div>
 
-      <MenuAdminCard />
-
-      {/* Agências */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2"><Building2 size={18} /> Agências</CardTitle>
-            <CardDescription>Aparecem nos filtros de Clientes, Saldo, NPS, Prospecção e Planilha/CRM. Renomear reflete em todas as abas.</CardDescription>
-          </div>
-          <Button size="sm" className="gap-2 shrink-0" onClick={() => setAgenciaDialog({ mode: "create", nome: "", hex: AGENCIA_COLORS[todasAgencias.length % AGENCIA_COLORS.length] })}>
-            <Plus size={14} /> Nova agência
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="divide-y rounded-md border">
-            {agenciasOrdenadas.map((a, idx) => {
-              const qtd = clientesPorAgencia[a.id] || 0;
-              return (
-                <div key={a.id} className={cn("flex items-center gap-3 px-3 py-2", !a.ativa && "opacity-50")}>
-                  <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ backgroundColor: a.hex }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{a.label}</span>
-                      {!a.ativa && <Badge variant="outline" className="text-[10px]">Oculta</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      <span className="font-mono">{a.id}</span> · {qtd} {qtd === 1 ? "cliente" : "clientes"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => moveAgencia(a, -1)} title="Subir">
-                      <ArrowUp size={14} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === agenciasOrdenadas.length - 1} onClick={() => moveAgencia(a, 1)} title="Descer">
-                      <ArrowDown size={14} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleAtiva(a)} title={a.ativa ? "Ocultar dos filtros" : "Reativar"}>
-                      {a.ativa ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAgenciaDialog({ mode: "edit", id: a.id, nome: a.label, hex: a.hex })} title="Editar">
-                      <Pencil size={14} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      disabled={qtd > 0}
-                      onClick={() => setAgenciaToDelete(a)}
-                      title={qtd > 0 ? "Mova os clientes antes de excluir" : "Excluir"}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-            {agenciasOrdenadas.length === 0 && (
-              <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma agência cadastrada.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Plataformas de ads */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2"><Megaphone size={18} /> Plataformas de ads</CardTitle>
-            <CardDescription>Opções do campo "Plataformas de mídia" nos cadastros de cliente e saldo. Renomear atualiza os clientes que já usam a plataforma.</CardDescription>
-          </div>
-          <Button size="sm" className="gap-2 shrink-0" onClick={() => setPlataformaDialog({ mode: "create", nome: "" })}>
-            <Plus size={14} /> Nova plataforma
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="divide-y rounded-md border">
-            {plataformasOrdenadas.map((p, idx) => {
-              const qtd = clientesPorPlataforma[p.nome] || 0;
-              return (
-                <div key={p.id} className={cn("flex items-center gap-3 px-3 py-2", !p.ativa && "opacity-50")}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{p.nome}</span>
-                      {!p.ativa && <Badge variant="outline" className="text-[10px]">Oculta</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{qtd} {qtd === 1 ? "cliente usa" : "clientes usam"}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => movePlataforma(p, -1)} title="Subir">
-                      <ArrowUp size={14} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === plataformasOrdenadas.length - 1} onClick={() => movePlataforma(p, 1)} title="Descer">
-                      <ArrowDown size={14} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => togglePlataforma(p)} title={p.ativa ? "Ocultar dos formulários" : "Reativar"}>
-                      {p.ativa ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPlataformaDialog({ mode: "edit", id: p.id, nome: p.nome, nomeOriginal: p.nome })} title="Renomear">
-                      <Pencil size={14} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPlataformaToDelete(p)} title="Excluir">
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-            {plataformasOrdenadas.length === 0 && (
-              <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma plataforma. Clique em "Nova plataforma" para criar a primeira.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Categorias de cursos */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2"><GraduationCap size={18} /> Categorias de cursos</CardTitle>
-            <CardDescription>Abas da tela de Cursos, nesta ordem. Também dá para criar uma categoria direto no cadastro do curso.</CardDescription>
-          </div>
-          <Button size="sm" className="gap-2 shrink-0" onClick={() => setCategoriaDialog({ mode: "create", nome: "", hex: CATEGORIA_COLORS[categorias.length % CATEGORIA_COLORS.length] })}>
-            <Plus size={14} /> Nova categoria
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="divide-y rounded-md border">
-            {categorias.map((c, idx) => {
-              const qtd = cursosPorCategoria[c.id] || 0;
-              return (
-                <div key={c.id} className="flex items-center gap-3 px-3 py-2">
-                  <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ backgroundColor: corDaCategoria(c.cor) }} />
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium truncate block">{c.nome}</span>
-                    <p className="text-xs text-muted-foreground">{qtd} {qtd === 1 ? "curso" : "cursos"}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => moveCategoria(c, -1)} title="Subir">
-                      <ArrowUp size={14} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === categorias.length - 1} onClick={() => moveCategoria(c, 1)} title="Descer">
-                      <ArrowDown size={14} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCategoriaDialog({ mode: "edit", id: c.id, nome: c.nome, hex: corDaCategoria(c.cor) })} title="Editar">
-                      <Pencil size={14} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setCategoriaToDelete(c)} title="Excluir">
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-            {categorias.length === 0 && (
-              <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma categoria. Clique em "Nova categoria" para criar a primeira.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <HabilidadesAdminCard />
-
-      <SwipeAdminCard />
-
-      <SwipeNichosAdminCard />
-
-      <PdfsAdminCard />
-
-      {/* Colunas do Kanban */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2"><Columns3 size={18} /> Colunas do Kanban (Demandas)</CardTitle>
-            <CardDescription>Crie, renomeie e escolha a cor das colunas. Para mover demandas entre colunas, use a aba Demandas.</CardDescription>
-            <div className="flex items-center gap-2 pt-2">
-              <Switch
-                checked={viradaAtiva}
-                onCheckedChange={(v) => { salvarViradaAtiva(v).catch(() => toast.error("Erro ao salvar")); }}
-              />
-              <span className="text-xs text-muted-foreground">Virada automática à meia-noite (amanhã → hoje, depois de amanhã → amanhã)</span>
-            </div>
-          </div>
-          <Button size="sm" className="gap-2 shrink-0" onClick={() => setColunaDialog({ mode: "create", titulo: "", hex: COLUMN_COLORS[colunas.length % COLUMN_COLORS.length], regra: "nenhuma", dias: [] })}>
-            <Plus size={14} /> Nova coluna
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="divide-y rounded-md border">
-            {colunas.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 px-3 py-2">
-                <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ backgroundColor: c.hex }} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium truncate">{c.title}</span>
-                    {c.sistema && <Badge variant="outline" className="text-[10px]">Fixa</Badge>}
-                  </div>
-                  <p className="text-xs text-muted-foreground font-mono">{c.id}</p>
-                  {textoRegra(c.regra, c.dias) && <p className="text-xs text-muted-foreground">{textoRegra(c.regra, c.dias)}</p>}
-                </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setColunaDialog({ mode: "edit", id: c.id, titulo: c.title, hex: c.hex, regra: c.regra, dias: c.dias })} title="Editar">
-                  <Pencil size={14} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive hover:text-destructive"
-                  disabled={c.sistema}
-                  onClick={() => setColunaToDelete(c)}
-                  title={c.sistema ? "Coluna fixa do sistema" : "Excluir coluna e suas demandas"}
-                >
-                  <Trash2 size={14} />
-                </Button>
-              </div>
+      <Tabs value={secao} onValueChange={(v) => navigate({ search: { secao: v as Secao }, replace: true })}>
+        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+          <TabsList className="w-max justify-start">
+            {SECOES.map((s) => (
+              <TabsTrigger key={s.id} value={s.id}>{s.label}</TabsTrigger>
             ))}
-            {colunas.length === 0 && (
-              <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma coluna. Clique em "Nova coluna" para criar a primeira.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          </TabsList>
+        </div>
 
-      {/* Aparência */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Sun size={18} /> Aparência</CardTitle>
-          <CardDescription>O botão no topo da tela também alterna o tema.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex gap-2">
-          <Button variant={theme === "light" ? "default" : "outline"} className="gap-2" onClick={() => setTheme("light")}>
-            <Sun size={14} /> Claro
-          </Button>
-          <Button variant={theme === "dark" ? "default" : "outline"} className="gap-2" onClick={() => setTheme("dark")}>
-            <Moon size={14} /> Escuro
-          </Button>
-        </CardContent>
-      </Card>
+        <div className="mt-4">
+          <TabsContent value="geral" className="mt-0 space-y-6">
+            <MenuAdminCard />
 
-      {/* Dados */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2"><Database size={18} /> Dados</CardTitle>
-            <CardDescription>Volume atual por tabela e exportação.</CardDescription>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <Button variant="outline" size="sm" className="gap-2" onClick={loadCounts}>
-              <RefreshCw size={14} /> Atualizar
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={exportClientesCsv}>
-              <Download size={14} /> Exportar clientes (CSV)
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              ["clientes", "Clientes"],
-              ["demandas", "Demandas"],
-              ["nps_avaliacoes", "Avaliações NPS"],
-              ["saldo_ads", "Registros de saldo"],
-              ["recargas", "Recargas"],
-              ["prospeccao", "Leads"],
-              ["acessos_clientes", "Acessos (Planilha/CRM)"],
-            ].map(([key, label]) => (
-              <div key={key} className="rounded-md border p-3">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-                <p className="numeric text-xl font-semibold">{counts[key] === undefined ? "…" : counts[key] === null ? "—" : counts[key]}</p>
-              </div>
-            ))}
-          </div>
-          {totalDemandasPorColuna === null && (
-            <p className="text-xs text-muted-foreground mt-3">Algumas tabelas ainda não existem no banco — aplique as migrations pendentes.</p>
-          )}
-        </CardContent>
-      </Card>
+            {/* Agências */}
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Building2 size={18} /> Agências</CardTitle>
+                  <CardDescription>Aparecem nos filtros de Clientes, Saldo, NPS, Prospecção e Planilha/CRM. Renomear reflete em todas as abas.</CardDescription>
+                </div>
+                <Button size="sm" className="gap-2 shrink-0" onClick={() => setAgenciaDialog({ mode: "create", nome: "", hex: AGENCIA_COLORS[todasAgencias.length % AGENCIA_COLORS.length] })}>
+                  <Plus size={14} /> Nova agência
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="divide-y rounded-md border">
+                  {agenciasOrdenadas.map((a, idx) => {
+                    const qtd = clientesPorAgencia[a.id] || 0;
+                    return (
+                      <div key={a.id} className={cn("flex items-center gap-3 px-3 py-2", !a.ativa && "opacity-50")}>
+                        <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ backgroundColor: a.hex }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate">{a.label}</span>
+                            {!a.ativa && <Badge variant="outline" className="text-[10px]">Oculta</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-mono">{a.id}</span> · {qtd} {qtd === 1 ? "cliente" : "clientes"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => moveAgencia(a, -1)} title="Subir">
+                            <ArrowUp size={14} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === agenciasOrdenadas.length - 1} onClick={() => moveAgencia(a, 1)} title="Descer">
+                            <ArrowDown size={14} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleAtiva(a)} title={a.ativa ? "Ocultar dos filtros" : "Reativar"}>
+                            {a.ativa ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAgenciaDialog({ mode: "edit", id: a.id, nome: a.label, hex: a.hex })} title="Editar">
+                            <Pencil size={14} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            disabled={qtd > 0}
+                            onClick={() => setAgenciaToDelete(a)}
+                            title={qtd > 0 ? "Mova os clientes antes de excluir" : "Excluir"}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {agenciasOrdenadas.length === 0 && (
+                    <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma agência cadastrada.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-      {/* Zona de perigo */}
-      <Card className="border-destructive/40">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive"><AlertTriangle size={18} /> Zona de perigo</CardTitle>
-          <CardDescription>Ações irreversíveis, sempre com confirmação digitada. Agências e acessos (Planilha/CRM) nunca são afetados.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3">
-            <div>
-              <p className="font-medium">Apagar todos os clientes</p>
-              <p className="text-xs text-muted-foreground">Remove os {counts.clientes ?? "…"} clientes e, com eles, avaliações NPS, saldos/recargas e pendências. Demandas e leads ficam, apenas desvinculados do cliente.</p>
-            </div>
-            <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeTarget("clientes"); }}>
-              Apagar clientes
-            </Button>
-          </div>
-          <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3">
-            <div>
-              <p className="font-medium">Apagar todas as demandas</p>
-              <p className="text-xs text-muted-foreground">Esvazia todas as colunas do Kanban ({counts.demandas ?? "…"} demandas, incluindo recorrentes). As colunas continuam.</p>
-            </div>
-            <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeTarget("demandas"); }}>
-              Apagar demandas
-            </Button>
-          </div>
-          <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3">
-            <div>
-              <p className="font-medium">Apagar todas as colunas do Kanban</p>
-              <p className="text-xs text-muted-foreground">Remove as {colunas.length} colunas da aba Demandas e as demandas dentro delas. Depois, crie colunas novas pelo botão "Nova coluna".</p>
-            </div>
-            <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeTarget("colunas"); }}>
-              Apagar colunas
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            {/* Plataformas de ads */}
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Megaphone size={18} /> Plataformas de ads</CardTitle>
+                  <CardDescription>Opções do campo "Plataformas de mídia" nos cadastros de cliente e saldo. Renomear atualiza os clientes que já usam a plataforma.</CardDescription>
+                </div>
+                <Button size="sm" className="gap-2 shrink-0" onClick={() => setPlataformaDialog({ mode: "create", nome: "" })}>
+                  <Plus size={14} /> Nova plataforma
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="divide-y rounded-md border">
+                  {plataformasOrdenadas.map((p, idx) => {
+                    const qtd = clientesPorPlataforma[p.nome] || 0;
+                    return (
+                      <div key={p.id} className={cn("flex items-center gap-3 px-3 py-2", !p.ativa && "opacity-50")}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate">{p.nome}</span>
+                            {!p.ativa && <Badge variant="outline" className="text-[10px]">Oculta</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{qtd} {qtd === 1 ? "cliente usa" : "clientes usam"}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => movePlataforma(p, -1)} title="Subir">
+                            <ArrowUp size={14} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === plataformasOrdenadas.length - 1} onClick={() => movePlataforma(p, 1)} title="Descer">
+                            <ArrowDown size={14} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => togglePlataforma(p)} title={p.ativa ? "Ocultar dos formulários" : "Reativar"}>
+                            {p.ativa ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPlataformaDialog({ mode: "edit", id: p.id, nome: p.nome, nomeOriginal: p.nome })} title="Renomear">
+                            <Pencil size={14} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPlataformaToDelete(p)} title="Excluir">
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {plataformasOrdenadas.length === 0 && (
+                    <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma plataforma. Clique em "Nova plataforma" para criar a primeira.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Aparência */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Sun size={18} /> Aparência</CardTitle>
+                <CardDescription>O botão no topo da tela também alterna o tema.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex gap-2">
+                <Button variant={theme === "light" ? "default" : "outline"} className="gap-2" onClick={() => setTheme("light")}>
+                  <Sun size={14} /> Claro
+                </Button>
+                <Button variant={theme === "dark" ? "default" : "outline"} className="gap-2" onClick={() => setTheme("dark")}>
+                  <Moon size={14} /> Escuro
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Dados */}
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Database size={18} /> Dados</CardTitle>
+                  <CardDescription>Volume atual por tabela e exportação.</CardDescription>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button variant="outline" size="sm" className="gap-2" onClick={loadCounts}>
+                    <RefreshCw size={14} /> Atualizar
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={exportClientesCsv}>
+                    <Download size={14} /> Exportar clientes (CSV)
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    ["clientes", "Clientes"],
+                    ["demandas", "Demandas"],
+                    ["nps_avaliacoes", "Avaliações NPS"],
+                    ["saldo_ads", "Registros de saldo"],
+                    ["recargas", "Recargas"],
+                    ["prospeccao", "Leads"],
+                    ["acessos_clientes", "Acessos (Planilha/CRM)"],
+                  ].map(([key, label]) => (
+                    <div key={key} className="rounded-md border p-3">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+                      <p className="numeric text-xl font-semibold">{counts[key] === undefined ? "…" : counts[key] === null ? "—" : counts[key]}</p>
+                    </div>
+                  ))}
+                </div>
+                {totalDemandasPorColuna === null && (
+                  <p className="text-xs text-muted-foreground mt-3">Algumas tabelas ainda não existem no banco — aplique as migrations pendentes.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Zona de perigo */}
+            <Card className="border-destructive/40">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive"><AlertTriangle size={18} /> Zona de perigo</CardTitle>
+                <CardDescription>Ações irreversíveis, sempre com confirmação digitada. Agências e acessos (Planilha/CRM) nunca são afetados.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3">
+                  <div>
+                    <p className="font-medium">Apagar todos os clientes</p>
+                    <p className="text-xs text-muted-foreground">Remove os {counts.clientes ?? "…"} clientes e, com eles, avaliações NPS, saldos/recargas e pendências. Demandas e leads ficam, apenas desvinculados do cliente.</p>
+                  </div>
+                  <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeTarget("clientes"); }}>
+                    Apagar clientes
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3">
+                  <div>
+                    <p className="font-medium">Apagar todas as demandas</p>
+                    <p className="text-xs text-muted-foreground">Esvazia todas as colunas do Kanban ({counts.demandas ?? "…"} demandas, incluindo recorrentes). As colunas continuam.</p>
+                  </div>
+                  <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeTarget("demandas"); }}>
+                    Apagar demandas
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3">
+                  <div>
+                    <p className="font-medium">Apagar todas as colunas do Kanban</p>
+                    <p className="text-xs text-muted-foreground">Remove as {colunas.length} colunas da aba Demandas e as demandas dentro delas. Depois, crie colunas novas pelo botão "Nova coluna".</p>
+                  </div>
+                  <Button variant="destructive" size="sm" className="shrink-0" onClick={() => { setWipeConfirm(""); setWipeTarget("colunas"); }}>
+                    Apagar colunas
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="demandas" className="mt-0 space-y-6">
+            {/* Colunas do Kanban */}
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Columns3 size={18} /> Colunas do Kanban (Demandas)</CardTitle>
+                  <CardDescription>Crie, renomeie e escolha a cor das colunas. Para mover demandas entre colunas, use a aba Demandas.</CardDescription>
+                  <div className="flex items-center gap-2 pt-2">
+                    <Switch
+                      checked={viradaAtiva}
+                      onCheckedChange={(v) => { salvarViradaAtiva(v).catch(() => toast.error("Erro ao salvar")); }}
+                    />
+                    <span className="text-xs text-muted-foreground">Virada automática à meia-noite (amanhã → hoje, depois de amanhã → amanhã)</span>
+                  </div>
+                </div>
+                <Button size="sm" className="gap-2 shrink-0" onClick={() => setColunaDialog({ mode: "create", titulo: "", hex: COLUMN_COLORS[colunas.length % COLUMN_COLORS.length], regra: "nenhuma", dias: [] })}>
+                  <Plus size={14} /> Nova coluna
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="divide-y rounded-md border">
+                  {colunas.map((c) => (
+                    <div key={c.id} className="flex items-center gap-3 px-3 py-2">
+                      <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ backgroundColor: c.hex }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">{c.title}</span>
+                          {c.sistema && <Badge variant="outline" className="text-[10px]">Fixa</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground font-mono">{c.id}</p>
+                        {textoRegra(c.regra, c.dias) && <p className="text-xs text-muted-foreground">{textoRegra(c.regra, c.dias)}</p>}
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setColunaDialog({ mode: "edit", id: c.id, titulo: c.title, hex: c.hex, regra: c.regra, dias: c.dias })} title="Editar">
+                        <Pencil size={14} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        disabled={c.sistema}
+                        onClick={() => setColunaToDelete(c)}
+                        title={c.sistema ? "Coluna fixa do sistema" : "Excluir coluna e suas demandas"}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  ))}
+                  {colunas.length === 0 && (
+                    <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma coluna. Clique em "Nova coluna" para criar a primeira.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="ideias" className="mt-0 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Lightbulb size={18} /> Categorias de ideias</CardTitle>
+                  <CardDescription>Categorias de ideias chegam em seguida.</CardDescription>
+                </CardHeader>
+              </Card>
+          </TabsContent>
+
+          <TabsContent value="onboarding" className="mt-0 space-y-6">
+            <OnboardingAdminSecao />
+          </TabsContent>
+
+          <TabsContent value="roadmap" className="mt-0 space-y-6">
+            <RoadmapAdminSecao />
+          </TabsContent>
+
+          <TabsContent value="pdfs" className="mt-0 space-y-6">
+            <PdfsAdminCard />
+
+            <PdfsLimiteCard />
+          </TabsContent>
+
+          <TabsContent value="ver-depois" className="mt-0 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Bookmark size={18} /> Ver depois</CardTitle>
+                  <CardDescription>Em breve.</CardDescription>
+                </CardHeader>
+              </Card>
+          </TabsContent>
+
+          <TabsContent value="livros" className="mt-0 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Book size={18} /> Livros</CardTitle>
+                  <CardDescription>Em breve.</CardDescription>
+                </CardHeader>
+              </Card>
+          </TabsContent>
+
+          <TabsContent value="cursos" className="mt-0 space-y-6">
+            {/* Categorias de cursos */}
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><GraduationCap size={18} /> Categorias de cursos</CardTitle>
+                  <CardDescription>Abas da tela de Cursos, nesta ordem. Também dá para criar uma categoria direto no cadastro do curso.</CardDescription>
+                </div>
+                <Button size="sm" className="gap-2 shrink-0" onClick={() => setCategoriaDialog({ mode: "create", nome: "", hex: CATEGORIA_COLORS[categorias.length % CATEGORIA_COLORS.length] })}>
+                  <Plus size={14} /> Nova categoria
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="divide-y rounded-md border">
+                  {categorias.map((c, idx) => {
+                    const qtd = cursosPorCategoria[c.id] || 0;
+                    return (
+                      <div key={c.id} className="flex items-center gap-3 px-3 py-2">
+                        <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ backgroundColor: corDaCategoria(c.cor) }} />
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium truncate block">{c.nome}</span>
+                          <p className="text-xs text-muted-foreground">{qtd} {qtd === 1 ? "curso" : "cursos"}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => moveCategoria(c, -1)} title="Subir">
+                            <ArrowUp size={14} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={idx === categorias.length - 1} onClick={() => moveCategoria(c, 1)} title="Descer">
+                            <ArrowDown size={14} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCategoriaDialog({ mode: "edit", id: c.id, nome: c.nome, hex: corDaCategoria(c.cor) })} title="Editar">
+                            <Pencil size={14} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setCategoriaToDelete(c)} title="Excluir">
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {categorias.length === 0 && (
+                    <p className="px-3 py-6 text-sm text-muted-foreground text-center">Nenhuma categoria. Clique em "Nova categoria" para criar a primeira.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="swipe" className="mt-0 space-y-6">
+            <SwipeAdminCard />
+
+            <SwipeNichosAdminCard />
+          </TabsContent>
+
+          <TabsContent value="habilidades" className="mt-0 space-y-6">
+            <HabilidadesAdminCard />
+          </TabsContent>
+        </div>
+      </Tabs>
 
       {/* Dialog agência */}
       <Dialog open={!!agenciaDialog} onOpenChange={(o) => { if (!o) setAgenciaDialog(null); }}>
