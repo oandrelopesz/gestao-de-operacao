@@ -54,7 +54,15 @@ export async function baixar({ link, rede, dir, categoria }, deps = {}) {
   const capturarMidiaDaPagina = deps.capturarMidiaDaPagina || capturarMidiaDaPaginaReal;
   const pelaPagina = async () => {
     try {
-      return await capturarMidiaDaPagina({ link, dir, cookies, somenteVideo: /^video_/.test(categoria || "") }, { rodar, listarMidias });
+      // Player do YouTube embutido na página: usa o login do YouTube (cópia gravável, como acima)
+      let cookiesYoutube = rede === "youtube" ? cookies : null;
+      const youtubeOriginal = rede === "youtube" ? null : cookiesDe("youtube", deps.existeArquivo);
+      if (youtubeOriginal) {
+        const copia = `${dir}/.cookies-youtube.txt`;
+        const copiarCookies = deps.copiarCookies || (async (de, para) => { await copyFile(de, para); await chmod(para, 0o600); });
+        cookiesYoutube = await copiarCookies(youtubeOriginal, copia).then(() => copia).catch(() => youtubeOriginal);
+      }
+      return await capturarMidiaDaPagina({ link, dir, cookies, cookiesYoutube, somenteVideo: /^video_/.test(categoria || "") }, { rodar, listarMidias });
     } catch (e) {
       if (e?.name === "JobPausado") throw e;
       erros.push(`página: ${String(e?.message || e).slice(0, 200)}`);

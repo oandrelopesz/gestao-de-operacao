@@ -12,6 +12,7 @@ import { listarMidias as listarReal } from "../tmp.js";
 import { ehUrlDeVideo, interagirComoUsuario } from "./lp.js";
 
 const MIN_VIDEO = 100 * 1024;
+const DO_YOUTUBE = /youtube\.com|youtu\.be/i;
 const MIN_IMAGEM = 30 * 1024;
 const EXT_DO_TIPO = {
   "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm",
@@ -38,10 +39,12 @@ export function escolherMidiaDaPagina({ videos, imagens, embeds }, { somenteVide
 }
 
 /** Mesmo contrato de `baixar` em download.js: { arquivos, modo }. */
-export async function capturarMidiaDaPagina({ link, dir, cookies = null, somenteVideo = false }, deps = {}) {
+// `cookiesYoutube`: player do YouTube embutido (anúncio do Google Ads, LP) usa o login do YouTube,
+// não o da página — sem ele a VPS toma "Sign in to confirm you're not a bot".
+export async function capturarMidiaDaPagina({ link, dir, cookies = null, cookiesYoutube = null, somenteVideo = false }, deps = {}) {
   const abrirPagina = deps.abrirPagina || abrirPaginaReal;
   const gravar = deps.gravar || ((caminho, corpo) => writeFile(caminho, corpo));
-  const baixarComYtDlp = deps.baixarComYtDlp || ((url) => baixarComYtDlpReal(url, dir, cookies, deps));
+  const baixarComYtDlp = deps.baixarComYtDlp || ((url, comCookies) => baixarComYtDlpReal(url, dir, comCookies, deps));
 
   const pagina = await abrirPagina(link);
   try {
@@ -52,10 +55,11 @@ export async function capturarMidiaDaPagina({ link, dir, cookies = null, somente
         : "Nenhum vídeo ou imagem aproveitável na página (pode exigir login ou ter sido removida)");
     }
     if (escolha.tipo === "ytdlp") {
-      const arquivos = await baixarComYtDlp(escolha.url);
+      const doYoutube = DO_YOUTUBE.test(escolha.url);
+      const arquivos = await baixarComYtDlp(escolha.url, doYoutube ? cookiesYoutube || cookies : cookies);
       if (!arquivos.length) {
-        throw new Error(/youtube\.com|youtu\.be/i.test(escolha.url)
-          ? "O vídeo é do YouTube, que bloqueia downloads do servidor. Baixe manualmente e use \"Enviar arquivo\" no card"
+        throw new Error(doYoutube
+          ? "O vídeo é do YouTube e ele não liberou o download (os cookies do YouTube no servidor podem ter vencido). Baixe manualmente e use \"Enviar arquivo\" no card"
           : "A página tem um player de vídeo, mas o yt-dlp não conseguiu baixar");
       }
       return { arquivos, modo: arquivos.length > 1 ? "carrossel" : "unico" };

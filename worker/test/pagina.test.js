@@ -79,6 +79,19 @@ test("escolherMidiaDaPagina: somenteVideo não aceita imagem (miniatura não é 
   assert.equal(r, null);
 });
 
+test("capturarMidiaDaPagina: player do YouTube usa os cookies do YouTube; outro player, os da página", async () => {
+  const usados = [];
+  const deps = (embed) => ({
+    abrirPagina: async () => ({ colhido: () => ({ videos: [], imagens: [], embeds: [embed] }), fechar: async () => {} }),
+    baixarComYtDlp: async (url, comCookies) => { usados.push(comCookies); return ["/tmp/j/v.mp4"]; },
+  });
+  const args = { link: "https://adstransparency.google.com/x", dir: "/tmp/j", cookies: "/tmp/j/.cookies.txt", cookiesYoutube: "/tmp/j/.cookies-youtube.txt" };
+  await capturarMidiaDaPagina(args, deps("https://www.youtube.com/embed/abc"));
+  await capturarMidiaDaPagina(args, deps("https://player.vimeo.com/video/1"));
+  await capturarMidiaDaPagina({ ...args, cookiesYoutube: null }, deps("https://youtu.be/abc"));
+  assert.deepEqual(usados, ["/tmp/j/.cookies-youtube.txt", "/tmp/j/.cookies.txt", "/tmp/j/.cookies.txt"]);
+});
+
 test("capturarMidiaDaPagina: vídeo do YouTube que não baixa explica o motivo e o que fazer", async () => {
   await assert.rejects(
     () => capturarMidiaDaPagina({ link: "https://adstransparency.google.com/x", dir: "/tmp/j" }, {
