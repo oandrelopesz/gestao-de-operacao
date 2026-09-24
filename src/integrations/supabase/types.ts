@@ -730,6 +730,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ideia_categorias: {
+        Row: {
+          created_at: string
+          hex: string
+          id: string
+          label: string
+          ordem: number
+          sistema: boolean
+        }
+        Insert: {
+          created_at?: string
+          hex?: string
+          id: string
+          label: string
+          ordem?: number
+          sistema?: boolean
+        }
+        Update: {
+          created_at?: string
+          hex?: string
+          id?: string
+          label?: string
+          ordem?: number
+          sistema?: boolean
+        }
+        Relationships: []
+      }
       ideias: {
         Row: {
           agencia: string | null

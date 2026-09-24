@@ -8,7 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAgencias } from "@/lib/agencias";
 import { salvarIdeia, mensagemErro, type Ideia } from "@/lib/ideias";
-import { TIPOS_IDEIA, limparLinks, type TipoIdeia } from "@/lib/ideiasTexto";
+import { CATEGORIA_CLIENTE, limparLinks, type TipoIdeia } from "@/lib/ideiasTexto";
+import { useCategoriasIdeias, criarCategoriaIdeia, CORES_CATEGORIAS_IDEIAS } from "@/lib/ideiasCategorias";
+import { traduzErroCategoria } from "@/components/ideias/CategoriasIdeiasDialog";
+import { cn } from "@/lib/utils";
+
+const NOVA_CATEGORIA = "__nova_categoria";
 import { toast } from "sonner";
 
 interface Props {
@@ -20,7 +25,11 @@ interface Props {
 
 export function IdeiaDialog({ state, clientes, onClose, onSaved }: Props) {
   const { agencias } = useAgencias();
+  const { categorias } = useCategoriasIdeias();
   const [tipo, setTipo] = useState<TipoIdeia>("este_sistema");
+  // Mini-form inline da opção "+ Nova categoria…"
+  const [novaCat, setNovaCat] = useState<{ label: string; hex: string } | null>(null);
+  const [criandoCat, setCriandoCat] = useState(false);
   const [agencia, setAgencia] = useState("");
   const [clienteId, setClienteId] = useState("");
   const [titulo, setTitulo] = useState("");
@@ -31,7 +40,8 @@ export function IdeiaDialog({ state, clientes, onClose, onSaved }: Props) {
   useEffect(() => {
     if (!state) return;
     const i = state.ideia;
-    setTipo(i?.tipo || "este_sistema");
+    setTipo(i?.tipo || categorias.find((c) => c.id !== CATEGORIA_CLIENTE)?.id || categorias[0]?.id || "este_sistema");
+    setNovaCat(null);
     setAgencia(i?.agencia || "");
     setClienteId(i?.cliente_id || "");
     setTitulo(i?.titulo || "");
@@ -43,6 +53,36 @@ export function IdeiaDialog({ state, clientes, onClose, onSaved }: Props) {
 
   const setLink = (idx: number, v: string) => setLinks((prev) => prev.map((l, i) => (i === idx ? v : l)));
   const removerLink = (idx: number) => setLinks((prev) => prev.filter((_, i) => i !== idx));
+
+  const escolherTipo = (v: string) => {
+    if (v === NOVA_CATEGORIA) {
+      setNovaCat({ label: "", hex: CORES_CATEGORIAS_IDEIAS[categorias.length % CORES_CATEGORIAS_IDEIAS.length] });
+      return;
+    }
+    setTipo(v);
+    if (v !== CATEGORIA_CLIENTE) { setAgencia(""); setClienteId(""); }
+  };
+
+  const criarCategoria = async () => {
+    if (!novaCat) return;
+    const label = novaCat.label.trim();
+    if (!label) { toast.error("Informe o nome da categoria"); return; }
+    if (categorias.some((c) => c.label.toLowerCase() === label.toLowerCase())) {
+      toast.error("Já existe uma categoria com esse nome");
+      return;
+    }
+    setCriandoCat(true);
+    try {
+      const nova = await criarCategoriaIdeia(label, novaCat.hex);
+      escolherTipo(nova.id);
+      setNovaCat(null);
+      toast.success(`Categoria "${nova.label}" criada`);
+    } catch (e) {
+      toast.error(traduzErroCategoria(e));
+    } finally {
+      setCriandoCat(false);
+    }
+  };
 
   const save = async () => {
     if (!titulo.trim()) { toast.error("Dê um nome para a ideia"); return; }
@@ -81,10 +121,10 @@ export function IdeiaDialog({ state, clientes, onClose, onSaved }: Props) {
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save(); }}>
           <div className="space-y-2">
             <Label htmlFor="ideia-tipo">Tipo</Label>
-            <Select value={tipo} onValueChange={(v) => { setTipo(v as TipoIdeia); if (v !== "cliente") { setAgencia(""); setClienteId(""); } }}>
+            <Select value={tipo} onValueChange={escolherTipo}>
               <SelectTrigger id="ideia-tipo"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {TIPOS_IDEIA.map((t) => (
+                {categorias.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
                     <span className="inline-flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.hex }} />
@@ -92,11 +132,46 @@ export function IdeiaDialog({ state, clientes, onClose, onSaved }: Props) {
                     </span>
                   </SelectItem>
                 ))}
+                <SelectItem value={NOVA_CATEGORIA} className="text-primary">
+                  <span className="inline-flex items-center gap-2"><Plus size={12} /> Nova categoria…</span>
+                </SelectItem>
               </SelectContent>
             </Select>
+            {novaCat && (
+              <div className="rounded-md border bg-muted/30 p-3 space-y-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="flex items-center gap-2">
+                  <Input
+                    autoFocus
+                    placeholder="Nome da nova categoria"
+                    value={novaCat.label}
+                    onChange={(e) => setNovaCat({ ...novaCat, label: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); criarCategoria(); } }}
+                  />
+                  <Button type="button" size="sm" onClick={criarCategoria} disabled={criandoCat}>
+                    {criandoCat ? "Criando..." : "Criar"}
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setNovaCat(null)} disabled={criandoCat}>Cancelar</Button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {CORES_CATEGORIAS_IDEIAS.map((hex) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      onClick={() => setNovaCat({ ...novaCat, hex })}
+                      className={cn(
+                        "h-5 w-5 rounded-full transition-transform hover:scale-110",
+                        novaCat.hex === hex && "ring-2 ring-offset-2 ring-offset-background ring-zinc-900 dark:ring-zinc-100",
+                      )}
+                      style={{ backgroundColor: hex }}
+                      title={hex}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {tipo === "cliente" && (
+          {tipo === CATEGORIA_CLIENTE && (
             <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-150">
               <div className="space-y-2">
                 <Label htmlFor="ideia-agencia">Agência</Label>

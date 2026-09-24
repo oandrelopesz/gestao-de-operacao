@@ -40,6 +40,7 @@ import { RoadmapAdminSecao } from "@/components/admin/RoadmapAdminSecao";
 import { PdfsLimiteCard } from "@/components/admin/PdfsLimiteCard";
 import { ColorPicker } from "@/components/admin/ColorPicker";
 import { VerDepoisTiposCard } from "@/components/admin/VerDepoisTiposCard";
+import { IdeiasCategoriasCard } from "@/components/admin/IdeiasCategoriasCard";
 import { LivrosMetaCard } from "@/components/admin/LivrosMetaCard";
 
 // Seções do Admin, uma por aba do sistema (?secao= na URL)
@@ -859,12 +860,7 @@ function AdminPage() {
           </TabsContent>
 
           <TabsContent value="ideias" className="mt-0 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Lightbulb size={18} /> Categorias de ideias</CardTitle>
-                <CardDescription>Categorias de ideias chegam em seguida.</CardDescription>
-              </CardHeader>
-            </Card>
+            <IdeiasCategoriasCard />
           </TabsContent>
 
           <TabsContent value="onboarding" className="mt-0 space-y-6">

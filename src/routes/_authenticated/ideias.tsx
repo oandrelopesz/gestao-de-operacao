@@ -16,7 +16,9 @@ import { EnviarParaDemandasDialog } from "@/components/ideias/EnviarParaDemandas
 import { fetchIdeias, excluirIdeia, marcarConcluida, mensagemErro, retirarDasDemandas, type Ideia } from "@/lib/ideias";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { TIPOS_IDEIA, tipoIdeiaMeta, filtrarIdeias, dominioDoLink, type SituacaoIdeia } from "@/lib/ideiasTexto";
+import { CATEGORIA_CLIENTE, tipoIdeiaMeta, filtrarIdeias, dominioDoLink, type SituacaoIdeia } from "@/lib/ideiasTexto";
+import { useCategoriasIdeias, EVENTO_CATEGORIAS_IDEIAS } from "@/lib/ideiasCategorias";
+import { CategoriasIdeiasDialog } from "@/components/ideias/CategoriasIdeiasDialog";
 import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
 import { loadClientesLite } from "@/lib/data";
 import { toast } from "sonner";
@@ -40,6 +42,20 @@ function IdeiasPage() {
   const [enviando, setEnviando] = useState<Ideia | null>(null);
   const [toDelete, setToDelete] = useState<Ideia | null>(null);
   const [retirando, setRetirando] = useState<Ideia | null>(null);
+  const { categorias } = useCategoriasIdeias();
+  const [gerenciandoCategorias, setGerenciandoCategorias] = useState(false);
+
+  // Categoria excluída: o filtro dela some, então volta para "Todas"
+  useEffect(() => {
+    if (filtroTipo !== "todos" && !categorias.some((c) => c.id === filtroTipo)) setFiltroTipo("todos");
+  }, [categorias, filtroTipo]);
+
+  // Exclusão de categoria move as ideias dela no banco: recarrega a lista a cada alteração de categorias
+  useEffect(() => {
+    const ouvir = () => { load(); };
+    window.addEventListener(EVENTO_CATEGORIAS_IDEIAS, ouvir);
+    return () => window.removeEventListener(EVENTO_CATEGORIAS_IDEIAS, ouvir);
+  }, []);
 
   const load = async () => {
     try {
@@ -161,20 +177,25 @@ function IdeiasPage() {
       )}
 
       <div className="flex flex-col gap-3">
-        <Tabs value={filtroTipo} onValueChange={setFiltroTipo}>
-          <TabsList className="w-full justify-start overflow-x-auto h-auto p-1 bg-muted/50">
-            <TabsTrigger value="todos" className="gap-2 shrink-0">
-              Todas <Badge variant="secondary" className="px-1.5 h-4 text-[10px] leading-none">{contagem.todos || 0}</Badge>
-            </TabsTrigger>
-            {TIPOS_IDEIA.map((t) => (
-              <TabsTrigger key={t.id} value={t.id} className="gap-2 shrink-0">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.hex }} />
-                {t.label}
-                <Badge variant="secondary" className="px-1.5 h-4 text-[10px] leading-none">{contagem[t.id] || 0}</Badge>
+        <div className="flex items-center gap-2">
+          <Tabs value={filtroTipo} onValueChange={setFiltroTipo} className="flex-1 min-w-0">
+            <TabsList className="w-full justify-start overflow-x-auto h-auto p-1 bg-muted/50">
+              <TabsTrigger value="todos" className="gap-2 shrink-0">
+                Todas <Badge variant="secondary" className="px-1.5 h-4 text-[10px] leading-none">{contagem.todos || 0}</Badge>
               </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+              {categorias.map((t) => (
+                <TabsTrigger key={t.id} value={t.id} className="gap-2 shrink-0">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.hex }} />
+                  {t.label}
+                  <Badge variant="secondary" className="px-1.5 h-4 text-[10px] leading-none">{contagem[t.id] || 0}</Badge>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setGerenciandoCategorias(true)} title="Criar, renomear, reordenar ou excluir categorias">
+            <Plus size={14} /> Categoria
+          </Button>
+        </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
@@ -213,9 +234,9 @@ function IdeiasPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtradas.map((ideia) => {
-            const tipo = tipoIdeiaMeta(ideia.tipo);
+            const tipo = tipoIdeiaMeta(ideia.tipo, categorias);
             const ag = ideia.agencia ? agenciaMeta(ideia.agencia) : undefined;
-            const cliente = ideia.tipo === "cliente" ? nomeCliente(ideia.cliente_id) : undefined;
+            const cliente = ideia.tipo === CATEGORIA_CLIENTE ? nomeCliente(ideia.cliente_id) : undefined;
             return (
               <Card key={ideia.id} className={cn("overflow-hidden group flex flex-col", ideia.concluida_em && "opacity-90")}>
                 <div className="h-2 w-full" style={{ backgroundColor: tipo.hex }} />
@@ -302,6 +323,8 @@ function IdeiasPage() {
       )}
 
       <IdeiaDialog state={dialog} clientes={clientes} onClose={() => setDialog(null)} onSaved={load} />
+
+      <CategoriasIdeiasDialog open={gerenciandoCategorias} onOpenChange={setGerenciandoCategorias} />
 
       <EnviarParaDemandasDialog
         ideia={enviando}

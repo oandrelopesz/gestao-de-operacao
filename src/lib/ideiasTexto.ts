@@ -2,15 +2,22 @@
  * Regras puras da aba Ideias (sem Supabase nem alias "@/"), para rodar em `node --test`.
  */
 
-export type TipoIdeia = "este_sistema" | "outro_sistema" | "cliente";
+/** Id de uma categoria de ideia (tabela ideia_categorias, editável). */
+export type TipoIdeia = string;
 
+/** Categoria fixa que liga os campos de agência/cliente. */
+export const CATEGORIA_CLIENTE = "cliente";
+
+/** As 3 categorias de sempre: padrão e fallback quando a tabela não puder ser lida. */
 export const TIPOS_IDEIA: { id: TipoIdeia; label: string; hex: string }[] = [
   { id: "este_sistema", label: "Este sistema", hex: "#8b5cf6" },
   { id: "outro_sistema", label: "Outro sistema", hex: "#06b6d4" },
-  { id: "cliente", label: "Para cliente", hex: "#f59e0b" },
+  { id: CATEGORIA_CLIENTE, label: "Para cliente", hex: "#f59e0b" },
 ];
 
-export const tipoIdeiaMeta = (id: string) => TIPOS_IDEIA.find((t) => t.id === id) || TIPOS_IDEIA[0];
+/** Procura a categoria na lista passada (padrão: TIPOS_IDEIA); id desconhecido vira uma categoria cinza com o próprio id. */
+export const tipoIdeiaMeta = (id: string, categorias: { id: string; label: string; hex: string }[] = TIPOS_IDEIA) =>
+  categorias.find((t) => t.id === id) || { id, label: id, hex: "#64748b" };
 
 export function normalizarLink(link: string): string {
   const l = link.trim();

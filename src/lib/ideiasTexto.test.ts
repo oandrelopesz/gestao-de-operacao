@@ -63,9 +63,12 @@ test("colunaPadrao: fazer_hoje, senão a primeira não-sistema, senão a primeir
   assert.equal(colunaPadrao([]), "");
 });
 
-test("tipoIdeiaMeta: id desconhecido cai no primeiro tipo", () => {
+test("tipoIdeiaMeta: procura na lista passada e id desconhecido vira categoria cinza", () => {
   assert.equal(tipoIdeiaMeta("cliente").label, "Para cliente");
-  assert.equal(tipoIdeiaMeta("xyz").id, "este_sistema");
+  assert.deepEqual(tipoIdeiaMeta("xyz"), { id: "xyz", label: "xyz", hex: "#64748b" });
+  const cats = [{ id: "podcast_ab12", label: "Podcast", hex: "#ec4899" }];
+  assert.equal(tipoIdeiaMeta("podcast_ab12", cats).label, "Podcast");
+  assert.equal(tipoIdeiaMeta("cliente", cats).label, "cliente");
 });
 
 test("filtrarIdeias: situação separa abertas de concluídas (padrão: abertas)", () => {
