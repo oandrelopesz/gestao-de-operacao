@@ -27,6 +27,25 @@ interface Props {
 
 const imagensDe = (lista: FileList | null | undefined) => Array.from(lista ?? []).filter((f) => f.type.startsWith("image/"));
 
+/** O que a barra de ferramentas mostra (marcado/desmarcado) na posição do cursor. */
+function lerEstado(ed: Editor) {
+  return {
+    negrito: ed.isActive("bold"),
+    italico: ed.isActive("italic"),
+    sublinhado: ed.isActive("underline"),
+    riscado: ed.isActive("strike"),
+    nivel: ([1, 2, 3] as const).find((l) => ed.isActive("heading", { level: l })) ?? 0,
+    lista: ed.isActive("bulletList"),
+    numerada: ed.isActive("orderedList"),
+    tarefas: ed.isActive("taskList"),
+    citacao: ed.isActive("blockquote"),
+    link: (ed.getAttributes("link").href as string | undefined) ?? null,
+    colunas: estadoColunas(ed),
+    podeDesfazer: ed.can().undo(),
+    podeRefazer: ed.can().redo(),
+  };
+}
+
 /** Editor da nota, no estilo Google Docs: formatação, listas, colunas (até 4), imagens e links. */
 export function EditorNota({ doc, textoAntigo, onChange, autoFocus }: Props) {
   const [enviando, setEnviando] = useState(0);
@@ -100,31 +119,18 @@ export function EditorNota({ doc, textoAntigo, onChange, autoFocus }: Props) {
     if (JSON.stringify(novo) !== atual && !editor.isFocused) editor.commands.setContent(novo, { emitUpdate: false });
   }, [doc, textoAntigo, editor]);
 
-  const estado = useEditorState({
+  // O useEditorState só se atualiza a partir da primeira transação do editor; até lá (editor recém-
+  // criado) o estado da barra é lido direto. Esperar por ele travaria: sem o editor na tela, não há
+  // transação nenhuma.
+  const estadoObservado = useEditorState({
     editor,
-    selector: ({ editor: ed }) => {
-      if (!ed) return null;
-      return {
-        negrito: ed.isActive("bold"),
-        italico: ed.isActive("italic"),
-        sublinhado: ed.isActive("underline"),
-        riscado: ed.isActive("strike"),
-        nivel: ([1, 2, 3] as const).find((l) => ed.isActive("heading", { level: l })) ?? 0,
-        lista: ed.isActive("bulletList"),
-        numerada: ed.isActive("orderedList"),
-        tarefas: ed.isActive("taskList"),
-        citacao: ed.isActive("blockquote"),
-        link: (ed.getAttributes("link").href as string | undefined) ?? null,
-        colunas: estadoColunas(ed),
-        podeDesfazer: ed.can().undo(),
-        podeRefazer: ed.can().redo(),
-      };
-    },
+    selector: ({ editor: ed }) => (ed ? lerEstado(ed) : null),
   });
 
-  if (!editor || !estado) {
+  if (!editor) {
     return <div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground"><Loader2 size={16} className="mr-2 animate-spin" /> Abrindo o editor…</div>;
   }
+  const estado = estadoObservado ?? lerEstado(editor);
 
   const aplicarLink = () => {
     const url = (linkEditando ?? "").trim();
