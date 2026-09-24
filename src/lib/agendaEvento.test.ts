@@ -2,7 +2,7 @@ process.env.TZ = "America/Sao_Paulo";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  novoForm, formParaEvento, eventoParaForm, moverInicio, ancorarNaSerie, validarForm, paraUnidade, deUnidade,
+  novoForm, formParaEvento, eventoParaForm, moverInicio, moverPorArrasto, ancorarNaSerie, validarForm, paraUnidade, deUnidade,
   removerNulos, dataDe, type EventoGoogle,
 } from "./agendaEvento.ts";
 import { regraDoPreset } from "./recorrencia.ts";
@@ -102,6 +102,27 @@ test("ancorarNaSerie aplica o deslocamento da ocorrência no início da série",
   const g = ancorarNaSerie(f, "2026-09-24", "2026-10-08");
   assert.equal(g.inicioData, "2026-09-25");
   assert.equal(g.fimData, "2026-09-25");
+});
+
+test("moverPorArrasto: horário novo com a duração que a grade entregou", () => {
+  const g = moverPorArrasto(BASE, new Date(2026, 8, 25, 14, 0), new Date(2026, 8, 25, 15, 30), false);
+  assert.deepEqual([g.inicioData, g.inicioHora, g.fimData, g.fimHora, g.diaInteiro], ["2026-09-25", "14:00", "2026-09-25", "15:30", false]);
+});
+
+test("moverPorArrasto: para a faixa de dia inteiro (fim exclusivo) e de volta", () => {
+  const g = moverPorArrasto(BASE, new Date(2026, 8, 26), new Date(2026, 8, 28), true);
+  assert.deepEqual([g.inicioData, g.fimData, g.diaInteiro], ["2026-09-26", "2026-09-27", true]);
+  const h = moverPorArrasto(g, new Date(2026, 8, 26), null, true);
+  assert.deepEqual([h.inicioData, h.fimData], ["2026-09-26", "2026-09-26"]);
+  // Dia inteiro solto num horário: o FullCalendar manda fim null → 1 hora
+  const i = moverPorArrasto(g, new Date(2026, 8, 26, 9, 0), null, false);
+  assert.deepEqual([i.inicioHora, i.fimData, i.fimHora, i.diaInteiro], ["09:00", "2026-09-26", "10:00", false]);
+});
+
+test("moverPorArrasto: repetição semanal acompanha o novo dia", () => {
+  const f = { ...BASE, recorrencia: regraDoPreset("semanal", "2026-09-24") };
+  const g = moverPorArrasto(f, new Date(2026, 8, 25, 10, 0), new Date(2026, 8, 25, 11, 0), false);
+  assert.deepEqual(g.recorrencia?.diasSemana, ["FR"]);
 });
 
 test("validarForm", () => {

@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import {
   eventoParaForm, linhasRecorrencia, moverInicio, temParticipantes, validarForm, type FormEvento,
 } from "@/lib/agendaEvento";
-import { AgendaConflitoError, podeEscrever, type AgendaGoogle } from "@/lib/googleCalendar";
+import { AgendaConflitoError, podeEditarEvento, podeEscrever, type AgendaGoogle } from "@/lib/googleCalendar";
 import { excluirComEscopo, salvarComEscopo, type Escopo, type EventoAberto } from "@/lib/agendaSerie";
 import { useEscolha, type OpcaoEscolha } from "./Escolha";
 import { RecorrenciaCampo } from "./RecorrenciaCampo";
@@ -47,11 +47,7 @@ export function EventoDialog({ abertura, agendas, onClose, onMudou }: Props) {
 
   const editando = abertura?.tipo === "editar" ? abertura.aberto : null;
   const agenda = agendas.find((a) => a.id === form?.calendarId);
-  const somenteLeitura = !!editando && (() => {
-    if (!agenda || !podeEscrever(agenda)) return true;
-    const org = editando.evento.organizer;
-    return !!org && !org.self && org.email !== editando.calendarId && !editando.evento.guestsCanModify;
-  })();
+  const somenteLeitura = !!editando && !podeEditarEvento(agenda, editando.evento, editando.calendarId);
   const gravaveis = agendas.filter(podeEscrever);
   const recorrente = !!editando?.mestre;
 

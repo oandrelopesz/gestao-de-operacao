@@ -5,9 +5,12 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import ptBr from "@fullcalendar/core/locales/pt-br";
-import type { EventInput } from "@fullcalendar/core";
+import type { EventApi, EventInput } from "@fullcalendar/core";
 
 export type VisaoAgenda = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
+
+/** Até 45 min o evento é baixo demais para hora + nome em duas linhas: vai tudo numa linha só. */
+const CURTO_MS = 45 * 60_000;
 
 interface AgendaGradeProps {
   visao: VisaoAgenda;
@@ -16,9 +19,18 @@ interface AgendaGradeProps {
   onPeriodo: (inicio: Date, fim: Date, titulo: string) => void;
   onSelecionar: (inicio: Date, fim: Date, diaInteiro: boolean) => void;
   onClicar: (id: string) => void;
+  /** Evento arrastado ou esticado. `reverter` devolve o evento ao lugar (cancelou ou deu erro). */
+  onMover: (id: string, inicio: Date, fim: Date | null, diaInteiro: boolean, reverter: () => void) => void;
+  /** Começou/terminou de arrastar (a recarga automática espera). */
+  onArrastando: (arrastando: boolean) => void;
 }
 
-export default function AgendaGrade({ visao, eventos, calRef, onPeriodo, onSelecionar, onClicar }: AgendaGradeProps) {
+export default function AgendaGrade({ visao, eventos, calRef, onPeriodo, onSelecionar, onClicar, onMover, onArrastando }: AgendaGradeProps) {
+  const mover = (a: { event: EventApi; revert: () => void }) => {
+    if (!a.event.start) { a.revert(); return; }
+    onMover(a.event.id, a.event.start, a.event.end, a.event.allDay, a.revert);
+  };
+
   return (
     <div className="agenda-fc h-full">
       <FullCalendar
@@ -32,10 +44,12 @@ export default function AgendaGrade({ visao, eventos, calRef, onPeriodo, onSelec
         nowIndicator
         selectable
         selectMirror
+        editable
         dayMaxEvents
         allDayText="dia todo"
         slotDuration="00:30:00"
         scrollTime="07:00:00"
+        eventMinHeight={22}
         eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
         slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
         datesSet={(a) => onPeriodo(a.start, a.end, a.view.title)}
@@ -46,6 +60,27 @@ export default function AgendaGrade({ visao, eventos, calRef, onPeriodo, onSelec
         eventClick={(a) => {
           a.jsEvent.preventDefault();
           onClicar(a.event.id);
+        }}
+        eventDragStart={() => onArrastando(true)}
+        eventDragStop={() => onArrastando(false)}
+        eventResizeStart={() => onArrastando(true)}
+        eventResizeStop={() => onArrastando(false)}
+        eventDrop={mover}
+        eventResize={mover}
+        eventContent={(arg) => {
+          const { start, end, allDay, title } = arg.event;
+          const curto = !allDay && arg.view.type !== "dayGridMonth" && !!start && !!end && end.getTime() - start.getTime() <= CURTO_MS;
+          if (!curto) return true; // visual padrão
+          return (
+            <div className="fc-evento-curto">
+              <span className="fc-evento-curto-titulo">{title || "(sem título)"}</span>
+              <span className="fc-evento-curto-hora">{arg.timeText}</span>
+            </div>
+          );
+        }}
+        eventDidMount={(arg) => {
+          // Nome completo ao passar o mouse (eventos curtos ou estreitos cortam o texto)
+          arg.el.title = arg.timeText ? `${arg.event.title} · ${arg.timeText}` : arg.event.title;
         }}
       />
     </div>

@@ -56,6 +56,13 @@ export function podeEscrever(a: AgendaGoogle): boolean {
   return a.accessRole === "owner" || a.accessRole === "writer";
 }
 
+/** Dá para editar este evento daqui? (agenda com escrita e evento seu, ou convidado com permissão) */
+export function podeEditarEvento(agenda: AgendaGoogle | undefined, evento: EventoGoogle, calendarId: string): boolean {
+  if (!agenda || !podeEscrever(agenda)) return false;
+  const org = evento.organizer;
+  return !org || !!org.self || org.email === calendarId || !!evento.guestsCanModify;
+}
+
 export async function listarAgendas(): Promise<AgendaGoogle[]> {
   const todas: AgendaGoogle[] = [];
   let pagina: string | undefined;

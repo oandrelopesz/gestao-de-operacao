@@ -11,9 +11,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { DriveAuthError, oauthUrl, statusDoDrive } from "@/lib/googleDrive";
 import {
-  AgendaSemPermissaoError, listarAgendas, listarEventos, obterEvento, podeEscrever, temPermissaoAgenda, type AgendaGoogle,
+  AgendaConflitoError, AgendaSemPermissaoError, listarAgendas, listarEventos, obterEvento, podeEditarEvento, podeEscrever,
+  temPermissaoAgenda, type AgendaGoogle,
 } from "@/lib/googleCalendar";
-import { novoForm, type EventoGoogle } from "@/lib/agendaEvento";
+import { eventoParaForm, moverPorArrasto, novoForm, temParticipantes, type EventoGoogle } from "@/lib/agendaEvento";
+import { salvarComEscopo, type Escopo } from "@/lib/agendaSerie";
+import { useEscolha } from "@/components/agenda/Escolha";
 import { FALLBACK_USER_ID, getUserId } from "@/lib/clientesService";
 import { BotaoGoogleLogin } from "@/components/swipe/BotaoGoogleLogin";
 import { EventoDialog, type AberturaEvento } from "@/components/agenda/EventoDialog";
@@ -54,6 +57,7 @@ function AgendaPage() {
   const [carregandoEventos, setCarregandoEventos] = useState(false);
   const [abertura, setAbertura] = useState<AberturaEvento | null>(null);
   const calRef = useRef<FullCalendar | null>(null);
+  const { elemento: perguntas, perguntar } = useEscolha();
 
   useEffect(() => {
     setMontado(true);
@@ -89,10 +93,11 @@ function AgendaPage() {
   const visiveis = useMemo(() => agendas.filter((a) => !ocultas.includes(a.id)), [agendas, ocultas]);
 
   const requisicao = useRef(0);
-  const carregarEventos = useCallback(async () => {
+  /** `silencioso`: recarga automática — sem indicador e sem aviso de erro (tenta de novo no próximo minuto). */
+  const carregarEventos = useCallback(async (silencioso = false) => {
     if (estado !== "pronto" || !periodo) return;
     const minha = ++requisicao.current;
-    setCarregandoEventos(true);
+    if (!silencioso) setCarregandoEventos(true);
     const resultados = await Promise.allSettled(
       visiveis.map(async (a) => (await listarEventos(a.id, periodo.inicio, periodo.fim)).map((evento) => ({ calendarId: a.id, evento }))),
     );
@@ -100,15 +105,29 @@ function AgendaPage() {
     setCarregandoEventos(false);
     const falhas = resultados.filter((r): r is PromiseRejectedResult => r.status === "rejected");
     if (falhas.some((f) => f.reason instanceof AgendaSemPermissaoError)) { setEstado("sem_permissao"); return; }
+    if (falhas.length && silencioso) return; // mantém o que já está na tela
     if (falhas.length) toast.error(`Não foi possível carregar ${falhas.length === 1 ? "uma agenda" : `${falhas.length} agendas`}: ${String(falhas[0].reason?.message ?? falhas[0].reason)}`);
     setOcorrencias(resultados.flatMap((r) => (r.status === "fulfilled" ? r.value : [])));
   }, [estado, periodo, visiveis]);
 
   useEffect(() => { carregarEventos(); }, [carregarEventos]);
 
+  // Atualiza sozinha a cada minuto com a aba visível — mas não no meio de um arrastar,
+  // de uma pergunta de "mover" ou com o formulário aberto (a grade mudaria por baixo)
+  const ocupado = useRef(false);
+  const aberturaRef = useRef(abertura);
+  aberturaRef.current = abertura;
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      if (document.visibilityState !== "visible" || ocupado.current || aberturaRef.current) return;
+      carregarEventos(true);
+    }, 60_000);
+    return () => window.clearInterval(t);
+  }, [carregarEventos]);
+
   // Voltou para a aba: pode ter mudado algo no celular
   useEffect(() => {
-    const aoVoltar = () => { if (document.visibilityState === "visible") carregarEventos(); };
+    const aoVoltar = () => { if (document.visibilityState === "visible" && !ocupado.current) carregarEventos(true); };
     document.addEventListener("visibilitychange", aoVoltar);
     return () => document.removeEventListener("visibilitychange", aoVoltar);
   }, [carregarEventos]);
@@ -125,6 +144,7 @@ function AgendaPage() {
       backgroundColor: a?.backgroundColor,
       borderColor: a?.backgroundColor,
       textColor: a?.foregroundColor,
+      editable: podeEditarEvento(a, evento, calendarId),
     };
   }), [ocorrencias, corDe]);
 
@@ -149,6 +169,45 @@ function AgendaPage() {
       setAbertura({ tipo: "editar", aberto: { calendarId: o.calendarId, evento: o.evento, mestre } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível abrir o evento");
+    }
+  };
+
+  // Arrastou/esticou na grade: salva pelo mesmo caminho do formulário (escopo e aviso aos participantes)
+  const mover = async (id: string, inicio: Date, fim: Date | null, diaInteiro: boolean, reverter: () => void) => {
+    const o = ocorrencias.find((x) => `${x.calendarId}::${x.evento.id}` === id);
+    if (!o) { reverter(); return; }
+    ocupado.current = true;
+    try {
+      const mestre = o.evento.recurringEventId ? await obterEvento(o.calendarId, o.evento.recurringEventId) : null;
+      const form = moverPorArrasto(eventoParaForm(o.evento, o.calendarId, mestre?.recurrence), inicio, fim, diaInteiro);
+      let escopo: Escopo = "todos";
+      if (mestre) {
+        const e = await perguntar("Mover evento recorrente", [
+          { valor: "este", rotulo: "Este evento" },
+          { valor: "seguintes", rotulo: "Este e os eventos seguintes" },
+          { valor: "todos", rotulo: "Todos os eventos" },
+        ], { confirmar: "OK" });
+        if (!e) { reverter(); return; }
+        escopo = e as Escopo;
+      }
+      let enviar = false;
+      if (temParticipantes(o.evento)) {
+        const r = await perguntar("Avisar os participantes da mudança?", [
+          { valor: "nao", rotulo: "Não enviar" },
+          { valor: "sim", rotulo: "Enviar" },
+        ], { modo: "botoes", descricao: "O Google manda um e-mail para os participantes." });
+        if (r === null) { reverter(); return; }
+        enviar = r === "sim";
+      }
+      await salvarComEscopo(form, { calendarId: o.calendarId, evento: o.evento, mestre }, escopo, enviar);
+      toast.success("Evento movido no Google Agenda");
+      carregarEventos();
+    } catch (e) {
+      reverter();
+      toast.error(e instanceof Error ? e.message : "Não foi possível mover o evento");
+      if (e instanceof AgendaConflitoError) carregarEventos();
+    } finally {
+      ocupado.current = false;
     }
   };
 
@@ -257,7 +316,7 @@ function AgendaPage() {
               <h2 className="text-base font-semibold first-letter:uppercase">{periodo?.titulo}</h2>
               {carregandoEventos && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
               <div className="ml-auto flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={carregarEventos} aria-label="Atualizar"><RefreshCw size={14} /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => carregarEventos()} aria-label="Atualizar"><RefreshCw size={14} /></Button>
                 <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
                   {VISOES.map((v) => (
                     <button
@@ -286,6 +345,8 @@ function AgendaPage() {
                     onPeriodo={(inicio, fim, titulo) => setPeriodo({ inicio, fim, titulo })}
                     onSelecionar={novo}
                     onClicar={abrir}
+                    onMover={mover}
+                    onArrastando={(v) => { ocupado.current = v; }}
                   />
                 </Suspense>
               )}
@@ -294,7 +355,8 @@ function AgendaPage() {
         </div>
       )}
 
-      <EventoDialog abertura={abertura} agendas={agendas} onClose={() => setAbertura(null)} onMudou={carregarEventos} />
+      <EventoDialog abertura={abertura} agendas={agendas} onClose={() => setAbertura(null)} onMudou={() => carregarEventos()} />
+      {perguntas}
     </div>
   );
 }

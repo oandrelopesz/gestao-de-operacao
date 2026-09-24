@@ -200,6 +200,20 @@ export function moverInicio(f: FormEvento, data: string, hora: string): FormEven
   return { ...f, recorrencia, inicioData: data, inicioHora: hora, fimData: fim.data, fimHora: fim.hora };
 }
 
+/**
+ * Evento arrastado/esticado na grade. `fim` vem exclusivo no dia inteiro e `null` quando o
+ * FullCalendar não sabe a duração (dia inteiro de 1 dia, ou dia inteiro solto num horário → 1 hora).
+ */
+export function moverPorArrasto(f: FormEvento, inicio: Date, fim: Date | null, diaInteiro: boolean): FormEvento {
+  const g = moverInicio({ ...f, diaInteiro }, dataLocal(inicio), diaInteiro ? f.inicioHora : horaLocal(inicio));
+  if (diaInteiro) {
+    const ultimo = fim ? somarDias(dataLocal(fim), -1) : g.inicioData;
+    return { ...g, fimData: ultimo < g.inicioData ? g.inicioData : ultimo };
+  }
+  const ate = fim ?? new Date(inicio.getTime() + 60 * 60_000);
+  return { ...g, fimData: dataLocal(ate), fimHora: horaLocal(ate) };
+}
+
 /** Editar "todos" a partir de uma ocorrência: o deslocamento de dias feito nela vale para o início da série. */
 export function ancorarNaSerie(f: FormEvento, inicioSerieISO: string, ocorrenciaISO: string): FormEvento {
   const desloc = diferencaDias(ocorrenciaISO, f.inicioData);
