@@ -352,7 +352,7 @@ html[data-hidden] [data-state="closed"] {
 .agenda-fc .fc-col-header-cell-cushion { padding: 6px 4px; text-transform: capitalize; }
 .agenda-fc .fc-timegrid-slot-label-cushion,
 .agenda-fc .fc-timegrid-axis-cushion { color: var(--muted-foreground); font-size: 0.7rem; }
-.agenda-fc .fc-timegrid-slot { height: 2.4em; }
+.agenda-fc .fc-timegrid-slot { height: 3.2em; }
 .agenda-fc .fc-event { border-radius: 6px; cursor: pointer; }
 .agenda-fc .fc-timegrid-event .fc-event-main { padding: 2px 4px; }
 .agenda-fc .fc-day-today .fc-daygrid-day-number {

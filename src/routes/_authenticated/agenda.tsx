@@ -254,7 +254,7 @@ function AgendaPage() {
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => api()?.prev()} aria-label="Anterior"><ChevronLeft size={16} /></Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => api()?.next()} aria-label="Próximo"><ChevronRight size={16} /></Button>
               </div>
-              <h2 className="text-base font-semibold capitalize">{periodo?.titulo}</h2>
+              <h2 className="text-base font-semibold first-letter:uppercase">{periodo?.titulo}</h2>
               {carregandoEventos && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
               <div className="ml-auto flex items-center gap-2">
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={carregarEventos} aria-label="Atualizar"><RefreshCw size={14} /></Button>
