@@ -333,3 +333,30 @@
 html[data-hidden] [data-state="closed"] {
   animation: none !important;
 }
+
+/* Agenda (FullCalendar) com as cores do tema */
+.agenda-fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--card);
+  --fc-neutral-bg-color: var(--muted);
+  --fc-list-event-hover-bg-color: var(--muted);
+  --fc-today-bg-color: color-mix(in oklch, var(--primary) 7%, transparent);
+  --fc-highlight-color: color-mix(in oklch, var(--primary) 16%, transparent);
+  --fc-now-indicator-color: var(--destructive);
+  --fc-event-border-color: transparent;
+  font-size: 0.8rem;
+}
+.agenda-fc .fc-scrollgrid { border-radius: 12px; overflow: hidden; }
+.agenda-fc .fc-col-header-cell-cushion,
+.agenda-fc .fc-daygrid-day-number { color: var(--foreground); text-decoration: none; font-weight: 500; }
+.agenda-fc .fc-col-header-cell-cushion { padding: 6px 4px; text-transform: capitalize; }
+.agenda-fc .fc-timegrid-slot-label-cushion,
+.agenda-fc .fc-timegrid-axis-cushion { color: var(--muted-foreground); font-size: 0.7rem; }
+.agenda-fc .fc-timegrid-slot { height: 2.4em; }
+.agenda-fc .fc-event { border-radius: 6px; cursor: pointer; }
+.agenda-fc .fc-timegrid-event .fc-event-main { padding: 2px 4px; }
+.agenda-fc .fc-day-today .fc-daygrid-day-number {
+  background: var(--primary); color: var(--primary-foreground); border-radius: 9999px; min-width: 1.6rem; text-align: center; margin: 3px;
+}
+.agenda-fc .fc-daygrid-more-link { color: var(--muted-foreground); font-weight: 500; }
+.agenda-fc .fc-popover { background: var(--popover); border-color: var(--border); border-radius: 10px; }
