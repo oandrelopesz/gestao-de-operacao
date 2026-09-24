@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ClientePicker } from "@/components/demandas/ClientePicker";
 import { hojeBrasilia, diasDeAtraso, formatarDataCurta } from "@/lib/entrega";
 import { NOMES_DIA } from "@/lib/colunasDias";
 
@@ -63,6 +64,7 @@ interface Demanda {
   proxima_execucao?: string;
   recorrente_pai_id?: string;
   clientes?: { nome: string; agencia?: string };
+  pessoal?: boolean;
 }
 
 interface DemandaDrawerProps {
@@ -277,23 +279,18 @@ export function DemandaDrawer({
                   <span>Cliente</span>
                 </div>
                 <div className="flex items-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 px-1.5 py-0.5 rounded transition-colors text-left truncate max-w-full">
-                        {clientes.find((c) => c.id === demanda.cliente_id)?.nome || demanda.clientes?.nome || "Adicionar cliente"}
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="max-h-[300px] overflow-y-auto">
-                      <DropdownMenuItem onClick={() => saveUpdate({ cliente_id: null })}>
-                        Nenhum
-                      </DropdownMenuItem>
-                      {clientes.map(c => (
-                        <DropdownMenuItem key={c.id} onClick={() => saveUpdate({ cliente_id: c.id })}>
-                          {c.nome}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <ClientePicker
+                    clientes={clientes}
+                    clienteIdAtual={demanda.cliente_id}
+                    pessoalAtual={demanda.pessoal}
+                    onEscolher={(valor) => saveUpdate(valor)}
+                  >
+                    <button className="text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 px-1.5 py-0.5 rounded transition-colors text-left truncate max-w-full">
+                      {demanda.pessoal
+                        ? "Pessoal"
+                        : clientes.find((c) => c.id === demanda.cliente_id)?.nome || demanda.clientes?.nome || "Adicionar cliente"}
+                    </button>
+                  </ClientePicker>
                 </div>
               </div>
             )}

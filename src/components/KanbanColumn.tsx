@@ -34,6 +34,7 @@ interface Demanda {
   dia_semana?: number | null;
   processo_passo_id?: string | null;
   roadmap_id?: string | null;
+  pessoal?: boolean;
 }
 
 interface KanbanColumnProps {
@@ -54,8 +55,10 @@ interface KanbanColumnProps {
   /** Colunas de sistema (recorrentes, feito) podem ser renomeadas, mas não excluídas */
   isSystem?: boolean;
   onSetDia?: (id: string, dia: number) => void;
+  onAtribuirCliente?: (id: string, valor: { cliente_id: string | null; pessoal: boolean }) => void;
   diasDaColuna?: number[];
   secoes?: { id: string; titulo: string; demandas: Demanda[] }[];
+  clientes?: { id: string; nome: string; agencia?: string }[];
 }
 
 const VISIBLE_BATCH = 40;
@@ -87,8 +90,10 @@ export function KanbanColumn({
   onDeleteColumn,
   isSystem,
   onSetDia,
+  onAtribuirCliente,
   diasDaColuna,
   secoes,
+  clientes: clientesDisponiveis,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id, disabled: !!secoes });
   const [isAdding, setIsAdding] = useState(false);
@@ -141,7 +146,9 @@ export function KanbanColumn({
       onComplete={onComplete}
       onMoveToDone={onMoveToDone}
       onSetDia={onSetDia}
+      onAtribuirCliente={onAtribuirCliente}
       diasDaColuna={diasDaColuna}
+      clientes={clientesDisponiveis}
     />
   );
 

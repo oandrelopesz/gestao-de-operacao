@@ -717,6 +717,8 @@ function DemandasPage() {
                     secoes={secoes}
                     diasDaColuna={col.dias}
                     onSetDia={mudarDia}
+                    onAtribuirCliente={(id, valor) => handleUpdateDemanda(id, valor)}
+                    clientes={clientes}
                     onQuickAdd={handleQuickAdd}
                     onFullAdd={(status) => {
                       setEditingDemanda({ status });

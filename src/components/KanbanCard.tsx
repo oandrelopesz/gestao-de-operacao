@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
-import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, AlertTriangle, Rocket, Map as MapIcon } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, UserPlus, AlertTriangle, Rocket, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ClientePicker } from "@/components/demandas/ClientePicker";
 import { cn } from "@/lib/utils";
 import { NOMES_DIA, rotuloFazerNoDia } from "@/lib/colunasDias";
 import { hojeBrasilia, diasDeAtraso, formatarDataCurta } from "@/lib/entrega";
@@ -35,6 +36,7 @@ interface Demanda {
   dia_semana?: number | null;
   processo_passo_id?: string | null;
   roadmap_id?: string | null;
+  pessoal?: boolean;
 }
 
 interface KanbanCardProps {
@@ -44,7 +46,9 @@ interface KanbanCardProps {
   onComplete?: (id: string) => void;
   onMoveToDone?: (id: string) => void;
   onSetDia?: (id: string, dia: number) => void;
+  onAtribuirCliente?: (id: string, valor: { cliente_id: string | null; pessoal: boolean }) => void;
   diasDaColuna?: number[];
+  clientes?: { id: string; nome: string; agencia?: string }[];
 }
 
 interface SortableBindings {
@@ -70,7 +74,7 @@ export function KanbanCard(props: KanbanCardProps) {
 }
 
 /** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
-export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, diasDaColuna, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
+export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, onAtribuirCliente, diasDaColuna, clientes, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
   const navigate = useNavigate();
   const isRecorrenteMae = demanda.status === "recorrentes";
   const isDragging = sortable?.isDragging ?? false;
@@ -166,7 +170,33 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
               </h4>
             </div>
 
-            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+            <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+              {onAtribuirCliente && (
+                <div onPointerDown={(e) => e.stopPropagation()}>
+                  <ClientePicker
+                    clientes={clientes ?? []}
+                    clienteIdAtual={demanda.cliente_id}
+                    pessoalAtual={demanda.pessoal}
+                    onEscolher={(valor) => onAtribuirCliente(demanda.id, valor)}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Atribuir cliente"
+                      onClick={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className={cn(
+                        "h-6 w-6 transition-opacity",
+                        demanda.cliente_id || demanda.pessoal
+                          ? "opacity-0 group-hover:opacity-100"
+                          : "opacity-100"
+                      )}
+                    >
+                      <UserPlus size={14} />
+                    </Button>
+                  </ClientePicker>
+                </div>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity -mr-1">
@@ -201,7 +231,7 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
             </div>
           </div>
 
-          {(demanda.clientes?.nome || demanda.descricao || isRecorrenteMae || diaCard != null || demanda.prazo || demanda.processo_passo_id || demanda.roadmap_id) && (
+          {(demanda.clientes?.nome || demanda.pessoal || demanda.descricao || isRecorrenteMae || diaCard != null || demanda.prazo || demanda.processo_passo_id || demanda.roadmap_id) && (
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
               {demanda.processo_passo_id && (
                 <button
@@ -233,7 +263,11 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                 </button>
               )}
 
-              {demanda.clientes?.nome && (
+              {demanda.pessoal ? (
+                <span className="inline-flex items-center gap-1 max-w-full truncate text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600">
+                  <User size={10} className="shrink-0" /> Pessoal
+                </span>
+              ) : demanda.clientes?.nome && (
                 <span
                   title={`Cliente: ${demanda.clientes.nome}`}
                   className="inline-flex items-center gap-1 max-w-full truncate text-[10px] font-medium px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300"
