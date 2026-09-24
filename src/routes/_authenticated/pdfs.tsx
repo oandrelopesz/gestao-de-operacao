@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   FileText, Folder, FolderOpen, FolderPlus, Upload, Search, Eye, Download, MoreVertical, Pencil, Trash2,
-  ChevronRight, ChevronDown, Home, Loader2, CheckCircle2, AlertCircle, X, Library,
+  ChevronRight, ChevronDown, Home, Loader2, CheckCircle2, AlertCircle, X, Library, Check, CheckSquare, FolderInput,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -78,6 +78,10 @@ function PdfsPage() {
   const [editando, setEditando] = useState<PdfArquivo | null>(null);
   const [pdfToDelete, setPdfToDelete] = useState<PdfArquivo | null>(null);
   const [excluindoPdf, setExcluindoPdf] = useState(false);
+  // Seleção em massa (mover para pasta / excluir)
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const [excluirSelecionados, setExcluirSelecionados] = useState(false);
   const [pastaDialog, setPastaDialog] = useState<PastaDialogState>(null);
   const [pastaToDelete, setPastaToDelete] = useState<PdfPasta | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -252,7 +256,70 @@ function PdfsPage() {
 
   // ------------------------------------------------------------ Ações nos PDFs
 
+  // ------------------------------------------------------------ Seleção em massa
+
+  const selecaoAtiva = modoSelecao || selecionados.size > 0;
+  const alternarSelecao = (id: string) =>
+    setSelecionados((prev) => {
+      const nova = new Set(prev);
+      if (nova.has(id)) nova.delete(id); else nova.add(id);
+      return nova;
+    });
+  const limparSelecao = () => { setSelecionados(new Set()); setModoSelecao(false); };
+  const pdfsSelecionados = bib.pdfs.filter((f) => selecionados.has(f.id));
+  // O que está na tela agora (para "Selecionar todos")
+  const pdfsNaTela = busca.trim() ? resultadosBusca : pastaAtual ? pdfsDaPasta : recentes;
+  const pastasOrdenadas = useMemo(
+    () => bib.pastas.map((p) => ({ id: p.id, rotulo: nomeDoLocal(p.id), cor: corDaPasta(bib.pastas, p.id) })).sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR")),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bib.pastas],
+  );
+
+  useEffect(() => {
+    if (!selecaoAtiva) return;
+    const aoTeclar = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !document.querySelector('[role="dialog"], [role="alertdialog"]')) limparSelecao();
+    };
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [selecaoAtiva]);
+
+  const moverSelecionados = async (pastaId: string) => {
+    const ids = pdfsSelecionados.filter((f) => f.pasta_id !== pastaId).map((f) => f.id);
+    const destino = bib.pastas.find((p) => p.id === pastaId);
+    if (!ids.length) { toast.info(`Já estão em "${destino?.nome}"`); return; }
+    setBiblioteca((prev) => prev && { ...prev, pdfs: prev.pdfs.map((f) => (ids.includes(f.id) ? { ...f, pasta_id: pastaId } : f)) });
+    try {
+      await Promise.all(ids.map((id) => atualizarPdf(id, { pasta_id: pastaId })));
+      toast.success(`${ids.length} ${ids.length === 1 ? "PDF movido" : "PDFs movidos"} para "${destino?.nome}"`);
+      limparSelecao();
+    } catch (e) {
+      toast.error(mensagemErroPdf(e));
+      await load();
+    }
+  };
+
+  const confirmarExclusaoSelecionados = async () => {
+    const alvos = pdfsSelecionados;
+    setExcluindoPdf(true);
+    try {
+      const resultados = await Promise.allSettled(alvos.map((f) => excluirPdf(f)));
+      const ok = alvos.filter((_, i) => resultados[i].status === "fulfilled").map((f) => f.id);
+      setBiblioteca((prev) => prev && { ...prev, pdfs: prev.pdfs.filter((f) => !ok.includes(f.id)) });
+      const falhas = alvos.length - ok.length;
+      if (ok.length) toast.success(`${ok.length} ${ok.length === 1 ? "PDF excluído" : "PDFs excluídos"}`);
+      if (falhas) toast.error(`${falhas} não ${falhas === 1 ? "pôde" : "puderam"} ser ${falhas === 1 ? "excluído" : "excluídos"}`);
+      setSelecionados((prev) => new Set([...prev].filter((id) => !ok.includes(id))));
+      setExcluirSelecionados(false);
+      if (!falhas) setModoSelecao(false);
+    } finally {
+      setExcluindoPdf(false);
+    }
+  };
+
   const moverPdf = async (pdfId: string, pastaId: string) => {
+    // Arrastou um PDF selecionado: vão todos os selecionados
+    if (selecionados.has(pdfId) && selecionados.size > 1) { await moverSelecionados(pastaId); return; }
     const pdf = bib.pdfs.find((f) => f.id === pdfId);
     if (!pdf || pdf.pasta_id === pastaId) return;
     const destino = bib.pastas.find((p) => p.id === pastaId);
@@ -305,6 +372,10 @@ function PdfsPage() {
       onBaixar={() => baixar(pdf)}
       onEditar={() => setEditando(pdf)}
       onExcluir={() => setPdfToDelete(pdf)}
+      selecionado={selecionados.has(pdf.id)}
+      selecaoAtiva={selecaoAtiva}
+      modoSelecao={modoSelecao}
+      onAlternar={() => alternarSelecao(pdf.id)}
     />
   );
 
@@ -312,7 +383,64 @@ function PdfsPage() {
   const qtdAtual = pastaAtual ? contagem.get(pastaAtual.id) : undefined;
 
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-6", selecaoAtiva && "pb-20")}>
+      {selecaoAtiva && (
+        <div className="fixed bottom-5 left-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-popover px-3 py-2 shadow-xl">
+            <span className="flex items-center gap-1.5 text-sm font-semibold">
+              <CheckSquare size={15} className="text-primary" />
+              {pdfsSelecionados.length ? `${pdfsSelecionados.length} ${pdfsSelecionados.length === 1 ? "selecionado" : "selecionados"}` : "Clique nos PDFs para selecionar"}
+            </span>
+            {pdfsSelecionados.length > 0 && <span className="hidden text-xs text-muted-foreground md:inline">· arraste um para uma pasta para mover todos</span>}
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              {pdfsNaTela.some((f) => !selecionados.has(f.id)) && (
+                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelecionados(new Set([...selecionados, ...pdfsNaTela.map((f) => f.id)]))}>
+                  Selecionar todos ({pdfsNaTela.length})
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" disabled={!pdfsSelecionados.length}>
+                    <FolderInput size={13} /> Mover para pasta
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" side="top" className="max-h-80 w-72 overflow-y-auto">
+                  <DropdownMenuLabel className="text-xs">Mover {pdfsSelecionados.length} para</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {pastasOrdenadas.map((p) => (
+                    <DropdownMenuItem key={p.id} className="gap-2 text-xs" onClick={() => moverSelecionados(p.id)}>
+                      <Folder size={13} className="shrink-0" style={{ color: p.cor }} /> <span className="truncate">{p.rotulo}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs text-destructive hover:text-destructive" disabled={!pdfsSelecionados.length}
+                onClick={() => setExcluirSelecionados(true)}>
+                <Trash2 size={13} /> Excluir
+              </Button>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={limparSelecao} title="Sair da seleção (Esc)" aria-label="Sair da seleção">
+                <X size={15} />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <AlertDialog open={excluirSelecionados} onOpenChange={(o) => { if (!o && !excluindoPdf) setExcluirSelecionados(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {pdfsSelecionados.length} {pdfsSelecionados.length === 1 ? "PDF" : "PDFs"}?</AlertDialogTitle>
+            <AlertDialogDescription>Os arquivos são apagados de vez. Não dá para desfazer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindoPdf}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmarExclusaoSelecionados(); }} disabled={excluindoPdf} className="bg-destructive hover:bg-destructive/90">
+              {excluindoPdf ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <input
         ref={inputRef}
         type="file"
@@ -455,7 +583,8 @@ function PdfsPage() {
             </div>
           )}
 
-          <div className="relative">
+          <div className="flex items-center gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
             <Input placeholder="Buscar PDF em todas as pastas..." className="pl-10 pr-9" value={busca} onChange={(e) => setBusca(e.target.value)} />
             {busca && (
@@ -463,6 +592,10 @@ function PdfsPage() {
                 <X size={16} />
               </button>
             )}
+          </div>
+          <Button variant={selecaoAtiva ? "default" : "outline"} className="shrink-0 gap-1.5" onClick={() => (selecaoAtiva ? limparSelecao() : setModoSelecao(true))}>
+            <CheckSquare size={15} /> {selecaoAtiva ? "Sair da seleção" : "Selecionar"}
+          </Button>
           </div>
 
           {envios.length > 0 && (
@@ -722,12 +855,21 @@ interface PdfLinhaProps {
   onBaixar: () => void;
   onEditar: () => void;
   onExcluir: () => void;
+  selecionado: boolean;
+  selecaoAtiva: boolean;
+  modoSelecao: boolean;
+  onAlternar: () => void;
 }
 
-function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onExcluir }: PdfLinhaProps) {
+function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onExcluir, selecionado, selecaoAtiva, modoSelecao, onAlternar }: PdfLinhaProps) {
+  // No modo "Selecionar" (ou com Ctrl/Cmd) o clique no nome marca em vez de abrir
+  const clicarNome = (e: { ctrlKey: boolean; metaKey: boolean }) => {
+    if (modoSelecao || e.ctrlKey || e.metaKey) onAlternar();
+    else onVer();
+  };
   return (
     <div
-      className="group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
+      className={cn("group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40", selecionado && "bg-primary/5 hover:bg-primary/10")}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(MIME_PDF_INTERNO, pdf.id);
@@ -735,10 +877,23 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onExcluir }: Pdf
       }}
       title="Arraste para uma pasta para mover"
     >
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={selecionado}
+        aria-label={selecionado ? "Desmarcar" : "Selecionar"}
+        onClick={onAlternar}
+        className={cn(
+          "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-opacity",
+          selecionado ? "border-primary bg-primary text-primary-foreground" : cn("border-zinc-300 hover:border-primary dark:border-zinc-700", selecaoAtiva ? "opacity-100" : "opacity-0 group-hover:opacity-100"),
+        )}
+      >
+        {selecionado && <Check size={10} />}
+      </button>
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-500">
         <FileText size={18} />
       </span>
-      <button type="button" onClick={onVer} className="min-w-0 flex-1 text-left">
+      <button type="button" onClick={clicarNome} className="min-w-0 flex-1 text-left">
         <span className="block truncate text-sm font-medium group-hover:underline underline-offset-2">{pdf.nome}</span>
         <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           {pdf.player && (

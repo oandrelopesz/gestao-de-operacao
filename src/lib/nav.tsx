@@ -19,6 +19,7 @@ import {
   Map as MapIcon,
   BarChart3,
   CalendarDays,
+  Link2,
 } from "lucide-react";
 
 export interface NavLink {
@@ -63,6 +64,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     title: "Ferramentas",
     links: [
       { label: "Swipe file", icon: <Images size={17} />, to: "/swipe" },
+      { label: "Links", icon: <Link2 size={17} />, to: "/links" },
       { label: "PDFs", icon: <FileText size={17} />, to: "/pdfs" },
     ],
   },
