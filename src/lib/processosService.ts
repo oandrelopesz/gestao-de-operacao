@@ -98,7 +98,9 @@ export async function excluirTemplate(id: string): Promise<void> {
 
 // ---------------------------------------------------------------- Processos
 
-const PROCESSO_SELECT = "*, passos:processo_passos(*), cliente:clientes(id, nome, agencia, em_onboarding, trafego_ativo, onboarding_desde)";
+// processos↔processo_passos tem duas FKs (processo_passos.processo_id e processos.passo_onboarding_id);
+// sem o nome da FK o PostgREST recusa o embed por ambiguidade (PGRST201).
+const PROCESSO_SELECT = "*, passos:processo_passos!processo_passos_processo_id_fkey(*), cliente:clientes(id, nome, agencia, em_onboarding, trafego_ativo, onboarding_desde)";
 
 export async function fetchProcessos(tipo: TipoProcesso, situacao: "ativos" | "historico"): Promise<Processo[]> {
   let query = (supabase.from("processos") as any).select(PROCESSO_SELECT).eq("tipo", tipo);
@@ -119,7 +121,7 @@ export async function fetchProcessos(tipo: TipoProcesso, situacao: "ativos" | "h
 export async function fetchRoadmapsLigados(passoIds: string[]): Promise<RoadmapLigado[]> {
   if (!passoIds.length) return [];
   const { data, error } = await (supabase.from("processos") as any)
-    .select("id, nome, status, passo_onboarding_id, passos:processo_passos(id, data, ordem, concluido_em)")
+    .select("id, nome, status, passo_onboarding_id, passos:processo_passos!processo_passos_processo_id_fkey(id, data, ordem, concluido_em)")
     .eq("tipo", "roadmap")
     .in("passo_onboarding_id", passoIds);
   if (error) throw error;
