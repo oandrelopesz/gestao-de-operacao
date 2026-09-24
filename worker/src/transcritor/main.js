@@ -85,6 +85,23 @@ async function main() {
 
   let ocupado = false;
   let atual = null;
+  // O Speaches só baixa o modelo quando pedido (idempotente): a fila espera ele ficar pronto
+  let modeloPronto = false;
+  const garantirModelo = async () => {
+    try {
+      const r = await fetch(`${config.speachesUrl}/v1/models/${encodeURIComponent(config.modelo)}`, { method: "POST" });
+      if (r.ok || r.status === 409) {
+        modeloPronto = true;
+        log("modelo.pronto", { modelo: config.modelo });
+        return;
+      }
+      log("modelo.aguardando", { status: r.status, corpo: (await r.text()).slice(0, 200) });
+    } catch (e) {
+      log("modelo.aguardando", { erro: String(e?.message || e) });
+    }
+    setTimeout(garantirModelo, 30000);
+  };
+  garantirModelo();
   const rotas = criarRotasUpload({ pasta: config.pasta, banco, verificar, origens: config.origens });
   http
     .createServer(async (req, res) => {
@@ -93,7 +110,7 @@ async function main() {
         aplicarCors(req, res, config.origens);
         if (req.url === "/health") {
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: true, ocupado, atual, versao: config.versao }));
+          res.end(JSON.stringify({ ok: true, modelo: modeloPronto ? "pronto" : "baixando", ocupado, atual, versao: config.versao }));
           return;
         }
         res.writeHead(404);
@@ -107,7 +124,7 @@ async function main() {
     .listen(config.porta, () => log("servidor.ouvindo", { porta: config.porta, versao: config.versao }));
 
   const laco = async () => {
-    if (ocupado) return;
+    if (ocupado || !modeloPronto) return;
     ocupado = true;
     try {
       // Continua enquanto houver fila; `atual` só serve para o /health e a faxina

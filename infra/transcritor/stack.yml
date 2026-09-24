@@ -1,0 +1,101 @@
+# Stack Swarm do Transcritor. Colar em Portainer > Stacks > Add stack (Web editor), nome: transcritor.
+# - speaches: Whisper (faster-whisper) numa API compatível com a da OpenAI. Só na rede interna.
+# - orquestrador: a mesma imagem do worker do swipe (swipe-worker:latest), com outro comando.
+#   Recebe os arquivos do app, baixa links, corta nos silêncios e grava o texto na tabela transcricoes.
+version: "3.8"
+
+services:
+  speaches:
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
+    environment:
+      # O modelo é baixado a pedido do orquestrador (POST /v1/models/...) e fica no volume
+      PRELOAD_MODELS: '["deepdml/faster-whisper-large-v3-turbo-ct2"]'
+      STT_MODEL_TTL: "-1"
+      WHISPER__COMPUTE_TYPE: "int8"
+      WHISPER__CPU_THREADS: "3"
+      ENABLE_UI: "false"
+    volumes:
+      - transcritor_hf:/home/ubuntu/.cache/huggingface/hub
+    networks:
+      - ALDigitalNet
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 10s
+      resources:
+        limits:
+          cpus: "3"
+          memory: 6G
+      placement:
+        constraints:
+          - node.role == manager
+
+  orquestrador:
+    image: swipe-worker:latest
+    command: ["node", "src/transcritor/main.js"]
+    environment:
+      PORTA: "8090"
+      SUPABASE_URL: "https://bnpvzguapunsztsdvmrs.supabase.co"
+      # Chave pública do app (a mesma do front)
+      SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJucHZ6Z3VhcHVuc3p0c2R2bXJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0MTM3NzIsImV4cCI6MjA5Mjk4OTc3Mn0.2JNYq2-Ra5Na0kIUJtEnpER1IK7uBg6mhsw3IlW6duA"
+      SPEACHES_URL: "http://speaches:8000"
+      MODELO: "deepdml/faster-whisper-large-v3-turbo-ct2"
+      # Quem pode enviar arquivos: login Google do app (ID token conferido no tokeninfo)
+      GOOGLE_CLIENT_ID: "992656410238-rv5027f2sb5a9p682u2lljej6r8c6pdd.apps.googleusercontent.com"
+      EMAILS_PERMITIDOS: "contato@andrelopes.digital"
+      ORIGENS: "https://gestao-de-operacao.lovable.app"
+      PASTA: "/dados/transcritor"
+      TZ: "America/Sao_Paulo"
+    volumes:
+      - transcritor_dados:/dados/transcritor
+    configs:
+      - source: swipe_cookies_instagram_v2
+        target: /cookies/instagram.txt
+        mode: 0444
+      - source: swipe_cookies_tiktok_v2
+        target: /cookies/tiktok.txt
+        mode: 0444
+      - source: swipe_cookies_facebook
+        target: /cookies/facebook.txt
+        mode: 0444
+    networks:
+      - ALDigitalNet
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 10s
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.transcritor.rule=Host(`transcritor.minuanoai.com.br`)
+        - traefik.http.routers.transcritor.entrypoints=websecure
+        - traefik.http.routers.transcritor.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.transcritor.service=transcritor
+        - traefik.http.services.transcritor.loadbalancer.server.port=8090
+        - traefik.http.services.transcritor.loadbalancer.passHostHeader=true
+
+volumes:
+  transcritor_hf:
+  transcritor_dados:
+
+configs:
+  swipe_cookies_instagram_v2:
+    external: true
+  swipe_cookies_tiktok_v2:
+    external: true
+  swipe_cookies_facebook:
+    external: true
+
+networks:
+  ALDigitalNet:
+    external: true
