@@ -3,7 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from "sonner";
 import type FullCalendar from "@fullcalendar/react";
 import type { EventInput } from "@fullcalendar/core";
-import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Loader2, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,6 +33,7 @@ const VISOES: { valor: VisaoAgenda; rotulo: string }[] = [
 ];
 const CHAVE_VISAO = "agenda_visao";
 const CHAVE_OCULTAS = "agenda_ocultas";
+const CHAVE_PAINEL = "agenda_painel_agendas";
 
 function lerLocal<T>(chave: string, padrao: T): T {
   try { const v = localStorage.getItem(chave); return v ? (JSON.parse(v) as T) : padrao; } catch { return padrao; }
@@ -51,6 +52,8 @@ function AgendaPage() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [agendas, setAgendas] = useState<AgendaGoogle[]>([]);
   const [ocultas, setOcultas] = useState<string[]>([]);
+  /** Bloco "Agendas" à esquerda; escondido, a grade ocupa a largura toda. */
+  const [painelAberto, setPainelAberto] = useState(true);
   const [visao, setVisao] = useState<VisaoAgenda>("timeGridWeek");
   const [periodo, setPeriodo] = useState<{ inicio: Date; fim: Date; titulo: string } | null>(null);
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
@@ -63,6 +66,7 @@ function AgendaPage() {
     setMontado(true);
     setVisao(lerLocal<VisaoAgenda>(CHAVE_VISAO, "timeGridWeek"));
     setOcultas(lerLocal<string[]>(CHAVE_OCULTAS, []));
+    setPainelAberto(lerLocal<boolean>(CHAVE_PAINEL, true));
   }, []);
 
   const iniciar = useCallback(async () => {
@@ -238,6 +242,10 @@ function AgendaPage() {
 
   const api = () => calRef.current?.getApi();
 
+  const alternarPainel = () => {
+    setPainelAberto((v) => { gravarLocal(CHAVE_PAINEL, !v); return !v; });
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -289,25 +297,33 @@ function AgendaPage() {
       )}
 
       {estado === "pronto" && (
-        <div className="grid items-start gap-5 lg:grid-cols-[220px_1fr]">
-          <Card className="order-2 lg:order-1">
-            <CardContent className="space-y-2 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Agendas</p>
-              {agendas.map((a) => (
-                <label key={a.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={!ocultas.includes(a.id)}
-                    onCheckedChange={() => alternarAgenda(a.id)}
-                    style={{ borderColor: a.backgroundColor, backgroundColor: ocultas.includes(a.id) ? undefined : a.backgroundColor }}
-                  />
-                  <span className="truncate">{a.summaryOverride ?? a.summary}</span>
-                </label>
-              ))}
-            </CardContent>
-          </Card>
+        <div className={cn("grid items-start gap-5", painelAberto && "lg:grid-cols-[220px_1fr]")}>
+          {painelAberto && (
+            <Card className="order-2 lg:order-1">
+              <CardContent className="space-y-2 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Agendas</p>
+                {agendas.map((a) => (
+                  <label key={a.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={!ocultas.includes(a.id)}
+                      onCheckedChange={() => alternarAgenda(a.id)}
+                      style={{ borderColor: a.backgroundColor, backgroundColor: ocultas.includes(a.id) ? undefined : a.backgroundColor }}
+                    />
+                    <span className="truncate">{a.summaryOverride ?? a.summary}</span>
+                  </label>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
-          <div className="order-1 space-y-3 lg:order-2">
+          <div className="order-1 min-w-0 space-y-3 lg:order-2">
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="ghost" size="icon" className="h-8 w-8" onClick={alternarPainel}
+                aria-label={painelAberto ? "Esconder agendas" : "Mostrar agendas"} title={painelAberto ? "Esconder agendas" : "Mostrar agendas"}
+              >
+                {painelAberto ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+              </Button>
               <Button variant="outline" size="sm" onClick={() => api()?.today()}>Hoje</Button>
               <div className="flex">
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => api()?.prev()} aria-label="Anterior"><ChevronLeft size={16} /></Button>
