@@ -23,6 +23,8 @@ import {
   Bookmark,
   Images,
   FileText,
+  Rocket,
+  Map as MapIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -52,6 +54,8 @@ const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     title: "Operação",
     links: [
       { label: "Demandas", icon: <LayoutDashboard size={17} />, to: "/" },
+      { label: "Onboarding", icon: <Rocket size={17} />, to: "/onboarding" },
+      { label: "Roadmap", icon: <MapIcon size={17} />, to: "/roadmap" },
       { label: "Ideias", icon: <Lightbulb size={17} />, to: "/ideias" },
       { label: "Planilha/CRM", icon: <KeyRound size={17} />, to: "/acessos" },
       { label: "Saldo", icon: <Wallet size={17} />, to: "/saldo" },

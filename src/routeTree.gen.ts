@@ -21,6 +21,7 @@ import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenti
 import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
 import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated/livros'
 import { Route as AuthenticatedNpsRouteImport } from './routes/_authenticated/nps'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedPdfsRouteImport } from './routes/_authenticated/pdfs'
 import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
 import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
@@ -87,6 +88,11 @@ const AuthenticatedNpsRoute = AuthenticatedNpsRouteImport.update({
   path: '/nps',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedPdfsRoute = AuthenticatedPdfsRouteImport.update({
   id: '/pdfs',
   path: '/pdfs',
@@ -125,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/livros': typeof AuthenticatedLivrosRoute
   '/nps': typeof AuthenticatedNpsRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/pdfs': typeof AuthenticatedPdfsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/saldo': typeof AuthenticatedSaldoRoute
@@ -142,6 +149,7 @@ export interface FileRoutesByTo {
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/livros': typeof AuthenticatedLivrosRoute
   '/nps': typeof AuthenticatedNpsRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/pdfs': typeof AuthenticatedPdfsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/saldo': typeof AuthenticatedSaldoRoute
@@ -162,6 +170,7 @@ export interface FileRoutesById {
   '/_authenticated/ideias': typeof AuthenticatedIdeiasRoute
   '/_authenticated/livros': typeof AuthenticatedLivrosRoute
   '/_authenticated/nps': typeof AuthenticatedNpsRoute
+  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/pdfs': typeof AuthenticatedPdfsRoute
   '/_authenticated/prospeccao': typeof AuthenticatedProspeccaoRoute
   '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
@@ -183,6 +192,7 @@ export interface FileRouteTypes {
     | '/ideias'
     | '/livros'
     | '/nps'
+    | '/onboarding'
     | '/pdfs'
     | '/prospeccao'
     | '/saldo'
@@ -200,6 +210,7 @@ export interface FileRouteTypes {
     | '/ideias'
     | '/livros'
     | '/nps'
+    | '/onboarding'
     | '/pdfs'
     | '/prospeccao'
     | '/saldo'
@@ -219,6 +230,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ideias'
     | '/_authenticated/livros'
     | '/_authenticated/nps'
+    | '/_authenticated/onboarding'
     | '/_authenticated/pdfs'
     | '/_authenticated/prospeccao'
     | '/_authenticated/saldo'
@@ -318,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedNpsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/pdfs': {
       id: '/_authenticated/pdfs'
       path: '/pdfs'
@@ -366,6 +385,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedIdeiasRoute: typeof AuthenticatedIdeiasRoute
   AuthenticatedLivrosRoute: typeof AuthenticatedLivrosRoute
   AuthenticatedNpsRoute: typeof AuthenticatedNpsRoute
+  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPdfsRoute: typeof AuthenticatedPdfsRoute
   AuthenticatedProspeccaoRoute: typeof AuthenticatedProspeccaoRoute
   AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
@@ -384,6 +404,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIdeiasRoute: AuthenticatedIdeiasRoute,
   AuthenticatedLivrosRoute: AuthenticatedLivrosRoute,
   AuthenticatedNpsRoute: AuthenticatedNpsRoute,
+  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPdfsRoute: AuthenticatedPdfsRoute,
   AuthenticatedProspeccaoRoute: AuthenticatedProspeccaoRoute,
   AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,
