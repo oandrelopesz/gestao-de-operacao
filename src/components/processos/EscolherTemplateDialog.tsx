@@ -21,6 +21,8 @@ interface EscolherTemplateDialogProps {
   tipo: TipoProcesso;
   /** Desabilita "Substituir": o processo já tem passos concluídos. */
   processoTemConcluidos: boolean;
+  /** Criando um processo novo: esconde a escolha substituir/acrescentar e o botão vira "Usar template". */
+  modoCriacao?: boolean;
   onEscolher: (templateId: string, modo: "substituir" | "acrescentar") => void | Promise<void>;
   onClose: () => void;
 }
@@ -30,7 +32,7 @@ type Modo = "substituir" | "acrescentar";
 const erroMsg = (e: unknown) => (e && typeof e === "object" && "message" in e ? String((e as any).message) : "Erro ao carregar");
 
 /** Escolher um template para aplicar num processo: substituir os passos atuais ou acrescentar ao fim. */
-export function EscolherTemplateDialog({ aberto, tipo, processoTemConcluidos, onEscolher, onClose }: EscolherTemplateDialogProps) {
+export function EscolherTemplateDialog({ aberto, tipo, processoTemConcluidos, modoCriacao = false, onEscolher, onClose }: EscolherTemplateDialogProps) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -116,7 +118,7 @@ export function EscolherTemplateDialog({ aberto, tipo, processoTemConcluidos, on
             <FilePlus2 size={14} /> Criar template novo
           </Button>
 
-          <div className="space-y-2">
+          {!modoCriacao && <div className="space-y-2">
             <Label className="text-xs">Como aplicar</Label>
             <RadioGroup value={modo} onValueChange={(v) => setModo(v as Modo)} className="space-y-2">
               <div className={cn("flex items-start gap-2.5 rounded-lg border p-2.5", processoTemConcluidos && "opacity-60")}>
@@ -138,13 +140,13 @@ export function EscolherTemplateDialog({ aberto, tipo, processoTemConcluidos, on
                 </Label>
               </div>
             </RadioGroup>
-          </div>
+          </div>}
 
           <DialogFooter>
             <Button variant="ghost" onClick={onClose} disabled={aplicando}>Cancelar</Button>
             <Button onClick={aplicar} disabled={!selecionadoId || aplicando} className="gap-1.5">
               {aplicando && <Loader2 size={14} className="animate-spin" />}
-              Aplicar template
+              {modoCriacao ? "Usar template" : "Aplicar template"}
             </Button>
           </DialogFooter>
         </DialogContent>

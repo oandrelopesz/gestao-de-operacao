@@ -93,18 +93,23 @@ function EmAndamento({ clienteFoco }: { clienteFoco?: string }) {
   const [erro, setErro] = useState<string | null>(null);
   const [destacado, setDestacado] = useState<string | null>(null);
 
+  // Contador de requisições: uma recarga antiga que termina depois de uma nova é descartada
+  const requisicao = useRef(0);
   const carregar = useCallback(async () => {
+    const minha = ++requisicao.current;
     try {
       const [c, p] = await Promise.all([fetchClientesEmOnboarding(), fetchProcessos("onboarding", "ativos")]);
       const r = await fetchRoadmapsLigados(p.flatMap((x) => x.passos.map((s) => s.id)));
+      if (minha !== requisicao.current) return;
       setClientes(c);
       setProcessos(p);
       setRoadmaps(r);
       setErro(null);
     } catch (e) {
+      if (minha !== requisicao.current) return;
       setErro(erroMsg(e));
     } finally {
-      setLoading(false);
+      if (minha === requisicao.current) setLoading(false);
     }
   }, []);
 
@@ -119,6 +124,7 @@ function EmAndamento({ clienteFoco }: { clienteFoco?: string }) {
   // ?cliente=<id>: rola até o card e destaca por 3s
   const cardsRef = useRef<Record<string, HTMLDivElement | null>>({});
   const focado = useRef<string | null>(null);
+  const timerDestaque = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (loading || !clienteFoco || focado.current === clienteFoco) return;
     const el = cardsRef.current[clienteFoco];
@@ -126,9 +132,11 @@ function EmAndamento({ clienteFoco }: { clienteFoco?: string }) {
     focado.current = clienteFoco;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     setDestacado(clienteFoco);
-    const t = setTimeout(() => setDestacado(null), 3000);
-    return () => clearTimeout(t);
+    // Timer num ref: a reexecução do efeito (clientes recarregados) não pode cancelá-lo e deixar o destaque preso
+    if (timerDestaque.current) clearTimeout(timerDestaque.current);
+    timerDestaque.current = setTimeout(() => setDestacado(null), 3000);
   }, [loading, clienteFoco, clientes]);
+  useEffect(() => () => { if (timerDestaque.current) clearTimeout(timerDestaque.current); }, []);
 
   const abrirRoadmap = (id: string) => navigate({ to: "/roadmap" as any, search: { id } as any });
 
@@ -226,6 +234,8 @@ function ClienteSemProcesso({ cliente, destaque, onCriado }: { cliente: ClienteR
       onCriado();
     } catch (e) {
       toast.error(erroMsg(e));
+      // O processo pode ter sido criado e só os passos falharem: recarrega para não tentar criar de novo
+      onCriado();
       throw e;
     }
   };
@@ -239,6 +249,7 @@ function ClienteSemProcesso({ cliente, destaque, onCriado }: { cliente: ClienteR
       onCriado();
     } catch (e) {
       toast.error(erroMsg(e));
+      onCriado();
     } finally {
       setCriando(false);
     }
@@ -279,6 +290,7 @@ function ClienteSemProcesso({ cliente, destaque, onCriado }: { cliente: ClienteR
         aberto={escolher}
         tipo="onboarding"
         processoTemConcluidos={false}
+        modoCriacao
         onEscolher={(id) => usarTemplate(id)}
         onClose={() => setEscolher(false)}
       />

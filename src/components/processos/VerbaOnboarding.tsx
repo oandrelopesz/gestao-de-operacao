@@ -19,6 +19,20 @@ interface VerbaOnboardingProps {
   onSalvo?: (v: VerbaPrincipal) => void;
 }
 
+/** Aviso entre instâncias: salvar a verba num lugar (ex.: diálogo de conclusão) atualiza as outras do mesmo cliente. */
+const EVENTO_VERBA = "verba-onboarding-salva";
+
+/** Valor digitado em pt-BR ("1.500,50", "1500,5", "1500.50") → número; null se inválido. */
+export function parseValorBR(texto: string): number | null {
+  let t = texto.replace(/[^\d.,-]/g, "");
+  if (!t) return null;
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
 const erroMsg = (e: unknown) => (e && typeof e === "object" && "message" in e ? String((e as any).message) : "Erro ao salvar");
 
 /** Verba mensal da operação principal do cliente, editável num popover (plataforma + valor). */
@@ -42,6 +56,11 @@ export function VerbaOnboarding({ clienteId, variante = "cabecalho", onSalvo }: 
 
   useEffect(() => {
     carregar();
+    const aoSalvarEmOutroLugar = (e: Event) => {
+      if ((e as CustomEvent<{ clienteId: string }>).detail?.clienteId === clienteId) carregar();
+    };
+    window.addEventListener(EVENTO_VERBA, aoSalvarEmOutroLugar);
+    return () => window.removeEventListener(EVENTO_VERBA, aoSalvarEmOutroLugar);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clienteId]);
 
@@ -49,16 +68,16 @@ export function VerbaOnboarding({ clienteId, variante = "cabecalho", onSalvo }: 
   useEffect(() => {
     if (!aberto) return;
     setPlataforma(verba?.plataforma ?? nomes[0] ?? "");
-    setValor(verba && verba.valor > 0 ? String(verba.valor) : "");
+    setValor(verba && verba.valor > 0 ? String(verba.valor).replace(".", ",") : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto]);
 
   const opcoes = Array.from(new Set([...(verba?.plataformasConfiguradas ?? []), ...nomes]));
-  const numero = Number(valor.replace(",", "."));
-  const valido = !!plataforma && valor.trim() !== "" && Number.isFinite(numero) && numero >= 0;
+  const numero = parseValorBR(valor);
+  const valido = !!plataforma && numero !== null && numero >= 0;
 
   const salvar = async () => {
-    if (!valido || salvando) return;
+    if (!valido || numero === null || salvando) return;
     setSalvando(true);
     try {
       await salvarVerbaPrincipal(clienteId, plataforma, numero);
@@ -67,6 +86,7 @@ export function VerbaOnboarding({ clienteId, variante = "cabecalho", onSalvo }: 
       const exibida = { ...nova, plataforma, valor: numero };
       setVerba(exibida);
       onSalvo?.(exibida);
+      window.dispatchEvent(new CustomEvent(EVENTO_VERBA, { detail: { clienteId } }));
       setAberto(false);
       toast.success("Verba mensal salva");
     } catch (e) {
@@ -147,10 +167,8 @@ export function VerbaOnboarding({ clienteId, variante = "cabecalho", onSalvo }: 
         <div className="space-y-1.5">
           <Label className="text-xs">Valor por mês ({simboloMoeda(verba?.moeda)})</Label>
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
-            min={0}
-            step="0.01"
             placeholder="0,00"
             value={valor}
             onChange={(e) => setValor(e.target.value)}

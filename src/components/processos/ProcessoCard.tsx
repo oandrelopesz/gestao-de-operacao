@@ -309,7 +309,7 @@ export function ProcessoCard({ processo, roadmaps, destaque, extraCabecalho, aco
         </AlertDialogContent>
       </AlertDialog>
 
-      {ehOnboarding && (
+      {ehOnboarding && (concluirAberto || tudoConcluido) && (
         <ConcluirOnboardingDialog
           aberto={concluirAberto}
           processo={processo}

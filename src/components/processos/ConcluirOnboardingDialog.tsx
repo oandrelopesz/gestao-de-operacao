@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Loader2, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -30,16 +31,16 @@ export const dataBrasilia = (iso: string) => hojeBrasilia(new Date(iso));
 
 /** Confirma o fim do onboarding: resumo, verba (editável) e o que acontece com o cliente. */
 export function ConcluirOnboardingDialog({ aberto, processo, onClose, onMudou }: ConcluirOnboardingDialogProps) {
-  const [ativaTrafego] = useConfig<boolean>("onboarding_ativa_trafego", true);
+  const [ativaTrafego, , carregandoConfig] = useConfig<boolean>("onboarding_ativa_trafego", true);
   const [concluindo, setConcluindo] = useState(false);
 
   const hoje = hojeBrasilia();
-  const inicio = dataBrasilia(processo.iniciado_em);
+  const inicio = dataBrasilia(processo.cliente?.onboarding_desde ?? processo.iniciado_em);
   const dias = Math.max(0, duracaoDias(inicio, hoje));
   const nomeCliente = processo.cliente?.nome ?? "cliente";
 
   const confirmar = async () => {
-    if (concluindo) return;
+    if (concluindo || carregandoConfig) return;
     setConcluindo(true);
     try {
       await concluirOnboarding(processo, ativaTrafego !== false);
@@ -68,11 +69,18 @@ export function ConcluirOnboardingDialog({ aberto, processo, onClose, onMudou }:
             <PartyPopper size={20} />
           </div>
           <DialogTitle>Concluir onboarding</DialogTitle>
-          <DialogDescription>
-            {ativaTrafego !== false
-              ? "O cliente sai do onboarding e passa a ter tráfego ativo com essa verba mensal."
-              : "O cliente sai do onboarding."}
-          </DialogDescription>
+          {carregandoConfig ? (
+            <>
+              <Skeleton className="h-4 w-full max-w-sm" />
+              <DialogDescription className="sr-only">Carregando configuração</DialogDescription>
+            </>
+          ) : (
+            <DialogDescription>
+              {ativaTrafego !== false
+                ? "O cliente sai do onboarding e passa a ter tráfego ativo com essa verba mensal."
+                : "O cliente sai do onboarding."}
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         <dl className="divide-y rounded-xl border bg-muted/20 px-4">
@@ -85,7 +93,7 @@ export function ConcluirOnboardingDialog({ aberto, processo, onClose, onMudou }:
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={concluindo}>Cancelar</Button>
-          <Button onClick={confirmar} disabled={concluindo} className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-600/90">
+          <Button onClick={confirmar} disabled={concluindo || carregandoConfig} className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-600/90">
             {concluindo && <Loader2 size={14} className="animate-spin" />}
             Concluir onboarding
           </Button>
