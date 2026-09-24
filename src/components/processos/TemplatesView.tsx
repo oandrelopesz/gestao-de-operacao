@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Copy, Layers, MoreHorizontal, Pencil, Plus, Trash2, Type } from "lucide-react";
+import { Copy, Layers, Loader2, MoreHorizontal, Pencil, Plus, Trash2, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -122,7 +122,11 @@ export function TemplatesView({ tipo }: TemplatesViewProps) {
 
       {erro && <p className="text-sm text-destructive">{erro}</p>}
 
-      {!loading && templates.length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin text-muted-foreground" />
+        </div>
+      ) : templates.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
           <div className="bg-muted rounded-full p-4"><Layers size={32} className="text-muted-foreground" /></div>
           <h3 className="text-base font-medium">Nenhum template ainda</h3>

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { format, isAfter, startOfYear, subDays } from "date-fns";
-import { History, Search } from "lucide-react";
+import { format } from "date-fns";
+import { History, Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { hojeBrasilia } from "@/lib/entrega";
 import { duracaoDias, type TipoProcesso } from "@/lib/processos";
 import { fetchProcessos, fetchRoadmapsLigados, type Processo, type RoadmapLigado } from "@/lib/processosService";
 import { Trilha } from "./Trilha";
@@ -19,11 +20,17 @@ type Periodo = "30dias" | "ano" | "tudo";
 
 const erroMsg = (e: unknown) => (e && typeof e === "object" && "message" in e ? String((e as any).message) : "Erro ao carregar");
 
-const naJanela = (dataISO: string, periodo: Periodo): boolean => {
+const DIA_MS = 24 * 60 * 60 * 1000;
+const utc = (dataYMD: string) => Date.UTC(Number(dataYMD.slice(0, 4)), Number(dataYMD.slice(5, 7)) - 1, Number(dataYMD.slice(8, 10)));
+/** Data (YYYY-MM-DD) `n` dias antes/depois de `dataYMD`, em UTC (sem depender do fuso do navegador). */
+const somarDias = (dataYMD: string, n: number) => new Date(utc(dataYMD) + n * DIA_MS).toISOString().slice(0, 10);
+
+/** Compara pelo dia em Brasília (mesmo fuso do banco), não pelo fuso do navegador. `dataISO` é um timestamptz. */
+const naJanela = (dataISO: string, periodo: Periodo, hoje: string): boolean => {
   if (periodo === "tudo") return true;
-  const data = new Date(dataISO);
-  const limite = periodo === "30dias" ? subDays(new Date(), 30) : startOfYear(new Date());
-  return isAfter(data, limite);
+  const diaBrasilia = hojeBrasilia(new Date(dataISO));
+  const limite = periodo === "30dias" ? somarDias(hoje, -29) : `${hoje.slice(0, 4)}-01-01`;
+  return diaBrasilia >= limite;
 };
 
 /** Aba de histórico (compartilhada entre Onboarding e Roadmap): processos concluídos/encerrados, com a trilha em somente-leitura. */
@@ -56,10 +63,11 @@ export function HistoricoView({ tipo }: HistoricoViewProps) {
 
   const filtrados = useMemo(() => {
     const buscaNorm = busca.trim().toLowerCase();
+    const hoje = hojeBrasilia();
     return processos.filter((p) => {
       if (buscaNorm && !p.cliente?.nome?.toLowerCase().includes(buscaNorm)) return false;
       const dataRef = p.concluido_em ?? p.iniciado_em;
-      if (!naJanela(dataRef, periodo)) return false;
+      if (!naJanela(dataRef, periodo, hoje)) return false;
       return true;
     });
   }, [processos, busca, periodo]);
@@ -83,7 +91,11 @@ export function HistoricoView({ tipo }: HistoricoViewProps) {
 
       {erro && <p className="text-sm text-destructive">{erro}</p>}
 
-      {!loading && filtrados.length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={24} className="animate-spin text-muted-foreground" />
+        </div>
+      ) : filtrados.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
           <div className="bg-muted rounded-full p-4"><History size={32} className="text-muted-foreground" /></div>
           <h3 className="text-base font-medium">
@@ -101,7 +113,7 @@ export function HistoricoView({ tipo }: HistoricoViewProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Cliente</TableHead>
-                <TableHead>Processo</TableHead>
+                <TableHead>Processo/template</TableHead>
                 <TableHead>Início</TableHead>
                 <TableHead>Conclusão</TableHead>
                 <TableHead>Duração</TableHead>
