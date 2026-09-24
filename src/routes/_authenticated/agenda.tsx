@@ -9,10 +9,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { getCached, setCached } from "@/lib/pageCache";
 import { DriveAuthError, oauthUrl, statusDoDrive } from "@/lib/googleDrive";
 import {
   AgendaConflitoError, AgendaSemPermissaoError, listarAgendas, listarEventos, obterEvento, podeEditarEvento, podeEscrever,
-  temPermissaoAgenda, type AgendaGoogle,
+  type AgendaGoogle,
 } from "@/lib/googleCalendar";
 import { eventoParaForm, moverPorArrasto, novoForm, temParticipantes, type EventoGoogle } from "@/lib/agendaEvento";
 import { salvarComEscopo, type Escopo } from "@/lib/agendaSerie";
@@ -45,12 +46,38 @@ function gravarLocal(chave: string, valor: unknown) {
 type Estado = "carregando" | "sem_login" | "sem_permissao" | "pronto" | "erro";
 interface Ocorrencia { calendarId: string; evento: EventoGoogle }
 
+// ---------------------------------------------------------------- Cache (abrir na hora)
+// Memória (trocar de aba dentro do sistema) + navegador (recarregar a página): a agenda aparece na
+// hora com o que já foi visto e se atualiza por trás. Guarda os últimos períodos navegados.
+type CacheEventos = Record<string, Ocorrencia[]>;
+const CACHE_AGENDAS = "agenda.agendas";
+const CACHE_EVENTOS = "agenda.eventos";
+const CHAVE_CACHE_LOCAL = "agenda_cache_v1";
+const MAX_PERIODOS = 8;
+const PERMISSAO_OK = "agenda_permissao_ok"; // na sessão da aba: não precisa checar de novo
+const chavePeriodo = (inicio: Date, fim: Date) => `${inicio.toISOString()}|${fim.toISOString()}`;
+
+function guardarCache(agendas: AgendaGoogle[], eventos: CacheEventos) {
+  const chaves = Object.keys(eventos);
+  const recentes = chaves.length > MAX_PERIODOS ? Object.fromEntries(chaves.slice(-MAX_PERIODOS).map((k) => [k, eventos[k]])) : eventos;
+  setCached(CACHE_AGENDAS, agendas);
+  setCached(CACHE_EVENTOS, recentes);
+  gravarLocal(CHAVE_CACHE_LOCAL, { agendas, eventos: recentes });
+}
+function lerSessao(chave: string): boolean {
+  try { return sessionStorage.getItem(chave) === "1"; } catch { return false; }
+}
+function gravarSessao(chave: string, v: boolean) {
+  try { if (v) sessionStorage.setItem(chave, "1"); else sessionStorage.removeItem(chave); } catch { /* sem storage */ }
+}
+
 function AgendaPage() {
   const [montado, setMontado] = useState(false);
-  const [estado, setEstado] = useState<Estado>("carregando");
+  const [estado, setEstado] = useState<Estado>(() => (getCached<AgendaGoogle[]>(CACHE_AGENDAS)?.length ? "pronto" : "carregando"));
   const [erro, setErro] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
-  const [agendas, setAgendas] = useState<AgendaGoogle[]>([]);
+  const [agendas, setAgendas] = useState<AgendaGoogle[]>(() => getCached<AgendaGoogle[]>(CACHE_AGENDAS) ?? []);
+  const eventosCache = useRef<CacheEventos>(getCached<CacheEventos>(CACHE_EVENTOS) ?? {});
   const [ocultas, setOcultas] = useState<string[]>([]);
   /** Bloco "Agendas" à esquerda; escondido, a grade ocupa a largura toda. */
   const [painelAberto, setPainelAberto] = useState(true);
@@ -64,24 +91,53 @@ function AgendaPage() {
 
   useEffect(() => {
     setMontado(true);
+    // Recarregou a página: o que foi visto da última vez aparece já, enquanto atualiza
+    if (!getCached(CACHE_AGENDAS)) {
+      const local = lerLocal<{ agendas: AgendaGoogle[]; eventos: CacheEventos } | null>(CHAVE_CACHE_LOCAL, null);
+      if (local?.agendas?.length) {
+        eventosCache.current = local.eventos ?? {};
+        setCached(CACHE_AGENDAS, local.agendas);
+        setCached(CACHE_EVENTOS, eventosCache.current);
+        setAgendas(local.agendas);
+        setEstado((e) => (e === "carregando" ? "pronto" : e));
+      }
+    }
     setVisao(lerLocal<VisaoAgenda>(CHAVE_VISAO, "timeGridWeek"));
     setOcultas(lerLocal<string[]>(CHAVE_OCULTAS, []));
     setPainelAberto(lerLocal<boolean>(CHAVE_PAINEL, true));
   }, []);
 
-  const iniciar = useCallback(async () => {
-    setEstado("carregando");
+  /**
+   * Com cache na tela, só atualiza a lista de agendas por trás. A conexão com o Google só é
+   * conferida uma vez por sessão da aba (antes: duas consultas ao servidor a cada abertura).
+   */
+  const iniciar = useCallback(async (forcar = false) => {
+    const temCache = !!getCached<AgendaGoogle[]>(CACHE_AGENDAS)?.length || !!lerLocal(CHAVE_CACHE_LOCAL, null);
+    if (!temCache || forcar) setEstado("carregando");
     setErro(null);
     try {
-      const st = await statusDoDrive(true);
-      setClientId(st.client_id);
-      if (!st.connected || !(await temPermissaoAgenda())) { setEstado("sem_permissao"); return; }
-      setAgendas(await listarAgendas());
+      if (forcar || !lerSessao(PERMISSAO_OK)) {
+        const st = await statusDoDrive(forcar);
+        setClientId(st.client_id);
+        const temAgenda = (st.scope ?? "").split(/\s+/).includes("https://www.googleapis.com/auth/calendar.events");
+        if (!st.connected || !temAgenda) { gravarSessao(PERMISSAO_OK, false); setEstado("sem_permissao"); return; }
+        gravarSessao(PERMISSAO_OK, true);
+      }
+      const lista = await listarAgendas();
+      setAgendas(lista);
+      guardarCache(lista, eventosCache.current);
       setEstado("pronto");
     } catch (e) {
-      if (e instanceof AgendaSemPermissaoError) setEstado("sem_permissao");
-      else if (e instanceof DriveAuthError) setEstado("sem_login");
-      else { setErro(e instanceof Error ? e.message : "Erro ao abrir a agenda"); setEstado("erro"); }
+      if (e instanceof AgendaSemPermissaoError) { gravarSessao(PERMISSAO_OK, false); setEstado("sem_permissao"); return; }
+      if (e instanceof DriveAuthError) {
+        statusDoDrive().then((st) => setClientId(st.client_id)).catch(() => {});
+        setEstado("sem_login");
+        return;
+      }
+      // Com cache na tela, um erro de rede não derruba a agenda: segue com o que já tem
+      if (temCache && !forcar) return;
+      setErro(e instanceof Error ? e.message : "Erro ao abrir a agenda");
+      setEstado("erro");
     }
   }, []);
 
@@ -101,6 +157,9 @@ function AgendaPage() {
   const carregarEventos = useCallback(async (silencioso = false) => {
     if (estado !== "pronto" || !periodo) return;
     const minha = ++requisicao.current;
+    const chave = chavePeriodo(periodo.inicio, periodo.fim);
+    const doCache = eventosCache.current[chave];
+    if (doCache) setOcorrencias(doCache); // período já visto: aparece na hora, atualiza por trás
     if (!silencioso) setCarregandoEventos(true);
     const resultados = await Promise.allSettled(
       visiveis.map(async (a) => (await listarEventos(a.id, periodo.inicio, periodo.fim)).map((evento) => ({ calendarId: a.id, evento }))),
@@ -111,8 +170,14 @@ function AgendaPage() {
     if (falhas.some((f) => f.reason instanceof AgendaSemPermissaoError)) { setEstado("sem_permissao"); return; }
     if (falhas.length && silencioso) return; // mantém o que já está na tela
     if (falhas.length) toast.error(`Não foi possível carregar ${falhas.length === 1 ? "uma agenda" : `${falhas.length} agendas`}: ${String(falhas[0].reason?.message ?? falhas[0].reason)}`);
-    setOcorrencias(resultados.flatMap((r) => (r.status === "fulfilled" ? r.value : [])));
-  }, [estado, periodo, visiveis]);
+    const novas = resultados.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+    setOcorrencias(novas);
+    if (!falhas.length) {
+      const { [chave]: _antigo, ...resto } = eventosCache.current;
+      eventosCache.current = { ...resto, [chave]: novas }; // o mais recente vai para o fim (mantido no corte)
+      guardarCache(agendas, eventosCache.current);
+    }
+  }, [estado, periodo, visiveis, agendas]);
 
   useEffect(() => { carregarEventos(); }, [carregarEventos]);
 
@@ -137,7 +202,7 @@ function AgendaPage() {
   }, [carregarEventos]);
 
   const corDe = useMemo(() => new Map(agendas.map((a) => [a.id, a])), [agendas]);
-  const eventosGrade = useMemo<EventInput[]>(() => ocorrencias.map(({ calendarId, evento }) => {
+  const eventosGrade = useMemo<EventInput[]>(() => ocorrencias.filter((o) => !ocultas.includes(o.calendarId)).map(({ calendarId, evento }) => {
     const a = corDe.get(calendarId);
     return {
       id: `${calendarId}::${evento.id}`,
@@ -150,7 +215,7 @@ function AgendaPage() {
       textColor: a?.foregroundColor,
       editable: podeEditarEvento(a, evento, calendarId),
     };
-  }), [ocorrencias, corDe]);
+  }), [ocorrencias, corDe, ocultas]);
 
   const principal = agendas.find((a) => a.primary && podeEscrever(a)) ?? agendas.find(podeEscrever);
 
@@ -280,7 +345,7 @@ function AgendaPage() {
         <Card className="border-destructive/40">
           <CardContent className="flex items-center justify-between gap-3 p-4 text-sm text-destructive">
             {erro}
-            <Button size="sm" variant="outline" onClick={iniciar}>Tentar de novo</Button>
+            <Button size="sm" variant="outline" onClick={() => iniciar(true)}>Tentar de novo</Button>
           </CardContent>
         </Card>
       )}
@@ -302,7 +367,7 @@ function AgendaPage() {
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardContent className="space-y-3 p-4 text-sm">
             <p className="font-medium">Entre com o Google neste navegador para ver a agenda</p>
-            {clientId ? <BotaoGoogleLogin clientId={clientId} onEntrou={iniciar} /> : <p className="text-muted-foreground">Configure o login Google no Admin.</p>}
+            {clientId ? <BotaoGoogleLogin clientId={clientId} onEntrou={() => iniciar(true)} /> : <p className="text-muted-foreground">Configure o login Google no Admin.</p>}
           </CardContent>
         </Card>
       )}

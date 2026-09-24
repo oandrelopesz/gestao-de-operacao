@@ -33,7 +33,7 @@ function absorverChaveDaUrl(): void {
   } catch {
     // storage indisponível
   }
-  tokenCache = null;
+  invalidarTokenGoogle();
   window.history.replaceState({}, "", window.location.pathname + window.location.search);
 }
 
@@ -53,7 +53,7 @@ export function setSwipeKey(key: string): void {
   } catch {
     // storage indisponível: a chave vale só para esta sessão
   }
-  tokenCache = null;
+  invalidarTokenGoogle();
 }
 
 export interface DriveStatus {
@@ -89,11 +89,33 @@ export function oauthUrl(clientId: string, redirectUri: string, userId: string, 
 }
 
 let tokenCache: { token: string; expiresAt: number } | null = null;
+
+// O token de acesso (1 h) também fica na sessão da aba: recarregar a página não precisa refazer o
+// login silencioso do Google (que leva segundos). Some ao fechar a aba.
+const CHAVE_SESSAO_TOKEN = "google_access_token";
+function tokenDaSessao(): { token: string; expiresAt: number } | null {
+  try {
+    const v = sessionStorage.getItem(CHAVE_SESSAO_TOKEN);
+    const t = v ? (JSON.parse(v) as { token: string; expiresAt: number }) : null;
+    return t && t.expiresAt - Date.now() > 60_000 ? t : null;
+  } catch {
+    return null;
+  }
+}
+function guardarTokenNaSessao(t: { token: string; expiresAt: number } | null) {
+  try {
+    if (t) sessionStorage.setItem(CHAVE_SESSAO_TOKEN, JSON.stringify(t));
+    else sessionStorage.removeItem(CHAVE_SESSAO_TOKEN);
+  } catch {
+    // storage indisponível: fica só na memória
+  }
+}
 let statusCache: { data: DriveStatus; at: number } | null = null;
 
 /** Força buscar um access token novo na próxima chamada (ex.: o Google respondeu 401). */
 export function invalidarTokenGoogle(): void {
   tokenCache = null;
+  guardarTokenNaSessao(null);
 }
 
 export class SwipeKeyError extends Error {}
@@ -113,6 +135,11 @@ export async function statusDoDrive(forcar = false): Promise<DriveStatus> {
 
 export async function getAccessToken(): Promise<string> {
   if (tokenCache && tokenCache.expiresAt - Date.now() > 60_000) return tokenCache.token;
+  const daSessao = tokenDaSessao();
+  if (daSessao) {
+    tokenCache = daSessao;
+    return daSessao.token;
+  }
 
   // 1) Login Google (funciona em qualquer navegador/dispositivo), quando disponível
   let idToken = idTokenEmCache();
@@ -144,6 +171,7 @@ export async function getAccessToken(): Promise<string> {
   }
   if (!r.ok) throw new Error(data.error || `Erro ao obter token (${r.status})`);
   tokenCache = { token: data.access_token, expiresAt: new Date(data.expires_at).getTime() };
+  guardarTokenNaSessao(tokenCache);
   return data.access_token;
 }
 
@@ -154,7 +182,7 @@ async function driveFetch(path: string, init: RequestInit = {}, base = DRIVE): P
     headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` },
   });
   if (r.status === 401) {
-    tokenCache = null;
+    invalidarTokenGoogle();
     throw new Error("Token do Google expirou ou foi revogado. Reconecte o Drive em Admin → Swipe file.");
   }
   return r;

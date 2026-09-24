@@ -67,6 +67,8 @@ function AuthenticatedLayout() {
         router.preloadRoute({ to: l.to as any }).catch(() => {});
       });
       warmAllCaches();
+      // A grade da Agenda (FullCalendar) é carregada à parte: baixa já, para a aba abrir na hora
+      import("@/components/agenda/AgendaGrade").catch(() => {});
     }, 300);
     return () => clearTimeout(t);
   }, [router]);
