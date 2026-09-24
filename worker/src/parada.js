@@ -47,20 +47,23 @@ export function reiniciarParada() {
 
 /**
  * Enquanto o job roda, consulta o status dele no Supabase a cada `intervaloMs`; quando o app
- * marca `pausado`, pede a parada. Sem chave pública configurada, não vigia (o job segue normal).
- * Devolve a função que encerra a vigia.
+ * marca um status de parada (`pausado`) ou apaga a linha (Cancelar), pede a parada. Sem chave
+ * pública configurada, não vigia (o job segue normal). Devolve a função que encerra a vigia.
+ * `tabela`/`statusDeParada` servem ao Transcritor (`transcricoes` / `pausada`).
  */
-export function vigiarPausa({ jobId, supabaseUrl, anonKey, intervaloMs = 3000, fetch: _fetch = fetch }) {
+export function vigiarPausa({ jobId, supabaseUrl, anonKey, tabela = "swipe_jobs", statusDeParada = ["pausado"], intervaloMs = 3000, fetch: _fetch = fetch }) {
   if (!anonKey || !jobId) return () => {};
   let parado = false;
-  const url = `${supabaseUrl}/rest/v1/swipe_jobs?id=eq.${encodeURIComponent(jobId)}&select=status`;
+  const url = `${supabaseUrl}/rest/v1/${tabela}?id=eq.${encodeURIComponent(jobId)}&select=status`;
   const checar = async () => {
     try {
       const r = await _fetch(url, { headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` } });
       if (!r.ok) return;
       const linhas = await r.json();
-      if (!parado && linhas?.[0]?.status === "pausado") {
-        console.log(JSON.stringify({ evento: "job.pausa_pedida", id: jobId }));
+      if (parado || !Array.isArray(linhas)) return;
+      // Linha apagada = cancelado no app (o item some junto com o job)
+      if (!linhas.length || statusDeParada.includes(linhas[0]?.status)) {
+        console.log(JSON.stringify({ evento: linhas.length ? "job.pausa_pedida" : "job.cancelado", id: jobId }));
         pedirParada();
       }
     } catch {

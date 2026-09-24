@@ -95,3 +95,46 @@ test("executarJob zera a parada do job anterior e encerra a vigia no fim", async
   assert.deepEqual(r, { ok: true, resultado: { drive_file_id: "f1" } });
   assert.equal(vigiaEncerrada, true);
 });
+
+test("vigiarPausa: job apagado (cancelado no app) também pede a parada", async () => {
+  reiniciarParada();
+  let parou = false;
+  registrar(() => { parou = true; });
+  const parar = vigiarPausa({ jobId: "j1", supabaseUrl: "https://sb.test", anonKey: "anon", intervaloMs: 20, fetch: async () => ({ ok: true, json: async () => [] }) });
+  await new Promise((r) => setTimeout(r, 80));
+  parar();
+  assert.equal(parou, true);
+  reiniciarParada();
+});
+
+test("vigiarPausa: erro de rede ou resposta ruim não para o job", async () => {
+  reiniciarParada();
+  let parou = false;
+  registrar(() => { parou = true; });
+  let n = 0;
+  const fetchFake = async () => {
+    n++;
+    if (n % 2) throw new Error("rede caiu");
+    return { ok: false, json: async () => ({}) };
+  };
+  const parar = vigiarPausa({ jobId: "j1", supabaseUrl: "https://sb.test", anonKey: "anon", intervaloMs: 15, fetch: fetchFake });
+  await new Promise((r) => setTimeout(r, 90));
+  parar();
+  assert.equal(parou, false);
+  reiniciarParada();
+});
+
+test("vigiarPausa em outra tabela e com outro status de parada (Transcritor)", async () => {
+  reiniciarParada();
+  let parou = false;
+  registrar(() => { parou = true; });
+  const fetchFake = async (url) => {
+    assert.match(url, /transcricoes\?id=eq\.t1&select=status/);
+    return { ok: true, json: async () => [{ status: "pausada" }] };
+  };
+  const parar = vigiarPausa({ jobId: "t1", tabela: "transcricoes", statusDeParada: ["pausada"], supabaseUrl: "https://sb.test", anonKey: "anon", intervaloMs: 20, fetch: fetchFake });
+  await new Promise((r) => setTimeout(r, 80));
+  parar();
+  assert.equal(parou, true);
+  reiniciarParada();
+});
