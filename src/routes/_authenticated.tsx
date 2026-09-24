@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   LayoutDashboard,
@@ -34,6 +34,8 @@ import { AgenciasProvider } from "@/lib/agencias";
 import { PlataformasProvider } from "@/lib/plataformas";
 import { useTheme } from "@/lib/theme";
 import { warmAllCaches } from "@/lib/data";
+import { getConfig } from "@/lib/appConfig";
+import { aplicarMenu, type MenuConfig } from "@/lib/menuConfig";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -49,7 +51,7 @@ interface NavLink {
 }
 
 // Navegação agrupada por contexto: operação do dia, comercial, pessoal e sistema
-const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
+export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
   {
     title: "Operação",
     links: [
@@ -102,6 +104,24 @@ function AuthenticatedLayout() {
   });
   const { theme, toggle: toggleTheme } = useTheme();
   const router = useRouter();
+
+  // Config do menu lateral (Admin): quais abas aparecem e a ordem de cada grupo.
+  // Guardada num estado local (e não só no useConfig) para recarregar assim que o
+  // Admin salvar, via o evento "menu-config" disparado pelo MenuAdminCard.
+  const [menuCfg, setMenuCfg] = useState<MenuConfig | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    const carregarMenuCfg = () => {
+      getConfig<MenuConfig | null>("menu", null).then((v) => { if (vivo) setMenuCfg(v); });
+    };
+    carregarMenuCfg();
+    window.addEventListener("menu-config", carregarMenuCfg);
+    return () => {
+      vivo = false;
+      window.removeEventListener("menu-config", carregarMenuCfg);
+    };
+  }, []);
+  const grupos = useMemo(() => aplicarMenu(NAV_GROUPS, menuCfg), [menuCfg]);
 
   // Logo após abrir o app: pré-carrega o código de todas as rotas e aquece o
   // cache de dados de cada aba, para a troca de aba ser instantânea.
@@ -241,7 +261,7 @@ function AuthenticatedLayout() {
           </div>
 
           <nav className="flex-1 px-3 pb-4 space-y-5 overflow-y-auto">
-            {NAV_GROUPS.map((group) => (
+            {grupos.map((group) => (
               <div key={group.title}>
                 <p className="px-3 mb-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-muted-foreground/70">{group.title}</p>
                 <div className="space-y-0.5">

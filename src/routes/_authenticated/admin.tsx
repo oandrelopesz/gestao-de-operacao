@@ -33,6 +33,7 @@ import { HabilidadesAdminCard } from "@/components/habilidades/HabilidadesAdminC
 import { SwipeAdminCard } from "@/components/swipe/SwipeAdminCard";
 import { SwipeNichosAdminCard } from "@/components/swipe/SwipeNichosAdminCard";
 import { PdfsAdminCard } from "@/components/pdfs/PdfsAdminCard";
+import { MenuAdminCard } from "@/components/admin/MenuAdminCard";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
@@ -552,6 +553,8 @@ function AdminPage() {
         <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
         <p className="text-muted-foreground">Configurações gerais: agências, plataformas, categorias de cursos, habilidades, colunas do Kanban, aparência e dados.</p>
       </div>
+
+      <MenuAdminCard />
 
       {/* Agências */}
       <Card>
