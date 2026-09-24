@@ -215,7 +215,7 @@ function TranscritorPage() {
               <CardContent className="flex flex-col items-center gap-3 px-6 py-14 text-center">
                 <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><AudioLines size={26} /></span>
                 <p className="text-base font-semibold">Nenhuma transcrição ainda</p>
-                <p className="max-w-md text-sm text-muted-foreground">Cole um link do Instagram, TikTok ou de um anúncio, ou envie um áudio/vídeo. Termos em inglês e de marketing são reconhecidos com o glossário do Admin.</p>
+                <p className="max-w-md text-sm text-muted-foreground">Cole um link do Instagram, TikTok, YouTube ou de um anúncio, ou envie um áudio/vídeo. Termos em inglês e de marketing são reconhecidos com o glossário do Admin.</p>
                 <Button className="mt-1 gap-2" onClick={() => setDialogo(true)}><Plus size={16} /> Transcrever</Button>
               </CardContent>
             </Card>
