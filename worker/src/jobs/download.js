@@ -33,14 +33,19 @@ export function cookiesDe(rede, existe) {
 }
 
 export async function baixar({ link, rede, dir, categoria }, deps = {}) {
-  // Anúncio da Ads Library: nem yt-dlp nem gallery-dl conhecem a página; captura própria
-  if (ehAdsLibrary(link)) return (deps.baixarAnuncio || baixarAnuncioReal)({ link, dir });
-
   const rodar = deps.rodar || rodarReal;
   const listarMidias = deps.listarMidias || listarReal;
   const normalizar = deps.normalizarFormatos || ((arquivos) => normalizarFormatos(arquivos, { rodar }));
-  const cookiesOriginal = cookiesDe(rede, deps.existeArquivo);
   const carrossel = categoria === "carrossel";
+
+  // Anúncio (ou página do anunciante) da Ads Library: nem yt-dlp nem gallery-dl conhecem a página;
+  // captura própria, que já escolhe o anúncio pela categoria e devolve os cards na ordem
+  if (ehAdsLibrary(link)) {
+    const r = await (deps.baixarAnuncio || baixarAnuncioReal)({ link, dir, categoria });
+    return carrossel ? { arquivos: await normalizar(r.arquivos), modo: "carrossel" } : r;
+  }
+
+  const cookiesOriginal = cookiesDe(rede, deps.existeArquivo);
   // yt-dlp e gallery-dl regravam o arquivo de cookies (o YouTube renova a sessão a cada acesso), e o
   // montado pela stack é só leitura: cada job usa uma cópia gravável na própria pasta temporária.
   let cookies = null;

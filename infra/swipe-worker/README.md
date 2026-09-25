@@ -126,14 +126,25 @@ voltar a acontecer, confira `unzip -l` procurando `?` nos nomes.
 
 ## Anúncios da Biblioteca de Anúncios do Facebook
 
-Link `facebook.com/ads/library/?id=<n>` de um anúncio: nem o yt-dlp nem o gallery-dl conhecem a
-página, então o worker abre com o Chromium (a página é pública, sem login), acha o card pelo número
-do id e baixa o criativo (`src/jobs/adslibrary.js`). Anúncio de vídeo vira `.mp4`; estático vira
-`.jpg`; vários criativos viram carrossel. Funciona sem os cookies de Facebook.
+Nem o yt-dlp nem o gallery-dl conhecem a página, então o worker abre com o Chromium (a página é
+pública, sem login) e lê o JSON que ela embute: cada anúncio é `"ad_archive_id":"<n>"` seguido de
+`"snapshot":{display_format, cards, videos, images}` (`src/jobs/adslibrary.js`). Funciona sem os
+cookies de Facebook. Dois links servem:
 
-Duas limitações honestas: a Ads Library serve a imagem no tamanho de exibição (não o arquivo
-original em alta), e se o anúncio for removido/inativado o card não aparece — o erro é claro
-("Anúncio não encontrado na Ads Library") e o job segue a retentativa normal.
+- **Anúncio** `facebook.com/ads/library/?id=<n>`: baixa aquele anúncio. Se o JSON não vier, cai no
+  card renderizado (achado pelo número do id, em tamanho de exibição).
+- **Página do anunciante** (`...&view_all_page_id=<n>`, a lista "Ver todos os anúncios"): baixa o
+  **primeiro anúncio da lista no formato da categoria** — carrossel → `CAROUSEL` (ou qualquer um com
+  2+ cards), vídeo → `VIDEO`, estático → `IMAGE`. Sem anúncio do formato, o erro diz quantos anúncios
+  havia e pede o link do anúncio (`?id=` + a "Identificação da biblioteca" do card). Até 25/09/2026
+  esse link caía no captador genérico, que salvava o maior vídeo da página como `Card 01.mp4`.
+- Link de busca (`?q=...`) não aponta anúncio: erro pedindo o link do anúncio.
+
+O criativo sai em alta (original da imagem, HD do vídeo). **Carrossel** (e DCO) sai um arquivo por
+card, na ordem do anúncio, cada card com a sua mídia — vídeo ou imagem, misturados se for o caso —
+e vira a pasta com `Card 01.jpg`, `Card 02.mp4`... Anúncio de vídeo vira `.mp4` (o poster cai);
+estático vira `.jpg`. Anúncio removido/inativado: "Anúncio não encontrado na Ads Library" e o job
+segue a retentativa normal.
 
 ## Ver o que o worker está fazendo
 
