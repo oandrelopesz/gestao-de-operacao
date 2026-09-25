@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/clientes";
+import { hojeBrasilia } from "@/lib/entrega";
+import { situacaoDoMes } from "@/lib/financeiro";
 import { useNavigate } from "@tanstack/react-router";
 
 interface SaldoAlerta {
@@ -30,12 +32,18 @@ interface SaldoAlerta {
   alerta_dispensado?: boolean | null;
 }
 
+/** Um alerta por parcela vencida e não recebida (pagamento único = parcela 1 de 1). */
 interface FinanceiroAlerta {
+  /** Chave para dispensar: a fonte (pagamento único) ou fonte + mês + parcela (fracionado) */
+  id: string;
   fonte_id: string;
   nome: string;
-  valor_mensal: number;
-  dia_recebimento: number;
-  status_mes: 'recebido' | 'atrasado' | 'pendente' | 'a_vencer';
+  valor: number;
+  dia: number;
+  vencimento: string;
+  parcela: number;
+  total: number;
+  status: 'atrasado' | 'pendente';
 }
 
 export function NotificationBell() {
@@ -55,16 +63,33 @@ export function NotificationBell() {
 
       if (saldoError) throw saldoError;
 
+      // A situação de cada parcela é calculada aqui (fonte fracionada tem uma por dia de pagamento)
       const { data: finData, error: finError } = await supabase
         .from("financeiro_view" as any)
-        .select("*")
-        .in("status_mes", ["pendente", "atrasado"]);
+        .select("*");
 
       if (finError) throw finError;
 
+      const hoje = hojeBrasilia();
+      const finAlertas = ((finData as any[]) || []).flatMap((fonte): FinanceiroAlerta[] =>
+        situacaoDoMes(fonte, hoje).parcelas
+          .filter((p) => p.status === "pendente" || p.status === "atrasado")
+          .map((p) => ({
+            id: p.total > 1 ? `${fonte.fonte_id}:${fonte.mes_atual}:${p.numero}` : fonte.fonte_id,
+            fonte_id: fonte.fonte_id,
+            nome: fonte.nome,
+            valor: p.valor,
+            dia: p.dia,
+            vencimento: p.vencimento,
+            parcela: p.numero,
+            total: p.total,
+            status: p.status as FinanceiroAlerta["status"],
+          })),
+      );
+
       // Alertas dispensados pelo usuário não notificam até a próxima recarga
       setAlertas(((saldoData as any[]) || []).filter((a) => !a.alerta_dispensado));
-      setFinanceiroAlertas(finData as any[] || []);
+      setFinanceiroAlertas(finAlertas);
     } catch (error) {
       console.error("Erro ao buscar alertas:", error);
     } finally {
@@ -100,7 +125,7 @@ export function NotificationBell() {
   }, []);
 
   const visibleAlertas = useMemo(() => alertas.filter(a => !hiddenIds.includes(a.id)), [alertas, hiddenIds]);
-  const visibleFinAlertas = useMemo(() => financeiroAlertas.filter(a => !hiddenIds.includes(a.fonte_id)), [financeiroAlertas, hiddenIds]);
+  const visibleFinAlertas = useMemo(() => financeiroAlertas.filter(a => !hiddenIds.includes(a.id)), [financeiroAlertas, hiddenIds]);
   const count = visibleAlertas.length + visibleFinAlertas.length;
 
   // Ordenação: Zerados > Críticos > Alertas (por dias_restantes)
@@ -116,12 +141,12 @@ export function NotificationBell() {
 
   const hasZerado = visibleAlertas.some(a => a.status_alerta === 'zerado');
   const hasCritico = visibleAlertas.some(a => a.status_alerta === 'critico');
-  const hasAtrasadoFin = visibleFinAlertas.some(a => a.status_mes === 'atrasado');
+  const hasAtrasadoFin = visibleFinAlertas.some(a => a.status === 'atrasado');
 
   const handleClearAll = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const allIds = [...alertas.map(a => a.id), ...financeiroAlertas.map(a => a.fonte_id)];
+    const allIds = [...alertas.map(a => a.id), ...financeiroAlertas.map(a => a.id)];
     const newHiddenIds = Array.from(new Set([...hiddenIds, ...allIds]));
     setHiddenIds(newHiddenIds);
     localStorage.setItem("hidden_notification_ids", JSON.stringify(newHiddenIds));
@@ -255,7 +280,7 @@ export function NotificationBell() {
                     <DollarSign size={10} /> Financeiro Pessoal
                   </div>
                   {visibleFinAlertas.map(alerta => (
-                    <FinanceiroNotificationItem key={alerta.fonte_id} alerta={alerta} onClick={() => handleFinClick(alerta.fonte_id)} />
+                    <FinanceiroNotificationItem key={alerta.id} alerta={alerta} onClick={() => handleFinClick(alerta.fonte_id)} />
                   ))}
                 </>
               )}
@@ -328,7 +353,13 @@ function NotificationItem({ alerta, onClick, formatDate }: { alerta: SaldoAlerta
 }
 
 function FinanceiroNotificationItem({ alerta, onClick }: { alerta: FinanceiroAlerta, onClick: () => void }) {
-  const isAtrasado = alerta.status_mes === 'atrasado';
+  const isAtrasado = alerta.status === 'atrasado';
+  const qual = alerta.total > 1 ? `Parcela ${alerta.parcela}/${alerta.total}` : "";
+  const mensagem = isAtrasado
+    ? `🚨 ${qual ? `${qual} atrasada` : "Pagamento atrasado!"} (dia ${alerta.dia})`
+    : alerta.vencimento === hojeBrasilia()
+      ? `⏱ ${qual ? `${qual} vence` : "Vence"} hoje (dia ${alerta.dia})`
+      : `⏱ ${qual ? `${qual} venceu` : "Venceu"} dia ${alerta.dia}`;
   
   return (
     <DropdownMenuItem 
@@ -356,10 +387,10 @@ function FinanceiroNotificationItem({ alerta, onClick }: { alerta: FinanceiroAle
             "text-[11px] font-bold",
             isAtrasado ? "text-red-700" : "text-amber-600"
           )}>
-            {isAtrasado ? `🚨 Pagamento atrasado!` : `⏱ Vence hoje (Dia ${alerta.dia_recebimento})`}
+            {mensagem}
           </span>
           <span className="text-[11px] font-bold">
-            {formatBRL(alerta.valor_mensal)}
+            {formatBRL(alerta.valor)}
           </span>
         </div>
       </div>

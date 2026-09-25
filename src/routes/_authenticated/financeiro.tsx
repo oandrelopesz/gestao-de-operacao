@@ -63,6 +63,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCachedState, hasCached } from "@/lib/pageCache";
 import { CACHE_KEYS, loadFinanceiro } from "@/lib/data";
 import { formatBRL, parseBRLInput, maskBRLInput } from "@/lib/clientes";
+import { hojeBrasilia } from "@/lib/entrega";
+import {
+  situacaoDoMes,
+  resumoDoMes,
+  dividirEmParcelas,
+  validarParcelas,
+  ordenarParcelas,
+  ehFracionado,
+  parcelasDaFonte,
+  textoDoValor,
+  descreverDias,
+  agruparHistorico,
+  infoDoStatus,
+  MIN_PARCELAS,
+  type Parcela,
+  type ParcelaDoMes,
+  type RecebimentoMes,
+} from "@/lib/financeiro";
+import { ParcelasEditor } from "@/components/financeiro/ParcelasEditor";
+import { ParcelasDoMes } from "@/components/financeiro/ParcelasDoMes";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -95,6 +115,10 @@ type FinanceiroView = {
   data_confirmacao: string | null;
   valor_recebido: number | null;
   status_mes: 'recebido' | 'atrasado' | 'pendente' | 'a_vencer';
+  /** null = pagamento único; fracionado = [{ dia, valor }] */
+  parcelas: Parcela[] | null;
+  /** Recebimentos do mês atual, um por parcela já marcada */
+  recebimentos_mes: RecebimentoMes[] | null;
 };
 
 function FinanceiroPage() {
@@ -108,6 +132,11 @@ function FinanceiroPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingFonte, setEditingFonte] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  // Valor/dia do pagamento único e as parcelas do fracionado (o resto do formulário é lido pelo FormData)
+  const [valorMensalTexto, setValorMensalTexto] = useState("");
+  const [diaTexto, setDiaTexto] = useState("1");
+  const [fracionado, setFracionado] = useState(false);
+  const [parcelasForm, setParcelasForm] = useState<Parcela[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedFonteHistory, setSelectedFonteHistory] = useState<any>(null);
@@ -128,84 +157,105 @@ function FinanceiroPage() {
     fetchFinanceiro();
   }, []);
 
+  // Situação do mês de cada fonte, parcela por parcela, no dia de hoje em Brasília (o mesmo do banco)
+  const hoje = hojeBrasilia();
+  const situacoes = useMemo(() => new Map(data.map((f) => [f.fonte_id, situacaoDoMes(f, hoje)])), [data, hoje]);
+  const situacaoDe = (fonte: FinanceiroView) => situacoes.get(fonte.fonte_id) ?? situacaoDoMes(fonte, hoje);
+
   const filteredData = useMemo(() => {
     return data.filter(item => {
       const matchesTipo = filterTipo === "all" || item.tipo === filterTipo;
-      const matchesStatus = filterStatus === "all" || item.status_mes === filterStatus;
+      const matchesStatus = filterStatus === "all" || situacoes.get(item.fonte_id)?.status === filterStatus;
       const matchesSearch = item.nome.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesTipo && matchesStatus && matchesSearch;
     });
-  }, [data, filterTipo, filterStatus, searchQuery]);
+  }, [data, situacoes, filterTipo, filterStatus, searchQuery]);
 
-  const metrics = useMemo(() => {
-    const totalPrevisto = data.reduce((acc, curr) => acc + (curr.valor_mensal || 0), 0);
-    const totalRecebido = data.reduce((acc, curr) => acc + (curr.recebido_mes_atual ? (curr.valor_recebido || curr.valor_mensal) : 0), 0);
-    const totalEmAberto = data.filter(i => !i.recebido_mes_atual).reduce((acc, curr) => acc + curr.valor_mensal, 0);
-    const totalAtrasado = data.filter(i => i.status_mes === 'atrasado').reduce((acc, curr) => acc + curr.valor_mensal, 0);
+  const metrics = useMemo(() => resumoDoMes(data, hoje), [data, hoje]);
 
-    return {
-      totalPrevisto,
-      totalRecebido,
-      totalEmAberto,
-      totalAtrasado,
-      fontesAtivas: data.length,
-      fontesConfirmadas: data.filter(i => i.recebido_mes_atual).length,
-      fontesPendentes: data.filter(i => !i.recebido_mes_atual).length,
-      fontesAtrasadas: data.filter(i => i.status_mes === 'atrasado').length
-    };
-  }, [data]);
-
-  const toggleRecebido = async (item: FinanceiroView) => {
+  const toggleParcela = async (fonte: FinanceiroView, parcela: ParcelaDoMes) => {
+    const recebida = parcela.status === "recebido";
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
       // if (!user) return; // Removido para permitir acesso sem login
 
-      const now = new Date();
-      const mesRefStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-
-      if (item.recebimento_id) {
+      if (parcela.recebimento) {
         // Alterna o estado
         const { error } = await supabase
           .from("financeiro_recebimentos")
           .update({
-            recebido: !item.recebido_mes_atual,
-            data_confirmacao: !item.recebido_mes_atual ? new Date().toISOString() : null,
-            valor_recebido: !item.recebido_mes_atual ? item.valor_mensal : null,
+            recebido: !recebida,
+            data_confirmacao: !recebida ? new Date().toISOString() : null,
+            valor_recebido: !recebida ? parcela.valor : null,
           })
-          .eq("id", item.recebimento_id);
+          .eq("id", parcela.recebimento.id);
         if (error) throw error;
       } else {
-        // Cria novo registro
+        // Cria o registro da parcela no mês (o mês é o da view, em Brasília)
         const { error } = await supabase
           .from("financeiro_recebimentos")
           .insert({
             user_id: userId,
-            fonte_id: item.fonte_id,
-            mes_referencia: mesRefStr,
+            fonte_id: fonte.fonte_id,
+            mes_referencia: fonte.mes_atual,
+            parcela: parcela.numero,
             recebido: true,
             data_confirmacao: new Date().toISOString(),
-            valor_recebido: item.valor_mensal,
+            valor_recebido: parcela.valor,
           });
         if (error) throw error;
       }
-      
-      toast.success(item.recebido_mes_atual ? "Status alterado para pendente" : "Marcar como recebido!");
+
+      const qual = parcela.total > 1 ? `Parcela ${parcela.numero}/${parcela.total}` : "Pagamento";
+      toast.success(recebida ? `${qual} voltou para pendente` : `${qual} marcado como recebido`);
       fetchFinanceiro();
     } catch (error: any) {
       toast.error("Erro ao atualizar recebimento: " + error.message);
     }
   };
 
+  const abrirFormulario = (fonte: FinanceiroView | null) => {
+    setEditingFonte(fonte);
+    const emParcelas = fonte && ehFracionado(fonte) ? parcelasDaFonte(fonte) : null;
+    setFracionado(!!emParcelas);
+    setParcelasForm(emParcelas || []);
+    // O valor vai para a máscara em reais (a máscara lê dígitos como centavos: 3500 viraria "35,00")
+    setValorMensalTexto(fonte ? textoDoValor(fonte.valor_mensal) : "");
+    setDiaTexto(String(fonte?.dia_recebimento || 1));
+    setModalOpen(true);
+  };
+
+  const alternarFracionado = (ativo: boolean) => {
+    setFracionado(ativo);
+    // Ao ligar, sugere o valor atual dividido em 2 parcelas espalhadas pelo mês
+    if (ativo && parcelasForm.length < MIN_PARCELAS) {
+      setParcelasForm(dividirEmParcelas(parseBRLInput(valorMensalTexto), MIN_PARCELAS, parseInt(diaTexto) || 1));
+    }
+  };
+
   const handleSaveFonte = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // parcelas como tipo literal (não a interface Parcela) para caber no Json do Supabase
+    let pagamento: { valor_mensal: number; dia_recebimento: number; parcelas: { dia: number; valor: number }[] | null };
+    if (fracionado) {
+      const erro = validarParcelas(parcelasForm);
+      if (erro) {
+        toast.error(erro);
+        return;
+      }
+      const parcelas = ordenarParcelas(parcelasForm).map((p) => ({ dia: p.dia, valor: p.valor }));
+      const total = parcelas.reduce((t, p) => t + p.valor, 0);
+      pagamento = { valor_mensal: Math.round(total * 100) / 100, dia_recebimento: parcelas[0].dia, parcelas };
+    } else {
+      pagamento = { valor_mensal: parseBRLInput(valorMensalTexto), dia_recebimento: parseInt(diaTexto), parcelas: null };
+    }
     setSaving(true);
     const formData = new FormData(e.currentTarget);
     const values = {
       nome: formData.get("nome") as string,
       tipo: formData.get("tipo") as string,
-      valor_mensal: parseBRLInput(formData.get("valor_mensal") as string),
-      dia_recebimento: parseInt(formData.get("dia_recebimento") as string),
+      ...pagamento,
       ativo: formData.get("ativo") === "on",
       observacoes: formData.get("observacoes") as string,
     };
@@ -276,7 +326,7 @@ function FinanceiroPage() {
         .select("*")
         .eq("fonte_id", fonte.fonte_id)
         .order("mes_referencia", { ascending: false })
-        .limit(12);
+        .limit(72); // 12 meses de até 6 parcelas
       if (error) throw error;
       setHistoryData(history || []);
     } catch (error: any) {
@@ -284,14 +334,8 @@ function FinanceiroPage() {
     }
   };
 
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case 'recebido': return { label: "Recebido", color: "bg-emerald-500", text: "text-emerald-500", border: "border-emerald-200", bg: "bg-emerald-50/50" };
-      case 'atrasado': return { label: "Atrasado", color: "bg-red-500", text: "text-red-500", border: "border-red-200", bg: "bg-red-50/50" };
-      case 'pendente': return { label: "Pendente", color: "bg-amber-500", text: "text-amber-500", border: "border-amber-200", bg: "bg-amber-50/50" };
-      default: return { label: "A vencer", color: "bg-zinc-400", text: "text-zinc-500", border: "border-zinc-200", bg: "bg-zinc-50/50" };
-    }
-  };
+  const historicoPorMes = useMemo(() => agruparHistorico(historyData), [historyData]);
+  const situacaoHistorico = selectedFonteHistory ? situacaoDe(selectedFonteHistory) : null;
 
   return (
     <div className="space-y-6">
@@ -300,7 +344,7 @@ function FinanceiroPage() {
           <h1 className="text-2xl font-bold tracking-tight">Financeiro</h1>
           <p className="text-muted-foreground">Receita pessoal mensal</p>
         </div>
-        <Button onClick={() => { setEditingFonte(null); setModalOpen(true); }}>
+        <Button onClick={() => abrirFormulario(null)}>
           <Plus className="mr-2 h-4 w-4" /> Nova fonte
         </Button>
       </div>
@@ -312,8 +356,8 @@ function FinanceiroPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(metrics.totalPrevisto)}</div>
-            <p className="text-xs text-muted-foreground">{metrics.fontesAtivas} fontes ativas</p>
+            <div className="text-2xl font-bold">{formatBRL(metrics.previsto)}</div>
+            <p className="text-xs text-muted-foreground">{metrics.fontes} fontes ativas</p>
           </CardContent>
         </Card>
         <Card>
@@ -322,8 +366,8 @@ function FinanceiroPage() {
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{formatBRL(metrics.totalRecebido)}</div>
-            <p className="text-xs text-muted-foreground">{metrics.fontesConfirmadas} de {metrics.fontesAtivas} confirmadas</p>
+            <div className="text-2xl font-bold text-emerald-600">{formatBRL(metrics.recebido)}</div>
+            <p className="text-xs text-muted-foreground">{metrics.fontesRecebidas} de {metrics.fontes} confirmadas</p>
           </CardContent>
         </Card>
         <Card>
@@ -332,8 +376,8 @@ function FinanceiroPage() {
             <Clock className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{formatBRL(metrics.totalEmAberto)}</div>
-            <p className="text-xs text-muted-foreground">{metrics.fontesPendentes} fontes pendentes</p>
+            <div className="text-2xl font-bold text-amber-600">{formatBRL(metrics.emAberto)}</div>
+            <p className="text-xs text-muted-foreground">{metrics.fontesEmAberto} fontes pendentes</p>
           </CardContent>
         </Card>
         <Card>
@@ -342,8 +386,8 @@ function FinanceiroPage() {
             <AlertCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className={cn("text-2xl font-bold", metrics.totalAtrasado > 0 ? "text-red-600" : "text-muted-foreground")}>
-              {formatBRL(metrics.totalAtrasado)}
+            <div className={cn("text-2xl font-bold", metrics.atrasado > 0 ? "text-red-600" : "text-muted-foreground")}>
+              {formatBRL(metrics.atrasado)}
             </div>
             <p className="text-xs text-muted-foreground">{metrics.fontesAtrasadas} fontes em atraso</p>
           </CardContent>
@@ -421,14 +465,16 @@ function FinanceiroPage() {
       ) : viewMode === "cards" ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredData.map((fonte) => {
-            const status = getStatusInfo(fonte.status_mes);
+            const situacao = situacaoDe(fonte);
+            const status = infoDoStatus(situacao.status);
+            const unica = situacao.parcelas[0];
             return (
-              <Card 
-                key={fonte.fonte_id} 
+              <Card
+                key={fonte.fonte_id}
                 className={cn(
                   "group relative transition-all hover:shadow-md cursor-pointer border-l-4",
                   status.border,
-                  fonte.recebido_mes_atual && "bg-emerald-50/30 dark:bg-emerald-950/10"
+                  situacao.status === "recebido" && "bg-emerald-50/30 dark:bg-emerald-950/10"
                 )}
                 onClick={() => openHistory(fonte)}
               >
@@ -452,7 +498,7 @@ function FinanceiroPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-[160px]">
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingFonte(fonte); setModalOpen(true); }}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); abrirFormulario(fonte); }}>
                           <Pencil size={12} className="mr-2" /> Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleAtivo(fonte); }}>
@@ -477,29 +523,38 @@ function FinanceiroPage() {
                   <div className="space-y-1">
                     <div className="text-xl font-bold">{formatBRL(fonte.valor_mensal)}</div>
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>Todo dia {fonte.dia_recebimento}</span>
+                      <span>
+                        {situacao.fracionado
+                          ? `${situacao.parcelas.length} parcelas · ${descreverDias(situacao.parcelas)}`
+                          : `Todo dia ${fonte.dia_recebimento}`}
+                      </span>
                       <Badge variant="outline" className={cn("text-[9px] font-bold", status.text, status.border)}>
                         {status.label}
+                        {situacao.fracionado && situacao.status !== "recebido" && ` · ${situacao.recebidas}/${situacao.parcelas.length}`}
                       </Badge>
                     </div>
                   </div>
                   <Separator />
                   <div className="pt-1">
-                    <Button 
-                      variant={fonte.recebido_mes_atual ? "outline" : "default"}
-                      size="sm"
-                      className={cn(
-                        "w-full h-9 text-xs font-bold transition-all",
-                        fonte.recebido_mes_atual ? "border-emerald-200 text-emerald-600 bg-emerald-50/50" : ""
-                      )}
-                      onClick={(e) => { e.stopPropagation(); toggleRecebido(fonte); }}
-                    >
-                      {fonte.recebido_mes_atual ? (
-                        <><CheckCircle2 className="mr-2 h-4 w-4" /> Recebido em {new Date(fonte.data_confirmacao!).toLocaleDateString('pt-BR')}</>
-                      ) : (
-                        "Marcar como recebido"
-                      )}
-                    </Button>
+                    {situacao.fracionado ? (
+                      <ParcelasDoMes parcelas={situacao.parcelas} onAlternar={(p) => toggleParcela(fonte, p)} />
+                    ) : (
+                      <Button
+                        variant={unica.status === "recebido" ? "outline" : "default"}
+                        size="sm"
+                        className={cn(
+                          "w-full h-9 text-xs font-bold transition-all",
+                          unica.status === "recebido" ? "border-emerald-200 text-emerald-600 bg-emerald-50/50" : ""
+                        )}
+                        onClick={(e) => { e.stopPropagation(); toggleParcela(fonte, unica); }}
+                      >
+                        {unica.status === "recebido" ? (
+                          <><CheckCircle2 className="mr-2 h-4 w-4" /> Recebido{unica.recebimento?.data_confirmacao ? ` em ${new Date(unica.recebimento.data_confirmacao).toLocaleDateString('pt-BR')}` : ""}</>
+                        ) : (
+                          "Marcar como recebido"
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -522,13 +577,14 @@ function FinanceiroPage() {
             </thead>
             <tbody>
               {filteredData.map((fonte) => {
-                const status = getStatusInfo(fonte.status_mes);
+                const situacao = situacaoDe(fonte);
+                const status = infoDoStatus(situacao.status);
                 return (
-                  <tr 
-                    key={fonte.fonte_id} 
+                  <tr
+                    key={fonte.fonte_id}
                     className={cn(
                       "border-b transition-colors hover:bg-muted/30 cursor-pointer",
-                      fonte.recebido_mes_atual && "bg-emerald-50/30 dark:bg-emerald-950/10"
+                      situacao.status === "recebido" && "bg-emerald-50/30 dark:bg-emerald-950/10"
                     )}
                     onClick={() => openHistory(fonte)}
                   >
@@ -542,27 +598,39 @@ function FinanceiroPage() {
                       </Badge>
                     </td>
                     <td className="py-3 px-4 font-bold">{formatBRL(fonte.valor_mensal)}</td>
-                    <td className="py-3 px-4 text-center">{fonte.dia_recebimento}</td>
+                    <td className="py-3 px-4 text-center">{situacao.parcelas.map((p) => p.dia).join(" · ")}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1.5">
                         <div className={cn("h-1.5 w-1.5 rounded-full", status.color)} />
-                        <span className={cn("text-xs font-medium", status.text)}>{status.label}</span>
+                        <span className={cn("text-xs font-medium", status.text)}>
+                          {status.label}
+                          {situacao.fracionado && situacao.status !== "recebido" && ` · ${situacao.recebidas}/${situacao.parcelas.length}`}
+                        </span>
                       </div>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); toggleRecebido(fonte); }}
-                        className={cn(
-                          "inline-flex items-center justify-center rounded-md h-6 w-6 border transition-all",
-                          fonte.recebido_mes_atual ? "bg-emerald-500 border-emerald-500 text-white" : "border-zinc-300 hover:border-emerald-500"
-                        )}
-                      >
-                        {fonte.recebido_mes_atual && <CheckCircle2 size={12} />}
-                      </button>
+                      <div className="inline-flex items-center gap-1.5">
+                        {situacao.parcelas.map((p) => {
+                          const recebida = p.status === "recebido";
+                          return (
+                            <button
+                              key={p.numero}
+                              title={situacao.fracionado ? `Parcela ${p.numero}/${p.total} · dia ${p.dia} · ${formatBRL(p.valor)}` : undefined}
+                              onClick={(e) => { e.stopPropagation(); toggleParcela(fonte, p); }}
+                              className={cn(
+                                "inline-flex items-center justify-center rounded-md h-6 min-w-[1.5rem] px-1 border text-[10px] font-bold transition-all",
+                                recebida ? "bg-emerald-500 border-emerald-500 text-white" : "border-zinc-300 hover:border-emerald-500"
+                              )}
+                            >
+                              {recebida ? <CheckCircle2 size={12} /> : situacao.fracionado ? p.dia : null}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingFonte(fonte); setModalOpen(true); }}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); abrirFormulario(fonte); }}>
                           <Pencil size={14} />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); setDeletingId(fonte.fonte_id); }}>
@@ -580,7 +648,7 @@ function FinanceiroPage() {
 
       {/* Modal Criar/Editar Fonte */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSaveFonte}>
             <DialogHeader>
               <DialogTitle>{editingFonte ? "Editar Fonte" : "Nova Fonte de Receita"}</DialogTitle>
@@ -606,43 +674,52 @@ function FinanceiroPage() {
                   </div>
                 </RadioGroup>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="valor_mensal">Valor Mensal</Label>
-                  <Input 
-                    id="valor_mensal" 
-                    name="valor_mensal" 
-                    placeholder="R$ 0,00" 
-                    defaultValue={editingFonte ? maskBRLInput(editingFonte.valor_mensal.toString()) : ""} 
-                    onChange={(e) => e.target.value = maskBRLInput(e.target.value)}
-                    required 
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="dia_recebimento">Dia do Recebimento</Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info size={12} className="text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-[200px]">
-                          <p className="text-xs">Se o dia for 30 ou 31 e o mês não tiver, considera o último dia do mês.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+              <ParcelasEditor
+                ativo={fracionado}
+                onAtivoChange={alternarFracionado}
+                parcelas={parcelasForm}
+                onChange={setParcelasForm}
+              />
+              {!fracionado && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="valor_mensal">Valor Mensal</Label>
+                    <Input
+                      id="valor_mensal"
+                      name="valor_mensal"
+                      placeholder="R$ 0,00"
+                      value={valorMensalTexto}
+                      onChange={(e) => setValorMensalTexto(maskBRLInput(e.target.value))}
+                      required
+                    />
                   </div>
-                  <Input 
-                    id="dia_recebimento" 
-                    name="dia_recebimento" 
-                    type="number" 
-                    min="1" 
-                    max="31" 
-                    defaultValue={editingFonte?.dia_recebimento || 1} 
-                    required 
-                  />
+                  <div className="grid gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="dia_recebimento">Dia do Recebimento</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info size={12} className="text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[200px]">
+                            <p className="text-xs">Se o dia for 30 ou 31 e o mês não tiver, considera o último dia do mês.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <Input 
+                      id="dia_recebimento" 
+                      name="dia_recebimento" 
+                      type="number" 
+                      min="1"
+                      max="31"
+                      value={diaTexto}
+                      onChange={(e) => setDiaTexto(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex items-center space-x-2 py-2">
                 <Switch id="ativo" name="ativo" defaultChecked={editingFonte ? editingFonte.ativo : true} />
                 <Label htmlFor="ativo">Fonte ativa para faturamento</Label>
@@ -673,7 +750,7 @@ function FinanceiroPage() {
               )}>
                 {selectedFonteHistory?.tipo === 'agencia' ? 'Agência' : 'Pessoal'}
               </Badge>
-              {selectedFonteHistory?.status_mes === 'recebido' && (
+              {situacaoHistorico?.status === 'recebido' && (
                 <Badge className="bg-emerald-500 text-[9px] h-4">✓ Recebido</Badge>
               )}
             </div>
@@ -690,10 +767,25 @@ function FinanceiroPage() {
                 <p className="text-xl font-bold">{formatBRL(selectedFonteHistory?.valor_mensal)}</p>
               </div>
               <div className="p-4 rounded-xl bg-muted/50 border space-y-1">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Dia Recebimento</p>
-                <p className="text-xl font-bold">Todo dia {selectedFonteHistory?.dia_recebimento}</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                  {situacaoHistorico?.fracionado ? `Em ${situacaoHistorico.parcelas.length} parcelas` : "Dia Recebimento"}
+                </p>
+                <p className="text-xl font-bold">
+                  {situacaoHistorico?.fracionado ? descreverDias(situacaoHistorico.parcelas) : `Todo dia ${selectedFonteHistory?.dia_recebimento}`}
+                </p>
               </div>
             </div>
+
+            {situacaoHistorico?.fracionado && (
+              <div className="space-y-1.5">
+                {situacaoHistorico.parcelas.map((p) => (
+                  <div key={p.numero} className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">{p.numero}ª parcela · dia {p.dia}</span>
+                    <span className="font-bold">{formatBRL(p.valor)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -702,26 +794,35 @@ function FinanceiroPage() {
                 </h4>
               </div>
 
-              {historyData.length === 0 ? (
+              {historicoPorMes.length === 0 ? (
                 <div className="text-center py-10 border rounded-xl bg-muted/20">
                   <p className="text-sm text-muted-foreground">Nenhum recebimento registrado ainda.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {historyData.map((rec) => (
-                    <div key={rec.id} className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold capitalize">
-                          {new Date(rec.mes_referencia).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {rec.recebido ? `Recebido em ${new Date(rec.data_confirmacao).toLocaleDateString('pt-BR')}` : 'Não recebido'}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-emerald-600">{formatBRL(rec.valor_recebido)}</div>
-                        <Badge variant="outline" className="text-[9px] h-4 py-0 border-emerald-200 text-emerald-600 bg-emerald-50">Confirmado</Badge>
-                      </div>
+                  {historicoPorMes.map((mes) => (
+                    <div key={mes.mes} className="p-3 border rounded-lg bg-card shadow-sm space-y-2">
+                      <span className="text-sm font-bold capitalize">{mes.nome}</span>
+                      {mes.itens.map((rec) => (
+                        <div key={rec.id} className="flex items-center justify-between">
+                          <span className="text-[10px] text-muted-foreground">
+                            {mes.itens.length > 1 || (rec.parcela ?? 1) > 1 ? `${rec.parcela ?? 1}ª parcela · ` : ""}
+                            {rec.recebido
+                              ? `Recebido${rec.data_confirmacao ? ` em ${new Date(rec.data_confirmacao).toLocaleDateString('pt-BR')}` : ""}`
+                              : 'Não recebido'}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={cn("text-sm font-bold", rec.recebido ? "text-emerald-600" : "text-muted-foreground")}>
+                              {rec.valor_recebido != null ? formatBRL(rec.valor_recebido) : "—"}
+                            </span>
+                            {rec.recebido ? (
+                              <Badge variant="outline" className="text-[9px] h-4 py-0 border-emerald-200 text-emerald-600 bg-emerald-50">Confirmado</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[9px] h-4 py-0 text-muted-foreground">Pendente</Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -740,7 +841,7 @@ function FinanceiroPage() {
             )}
             
             <div className="pt-4">
-              <Button className="w-full" variant="outline" onClick={() => { setHistoryOpen(false); setEditingFonte(selectedFonteHistory); setModalOpen(true); }}>
+              <Button className="w-full" variant="outline" onClick={() => { setHistoryOpen(false); abrirFormulario(selectedFonteHistory); }}>
                 <Pencil size={14} className="mr-2" /> Editar Configurações da Fonte
               </Button>
             </div>

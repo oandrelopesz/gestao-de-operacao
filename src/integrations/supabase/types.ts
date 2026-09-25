@@ -571,6 +571,7 @@ export type Database = {
           id: string
           nome: string
           observacoes: string | null
+          parcelas: Json | null
           tipo: string
           updated_at: string | null
           user_id: string
@@ -583,6 +584,7 @@ export type Database = {
           id?: string
           nome: string
           observacoes?: string | null
+          parcelas?: Json | null
           tipo: string
           updated_at?: string | null
           user_id: string
@@ -595,6 +597,7 @@ export type Database = {
           id?: string
           nome?: string
           observacoes?: string | null
+          parcelas?: Json | null
           tipo?: string
           updated_at?: string | null
           user_id?: string
@@ -610,6 +613,7 @@ export type Database = {
           id: string
           mes_referencia: string
           observacoes: string | null
+          parcela: number
           recebido: boolean | null
           user_id: string
           valor_recebido: number | null
@@ -621,6 +625,7 @@ export type Database = {
           id?: string
           mes_referencia: string
           observacoes?: string | null
+          parcela?: number
           recebido?: boolean | null
           user_id: string
           valor_recebido?: number | null
@@ -632,6 +637,7 @@ export type Database = {
           id?: string
           mes_referencia?: string
           observacoes?: string | null
+          parcela?: number
           recebido?: boolean | null
           user_id?: string
           valor_recebido?: number | null
@@ -2034,8 +2040,10 @@ export type Database = {
           mes_atual: string | null
           nome: string | null
           observacoes: string | null
+          parcelas: Json | null
           recebido_mes_atual: boolean | null
           recebimento_id: string | null
+          recebimentos_mes: Json | null
           status_mes: string | null
           tipo: string | null
           user_id: string | null
