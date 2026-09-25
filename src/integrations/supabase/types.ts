@@ -565,6 +565,7 @@ export type Database = {
       }
       financeiro_fontes: {
         Row: {
+          agencia_id: string | null
           ativo: boolean | null
           created_at: string | null
           dia_recebimento: number
@@ -578,6 +579,7 @@ export type Database = {
           valor_mensal: number
         }
         Insert: {
+          agencia_id?: string | null
           ativo?: boolean | null
           created_at?: string | null
           dia_recebimento: number
@@ -591,6 +593,7 @@ export type Database = {
           valor_mensal?: number
         }
         Update: {
+          agencia_id?: string | null
           ativo?: boolean | null
           created_at?: string | null
           dia_recebimento?: number
@@ -603,7 +606,15 @@ export type Database = {
           user_id?: string
           valor_mensal?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_fontes_agencia_id_fkey"
+            columns: ["agencia_id"]
+            isOneToOne: false
+            referencedRelation: "agencias"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       financeiro_recebimentos: {
         Row: {
@@ -2033,6 +2044,7 @@ export type Database = {
       }
       financeiro_view: {
         Row: {
+          agencia_id: string | null
           ativo: boolean | null
           data_confirmacao: string | null
           dia_recebimento: number | null

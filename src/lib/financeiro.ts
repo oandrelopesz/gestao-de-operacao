@@ -5,6 +5,19 @@
 
 export type StatusMes = "recebido" | "atrasado" | "pendente" | "a_vencer";
 
+/** Freelancer = trabalho feito para uma agência (financeiro_fontes.agencia_id diz qual). */
+export type TipoFonte = "agencia" | "cliente_pessoal" | "freelancer";
+
+export const TIPOS_DE_FONTE: Record<TipoFonte, { label: string; classe: string }> = {
+  agencia: { label: "Agência", classe: "text-blue-600 border-blue-200 bg-blue-50" },
+  cliente_pessoal: { label: "Pessoal", classe: "text-emerald-600 border-emerald-200 bg-emerald-50" },
+  freelancer: { label: "Freelancer", classe: "text-violet-600 border-violet-200 bg-violet-50" },
+};
+
+export function tipoDaFonte(tipo: string) {
+  return TIPOS_DE_FONTE[tipo as TipoFonte] ?? TIPOS_DE_FONTE.cliente_pessoal;
+}
+
 export interface Parcela {
   dia: number;
   valor: number;

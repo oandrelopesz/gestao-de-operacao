@@ -77,12 +77,15 @@ import {
   agruparHistorico,
   infoDoStatus,
   MIN_PARCELAS,
+  type TipoFonte,
   type Parcela,
   type ParcelaDoMes,
   type RecebimentoMes,
 } from "@/lib/financeiro";
 import { ParcelasEditor } from "@/components/financeiro/ParcelasEditor";
 import { ParcelasDoMes } from "@/components/financeiro/ParcelasDoMes";
+import { TipoBadge } from "@/components/financeiro/TipoBadge";
+import { useAgencias } from "@/lib/agencias";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -100,11 +103,16 @@ export const Route = createFileRoute("/_authenticated/financeiro")({
   component: FinanceiroPage,
 });
 
+/** Valor do item "Sem agência" no seletor (o Select do Radix não aceita valor vazio). */
+const SEM_AGENCIA = "__sem_agencia__";
+
 type FinanceiroView = {
   fonte_id: string;
   user_id: string;
   nome: string;
-  tipo: 'agencia' | 'cliente_pessoal';
+  tipo: TipoFonte;
+  /** Só no freelancer: a agência para quem o trabalho é feito */
+  agencia_id: string | null;
   valor_mensal: number;
   dia_recebimento: number;
   ativo: boolean;
@@ -137,6 +145,9 @@ function FinanceiroPage() {
   const [diaTexto, setDiaTexto] = useState("1");
   const [fracionado, setFracionado] = useState(false);
   const [parcelasForm, setParcelasForm] = useState<Parcela[]>([]);
+  const [tipoForm, setTipoForm] = useState<TipoFonte>("agencia");
+  const [agenciaForm, setAgenciaForm] = useState<string | null>(null);
+  const { todasAgencias } = useAgencias();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedFonteHistory, setSelectedFonteHistory] = useState<any>(null);
@@ -223,6 +234,8 @@ function FinanceiroPage() {
     // O valor vai para a máscara em reais (a máscara lê dígitos como centavos: 3500 viraria "35,00")
     setValorMensalTexto(fonte ? textoDoValor(fonte.valor_mensal) : "");
     setDiaTexto(String(fonte?.dia_recebimento || 1));
+    setTipoForm(fonte?.tipo || "agencia");
+    setAgenciaForm(fonte?.agencia_id ?? null);
     setModalOpen(true);
   };
 
@@ -254,7 +267,8 @@ function FinanceiroPage() {
     const formData = new FormData(e.currentTarget);
     const values = {
       nome: formData.get("nome") as string,
-      tipo: formData.get("tipo") as string,
+      tipo: tipoForm,
+      agencia_id: tipoForm === "freelancer" ? agenciaForm : null,
       ...pagamento,
       ativo: formData.get("ativo") === "on",
       observacoes: formData.get("observacoes") as string,
@@ -413,6 +427,7 @@ function FinanceiroPage() {
             <SelectItem value="all">Todos Tipos</SelectItem>
             <SelectItem value="agencia">Agências</SelectItem>
             <SelectItem value="cliente_pessoal">Clientes Pessoais</SelectItem>
+            <SelectItem value="freelancer">Freelancers</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -483,12 +498,7 @@ function FinanceiroPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-base font-bold truncate">{fonte.nome}</CardTitle>
-                        <Badge variant="outline" className={cn(
-                          "text-[9px] py-0 px-1.5 h-4",
-                          fonte.tipo === 'agencia' ? "text-blue-600 border-blue-200 bg-blue-50" : "text-emerald-600 border-emerald-200 bg-emerald-50"
-                        )}>
-                          {fonte.tipo === 'agencia' ? 'Agência' : 'Pessoal'}
-                        </Badge>
+                        <TipoBadge tipo={fonte.tipo} agenciaId={fonte.agencia_id} className="text-[9px] py-0 px-1.5 h-4" />
                       </div>
                     </div>
                     <DropdownMenu>
@@ -590,12 +600,9 @@ function FinanceiroPage() {
                   >
                     <td className="py-3 px-4 font-medium">{fonte.nome}</td>
                     <td className="py-3 px-4">
-                      <Badge variant="outline" className={cn(
-                        "text-[10px] py-0 px-2 h-4",
-                        fonte.tipo === 'agencia' ? "text-blue-600 border-blue-200 bg-blue-50" : "text-emerald-600 border-emerald-200 bg-emerald-50"
-                      )}>
-                        {fonte.tipo === 'agencia' ? 'Agência' : 'Pessoal'}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <TipoBadge tipo={fonte.tipo} agenciaId={fonte.agencia_id} className="text-[10px] py-0 px-2 h-4" />
+                      </div>
                     </td>
                     <td className="py-3 px-4 font-bold">{formatBRL(fonte.valor_mensal)}</td>
                     <td className="py-3 px-4 text-center">{situacao.parcelas.map((p) => p.dia).join(" · ")}</td>
@@ -663,7 +670,7 @@ function FinanceiroPage() {
               </div>
               <div className="grid gap-2">
                 <Label>Tipo de Fonte</Label>
-                <RadioGroup name="tipo" defaultValue={editingFonte?.tipo || "agencia"} className="flex gap-4">
+                <RadioGroup name="tipo" value={tipoForm} onValueChange={(v) => setTipoForm(v as TipoFonte)} className="flex flex-wrap gap-x-4 gap-y-2">
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="agencia" id="agencia" />
                     <Label htmlFor="agencia" className="font-normal cursor-pointer">Agência</Label>
@@ -672,8 +679,31 @@ function FinanceiroPage() {
                     <RadioGroupItem value="cliente_pessoal" id="cliente_pessoal" />
                     <Label htmlFor="cliente_pessoal" className="font-normal cursor-pointer">Cliente Pessoal</Label>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="freelancer" id="freelancer" />
+                    <Label htmlFor="freelancer" className="font-normal cursor-pointer">Freelancer</Label>
+                  </div>
                 </RadioGroup>
               </div>
+              {tipoForm === "freelancer" && (
+                <div className="grid gap-2">
+                  <Label htmlFor="agencia_id">Agência</Label>
+                  <Select value={agenciaForm || SEM_AGENCIA} onValueChange={(v) => setAgenciaForm(v === SEM_AGENCIA ? null : v)}>
+                    <SelectTrigger id="agencia_id">
+                      <SelectValue placeholder="Escolha a agência" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={SEM_AGENCIA}>Sem agência</SelectItem>
+                      {todasAgencias
+                        .filter((a) => a.ativa || a.id === agenciaForm)
+                        .map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Para qual agência você faz esse trabalho.</p>
+                </div>
+              )}
               <ParcelasEditor
                 ativo={fracionado}
                 onAtivoChange={alternarFracionado}
@@ -744,12 +774,9 @@ function FinanceiroPage() {
         <SheetContent className="sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <div className="flex items-center gap-2 mb-2">
-              <Badge variant="outline" className={cn(
-                "text-[9px] uppercase tracking-tighter",
-                selectedFonteHistory?.tipo === 'agencia' ? "text-blue-600 border-blue-200" : "text-emerald-600 border-emerald-200"
-              )}>
-                {selectedFonteHistory?.tipo === 'agencia' ? 'Agência' : 'Pessoal'}
-              </Badge>
+              {selectedFonteHistory && (
+                <TipoBadge tipo={selectedFonteHistory.tipo} agenciaId={selectedFonteHistory.agencia_id} className="text-[9px] uppercase tracking-tighter" />
+              )}
               {situacaoHistorico?.status === 'recebido' && (
                 <Badge className="bg-emerald-500 text-[9px] h-4">✓ Recebido</Badge>
               )}

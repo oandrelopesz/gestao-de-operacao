@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   parcelasDaFonte, ehFracionado, vencimentoNoMes, statusDaParcela, situacaoDoMes, resumoDoMes,
-  dividirEmParcelas, ajustarQuantidade, validarParcelas, textoDoValor, nomeDoMes, agruparHistorico, descreverDias,
+  dividirEmParcelas, ajustarQuantidade, validarParcelas, textoDoValor, nomeDoMes, agruparHistorico, descreverDias, tipoDaFonte,
 } from "./financeiro.ts";
 import type { RecebimentoMes } from "./financeiro.ts";
 
@@ -181,4 +181,12 @@ test("agruparHistorico: um grupo por mês (mais recente primeiro), parcelas em o
     ["2026-05", "maio de 2026", ["d"]],
   ]);
   assert.equal(agruparHistorico([{ id: "x", mes_referencia: "2026-09-01", parcela: 1 }, { id: "y", mes_referencia: "2026-08-01", parcela: 1 }], 1).length, 1);
+});
+
+test("tipoDaFonte: rótulo de cada tipo; tipo desconhecido cai em Pessoal", () => {
+  assert.equal(tipoDaFonte("agencia").label, "Agência");
+  assert.equal(tipoDaFonte("cliente_pessoal").label, "Pessoal");
+  assert.equal(tipoDaFonte("freelancer").label, "Freelancer");
+  assert.equal(tipoDaFonte("outro").label, "Pessoal");
+  assert.notEqual(tipoDaFonte("freelancer").classe, tipoDaFonte("agencia").classe);
 });
