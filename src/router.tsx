@@ -1,12 +1,17 @@
 import { createRouter, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { routeTree } from "./routeTree.gen";
 import { ehCodigoDesatualizado, recarregarUmaVez, instalarRecuperacaoGlobal } from "@/lib/recuperacaoErro";
 
 // Erros de tela: primeiro o app tenta se recuperar sozinho (código de uma versão anterior do site →
 // recarrega; outros erros → tenta de novo e, se persistir, recarrega). A tela de erro só aparece se
 // nada disso resolver — ver src/lib/recuperacaoErro.ts.
-function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function DefaultErrorComponent({ error: erroBruto, reset }: { error: unknown; reset: () => void }) {
+  // Versões novas do router tipam o erro como `unknown`
+  const error = useMemo(
+    () => (erroBruto instanceof Error ? erroBruto : new Error(String(erroBruto ?? "Erro desconhecido"))),
+    [erroBruto],
+  );
   const router = useRouter();
   const [falhou, setFalhou] = useState(false);
 
