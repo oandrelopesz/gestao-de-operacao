@@ -5,7 +5,7 @@ export interface MenuConfig { ocultas: string[]; ordem: Record<string, string[]>
 export const MENU_FIXOS = ["/", "/admin"];
 
 /** Abas que mudaram de endereço: a ordem e o "oculta" salvos com o endereço antigo continuam valendo. */
-const ENDERECOS_ANTIGOS: Record<string, string> = { "/pdfs": "/arquivos" };
+const ENDERECOS_ANTIGOS: Record<string, string> = { "/pdfs": "/arquivos", "/prospeccao": "/crm" };
 
 export function normalizarMenu(cfg: MenuConfig | null): MenuConfig | null {
   if (!cfg) return cfg;

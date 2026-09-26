@@ -43,3 +43,9 @@ test("moverNoGrupo e alternarOculta", () => {
   assert.deepEqual(alternarOculta(c2, "/ideias").ocultas, []);
   assert.deepEqual(alternarOculta(c2, "/admin").ocultas, ["/ideias"]);
 });
+
+test("aba Prospecção virou CRM: ordem e oculta salvas com /prospeccao continuam valendo", () => {
+  const cfg = normalizarMenu({ ocultas: ["/prospeccao"], ordem: { Operação: ["/clientes", "/prospeccao"] } });
+  assert.deepEqual(cfg?.ocultas, ["/crm"]);
+  assert.deepEqual(cfg?.ordem["Operação"], ["/clientes", "/crm"]);
+});

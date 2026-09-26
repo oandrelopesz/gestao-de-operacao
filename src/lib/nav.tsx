@@ -50,7 +50,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     title: "Comercial",
     links: [
       { label: "Clientes Ativos", icon: <Users size={17} />, to: "/clientes" },
-      { label: "Prospecção", icon: <Target size={17} />, to: "/prospeccao" },
+      { label: "CRM", icon: <Target size={17} />, to: "/crm" },
     ],
   },
   {
