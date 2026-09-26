@@ -386,7 +386,7 @@ function ProximoContato({ lead }: { lead: LeadCrm }) {
   );
 }
 
-interface ValorReuniao { data: string; hora: string; duracaoMin: number; email: string }
+interface ValorReuniao { data: string; hora: string; duracaoMin: number }
 
 function valorReuniaoDo(lead: LeadCrm): ValorReuniao {
   const c = camposDeIso(lead.reuniao_em);
@@ -394,7 +394,6 @@ function valorReuniaoDo(lead: LeadCrm): ValorReuniao {
     data: c.data,
     hora: c.hora,
     duracaoMin: lead.reuniao_em ? lead.reuniao_duracao_min ?? duracaoPadraoReuniao() : duracaoPadraoReuniao(),
-    email: lead.email ?? "",
   };
 }
 
@@ -416,7 +415,7 @@ function ReuniaoBloco({ lead }: { lead: LeadCrm }) {
       return;
     }
     setSalvando(true);
-    const ok = await alterarReuniao(lead, { em, duracaoMin: valor.duracaoMin, email: valor.email.trim() || null });
+    const ok = await alterarReuniao(lead, { em, duracaoMin: valor.duracaoMin });
     setSalvando(false);
     if (ok) setEditando(false);
   };
@@ -472,7 +471,7 @@ function ReuniaoBloco({ lead }: { lead: LeadCrm }) {
 
       {editando && (
         <div className="space-y-3 border-t pt-3">
-          <CamposReuniao valor={valor} onChange={setValor} comEmail />
+          <CamposReuniao valor={valor} onChange={setValor} convite={lead.email} />
           <p className="text-xs text-muted-foreground">
             O evento é {lead.evento_google_id ? "atualizado" : "criado"} na agenda da contato@ com Meet e notificações
             1 h, 30 min e 10 min antes.{!inicio && " Marcar aqui não muda a coluna do lead."}

@@ -37,7 +37,6 @@ import { maskBRLInput, parseBRLInput } from "@/lib/clientes";
 const paraReuniao = (v: CamposReuniaoValor): DadosReuniao => ({
   em: isoDeCampos(v.data, v.hora) ?? "",
   duracaoMin: v.duracaoMin,
-  email: v.email.trim(),
 });
 
 /** 1500 → "1.500,00" (formato da máscara) */
@@ -117,7 +116,6 @@ function FormularioMovimento({
       lead.reuniao_em && lead.reuniao_duracao_min
         ? lead.reuniao_duracao_min
         : duracaoPadraoReuniao(),
-    email: lead.email ?? "",
   }));
 
   // remarcação: a nova data começa vazia de propósito
@@ -127,7 +125,6 @@ function FormularioMovimento({
     data: "",
     hora: "",
     duracaoMin: lead.reuniao_duracao_min ?? duracaoPadraoReuniao(),
-    email: lead.email ?? "",
   }));
 
   // proposta e ganho
@@ -201,7 +198,7 @@ function FormularioMovimento({
       <div className="grid gap-4 py-4">
         {exigencia === "reuniao" && (
           <>
-            <CamposReuniao valor={reuniao} onChange={setReuniao} comEmail />
+            <CamposReuniao valor={reuniao} onChange={setReuniao} convite={lead.email} />
             <p className="text-xs text-muted-foreground">
               O evento é criado na agenda da contato@ com Meet e notificações 1 h, 30 min e 10 min
               antes.
@@ -240,7 +237,7 @@ function FormularioMovimento({
             {motivoRemarcacao === "pediu_remarcar" && (
               <fieldset className="grid gap-3 rounded-lg border border-border/60 p-3">
                 <legend className="px-1 text-sm font-medium">Nova data e hora (obrigatório)</legend>
-                <CamposReuniao valor={nova} onChange={setNova} comEmail />
+                <CamposReuniao valor={nova} onChange={setNova} convite={lead.email} />
                 <p className="text-xs text-muted-foreground">
                   O evento da agenda é movido para a nova data, com o mesmo Meet.
                 </p>
@@ -257,7 +254,7 @@ function FormularioMovimento({
                 </div>
                 {temNova ? (
                   <>
-                    <CamposReuniao valor={nova} onChange={setNova} comEmail />
+                    <CamposReuniao valor={nova} onChange={setNova} convite={lead.email} />
                     <p className="text-xs text-muted-foreground">
                       O evento da agenda é movido para a nova data, com o mesmo Meet.
                     </p>

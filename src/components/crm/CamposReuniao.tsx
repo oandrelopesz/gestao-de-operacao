@@ -1,4 +1,5 @@
-// Campos de data, hora, duração e (opcional) e-mail de uma reunião do CRM. Usado na janela de movimento e na ficha.
+// Campos de data, hora e duração de uma reunião do CRM (janela de movimento e ficha). O e-mail do convite não é
+// pedido aqui: vem do próprio lead; `convite` só mostra para quem ele vai.
 import { useId } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DURACOES_REUNIAO } from "@/lib/crmColunas";
+import { DURACOES_REUNIAO, emailValido } from "@/lib/crmColunas";
 
 export interface CamposReuniaoValor {
   /** aaaa-mm-dd (fuso de São Paulo) */
@@ -17,7 +18,6 @@ export interface CamposReuniaoValor {
   /** hh:mm */
   hora: string;
   duracaoMin: number;
-  email: string;
 }
 
 const CHAVE_DURACAO = "crm-duracao";
@@ -44,11 +44,12 @@ function lembrarDuracao(n: number) {
 export function CamposReuniao({
   valor,
   onChange,
-  comEmail,
+  convite,
 }: {
   valor: CamposReuniaoValor;
   onChange: (v: CamposReuniaoValor) => void;
-  comEmail?: boolean;
+  /** E-mail do lead (null = lead sem e-mail). Sem a prop, o aviso do convite não aparece. */
+  convite?: string | null;
 }) {
   const id = useId();
   const duracoes = DURACOES_REUNIAO.includes(valor.duracaoMin)
@@ -99,22 +100,16 @@ export function CamposReuniao({
           </Select>
         </div>
       </div>
-      {comEmail && (
-        <div className="grid gap-1.5">
-          <Label htmlFor={`${id}-email`}>E-mail do lead (recebe o convite)</Label>
-          <Input
-            id={`${id}-email`}
-            type="email"
-            inputMode="email"
-            autoComplete="off"
-            placeholder="nome@empresa.com.br"
-            value={valor.email}
-            onChange={(e) => onChange({ ...valor, email: e.target.value })}
-          />
-          <p className="text-xs text-muted-foreground">
-            Sem e-mail, o evento é criado sem convidado.
-          </p>
-        </div>
+      {convite !== undefined && (
+        <p className="text-xs text-muted-foreground">
+          {convite && emailValido(convite) ? (
+            <>
+              O convite vai para <span className="font-medium text-foreground">{convite.trim()}</span> (e-mail do lead).
+            </>
+          ) : (
+            <>Lead sem e-mail: o evento é criado sem convidado. Para convidar, preencha o e-mail na ficha do lead.</>
+          )}
+        </p>
       )}
     </div>
   );
