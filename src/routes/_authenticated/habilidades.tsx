@@ -618,7 +618,7 @@ function SubRow({ sub, prioritaria, isFirst, isLast, onNota, onEdit, onDelete, o
         />
         <span className="numeric w-9 text-right font-semibold text-sm" style={{ color: nivel.hex }}>{formatNota(valor)}</span>
       </div>
-      <div className="flex items-center opacity-60 group-hover:opacity-100 transition-opacity justify-end">
+      <div className="flex items-center opacity-60 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity justify-end">
         <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isFirst} onClick={() => onMove(-1)} title="Subir"><ArrowUp size={13} /></Button>
         <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isLast} onClick={() => onMove(1)} title="Descer"><ArrowDown size={13} /></Button>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} title="Editar"><Pencil size={13} /></Button>

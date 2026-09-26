@@ -171,7 +171,7 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                     "transition-opacity mt-1 h-4 w-4 rounded-sm border flex items-center justify-center shrink-0 cursor-pointer",
                     selecionada
                       ? "bg-primary border-primary text-primary-foreground opacity-100"
-                      : cn("border-zinc-300 dark:border-zinc-700 hover:border-primary", modoSelecao ? "opacity-100" : "opacity-0 group-hover:opacity-100")
+                      : cn("border-zinc-300 dark:border-zinc-700 hover:border-primary", modoSelecao ? "opacity-100" : "opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100")
                   )}
                 >
                   {selecionada && <Check size={10} />}
@@ -205,7 +205,7 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                       className={cn(
                         "h-6 w-6 transition-opacity",
                         demanda.cliente_id || demanda.pessoal
-                          ? "opacity-0 group-hover:opacity-100"
+                          ? "opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100"
                           : "opacity-100"
                       )}
                     >
@@ -216,7 +216,7 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
               )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity -mr-1">
+                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity -mr-1">
                     <MoreVertical size={14} />
                   </Button>
                 </DropdownMenuTrigger>
@@ -384,7 +384,7 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                   "transition-opacity ml-auto h-4 w-4 rounded-sm border flex items-center justify-center shrink-0",
                   isRecorrenteMae && !canCompleteRecorrente
                     ? "opacity-40 cursor-not-allowed border-zinc-300 dark:border-zinc-700"
-                    : "opacity-0 group-hover:opacity-100 border-zinc-300 dark:border-zinc-700 hover:bg-emerald-500 hover:border-emerald-500 hover:text-white cursor-pointer"
+                    : "opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 border-zinc-300 dark:border-zinc-700 hover:bg-emerald-500 hover:border-emerald-500 hover:text-white cursor-pointer"
                 )}
               >
                 <Check size={10} />

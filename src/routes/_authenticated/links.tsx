@@ -239,7 +239,7 @@ function LinksPage() {
                     onClick={(e) => { e.stopPropagation(); alternar(l.id); }}
                     className={cn(
                       "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-opacity",
-                      marcado ? "border-primary bg-primary text-primary-foreground" : cn("border-zinc-300 hover:border-primary dark:border-zinc-700", selecaoAtiva ? "opacity-100" : "opacity-0 group-hover:opacity-100"),
+                      marcado ? "border-primary bg-primary text-primary-foreground" : cn("border-zinc-300 hover:border-primary dark:border-zinc-700", selecaoAtiva ? "opacity-100" : "opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100"),
                     )}
                   >
                     {marcado && <Check size={10} />}
@@ -262,7 +262,7 @@ function LinksPage() {
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: tema.hex }} /> <span className="truncate">{tema.nome}</span>
                     </span>
                   ) : <span className="text-[10px] text-muted-foreground">Sem tema</span>}
-                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100" onClick={(e) => e.stopPropagation()}>
                     <Button variant="ghost" size="icon" className="h-7 w-7" title="Copiar link" onClick={() => copiar(l.url)}><Copy size={13} /></Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar" onClick={() => setEdicao({ id: l.id, nome: l.nome, url: l.url, tema_id: l.tema_id })}><Pencil size={13} /></Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Excluir" onClick={() => setParaExcluir([l.id])}><Trash2 size={13} /></Button>

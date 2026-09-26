@@ -958,7 +958,7 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
         onClick={onAlternar}
         className={cn(
           "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-opacity",
-          selecionado ? "border-primary bg-primary text-primary-foreground" : cn("border-zinc-300 hover:border-primary dark:border-zinc-700", selecaoAtiva ? "opacity-100" : "opacity-0 group-hover:opacity-100"),
+          selecionado ? "border-primary bg-primary text-primary-foreground" : cn("border-zinc-300 hover:border-primary dark:border-zinc-700", selecaoAtiva ? "opacity-100" : "opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100"),
         )}
       >
         {selecionado && <Check size={10} />}

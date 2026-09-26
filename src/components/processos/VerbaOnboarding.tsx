@@ -126,7 +126,7 @@ export function VerbaOnboarding({ clienteId, variante = "cabecalho", onSalvo }: 
           <span className="block text-sm font-medium">Definir verba</span>
         )}
       </span>
-      <Pencil size={12} className="ml-auto shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+      <Pencil size={12} className="ml-auto shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100" />
     </button>
   ) : (
     <button

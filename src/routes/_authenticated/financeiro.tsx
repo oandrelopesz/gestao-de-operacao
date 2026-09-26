@@ -503,7 +503,7 @@ function FinanceiroPage() {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity">
                           <MoreVertical size={14} />
                         </Button>
                       </DropdownMenuTrigger>

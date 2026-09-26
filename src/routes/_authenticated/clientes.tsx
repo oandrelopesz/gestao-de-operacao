@@ -721,7 +721,7 @@ function ClienteCard({
         if (e.key === "Delete" || e.key === "Backspace") onDelete();
       }}
     >
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8">

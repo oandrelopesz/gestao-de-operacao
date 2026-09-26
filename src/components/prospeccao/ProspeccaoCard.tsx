@@ -103,7 +103,7 @@ export function ProspeccaoCardView({ lead, onEdit, onDelete, onDuplicate, sortab
             <div onClick={(e) => e.stopPropagation()} className="shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity -mr-1">
+                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity -mr-1">
                     <MoreVertical size={14} />
                   </Button>
                 </DropdownMenuTrigger>

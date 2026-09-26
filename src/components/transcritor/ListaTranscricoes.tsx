@@ -176,7 +176,7 @@ export function ListaTranscricoes({ concluidas, onMudou }: Props) {
               <div className="flex items-center gap-3 px-3 py-2.5">
                 <button type="button" role="checkbox" aria-checked={marcada} aria-label={marcada ? "Desmarcar" : "Selecionar"} onClick={() => alternar(t.id)}
                   className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-opacity",
-                    marcada ? "border-primary bg-primary text-primary-foreground" : cn("border-zinc-300 hover:border-primary dark:border-zinc-600", marcadas.length ? "opacity-100" : "opacity-0 group-hover:opacity-100"))}>
+                    marcada ? "border-primary bg-primary text-primary-foreground" : cn("border-zinc-300 hover:border-primary dark:border-zinc-600", marcadas.length ? "opacity-100" : "opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100"))}>
                   {marcada && <Check size={10} />}
                 </button>
                 <button type="button" onClick={() => abrir(t)} className="text-muted-foreground hover:text-foreground" aria-label={expandida ? "Fechar texto" : "Ver texto"}>
