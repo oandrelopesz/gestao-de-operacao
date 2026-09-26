@@ -45,3 +45,13 @@ test("estrela tem 5 pontas e tamanho próprio respeita as opções", () => {
   const xs = tri.pontos.map(([x]) => tri.x + x);
   assert.equal(Math.max(...xs) - Math.min(...xs), 80);
 });
+
+test("rótulo da faixa em ponta (topo da pirâmide) fica a 2/3 da altura dela, onde o triângulo é mais largo", () => {
+  const pecas = pecasDa("piramide", 0, 0, { largura: 300, altura: 300, etapas: 3 });
+  const [ponta, meio] = poligonos(pecas);
+  const [t0, t1] = pecas.filter((p): p is Extract<Peca, { tipo: "texto" }> => p.tipo === "texto");
+  const altura = (p: typeof ponta) => Math.max(...p.pontos.map(([, y]) => y));
+  // O texto guarda y = centro − 10 (metade de uma linha de 18 px)
+  assert.equal(Math.round(t0.y + 10), Math.round(ponta.y + (altura(ponta) * 2) / 3));
+  assert.equal(Math.round(t1.y + 10), Math.round(meio.y + altura(meio) / 2));
+});

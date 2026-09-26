@@ -422,3 +422,25 @@ html[data-hidden] [data-state="closed"] {
     -webkit-text-size-adjust: 100%;
   }
 }
+
+/* Editor de quadros (Fluxogramas): ocupa toda a área do conteúdo, sem o respiro do layout.
+   Celular: descontando o cabeçalho (3,5rem + área segura) e a barra de atalhos de baixo (4rem + 1px + área segura). */
+.fluxo-editor {
+  height: calc(100dvh - 3.5rem);
+  margin: -2rem;
+}
+@media (width < 64rem) {
+  .fluxo-editor {
+    height: calc(100dvh - 7.5rem - 1px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    margin: -1rem -1rem calc(-5.5rem - env(safe-area-inset-bottom));
+  }
+}
+/* Sem a animação de entrada da página: o transform dela vira referência dos elementos "fixed" do Excalidraw
+   (camada do laser, 100vw × 100vh), que passariam a sobrar 56 px embaixo e desenhar deslocados */
+.page-enter:has(> .fluxo-editor) {
+  animation: none;
+}
+.fluxo-editor:fullscreen {
+  height: 100vh;
+  margin: 0;
+}

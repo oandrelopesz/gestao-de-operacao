@@ -58,7 +58,10 @@ function faixas(x0: number, y0: number, W: number, H: number, n: number, pontaEm
   }
   for (let i = 0; i < n; i++) {
     const topo = i * (h + vao);
-    pecas.push({ tipo: "texto", x: round(x0), y: round(y0 + topo + h / 2 - 10), largura: W, texto: rotulos[i] ?? `Etapa ${i + 1}` });
+    // Faixa em ponta (topo da pirâmide): o rótulo desce para 2/3 da altura, onde o triângulo tem mais largura
+    const emPonta = largura(topo / H) < 0.5;
+    const centro = topo + (emPonta ? (h * 2) / 3 : h / 2);
+    pecas.push({ tipo: "texto", x: round(x0), y: round(y0 + centro - 10), largura: W, texto: rotulos[i] ?? `Etapa ${i + 1}` });
   }
   return pecas;
 }
