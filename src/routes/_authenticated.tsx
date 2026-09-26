@@ -240,7 +240,7 @@ function AuthenticatedLayout() {
               </Avatar>
               <div className="flex flex-col overflow-hidden">
                 <span className="text-sm font-medium truncate capitalize">{userName}</span>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">gestor de tráfego</span>
+                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">estrategista digital</span>
               </div>
             </div>
           </div>
@@ -284,7 +284,6 @@ function AuthenticatedLayout() {
                 {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
               </Button>
               <NotificationBell />
-              <span className="ml-1 max-lg:hidden font-mono text-[10px] uppercase tracking-[0.16em] text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-full">beta</span>
             </div>
           </header>
           <div key={`${pathname}#${recarga}`} className="p-4 lg:p-8 max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))] page-enter">
