@@ -53,8 +53,8 @@ export interface CrmValor {
   abrirFicha: (id: string | null) => void;
   cadastroCliente: LeadCrm | null;
   iniciarCadastroCliente: (lead: LeadCrm | null) => void;
-  /** Grava cliente_id no lead e o evento no histórico */
-  concluirCadastroCliente: (lead: LeadCrm, clienteId: string) => Promise<void>;
+  /** Grava cliente_id no lead e o evento no histórico; false se não conseguiu vincular */
+  concluirCadastroCliente: (lead: LeadCrm, clienteId: string) => Promise<boolean>;
 }
 
 const Ctx = createContext<CrmValor | null>(null);
@@ -289,6 +289,15 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   const excluirLeads = useCallback(
     async (ids: string[]) => {
       try {
+        // Reunião futura de lead excluído: cancela o evento na agenda (nunca lança; falha só fica no console)
+        const agora = Date.now();
+        for (const id of ids) {
+          const l = leadsRef.current.find((x) => x.id === id);
+          if (l?.evento_google_id && l.reuniao_em && new Date(l.reuniao_em).getTime() > agora) {
+            const r = await dados.executarAgenda(l, l, "cancelar");
+            if (r.patch.evento_status === "erro") console.warn("Evento não cancelado:", r.patch.evento_erro);
+          }
+        }
         await dados.excluirLeads(ids);
         const fora = new Set(ids);
         setLeads((prev) => prev.filter((l) => !fora.has(l.id)));
@@ -368,7 +377,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
 
   const concluirCadastroCliente = useCallback(
     async (lead: LeadCrm, clienteId: string) => {
-      await executarPlano(lead, vazio({
+      return !!await executarPlano(lead, vazio({
         patch: { cliente_id: clienteId },
         eventos: [{ tipo: "cliente_cadastrado", descricao: "Cadastrado como cliente ativo", dados: { cliente_id: clienteId } }],
       }));
