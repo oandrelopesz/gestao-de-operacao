@@ -670,6 +670,90 @@ export type Database = {
           },
         ]
       }
+      fireflies_convites: {
+        Row: {
+          enviado_em: string
+          erro: string | null
+          evento_id: string
+          inicio: string
+          link_meet: string | null
+          ok: boolean | null
+          titulo: string | null
+        }
+        Insert: {
+          enviado_em?: string
+          erro?: string | null
+          evento_id: string
+          inicio: string
+          link_meet?: string | null
+          ok?: boolean | null
+          titulo?: string | null
+        }
+        Update: {
+          enviado_em?: string
+          erro?: string | null
+          evento_id?: string
+          inicio?: string
+          link_meet?: string | null
+          ok?: boolean | null
+          titulo?: string | null
+        }
+        Relationships: []
+      }
+      fireflies_reunioes: {
+        Row: {
+          arquivos: Json
+          created_at: string | null
+          data_hora: string | null
+          duracao_min: number | null
+          erro: string | null
+          excluir: boolean
+          id: string
+          link_fireflies: string | null
+          link_meet: string | null
+          organizador: string | null
+          participantes: string[]
+          status: string
+          titulo: string
+          titulo_pendente: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          arquivos?: Json
+          created_at?: string | null
+          data_hora?: string | null
+          duracao_min?: number | null
+          erro?: string | null
+          excluir?: boolean
+          id: string
+          link_fireflies?: string | null
+          link_meet?: string | null
+          organizador?: string | null
+          participantes?: string[]
+          status?: string
+          titulo: string
+          titulo_pendente?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          arquivos?: Json
+          created_at?: string | null
+          data_hora?: string | null
+          duracao_min?: number | null
+          erro?: string | null
+          excluir?: boolean
+          id?: string
+          link_fireflies?: string | null
+          link_meet?: string | null
+          organizador?: string | null
+          participantes?: string[]
+          status?: string
+          titulo?: string
+          titulo_pendente?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       google_oauth_tokens: {
         Row: {
           access_token: string

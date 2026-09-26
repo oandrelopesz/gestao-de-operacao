@@ -26,6 +26,7 @@ import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
 import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
 import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenticated/habilidades'
+import { Route as AuthenticatedFirefliesRouteImport } from './routes/_authenticated/fireflies'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
@@ -121,6 +122,11 @@ const AuthenticatedHabilidadesRoute =
     path: '/habilidades',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedFirefliesRoute = AuthenticatedFirefliesRouteImport.update({
+  id: '/fireflies',
+  path: '/fireflies',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedFinanceiroRoute = AuthenticatedFinanceiroRouteImport.update({
   id: '/financeiro',
   path: '/financeiro',
@@ -173,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/cursos': typeof AuthenticatedCursosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
+  '/fireflies': typeof AuthenticatedFirefliesRoute
   '/habilidades': typeof AuthenticatedHabilidadesRoute
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/links': typeof AuthenticatedLinksRoute
@@ -198,6 +205,7 @@ export interface FileRoutesByTo {
   '/cursos': typeof AuthenticatedCursosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
+  '/fireflies': typeof AuthenticatedFirefliesRoute
   '/habilidades': typeof AuthenticatedHabilidadesRoute
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/links': typeof AuthenticatedLinksRoute
@@ -226,6 +234,7 @@ export interface FileRoutesById {
   '/_authenticated/cursos': typeof AuthenticatedCursosRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
+  '/_authenticated/fireflies': typeof AuthenticatedFirefliesRoute
   '/_authenticated/habilidades': typeof AuthenticatedHabilidadesRoute
   '/_authenticated/ideias': typeof AuthenticatedIdeiasRoute
   '/_authenticated/links': typeof AuthenticatedLinksRoute
@@ -255,6 +264,7 @@ export interface FileRouteTypes {
     | '/cursos'
     | '/dashboard'
     | '/financeiro'
+    | '/fireflies'
     | '/habilidades'
     | '/ideias'
     | '/links'
@@ -280,6 +290,7 @@ export interface FileRouteTypes {
     | '/cursos'
     | '/dashboard'
     | '/financeiro'
+    | '/fireflies'
     | '/habilidades'
     | '/ideias'
     | '/links'
@@ -307,6 +318,7 @@ export interface FileRouteTypes {
     | '/_authenticated/cursos'
     | '/_authenticated/dashboard'
     | '/_authenticated/financeiro'
+    | '/_authenticated/fireflies'
     | '/_authenticated/habilidades'
     | '/_authenticated/ideias'
     | '/_authenticated/links'
@@ -450,6 +462,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHabilidadesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/fireflies': {
+      id: '/_authenticated/fireflies'
+      path: '/fireflies'
+      fullPath: '/fireflies'
+      preLoaderRoute: typeof AuthenticatedFirefliesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/financeiro': {
       id: '/_authenticated/financeiro'
       path: '/financeiro'
@@ -518,6 +537,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCursosRoute: typeof AuthenticatedCursosRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
+  AuthenticatedFirefliesRoute: typeof AuthenticatedFirefliesRoute
   AuthenticatedHabilidadesRoute: typeof AuthenticatedHabilidadesRoute
   AuthenticatedIdeiasRoute: typeof AuthenticatedIdeiasRoute
   AuthenticatedLinksRoute: typeof AuthenticatedLinksRoute
@@ -544,6 +564,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCursosRoute: AuthenticatedCursosRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
+  AuthenticatedFirefliesRoute: AuthenticatedFirefliesRoute,
   AuthenticatedHabilidadesRoute: AuthenticatedHabilidadesRoute,
   AuthenticatedIdeiasRoute: AuthenticatedIdeiasRoute,
   AuthenticatedLinksRoute: AuthenticatedLinksRoute,

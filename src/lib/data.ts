@@ -5,6 +5,7 @@ import { fetchDemandaColunas } from "@/lib/demandaColunas";
 import { fetchCursoCategorias } from "@/lib/cursoCategorias";
 import { fetchHabilidades } from "@/lib/habilidades";
 import { fetchPdfBiblioteca } from "@/lib/pdfs";
+import { CAMPOS_REUNIAO, normalizarReuniao, ordenar, type ReuniaoFireflies } from "@/lib/fireflies";
 import { setCached } from "@/lib/pageCache";
 
 /**
@@ -27,6 +28,7 @@ export const CACHE_KEYS = {
   livros: "livros",
   habilidades: "habilidades",
   pdfs: "pdfs",
+  fireflies: "fireflies",
 } as const;
 
 export async function loadDemandas() {
@@ -125,6 +127,16 @@ export async function loadLivros() {
   return (data as any[]) || [];
 }
 
+/** Reuniões importadas do Fireflies (aba Fireflies): mais recente primeiro, sem data no fim. */
+export async function loadFireflies(): Promise<ReuniaoFireflies[]> {
+  const { data, error } = await supabase
+    .from("fireflies_reunioes")
+    .select(CAMPOS_REUNIAO)
+    .order("data_hora", { ascending: false, nullsFirst: false });
+  if (error) throw error;
+  return ordenar(((data || []) as unknown as Record<string, unknown>[]).map(normalizarReuniao));
+}
+
 /**
  * Pré-aquece o cache de todas as abas logo após o app abrir, em segundo plano,
  * para que a primeira troca de aba já encontre o conteúdo pronto.
@@ -143,6 +155,7 @@ export async function warmAllCaches(): Promise<void> {
     [CACHE_KEYS.livros, loadLivros],
     [CACHE_KEYS.habilidades, fetchHabilidades],
     [CACHE_KEYS.pdfs, fetchPdfBiblioteca],
+    [CACHE_KEYS.fireflies, loadFireflies],
     [
       CACHE_KEYS.cursos,
       async () => {

@@ -22,6 +22,7 @@ import {
   BarChart3,
   CalendarDays,
   Link2,
+  NotebookPen,
 } from "lucide-react";
 
 export interface NavLink {
@@ -66,6 +67,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     title: "Ferramentas",
     links: [
       { label: "Transcritor", icon: <AudioLines size={17} />, to: "/transcritor" },
+      { label: "Fireflies", icon: <NotebookPen size={17} />, to: "/fireflies" },
       { label: "Swipe file", icon: <Images size={17} />, to: "/swipe" },
       { label: "Links", icon: <Link2 size={17} />, to: "/links" },
       { label: "Notas", icon: <StickyNote size={17} />, to: "/notas" },

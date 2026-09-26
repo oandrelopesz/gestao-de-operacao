@@ -15,6 +15,9 @@ services:
       SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJucHZ6Z3VhcHVuc3p0c2R2bXJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0MTM3NzIsImV4cCI6MjA5Mjk4OTc3Mn0.2JNYq2-Ra5Na0kIUJtEnpER1IK7uBg6mhsw3IlW6duA"
       SWIPE_KEY: "${SWIPE_KEY}"
       WORKER_KEY: "${WORKER_KEY}"
+      # Fireflies (aba Fireflies): chave da API e segredo do webhook, colados na stack pelo usuário
+      FIREFLIES_API_KEY: "${FIREFLIES_API_KEY}"
+      FIREFLIES_WEBHOOK_SECRET: "${FIREFLIES_WEBHOOK_SECRET}"
       SWIPE_TMP: "/dados/tmp"
       TZ: "America/Sao_Paulo"
     volumes:
