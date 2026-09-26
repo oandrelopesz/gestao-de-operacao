@@ -50,6 +50,16 @@ versão, sem ganho para o uso atual).
   roláveis com indicação de continuidade. Uma regra global para texto miúdo foi descartada porque quebraria
   selos de altura fixa (h-4 com texto de 9–10 px).
 
+### 3b. Mesmos dados e mesmas funções nos dois aparelhos (pedido de 25/09)
+- Base: mesmo banco (Supabase) e mesmo código publicado; sem modo offline.
+- Ao voltar ao sistema depois de ≥ 60 s fora (`src/lib/versaoApp.ts` + `AtualizarAoVoltar`): versão nova
+  publicada → no celular recarrega o app (sem janela aberta); no computador, ou com janela aberta, só um aviso
+  "Nova versão — Atualizar". Mesma versão → no celular remonta a tela para buscar os dados salvos em outro
+  aparelho; no computador nada muda.
+- Preferências guardadas só no aparelho: avisos dispensados do sino (`hidden_notification_ids`), calendário
+  oculto das Demandas (`demandas_calendar_visible`), menu recolhido e tema — levar os dois primeiros para o
+  banco fica para decidir com o usuário.
+
 ### 4. Tela por tela
 - **Fase 2 (prioridades do usuário)**
   - Demandas: cabeçalho que quebra linha; uma coluna por tela com deslize lateral (scroll-snap) e indicador;

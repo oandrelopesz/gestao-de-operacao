@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState, useRouter } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ChevronRight, ChevronLeft, PanelLeft, Sun, Moon, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 import { AgenciasProvider } from "@/lib/agencias";
 import { MobileNav } from "@/components/MobileNav";
+import { AtualizarAoVoltar } from "@/components/AtualizarAoVoltar";
 import { PlataformasProvider } from "@/lib/plataformas";
 import { useTheme } from "@/lib/theme";
 import { warmAllCaches } from "@/lib/data";
@@ -31,6 +32,9 @@ function AuthenticatedLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [userName, setUserName] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Sobe quando o celular volta de um tempo em segundo plano: remonta a tela para buscar dados frescos
+  const [recarga, setRecarga] = useState(0);
+  const recarregarPagina = useCallback(() => setRecarga((n) => n + 1), []);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("sidebar-collapsed") === "1";
@@ -283,10 +287,11 @@ function AuthenticatedLayout() {
               <span className="ml-1 max-lg:hidden font-mono text-[10px] uppercase tracking-[0.16em] text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-full">beta</span>
             </div>
           </header>
-          <div key={pathname} className="p-4 lg:p-8 max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))] page-enter">
+          <div key={`${pathname}#${recarga}`} className="p-4 lg:p-8 max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))] page-enter">
             <Outlet />
           </div>
           <MobileNav onMais={() => setIsSidebarOpen(true)} maisAberto={isSidebarOpen} />
+          <AtualizarAoVoltar onRecarregarPagina={recarregarPagina} />
         </main>
       </div>
     </PlataformasProvider>

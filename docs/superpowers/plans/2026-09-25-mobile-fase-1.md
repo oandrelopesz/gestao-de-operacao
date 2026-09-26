@@ -683,6 +683,13 @@ git commit -m "Arrastar: mouse igual a antes; no toque, segurar para arrastar e 
 
 ---
 
+### Task 6b: Sistema sempre atualizado ao voltar (pedido do usuário durante a execução)
+
+**Files:** Create `src/lib/versaoApp.ts` (+ `.test.ts`), `src/components/AtualizarAoVoltar.tsx`, `tools/auditoria-mobile/testar-voltar.mjs`; Modify `src/routes/_authenticated.tsx` (chave `${pathname}#${recarga}` na tela e `<AtualizarAoVoltar onRecarregarPagina={recarregarPagina} />`).
+
+- `versaoDoHtml(html)` → `"main-XXXX.js"` | null; `decidirAoVoltar({ausenteMs, versaoAtual, versaoNova, celular, janelaAberta})` → `"nada" | "recarregar-app" | "avisar-versao" | "recarregar-pagina"` (6 testes).
+- Verificado: `MSYS_NO_PATHCONV=1 node testar-voltar.mjs http://localhost:5188 /financeiro` → celular remonta, computador não.
+
 ### Task 7: Verificação completa, correções e publicação
 
 - [ ] **Step 1: regressão de desktop (base × nova)**
