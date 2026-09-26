@@ -29,6 +29,8 @@ export interface NavLink {
   label: string;
   icon: React.ReactNode;
   to: string;
+  /** Sinônimos para a busca do menu (sem acento e com erro de digitação também funciona) */
+  palavras?: string[];
 }
 
 // Navegação agrupada por contexto: operação do dia, comercial, pessoal, ferramentas e sistema
@@ -36,49 +38,49 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
   {
     title: "Operação",
     links: [
-      { label: "Demandas", icon: <LayoutDashboard size={17} />, to: "/" },
-      { label: "Agenda", icon: <CalendarDays size={17} />, to: "/agenda" },
-      { label: "Onboarding", icon: <Rocket size={17} />, to: "/onboarding" },
-      { label: "Roadmap", icon: <MapIcon size={17} />, to: "/roadmap" },
-      { label: "Ideias", icon: <Lightbulb size={17} />, to: "/ideias" },
-      { label: "Planilha/CRM", icon: <KeyRound size={17} />, to: "/acessos" },
-      { label: "Saldo", icon: <Wallet size={17} />, to: "/saldo" },
-      { label: "NPS de Clientes", icon: <MessageSquare size={17} />, to: "/nps" },
+      { label: "Demandas", icon: <LayoutDashboard size={17} />, to: "/", palavras: ["tarefas", "pendências", "afazeres", "kanban"] },
+      { label: "Agenda", icon: <CalendarDays size={17} />, to: "/agenda", palavras: ["calendário", "reuniões", "eventos", "compromissos"] },
+      { label: "Onboarding", icon: <Rocket size={17} />, to: "/onboarding", palavras: ["implantação", "novos clientes", "início"] },
+      { label: "Roadmap", icon: <MapIcon size={17} />, to: "/roadmap", palavras: ["planejamento", "etapas", "trilha"] },
+      { label: "Ideias", icon: <Lightbulb size={17} />, to: "/ideias", palavras: ["brainstorm", "sugestões"] },
+      { label: "Planilha/CRM", icon: <KeyRound size={17} />, to: "/acessos", palavras: ["acessos", "senhas", "logins", "credenciais"] },
+      { label: "Saldo", icon: <Wallet size={17} />, to: "/saldo", palavras: ["verba", "recarga", "anúncios", "ads", "créditos"] },
+      { label: "NPS de Clientes", icon: <MessageSquare size={17} />, to: "/nps", palavras: ["satisfação", "pesquisa", "avaliação"] },
     ],
   },
   {
     title: "Comercial",
     links: [
-      { label: "Clientes Ativos", icon: <Users size={17} />, to: "/clientes" },
-      { label: "CRM", icon: <Target size={17} />, to: "/crm" },
+      { label: "Clientes Ativos", icon: <Users size={17} />, to: "/clientes", palavras: ["carteira", "contas"] },
+      { label: "CRM", icon: <Target size={17} />, to: "/crm", palavras: ["prospecção", "leads", "funil", "vendas", "pipeline", "comercial"] },
     ],
   },
   {
     title: "Pessoal",
     links: [
-      { label: "Financeiro", icon: <DollarSign size={17} />, to: "/financeiro" },
-      { label: "Cursos", icon: <BookOpen size={17} />, to: "/cursos" },
-      { label: "Livros", icon: <Book size={17} />, to: "/livros" },
-      { label: "Habilidades", icon: <Gauge size={17} />, to: "/habilidades" },
-      { label: "Ver depois", icon: <Bookmark size={17} />, to: "/ver-depois" },
+      { label: "Financeiro", icon: <DollarSign size={17} />, to: "/financeiro", palavras: ["faturamento", "receita", "dinheiro", "parcelas", "recebimentos"] },
+      { label: "Cursos", icon: <BookOpen size={17} />, to: "/cursos", palavras: ["aulas", "estudos", "treinamentos"] },
+      { label: "Livros", icon: <Book size={17} />, to: "/livros", palavras: ["leitura", "biblioteca"] },
+      { label: "Habilidades", icon: <Gauge size={17} />, to: "/habilidades", palavras: ["competências", "skills", "desenvolvimento"] },
+      { label: "Ver depois", icon: <Bookmark size={17} />, to: "/ver-depois", palavras: ["salvos", "vídeos", "assistir depois"] },
     ],
   },
   {
     title: "Ferramentas",
     links: [
-      { label: "Transcritor", icon: <AudioLines size={17} />, to: "/transcritor" },
-      { label: "Fireflies", icon: <NotebookPen size={17} />, to: "/fireflies" },
-      { label: "Swipe file", icon: <Images size={17} />, to: "/swipe" },
-      { label: "Links", icon: <Link2 size={17} />, to: "/links" },
-      { label: "Notas", icon: <StickyNote size={17} />, to: "/notas" },
-      { label: "Arquivos", icon: <FileText size={17} />, to: "/arquivos" },
+      { label: "Transcritor", icon: <AudioLines size={17} />, to: "/transcritor", palavras: ["transcrição", "áudio", "vídeo", "legenda"] },
+      { label: "Fireflies", icon: <NotebookPen size={17} />, to: "/fireflies", palavras: ["reuniões gravadas", "gravações", "atas", "resumos"] },
+      { label: "Swipe file", icon: <Images size={17} />, to: "/swipe", palavras: ["referências", "criativos", "anúncios salvos", "inspiração"] },
+      { label: "Links", icon: <Link2 size={17} />, to: "/links", palavras: ["favoritos", "urls", "sites"] },
+      { label: "Notas", icon: <StickyNote size={17} />, to: "/notas", palavras: ["anotações", "bloco de notas"] },
+      { label: "Arquivos", icon: <FileText size={17} />, to: "/arquivos", palavras: ["pdf", "documentos", "drive", "pdfs"] },
     ],
   },
   {
     title: "Sistema",
     links: [
-      { label: "Dashboard", icon: <BarChart3 size={17} />, to: "/dashboard" },
-      { label: "Admin", icon: <Settings size={17} />, to: "/admin" },
+      { label: "Dashboard", icon: <BarChart3 size={17} />, to: "/dashboard", palavras: ["métricas", "relatórios", "indicadores", "resultados"] },
+      { label: "Admin", icon: <Settings size={17} />, to: "/admin", palavras: ["configurações", "ajustes", "sistema"] },
     ],
   },
 ];

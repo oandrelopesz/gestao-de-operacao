@@ -8,6 +8,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 import { AgenciasProvider } from "@/lib/agencias";
 import { MobileNav } from "@/components/MobileNav";
+import { NavLateral } from "@/components/NavLateral";
 import { AtualizarAoVoltar } from "@/components/AtualizarAoVoltar";
 import { PlataformasProvider } from "@/lib/plataformas";
 import { useTheme } from "@/lib/theme";
@@ -63,6 +64,12 @@ function AuthenticatedLayout() {
     };
   }, []);
   const grupos = useMemo(() => aplicarMenu(NAV_GROUPS, menuCfg), [menuCfg]);
+  const fecharMenuCelular = useCallback(() => setIsSidebarOpen(false), []);
+  // Ctrl+K com o menu escondido: no computador reabre o menu recolhido; no celular abre a gaveta
+  const abrirMenu = useCallback(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) setIsDesktopCollapsed(false);
+    else setIsSidebarOpen(true);
+  }, []);
 
   // Logo após abrir o app: pré-carrega o código de todas as rotas e aquece o
   // cache de dados de cada aba, para a troca de aba ser instantânea.
@@ -207,29 +214,7 @@ function AuthenticatedLayout() {
             </Button>
           </div>
 
-          <nav className="flex-1 px-3 pb-4 space-y-5 overflow-y-auto">
-            {grupos.map((group) => (
-              <div key={group.title}>
-                <p className="px-3 mb-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-muted-foreground/70">{group.title}</p>
-                <div className="space-y-0.5">
-                  {group.links.map((link) => (
-                    <Link
-                      key={link.to}
-                      to={link.to}
-                      activeOptions={{ exact: link.to === "/" }}
-                      className="group/nav relative flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium rounded-lg text-muted-foreground transition-all hover:bg-sidebar-accent/70 hover:text-foreground hover:translate-x-px data-[status=active]:bg-gradient-to-r data-[status=active]:from-primary/20 data-[status=active]:to-transparent data-[status=active]:text-foreground data-[status=active]:shadow-[inset_2px_0_0_var(--color-primary),0_0_24px_-8px_var(--color-primary)]"
-                      onClick={() => setIsSidebarOpen(false)}
-                    >
-                      <span className="text-muted-foreground group-hover/nav:text-foreground group-data-[status=active]/nav:text-primary transition-colors">
-                        {link.icon}
-                      </span>
-                      {link.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </nav>
+          <NavLateral grupos={grupos} onNavegar={fecharMenuCelular} onAbrirMenu={abrirMenu} />
 
           <div className="p-3 border-t border-sidebar-border">
             <div className="flex items-center gap-3 px-2 py-1.5 rounded-lg">
