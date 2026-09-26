@@ -631,6 +631,12 @@ git commit -m "Celular: botões que só apareciam com o mouse por cima ficam vis
 
 ### Task 6: Arrastar no toque sem roubar a rolagem
 
+> **Ajuste na execução (25/09):** em vez de `MouseSensor`, o mouse fica com um `PointerSensor` que só ignora
+> `pointerType === "touch"` (`PointerSemToque`), porque os botões dentro do card de Demandas bloqueiam
+> `onPointerDown` — com `MouseSensor` um clique neles poderia iniciar arrasto. O teclado só entra onde já
+> existia (Demandas e Fila). Verificado com `tools/auditoria-mobile/testar-arrastar.mjs` (mouse arrasta;
+> toque deslizando rola; toque segurando arrasta) — no código antigo o toque não arrastava de jeito nenhum.
+
 **Files:**
 - Create: `src/lib/arrastar.ts`
 - Modify: `src/routes/_authenticated/index.tsx:44-56,129-138`, `src/components/fila/FilaComSelecao.tsx:5,70-73`, `src/components/processos/Trilha.tsx:6-9,123`, `src/components/processos/TemplateEditorDialog.tsx:6-9,88`

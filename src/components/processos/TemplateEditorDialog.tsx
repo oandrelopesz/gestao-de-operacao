@@ -3,12 +3,10 @@ import { toast } from "sonner";
 import { ChevronDown, ChevronUp, GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import {
   DndContext,
-  PointerSensor,
   closestCenter,
-  useSensor,
-  useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import { useSensoresArrastar } from "@/lib/arrastar";
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
@@ -85,7 +83,7 @@ export function TemplateEditorDialog({ aberto, tipo, template, onClose, onSalvo 
     setFocoId(null);
   }, [focoId]);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensoresArrastar(6);
 
   const adicionarPasso = () => {
     const novo: PassoEdit = { id: idLocal(), titulo: `Demanda ${passos.length + 1}`, observacoes: "", aberto: false };

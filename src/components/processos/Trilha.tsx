@@ -3,12 +3,10 @@ import { toast } from "sonner";
 import { Check, Map as MapIcon, Plus, Route } from "lucide-react";
 import {
   DndContext,
-  PointerSensor,
   closestCenter,
-  useSensor,
-  useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import { useSensoresArrastar } from "@/lib/arrastar";
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
@@ -120,7 +118,7 @@ export function Trilha({ processo, roadmaps, somenteLeitura = false, onMudou, on
     }
   };
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensoresArrastar(6);
 
   const gravarOrdem = async (lista: Passo[]) => {
     const final = renumerar(ordenarPassos(renumerar(lista)));

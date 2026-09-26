@@ -1,12 +1,11 @@
 // Fila com ordem, pausa, cancelamento e seleção em massa — usada no Swipe file (downloads) e no
 // Transcritor. Quem usa entrega as linhas já traduzidas (título, subtítulo, etapa) e as ações.
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent,
-} from "@dnd-kit/core";
+import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
+import { useSensoresArrastar } from "@/lib/arrastar";
 import { toast } from "sonner";
 import {
   ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, Check, ChevronsUp, GripVertical, ListOrdered, Loader2, Pause, Play, X,
@@ -67,10 +66,7 @@ export function FilaComSelecao({
   // Selecionados que saíram da fila (terminaram, foram cancelados) deixam de contar
   const todos = useMemo(() => new Set([...andamento, ...aguardando, ...pausados].map((l) => l.id)), [andamento, aguardando, pausados]);
   const marcados = [...selecionados].filter((id) => todos.has(id));
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const sensors = useSensoresArrastar(4, sortableKeyboardCoordinates);
 
   if (!andamento.length && !aguardando.length && !pausados.length) return null;
 

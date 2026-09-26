@@ -38,6 +38,7 @@ import { useCachedState, hasCached } from "@/lib/pageCache";
 import { CACHE_KEYS, loadDemandas, loadClientesLite, loadColunas } from "@/lib/data";
 import { toast } from "sonner";
 import { useAgencias } from "@/lib/agencias";
+import { useSensoresArrastar } from "@/lib/arrastar";
 import {
   DndContext,
   DragOverlay,
@@ -45,10 +46,6 @@ import {
   closestCenter,
   pointerWithin,
   CollisionDetection,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
   DragStartEvent,
   DragOverEvent,
   DragEndEvent,
@@ -126,16 +123,7 @@ function DemandasPage() {
     });
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 3,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  const sensors = useSensoresArrastar(3, sortableKeyboardCoordinates);
 
   useEffect(() => {
     fetchColumns();
