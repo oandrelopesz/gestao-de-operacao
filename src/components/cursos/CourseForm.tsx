@@ -475,7 +475,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                   <FormItem>
                     <FormLabel>Login</FormLabel>
                     <FormControl>
-                      <Input placeholder="Email ou usuário" {...field} />
+                      <Input placeholder="Email ou usuário" autoComplete="off" data-1p-ignore data-lpignore="true" data-bwignore {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -490,8 +490,15 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                     <FormLabel>Senha</FormLabel>
                     <FormControl>
                       <div className="relative">
+                        {/* Senha da plataforma do curso, não do sistema: campo de texto mascarado por CSS (e não
+                            type="password") para o Chrome não oferecer salvá-la como login do GestorPro */}
                         <Input
-                          type={showPassword ? "text" : "password"}
+                          type="text"
+                          autoComplete="off"
+                          data-1p-ignore
+                          data-lpignore="true"
+                          data-bwignore
+                          className={cn(!showPassword && "[-webkit-text-security:disc]")}
                           placeholder="Senha de acesso"
                           {...field}
                         />
