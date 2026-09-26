@@ -21,7 +21,6 @@ export const CACHE_KEYS = {
   colunas: "demanda-colunas",
   clientesView: "clientes-view",
   saldo: "saldo",
-  leads: "leads",
   acessos: "acessos",
   financeiro: "financeiro",
   cursos: "cursos",
@@ -91,16 +90,6 @@ export async function loadSaldo() {
     .order("dias_restantes", { ascending: true, nullsFirst: false });
   if (error) throw error;
   return (data || []) as any[];
-}
-
-export async function loadLeads() {
-  const { data, error } = await supabase
-    .from("prospeccao")
-    .select("*")
-    .order("ordem", { ascending: true })
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data as any[]) || [];
 }
 
 export async function loadAcessos() {
