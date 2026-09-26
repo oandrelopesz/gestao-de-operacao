@@ -86,24 +86,6 @@ export type Database = {
         }
         Relationships: []
       }
-      app_config: {
-        Row: {
-          chave: string
-          updated_at: string
-          valor: Json
-        }
-        Insert: {
-          chave: string
-          updated_at?: string
-          valor: Json
-        }
-        Update: {
-          chave?: string
-          updated_at?: string
-          valor?: Json
-        }
-        Relationships: []
-      }
       alertas_saldo_enviados: {
         Row: {
           enviado_em: string
@@ -145,6 +127,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      app_config: {
+        Row: {
+          chave: string
+          updated_at: string
+          valor: Json
+        }
+        Insert: {
+          chave: string
+          updated_at?: string
+          valor: Json
+        }
+        Update: {
+          chave?: string
+          updated_at?: string
+          valor?: Json
+        }
+        Relationships: []
       }
       clientes: {
         Row: {
@@ -253,6 +253,71 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_colunas: {
+        Row: {
+          config: Json
+          created_at: string
+          hex: string
+          id: string
+          ordem: number
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          hex?: string
+          id?: string
+          ordem?: number
+          tipo?: string
+          titulo: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          hex?: string
+          id?: string
+          ordem?: number
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: []
+      }
+      crm_eventos: {
+        Row: {
+          created_at: string
+          dados: Json
+          descricao: string
+          id: string
+          lead_id: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          dados?: Json
+          descricao: string
+          id?: string
+          lead_id: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          dados?: Json
+          descricao?: string
+          id?: string
+          lead_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_eventos_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "prospeccao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       curso_categorias: {
         Row: {
           cor: string | null
@@ -286,6 +351,7 @@ export type Database = {
           categoria_id: string | null
           created_at: string | null
           em_andamento: boolean | null
+          expira_em: string | null
           id: string
           link_area_membros: string | null
           login: string | null
@@ -303,6 +369,7 @@ export type Database = {
           categoria_id?: string | null
           created_at?: string | null
           em_andamento?: boolean | null
+          expira_em?: string | null
           id?: string
           link_area_membros?: string | null
           login?: string | null
@@ -320,6 +387,7 @@ export type Database = {
           categoria_id?: string | null
           created_at?: string | null
           em_andamento?: boolean | null
+          expira_em?: string | null
           id?: string
           link_area_membros?: string | null
           login?: string | null
@@ -403,7 +471,29 @@ export type Database = {
           pessoal?: boolean
           titulo?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "demanda_conclusoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demanda_conclusoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demanda_conclusoes_demanda_id_fkey"
+            columns: ["demanda_id"]
+            isOneToOne: true
+            referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       demanda_execucoes: {
         Row: {
@@ -458,9 +548,9 @@ export type Database = {
           processo_passo_id: string | null
           prospeccao_id: string | null
           proxima_execucao: string | null
-          roadmap_id: string | null
           recorrente: boolean
           recorrente_pai_id: string | null
+          roadmap_id: string | null
           status: string
           titulo: string
           ultima_execucao: string | null
@@ -487,9 +577,9 @@ export type Database = {
           processo_passo_id?: string | null
           prospeccao_id?: string | null
           proxima_execucao?: string | null
-          roadmap_id?: string | null
           recorrente?: boolean
           recorrente_pai_id?: string | null
+          roadmap_id?: string | null
           status?: string
           titulo: string
           ultima_execucao?: string | null
@@ -516,9 +606,9 @@ export type Database = {
           processo_passo_id?: string | null
           prospeccao_id?: string | null
           proxima_execucao?: string | null
-          roadmap_id?: string | null
           recorrente?: boolean
           recorrente_pai_id?: string | null
+          roadmap_id?: string | null
           status?: string
           titulo?: string
           ultima_execucao?: string | null
@@ -541,6 +631,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "demandas_processo_passo_id_fkey"
+            columns: ["processo_passo_id"]
+            isOneToOne: true
+            referencedRelation: "processo_passos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "demandas_prospeccao_id_fkey"
             columns: ["prospeccao_id"]
             isOneToOne: false
@@ -555,6 +652,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "demandas_roadmap_id_fkey"
+            columns: ["roadmap_id"]
+            isOneToOne: false
+            referencedRelation: "processos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "demandas_status_fkey"
             columns: ["status"]
             isOneToOne: false
@@ -562,6 +666,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      demandas_viradas: {
+        Row: {
+          dia: string
+          executada_em: string
+          movidas: number
+        }
+        Insert: {
+          dia: string
+          executada_em?: string
+          movidas?: number
+        }
+        Update: {
+          dia?: string
+          executada_em?: string
+          movidas?: number
+        }
+        Relationships: []
       }
       financeiro_fontes: {
         Row: {
@@ -703,7 +825,7 @@ export type Database = {
       fireflies_reunioes: {
         Row: {
           arquivos: Json
-          created_at: string | null
+          created_at: string
           data_hora: string | null
           duracao_min: number | null
           erro: string | null
@@ -716,11 +838,11 @@ export type Database = {
           status: string
           titulo: string
           titulo_pendente: string | null
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           arquivos?: Json
-          created_at?: string | null
+          created_at?: string
           data_hora?: string | null
           duracao_min?: number | null
           erro?: string | null
@@ -733,11 +855,11 @@ export type Database = {
           status?: string
           titulo: string
           titulo_pendente?: string | null
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           arquivos?: Json
-          created_at?: string | null
+          created_at?: string
           data_hora?: string | null
           duracao_min?: number | null
           erro?: string | null
@@ -750,7 +872,7 @@ export type Database = {
           status?: string
           titulo?: string
           titulo_pendente?: string | null
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -962,6 +1084,62 @@ export type Database = {
           },
         ]
       }
+      link_temas: {
+        Row: {
+          created_at: string
+          hex: string
+          id: string
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          created_at?: string
+          hex?: string
+          id?: string
+          nome: string
+          ordem?: number
+        }
+        Update: {
+          created_at?: string
+          hex?: string
+          id?: string
+          nome?: string
+          ordem?: number
+        }
+        Relationships: []
+      }
+      links: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          tema_id: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          tema_id?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          tema_id?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "links_tema_id_fkey"
+            columns: ["tema_id"]
+            isOneToOne: false
+            referencedRelation: "link_temas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       livros: {
         Row: {
           autor: string
@@ -1006,6 +1184,68 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      nota_temas: {
+        Row: {
+          created_at: string
+          hex: string
+          id: string
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          created_at?: string
+          hex?: string
+          id?: string
+          nome: string
+          ordem?: number
+        }
+        Update: {
+          created_at?: string
+          hex?: string
+          id?: string
+          nome?: string
+          ordem?: number
+        }
+        Relationships: []
+      }
+      notas: {
+        Row: {
+          conteudo: string
+          created_at: string
+          doc: Json | null
+          id: string
+          tema_id: string | null
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          conteudo?: string
+          created_at?: string
+          doc?: Json | null
+          id?: string
+          tema_id?: string | null
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          conteudo?: string
+          created_at?: string
+          doc?: Json | null
+          id?: string
+          tema_id?: string | null
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_tema_id_fkey"
+            columns: ["tema_id"]
+            isOneToOne: false
+            referencedRelation: "nota_temas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notificacoes_config: {
         Row: {
@@ -1372,7 +1612,15 @@ export type Database = {
           titulo?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "processo_passos_processo_id_fkey"
+            columns: ["processo_id"]
+            isOneToOne: false
+            referencedRelation: "processos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       processo_template_passos: {
         Row: {
@@ -1399,7 +1647,15 @@ export type Database = {
           template_id?: string
           titulo?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "processo_template_passos_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "processo_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       processo_templates: {
         Row: {
@@ -1471,74 +1727,247 @@ export type Database = {
           tipo?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "processos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "processos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "processos_passo_onboarding_fk"
+            columns: ["passo_onboarding_id"]
+            isOneToOne: false
+            referencedRelation: "processo_passos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "processos_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "processo_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       prospeccao: {
         Row: {
           agencia_destino: string | null
+          cidade: string | null
           cliente_id: string | null
+          coluna_desde: string | null
+          coluna_id: string | null
+          compareceu: boolean
           created_at: string | null
           data_fechamento: string | null
           data_lead: string | null
           data_perda: string | null
           data_proximo_contato: string | null
+          desqualificado_em: string | null
+          email: string | null
+          empresa: string | null
           etapa: Database["public"]["Enums"]["prospeccao_etapa"]
+          evento_erro: string | null
+          evento_google_id: string | null
+          evento_meet_link: string | null
+          evento_status: string | null
+          faturamento_faixa: string | null
+          fbclid: string | null
+          fechado_em: string | null
+          follow_up: number
+          follow_up_proposta: number
+          follow_ups_ate_fechamento: number | null
+          follow_ups_ate_reuniao: number | null
+          gclid: string | null
+          google_meu_negocio: string | null
           id: string
+          instagram: string | null
+          investimento_faixa: string | null
+          motivo_desqualificacao: string | null
           motivo_perda: string | null
+          motivo_remarcacao: string | null
           nicho: string | null
+          no_shows: number
           nome: string
           observacoes: string | null
           ordem: number | null
           origem: Database["public"]["Enums"]["prospeccao_origem"] | null
           origem_detalhe: string | null
+          pagina_entrada: string | null
+          perdido_em: string | null
+          pontos_contato: Json
+          primeira_reuniao_marcada_em: string | null
+          primeira_reuniao_realizada_em: string | null
+          primeiro_contato_em: string | null
           probabilidade: number | null
+          proposta_enviada_em: string | null
+          proximo_contato_em: string | null
+          referencia: string | null
+          remarcacoes: number
+          reuniao_duracao_min: number
+          reuniao_em: string | null
+          reuniao_marcada_em: string | null
+          site: string | null
+          telefone: string | null
+          trafego: string
           updated_at: string | null
           user_id: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
           valor_estimado: number | null
+          valor_fechamento: number | null
+          valor_proposta: number | null
         }
         Insert: {
           agencia_destino?: string | null
+          cidade?: string | null
           cliente_id?: string | null
+          coluna_desde?: string | null
+          coluna_id?: string | null
+          compareceu?: boolean
           created_at?: string | null
           data_fechamento?: string | null
           data_lead?: string | null
           data_perda?: string | null
           data_proximo_contato?: string | null
+          desqualificado_em?: string | null
+          email?: string | null
+          empresa?: string | null
           etapa?: Database["public"]["Enums"]["prospeccao_etapa"]
+          evento_erro?: string | null
+          evento_google_id?: string | null
+          evento_meet_link?: string | null
+          evento_status?: string | null
+          faturamento_faixa?: string | null
+          fbclid?: string | null
+          fechado_em?: string | null
+          follow_up?: number
+          follow_up_proposta?: number
+          follow_ups_ate_fechamento?: number | null
+          follow_ups_ate_reuniao?: number | null
+          gclid?: string | null
+          google_meu_negocio?: string | null
           id?: string
+          instagram?: string | null
+          investimento_faixa?: string | null
+          motivo_desqualificacao?: string | null
           motivo_perda?: string | null
+          motivo_remarcacao?: string | null
           nicho?: string | null
+          no_shows?: number
           nome: string
           observacoes?: string | null
           ordem?: number | null
           origem?: Database["public"]["Enums"]["prospeccao_origem"] | null
           origem_detalhe?: string | null
+          pagina_entrada?: string | null
+          perdido_em?: string | null
+          pontos_contato?: Json
+          primeira_reuniao_marcada_em?: string | null
+          primeira_reuniao_realizada_em?: string | null
+          primeiro_contato_em?: string | null
           probabilidade?: number | null
+          proposta_enviada_em?: string | null
+          proximo_contato_em?: string | null
+          referencia?: string | null
+          remarcacoes?: number
+          reuniao_duracao_min?: number
+          reuniao_em?: string | null
+          reuniao_marcada_em?: string | null
+          site?: string | null
+          telefone?: string | null
+          trafego?: string
           updated_at?: string | null
           user_id: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
           valor_estimado?: number | null
+          valor_fechamento?: number | null
+          valor_proposta?: number | null
         }
         Update: {
           agencia_destino?: string | null
+          cidade?: string | null
           cliente_id?: string | null
+          coluna_desde?: string | null
+          coluna_id?: string | null
+          compareceu?: boolean
           created_at?: string | null
           data_fechamento?: string | null
           data_lead?: string | null
           data_perda?: string | null
           data_proximo_contato?: string | null
+          desqualificado_em?: string | null
+          email?: string | null
+          empresa?: string | null
           etapa?: Database["public"]["Enums"]["prospeccao_etapa"]
+          evento_erro?: string | null
+          evento_google_id?: string | null
+          evento_meet_link?: string | null
+          evento_status?: string | null
+          faturamento_faixa?: string | null
+          fbclid?: string | null
+          fechado_em?: string | null
+          follow_up?: number
+          follow_up_proposta?: number
+          follow_ups_ate_fechamento?: number | null
+          follow_ups_ate_reuniao?: number | null
+          gclid?: string | null
+          google_meu_negocio?: string | null
           id?: string
+          instagram?: string | null
+          investimento_faixa?: string | null
+          motivo_desqualificacao?: string | null
           motivo_perda?: string | null
+          motivo_remarcacao?: string | null
           nicho?: string | null
+          no_shows?: number
           nome?: string
           observacoes?: string | null
           ordem?: number | null
           origem?: Database["public"]["Enums"]["prospeccao_origem"] | null
           origem_detalhe?: string | null
+          pagina_entrada?: string | null
+          perdido_em?: string | null
+          pontos_contato?: Json
+          primeira_reuniao_marcada_em?: string | null
+          primeira_reuniao_realizada_em?: string | null
+          primeiro_contato_em?: string | null
           probabilidade?: number | null
+          proposta_enviada_em?: string | null
+          proximo_contato_em?: string | null
+          referencia?: string | null
+          remarcacoes?: number
+          reuniao_duracao_min?: number
+          reuniao_em?: string | null
+          reuniao_marcada_em?: string | null
+          site?: string | null
+          telefone?: string | null
+          trafego?: string
           updated_at?: string | null
           user_id?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
           valor_estimado?: number | null
+          valor_fechamento?: number | null
+          valor_proposta?: number | null
         }
         Relationships: [
           {
@@ -1560,6 +1989,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospeccao_coluna_id_fkey"
+            columns: ["coluna_id"]
+            isOneToOne: false
+            referencedRelation: "crm_colunas"
             referencedColumns: ["id"]
           },
         ]
@@ -1972,6 +2408,75 @@ export type Database = {
           },
         ]
       }
+      transcricoes: {
+        Row: {
+          arquivo_nome: string | null
+          concluido_em: string | null
+          created_at: string
+          duracao_seg: number | null
+          erro: string | null
+          expira_em: string | null
+          id: string
+          idioma: string | null
+          iniciado_em: string | null
+          link: string | null
+          nome: string | null
+          origem: string
+          plataforma: string | null
+          posicao: number
+          progresso: number
+          status: string
+          tamanho: number | null
+          tentativas: number
+          texto: string | null
+          validade_dias: number
+        }
+        Insert: {
+          arquivo_nome?: string | null
+          concluido_em?: string | null
+          created_at?: string
+          duracao_seg?: number | null
+          erro?: string | null
+          expira_em?: string | null
+          id?: string
+          idioma?: string | null
+          iniciado_em?: string | null
+          link?: string | null
+          nome?: string | null
+          origem: string
+          plataforma?: string | null
+          posicao?: number
+          progresso?: number
+          status?: string
+          tamanho?: number | null
+          tentativas?: number
+          texto?: string | null
+          validade_dias?: number
+        }
+        Update: {
+          arquivo_nome?: string | null
+          concluido_em?: string | null
+          created_at?: string
+          duracao_seg?: number | null
+          erro?: string | null
+          expira_em?: string | null
+          id?: string
+          idioma?: string | null
+          iniciado_em?: string | null
+          link?: string | null
+          nome?: string | null
+          origem?: string
+          plataforma?: string | null
+          posicao?: number
+          progresso?: number
+          status?: string
+          tamanho?: number | null
+          tentativas?: number
+          texto?: string | null
+          validade_dias?: number
+        }
+        Relationships: []
+      }
       ver_depois: {
         Row: {
           created_at: string
@@ -2146,7 +2651,15 @@ export type Database = {
           valor_mensal: number | null
           valor_recebido: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_fontes_agencia_id_fkey"
+            columns: ["agencia_id"]
+            isOneToOne: false
+            referencedRelation: "agencias"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nps_avaliacoes_view: {
         Row: {
@@ -2282,6 +2795,10 @@ export type Database = {
           saldo_atual_estimado: number
         }[]
       }
+      atualizar_conclusao_roadmap: {
+        Args: { p_processo: string }
+        Returns: undefined
+      }
       calcular_proxima_execucao: {
         Args: {
           p_data_referencia?: string
@@ -2297,16 +2814,27 @@ export type Database = {
         Args: { p_saldo_ads_id: string; p_verba_diaria: number }
         Returns: number
       }
+      coluna_do_passo: { Args: { p_data: string }; Returns: string }
       cotacao_brl: { Args: { p_moeda: string }; Returns: number }
       formatar_moeda: {
         Args: { p_moeda?: string; p_valor: number }
         Returns: string
       }
       get_nps_categoria: { Args: { score: number }; Returns: string }
+      hoje_brt: { Args: never; Returns: string }
+      limpar_transcricoes_vencidas: { Args: never; Returns: number }
+      onboarding_janela: { Args: never; Returns: number }
       operacao_verba_mensal: {
         Args: { o: Database["public"]["Tables"]["operacoes"]["Row"] }
         Returns: number
       }
+      proximo_dia_semana: { Args: { p_dia: number }; Returns: string }
+      sincronizar_passo: {
+        Args: { p_forcar?: boolean; p_passo: string }
+        Returns: undefined
+      }
+      sincronizar_passos_onboarding: { Args: never; Returns: number }
+      virar_dia_demandas: { Args: never; Returns: number }
     }
     Enums: {
       cliente_nps_status:
