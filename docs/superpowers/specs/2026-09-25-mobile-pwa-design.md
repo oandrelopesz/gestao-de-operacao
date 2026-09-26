@@ -42,11 +42,13 @@ versão, sem ganho para o uso atual).
 - **Janelas (Dialog)**: no celular ocupam a tela, com rolagem interna e rodapé (botões) sempre visível.
   Sheets laterais em largura total.
 - **Ações só no hover** (`opacity-0 group-hover:opacity-100`, 11 arquivos): visíveis em ponteiro de toque.
-- **Alvos de toque** ≥ 40 px no toque (botões de ícone, checkboxes, switches, itens de menu) e textos de
-  conteúdo com no mínimo 11 px no celular.
+- **Alvos de toque** ≥ 40 px no toque (botões de ícone, checkboxes, switches, itens de menu).
 - **Arrastar (dnd-kit)**: mouse como hoje; no toque, segurar ~250 ms para arrastar — deslizar rola a tela.
-- **Cartões de resumo** em 2 colunas no celular; barras de abas roláveis com indicação de continuidade.
-- **Campos**: nenhum abaixo de 16 px no celular (evita o zoom do iPhone ao focar).
+- **Campos**: nenhum abaixo de 16 px no iPhone (evita o zoom do Safari ao focar).
+- Ficam para as fases 2 e 3, tela a tela (dependem da marcação de cada página e precisam de conferência
+  visual): **cartões de resumo em 2 colunas**, **textos de conteúdo com no mínimo 11 px** e barras de abas
+  roláveis com indicação de continuidade. Uma regra global para texto miúdo foi descartada porque quebraria
+  selos de altura fixa (h-4 com texto de 9–10 px).
 
 ### 4. Tela por tela
 - **Fase 2 (prioridades do usuário)**
