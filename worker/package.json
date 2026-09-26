@@ -9,6 +9,7 @@
     "start": "node src/server.js"
   },
   "dependencies": {
+    "docx": "9.7.2",
     "playwright-core": "1.47.2",
     "single-file-cli": "2.0.73"
   }

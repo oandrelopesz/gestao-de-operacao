@@ -1,5 +1,5 @@
 // HTTP mínimo (node:http, sem framework). Um job por vez: o segundo recebe 409 e o
-// n8n tenta de novo no minuto seguinte.
+// n8n tenta de novo no minuto seguinte. As rotas /fireflies/* têm travas próprias (ver criarRotaFireflies).
 import { createServer } from "node:http";
 import { criarDrive as criarDriveReal, DriveIndisponivel } from "./drive.js";
 import { comPastaTemp as comPastaTempReal } from "./tmp.js";
@@ -8,6 +8,18 @@ import { capturar as capturarReal } from "./jobs/lp.js";
 import { publicarDownload as publicarDownloadReal, publicarLp as publicarLpReal } from "./publicar.js";
 import { lerConfig } from "./config.js";
 import { JobPausado, checarParada, paradaPedida, reiniciarParada, vigiarPausa as vigiarPausaReal } from "./parada.js";
+import { criarRotinasFireflies, depsReais as depsFirefliesReais, interpretarWebhook, verificarAssinatura } from "./fireflies/servico.js";
+
+const ROTAS_FIREFLIES = new Set(["/fireflies/agenda", "/fireflies/pendencias", "/fireflies/sincronizar", "/fireflies/importar", "/fireflies/webhook"]);
+const log = (evento, dados = {}) => console.log(JSON.stringify({ evento, ...dados }));
+
+async function lerJson(req) {
+  const pedacos = [];
+  for await (const p of req) pedacos.push(p);
+  const corpo = JSON.parse(Buffer.concat(pedacos).toString("utf8") || "{}");
+  if (!corpo || typeof corpo !== "object" || Array.isArray(corpo)) throw new Error("corpo não é objeto");
+  return corpo;
+}
 
 export async function executarJob(corpo, deps = {}) {
   const criarDrive = deps.criarDrive || criarDriveReal;
@@ -71,8 +83,147 @@ export async function executarJob(corpo, deps = {}) {
   }
 }
 
-export function criarServidor({ config, executarJob: executar = executarJob }) {
+/**
+ * Rotas /fireflies/* (crons e webhook pelo n8n, sempre com x-worker-key). Travas próprias, separadas da do
+ * /job: uma sincronização do Fireflies nunca segura download do swipe, e a agenda (robô que precisa entrar na
+ * reunião na hora) tem a sua, para não esperar uma sincronização longa. Ocupado = 409 (o cron tenta de novo),
+ * menos no webhook, que vai para a fila abaixo.
+ */
+function criarRotaFireflies({ config, rotinas, travas }) {
+  // Webhook que chega com a trava ocupada entra nesta fila (sem repetir id) e é importado assim que ela soltar:
+  // o "meeting.summarized" costuma chegar enquanto o "meeting.transcribed" ainda está importando, e perdê-lo
+  // deixaria a reunião sem resumo (a sincronização não reimporta linha 'pronto'). Restart perde a fila; a
+  // reunião que nem chegou a entrar no banco volta pela sincronização de hora em hora.
+  const filaWebhook = new Set();
+  async function drenarFila() {
+    while (filaWebhook.size && !travas.fireflies) {
+      const [id] = filaWebhook;
+      filaWebhook.delete(id);
+      travas.fireflies = true;
+      try {
+        const x = await rotinas().importar(id);
+        log("fireflies.importar", { id, ok: x.ok, erro: x.erro || null, origem: "webhook_fila" });
+      } catch (e) {
+        console.error(JSON.stringify({ evento: "fireflies.erro", rota: "/fireflies/webhook", id, erro: String(e?.message || e) }));
+      } finally {
+        travas.fireflies = false;
+      }
+    }
+  }
+
+  // Tarefas: { trava, evento, executar(), resumo(resultado) → dados do log (null = não loga) }
+  function montar(caminho, corpo, r) {
+    switch (caminho) {
+      case "/fireflies/agenda":
+        return {
+          trava: "agenda",
+          evento: "fireflies.agenda",
+          executar: () => r.agenda(),
+          resumo: (x) => (x.enviados?.length || x.falhas?.length ? { enviados: x.enviados, falhas: x.falhas } : null),
+        };
+      case "/fireflies/pendencias":
+        return {
+          trava: "fireflies",
+          evento: "fireflies.pendencias",
+          executar: () => r.pendencias(),
+          resumo: (x) => (x.renomeados || x.excluidos || x.erros?.length ? { renomeados: x.renomeados, excluidos: x.excluidos, erros: x.erros } : null),
+        };
+      case "/fireflies/sincronizar":
+        return {
+          trava: "fireflies",
+          evento: "fireflies.sincronizar",
+          executar: () => r.sincronizar({ limite: corpo.limite, completo: corpo.completo === true }),
+          resumo: (x) => ({ importados: x.importados, falhas: x.falhas?.length || 0, restantes: x.restantes, paginasLidas: x.paginasLidas, historicoCompleto: x.historicoCompleto }),
+        };
+      default: // /fireflies/importar
+        return {
+          trava: "fireflies",
+          evento: "fireflies.importar",
+          executar: () => r.importar(String(corpo.id)),
+          resumo: (x) => ({ id: String(corpo.id), ok: x.ok, erro: x.erro || null, origem: "manual" }),
+        };
+    }
+  }
+
+  return async function rotaFireflies(caminho, req, responder) {
+    if (req.headers["x-worker-key"] !== config.workerKey) return responder(401, { ok: false, erro: "chave inválida" });
+    if (!config.firefliesApiKey || !config.supabaseAnonKey) return responder(503, { ok: false, erro: "Fireflies não configurado" });
+    let corpo;
+    try {
+      corpo = await lerJson(req);
+    } catch {
+      return responder(400, { ok: false, erro: "corpo inválido" });
+    }
+    const r = rotinas();
+
+    let tarefa;
+    if (caminho === "/fireflies/webhook") {
+      // O n8n repassa o corpo CRU (string) e o header X-Hub-Signature; qualquer reserialização quebra o HMAC
+      if (!config.firefliesWebhookSecret) return responder(503, { ok: false, erro: "Segredo do webhook do Fireflies não configurado" });
+      if (!verificarAssinatura(corpo.corpo, corpo.assinatura, config.firefliesWebhookSecret)) {
+        log("fireflies.webhook_recusado", { motivo: "assinatura inválida" });
+        return responder(401, { ok: false, erro: "assinatura inválida" });
+      }
+      let payload;
+      try {
+        payload = JSON.parse(corpo.corpo);
+      } catch {
+        return responder(400, { ok: false, erro: "corpo do webhook não é JSON" });
+      }
+      const w = interpretarWebhook(payload);
+      if (w.ignorar) {
+        log("fireflies.webhook_ignorado", { evento_webhook: w.evento, motivo: w.motivo });
+        return responder(200, { ok: true, ignorado: true, evento: w.evento });
+      }
+      if (travas.fireflies) {
+        filaWebhook.add(w.id);
+        log("fireflies.webhook_na_fila", { id: w.id, evento_webhook: w.evento });
+        return responder(202, { ok: true, enfileirado: true, id: w.id });
+      }
+      tarefa = {
+        trava: "fireflies",
+        evento: "fireflies.importar",
+        // A importação que falha fica com status 'erro' na linha e volta na sincronização: o n8n recebe ok
+        executar: async () => {
+          const x = await r.importar(w.id);
+          return { ok: true, id: w.id, importado: x.ok, erro: x.erro || null };
+        },
+        resumo: (x) => ({ id: w.id, ok: x.importado, erro: x.erro, origem: "webhook", evento_webhook: w.evento }),
+      };
+    } else {
+      if (caminho === "/fireflies/importar" && !corpo.id) return responder(400, { ok: false, erro: "falta o id da reunião" });
+      tarefa = montar(caminho, corpo, r);
+    }
+
+    // Checar e travar sem `await` no meio: duas requisições próximas não passam as duas
+    if (travas[tarefa.trava]) return responder(409, { ok: false, erro: "ocupado" });
+    travas[tarefa.trava] = true;
+    try {
+      const resultado = await tarefa.executar();
+      const dados = tarefa.resumo(resultado);
+      if (dados) log(tarefa.evento, dados);
+      responder(200, resultado);
+    } catch (e) {
+      const infra = e instanceof DriveIndisponivel;
+      console.error(JSON.stringify({ evento: "fireflies.erro", rota: caminho, infra, erro: String(e?.message || e) }));
+      responder(infra ? 503 : 500, { ok: false, erro: String(e?.message || e).slice(0, 500) });
+    } finally {
+      travas[tarefa.trava] = false;
+      if (tarefa.trava === "fireflies" && filaWebhook.size) drenarFila();
+    }
+  };
+}
+
+/** `fireflies`: rotinas { agenda, pendencias, sincronizar, importar } (testes); sem ela, as reais, criadas no 1º uso. */
+export function criarServidor({ config, executarJob: executar = executarJob, fireflies = null }) {
   let ocupado = false;
+  const travas = { fireflies: false, agenda: false };
+  let rotinas = fireflies;
+  const rotaFireflies = criarRotaFireflies({
+    config,
+    travas,
+    rotinas: () => (rotinas ||= criarRotinasFireflies(depsFirefliesReais(config))),
+  });
 
   return createServer(async (req, res) => {
     const responder = (status, corpo) => {
@@ -81,6 +232,8 @@ export function criarServidor({ config, executarJob: executar = executarJob }) {
     };
 
     if (req.url === "/health") return responder(200, { ok: true, busy: ocupado, versao: config.versao });
+    const caminho = String(req.url || "").split("?")[0];
+    if (ROTAS_FIREFLIES.has(caminho) && req.method === "POST") return rotaFireflies(caminho, req, responder);
     if (req.url !== "/job" || req.method !== "POST") return responder(404, { ok: false, erro: "rota desconhecida" });
     if (req.headers["x-worker-key"] !== config.workerKey) return responder(401, { ok: false, erro: "chave inválida" });
     if (ocupado) return responder(409, { ok: false, erro: "ocupado" });

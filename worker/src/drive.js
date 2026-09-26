@@ -25,31 +25,43 @@ function erroDeStatus(status, mensagem) {
   return new Error(mensagem);
 }
 
+async function buscarGoogle(_fetch, url, init) {
+  try {
+    return await _fetch(url, init);
+  } catch (e) {
+    throw new DriveIndisponivel(`Não consegui falar com o Google (${e?.message || e})`);
+  }
+}
+
+/**
+ * Access token do Google da contato@ (Drive + Agenda `calendar.events`), entregue pela edge function
+ * `google-token` em troca do header `x-swipe-key`. Com `cache` (um objeto qualquer, ex.: `{}`), reaproveita
+ * o token enquanto faltar mais de 1 min para vencer; para forçar um novo, zere `cache.token`.
+ * Falha (rede, chave errada, Google desconectado) é DriveIndisponivel.
+ */
+export async function tokenGoogle({ supabaseUrl, swipeKey, fetch: _fetch = fetch, cache = null }) {
+  if (cache?.token && cache.validoAte - Date.now() > 60_000) return cache.token;
+  const r = await buscarGoogle(_fetch, `${supabaseUrl}/functions/v1/google-token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-swipe-key": swipeKey },
+    body: "{}",
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || !data.access_token) {
+    throw new DriveIndisponivel(data.error || `google-token respondeu ${r.status}`);
+  }
+  if (cache) {
+    cache.token = data.access_token;
+    cache.validoAte = new Date(data.expires_at).getTime() || Date.now() + 3000_000;
+  }
+  return data.access_token;
+}
+
 export function criarDrive({ supabaseUrl, swipeKey, fetch: _fetch = fetch }) {
-  let cache = null; // { token, validoAte }
+  const cache = {}; // { token, validoAte }
 
-  async function buscar(url, init) {
-    try {
-      return await _fetch(url, init);
-    } catch (e) {
-      throw new DriveIndisponivel(`Não consegui falar com o Google (${e?.message || e})`);
-    }
-  }
-
-  async function token() {
-    if (cache && cache.validoAte - Date.now() > 60_000) return cache.token;
-    const r = await buscar(`${supabaseUrl}/functions/v1/google-token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-swipe-key": swipeKey },
-      body: "{}",
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok || !data.access_token) {
-      throw new DriveIndisponivel(data.error || `google-token respondeu ${r.status}`);
-    }
-    cache = { token: data.access_token, validoAte: new Date(data.expires_at).getTime() || Date.now() + 3000_000 };
-    return cache.token;
-  }
+  const buscar = (url, init) => buscarGoogle(_fetch, url, init);
+  const token = () => tokenGoogle({ supabaseUrl, swipeKey, fetch: _fetch, cache });
 
   async function api(caminho, init = {}, base = DRIVE) {
     const t = await token();
@@ -58,7 +70,7 @@ export function criarDrive({ supabaseUrl, swipeKey, fetch: _fetch = fetch }) {
       headers: { ...(init.headers || {}), Authorization: `Bearer ${t}` },
     });
     if (r.status === 401) {
-      cache = null;
+      cache.token = null;
       throw new DriveIndisponivel("Token do Google expirou ou foi revogado. Reconecte o Drive no Admin.");
     }
     const data = await r.json().catch(() => ({}));
