@@ -2,6 +2,7 @@
 // As tabelas/colunas novas não estão no types.ts gerado pelo Lovable: por isso o `as any`.
 import { supabase } from "@/integrations/supabase/client";
 import { AgendaEventoSumiuError, atualizarEvento, criarEvento, excluirEvento, obterEvento } from "@/lib/googleCalendar";
+import { SwipeKeyError } from "@/lib/googleDrive";
 import type { EventoGoogle } from "@/lib/agendaEvento";
 import type { ColunaCrm, EventoCrm, LeadCrm, NovoEvento } from "@/lib/crmTipos";
 import { ordenarColunas } from "@/lib/crmColunas";
@@ -184,7 +185,10 @@ export async function executarAgenda(
       },
     };
   } catch (e: any) {
-    const msg = e?.message ?? String(e);
+    // Sem login do Google neste navegador: a mensagem original fala do swipe file
+    const msg = e instanceof SwipeKeyError
+      ? "entre com o Google neste navegador (aba Agenda) e use Tentar de novo"
+      : String(e?.message ?? e).replace(/.+$/, "");
     return {
       patch: { evento_status: "erro", evento_erro: msg },
       evento: { tipo: "agenda", descricao: `Falha na agenda: ${msg}`, dados: { acao, erro: msg } },

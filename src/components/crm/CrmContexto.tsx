@@ -115,7 +115,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         trocarLead(r.lead);
         juntarEventos(r.eventos);
         if (plano.agenda && r.lead.evento_status === "erro") {
-          toast.error(`Agenda: ${r.lead.evento_erro ?? "falhou"}. O lead foi salvo; use "Tentar de novo" no card.`);
+          toast.error(`Agenda: ${r.lead.evento_erro ?? "falhou"}. O lead foi salvo mesmo assim.`);
         }
         return r.lead;
       } catch (e: any) {

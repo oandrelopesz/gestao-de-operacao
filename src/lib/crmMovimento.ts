@@ -117,6 +117,16 @@ function resultadoReuniao(lead: LeadCrm, compareceu: boolean, agora: Date): Novo
   };
 }
 
+/** Reunião saiu do lead: sem evento criado, some também o aviso de erro da agenda. */
+function semReuniao(lead: LeadCrm, patch: Partial<LeadCrm>) {
+  patch.reuniao_em = null;
+  patch.pontos_contato = {};
+  if (!lead.evento_google_id) {
+    patch.evento_status = null;
+    patch.evento_erro = null;
+  }
+}
+
 const rotuloRemarcacao = (m: MotivoRemarcacao) => MOTIVOS_REMARCACAO.find((x) => x.id === m)?.rotulo ?? m;
 
 /** Plano completo de um movimento de coluna. Assume `validarMovimento` já conferido. */
@@ -166,10 +176,7 @@ export function planejarMovimento(
       if (r.motivo === "no_show") {
         patch.no_shows = (lead.no_shows ?? 0) + 1;
         eventos.push(resultadoReuniao(lead, false, agora));
-        if (!r.nova) {
-          patch.reuniao_em = null;
-          patch.pontos_contato = {};
-        }
+        if (!r.nova) semReuniao(lead, patch);
       }
       if (r.nova) {
         patch.remarcacoes = (lead.remarcacoes ?? 0) + 1;
@@ -209,8 +216,7 @@ export function planejarMovimento(
         eventos.push({ tipo: "desqualificacao", descricao: `Desqualificado: ${motivo}`, dados: { motivo } });
       }
       if (lead.reuniao_em && new Date(lead.reuniao_em).getTime() > agora.getTime()) {
-        patch.reuniao_em = null;
-        patch.pontos_contato = {};
+        semReuniao(lead, patch);
         if (lead.evento_google_id) agenda = "cancelar";
       }
       break;

@@ -844,7 +844,11 @@ function NotasHistorico({ lead }: { lead: LeadCrm }) {
   const { eventos, adicionarNota } = useCrm();
   const [texto, setTexto] = useState("");
   const [salvando, setSalvando] = useState(false);
-  const doLead = useMemo(() => eventos.filter((e) => e.lead_id === lead.id), [eventos, lead.id]);
+  // Mais recentes primeiro pela data gravada (duas ações seguidas podem voltar do banco fora de ordem)
+  const doLead = useMemo(
+    () => eventos.filter((e) => e.lead_id === lead.id).sort((x, y) => y.created_at.localeCompare(x.created_at)),
+    [eventos, lead.id],
+  );
 
   const adicionar = async () => {
     if (!texto.trim() || salvando) return;

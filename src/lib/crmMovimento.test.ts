@@ -141,3 +141,14 @@ test("perdido/desqualificado com reunião futura cancelam o evento; reunião pas
   assert.equal(passada.agenda, null);
   assert.equal(passada.patch.reuniao_em, undefined);
 });
+
+test("reunião que sai do lead sem evento criado limpa o aviso de erro da agenda", () => {
+  const comErro = leadBase({ reuniao_em: quinta13h, evento_status: "erro", evento_erro: "sem login" });
+  const desq = planejarMovimento(comErro, col("reuniao_marcada"), col("desqualificado"), { motivo: "Concorrente" }, agora);
+  assert.equal(desq.patch.evento_status, null);
+  assert.equal(desq.patch.evento_erro, null);
+  const noShow = planejarMovimento(comErro, col("reuniao_marcada"), col("remarcar"), { remarcacao: { motivo: "no_show" } }, deSP(2026, 10, 1, 14));
+  assert.equal(noShow.patch.evento_status, null);
+  const comEvento = planejarMovimento(leadBase({ reuniao_em: quinta13h, evento_google_id: "ev1", evento_status: "ok" }), col("reuniao_marcada"), col("perdido"), { motivo: "Achou caro" }, agora);
+  assert.equal(comEvento.patch.evento_status, undefined);
+});

@@ -1,6 +1,6 @@
 // Telas do sistema e abertura "estável" (sem animação, fontes carregadas, dados assentados)
 export const ROTAS = ["/", "/agenda", "/onboarding", "/roadmap", "/ideias", "/acessos", "/saldo", "/nps", "/clientes",
-  "/prospeccao", "/financeiro", "/cursos", "/livros", "/habilidades", "/ver-depois", "/transcritor", "/swipe", "/links",
+  "/crm", "/financeiro", "/cursos", "/livros", "/habilidades", "/ver-depois", "/transcritor", "/swipe", "/links",
   "/notas", "/arquivos", "/dashboard", "/admin"];
 
 export const nomeDaRota = (rota) => (rota === "/" ? "demandas" : rota.slice(1));
