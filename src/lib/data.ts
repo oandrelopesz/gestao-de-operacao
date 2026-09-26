@@ -7,6 +7,7 @@ import { fetchHabilidades } from "@/lib/habilidades";
 import { fetchPdfBiblioteca } from "@/lib/pdfs";
 import { CAMPOS_REUNIAO, normalizarReuniao, ordenar, type ReuniaoFireflies } from "@/lib/fireflies";
 import { setCached } from "@/lib/pageCache";
+import { carregarColunas as carregarColunasCrm, carregarEventos as carregarEventosCrm, carregarLeads as carregarLeadsCrm } from "@/lib/crmDados";
 
 /**
  * Carregadores compartilhados entre as páginas e o pré-aquecimento do cache.
@@ -29,6 +30,9 @@ export const CACHE_KEYS = {
   habilidades: "habilidades",
   pdfs: "pdfs",
   fireflies: "fireflies",
+  crmColunas: "crm-colunas",
+  crmLeads: "crm-leads",
+  crmEventos: "crm-eventos",
 } as const;
 
 export async function loadDemandas() {
@@ -149,7 +153,9 @@ export async function warmAllCaches(): Promise<void> {
     [CACHE_KEYS.clientesLite, loadClientesLite],
     [CACHE_KEYS.clientesView, loadClientesView],
     [CACHE_KEYS.saldo, loadSaldo],
-    [CACHE_KEYS.leads, loadLeads],
+    [CACHE_KEYS.crmColunas, carregarColunasCrm],
+    [CACHE_KEYS.crmLeads, carregarLeadsCrm],
+    [CACHE_KEYS.crmEventos, carregarEventosCrm],
     [CACHE_KEYS.acessos, loadAcessos],
     [CACHE_KEYS.financeiro, loadFinanceiro],
     [CACHE_KEYS.livros, loadLivros],

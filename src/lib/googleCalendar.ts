@@ -12,6 +12,8 @@ const enc = encodeURIComponent;
 export class AgendaSemPermissaoError extends Error {}
 /** O evento mudou no Google depois de aberto (etag diferente). */
 export class AgendaConflitoError extends Error {}
+/** O evento não existe mais no Google (apagado na agenda). */
+export class AgendaEventoSumiuError extends Error {}
 
 async function gcal<T>(path: string, init: RequestInit = {}, repetir = true): Promise<T> {
   const token = await getAccessToken();
@@ -28,6 +30,7 @@ async function gcal<T>(path: string, init: RequestInit = {}, repetir = true): Pr
   if (r.ok) return data as T;
   // Excluir algo que já não existe: o objetivo foi atingido
   if (r.status === 410 && init.method === "DELETE") return undefined as T;
+  if (r.status === 404 || r.status === 410) throw new AgendaEventoSumiuError("O evento não existe mais na agenda.");
   const msg: string = data?.error?.message ?? "";
   const motivo: string = data?.error?.errors?.[0]?.reason ?? "";
   if (r.status === 403 && (motivo === "insufficientPermissions" || /insufficient authentication scopes/i.test(msg))) {
