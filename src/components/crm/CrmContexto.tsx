@@ -9,6 +9,7 @@ import {
 import { registrarTentativa as planejarTentativa } from "@/lib/crmTentativas";
 import { marcarPonto as planejarPonto, NOMES_PONTOS } from "@/lib/crmPontos";
 import { acaoPendente } from "@/lib/crmAgenda";
+import type { EscopoExport } from "@/lib/crmExport";
 import * as dados from "@/lib/crmDados";
 import { useCachedState } from "@/lib/pageCache";
 import { CACHE_KEYS } from "@/lib/data";
@@ -55,6 +56,9 @@ export interface CrmValor {
   iniciarCadastroCliente: (lead: LeadCrm | null) => void;
   /** Grava cliente_id no lead e o evento no histórico; false se não conseguiu vincular */
   concluirCadastroCliente: (lead: LeadCrm, clienteId: string) => Promise<boolean>;
+  /** Janela de exportação aberta com este recorte (null = fechada) */
+  exportacao: EscopoExport | null;
+  abrirExportacao: (escopo: EscopoExport | null) => void;
 }
 
 const Ctx = createContext<CrmValor | null>(null);
@@ -76,6 +80,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   const [fichaId, setFichaId] = useState<string | null>(null);
   const [movimentoPendente, setMovimentoPendente] = useState<MovimentoPendente | null>(null);
   const [cadastroCliente, setCadastroCliente] = useState<LeadCrm | null>(null);
+  const [exportacao, setExportacao] = useState<EscopoExport | null>(null);
   const leadsRef = useRef(leads);
   leadsRef.current = leads;
 
@@ -390,6 +395,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     resolverMovimento, moverLead, registrarTentativa, marcarPonto, salvarCampos, alterarReuniao, tentarAgendaDeNovo,
     adicionarNota, criarLead, excluirLeads, moverEmMassa, trafegoEmMassa, salvarColunas, salvarOrdem,
     fichaId, abrirFicha: setFichaId, cadastroCliente, iniciarCadastroCliente: setCadastroCliente, concluirCadastroCliente,
+    exportacao, abrirExportacao: setExportacao,
   };
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }

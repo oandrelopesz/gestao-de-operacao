@@ -2,7 +2,7 @@
 // src/components/demandas/SelecaoBarra.tsx. Vai para o <body> (portal) para ficar presa à tela.
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowRightLeft, CheckSquare, Loader2, Tag, Trash2, X } from "lucide-react";
+import { ArrowRightLeft, CheckSquare, Download, Loader2, Tag, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,7 +52,7 @@ export function SelecaoBarraCrm({
   selecionados: string[];
   onLimpar: () => void;
 }) {
-  const { colunas, moverEmMassa, trafegoEmMassa, excluirLeads } = useCrm();
+  const { colunas, moverEmMassa, trafegoEmMassa, excluirLeads, abrirExportacao } = useCrm();
   const [ocupado, setOcupado] = useState(false);
   const [colunaMotivo, setColunaMotivo] = useState<ColunaCrm | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -173,6 +173,17 @@ export function SelecaoBarraCrm({
             title={`Marcar ${qtdLeads} como Pago`}
           >
             <Tag size={13} /> Pago
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1.5 text-xs"
+            disabled={ocupado}
+            onClick={() => abrirExportacao({ tipo: "selecionados", ids: selecionados })}
+            title={`Exportar os ${qtdLeads} selecionados`}
+          >
+            <Download size={13} /> Exportar
           </Button>
 
           <Button

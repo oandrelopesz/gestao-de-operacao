@@ -12,6 +12,7 @@ import { DialogoMovimento } from "@/components/crm/DialogoMovimento";
 import { NovoLeadDialog } from "@/components/crm/NovoLeadDialog";
 import { ConfigurarColunas } from "@/components/crm/ConfigurarColunas";
 import { CadastrarCliente } from "@/components/crm/CadastrarCliente";
+import { ExportarDialog } from "@/components/crm/ExportarDialog";
 import { agruparEventos, filtrarLeads, FILTRO_CRM_PADRAO, type FiltroCrm } from "@/lib/crmPeriodo";
 
 export const Route = createFileRoute("/_authenticated/crm")({
@@ -54,7 +55,7 @@ function useAgora(intervaloMs: number) {
 }
 
 function CrmTela() {
-  const { leads, eventos, carregando, erro } = useCrm();
+  const { leads, eventos, carregando, erro, abrirExportacao } = useCrm();
   const [visao, setVisao] = useState<VisaoCrm>(() => lerLocal("crm-visao", { v: "kanban" as VisaoCrm }).v);
   const [filtro, setFiltro] = useState<FiltroCrm>(() => lerLocal("crm-filtro", FILTRO_CRM_PADRAO));
   const [novoLead, setNovoLead] = useState(false);
@@ -81,6 +82,7 @@ function CrmTela() {
         qtd={filtrados.length}
         onNovoLead={() => setNovoLead(true)}
         onColunas={() => setConfigColunas(true)}
+        onExportar={() => abrirExportacao({ tipo: "todos" })}
       />
       {erro && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
@@ -102,6 +104,7 @@ function CrmTela() {
       <FichaLead />
       <DialogoMovimento />
       <CadastrarCliente />
+      <ExportarDialog filtrados={filtrados} />
       <NovoLeadDialog aberto={novoLead} onFechar={() => setNovoLead(false)} />
       <ConfigurarColunas aberto={configColunas} onFechar={() => setConfigColunas(false)} />
     </div>

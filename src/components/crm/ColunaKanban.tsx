@@ -2,7 +2,9 @@
 // de cards (área de soltar + SortableContext).
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { Download } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useCrm } from "@/components/crm/CrmContexto";
 import { CardLead } from "@/components/crm/CardLead";
 import { rotuloTipo } from "@/lib/crmColunas";
 import { formatarReais } from "@/lib/crmFormato";
@@ -40,6 +42,7 @@ export function ColunaKanban({
     id: coluna.id,
     data: { type: "Column", columnId: coluna.id },
   });
+  const { abrirExportacao } = useCrm();
   const ids = leads.map((l) => l.id);
   const algumSelecionado = selecionados.size > 0;
   const todosMarcados = ids.length > 0 && ids.every((id) => selecionados.has(id));
@@ -69,10 +72,23 @@ export function ColunaKanban({
           >
             {leads.length}
           </span>
+          <button
+            type="button"
+            className={cn(
+              "shrink-0 rounded p-0.5 text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100",
+              "ml-auto",
+              "opacity-0 group-hover/coluna:opacity-100 pointer-coarse:opacity-100",
+            )}
+            onClick={() => abrirExportacao({ tipo: "coluna", colunaId: coluna.id })}
+            title={`Exportar a coluna ${coluna.titulo}`}
+            aria-label={`Exportar a coluna ${coluna.titulo}`}
+          >
+            <Download size={13} />
+          </button>
           {ids.length > 0 && (
             <Checkbox
               className={cn(
-                "ml-auto shrink-0 transition-opacity",
+                "shrink-0 transition-opacity",
                 algumSelecionado || todosMarcados
                   ? "opacity-100"
                   : "opacity-0 focus-visible:opacity-100 group-hover/coluna:opacity-100 pointer-coarse:opacity-100",

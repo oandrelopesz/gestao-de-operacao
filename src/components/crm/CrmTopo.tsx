@@ -1,5 +1,5 @@
 // Topo do CRM: título, botões (Colunas, Novo lead), seletor de visão e filtros (período, critério, etiqueta, busca).
-import { BarChart3, CalendarRange, Columns3, KanbanSquare, ListChecks, Plus, Search, Table2, Tag, type LucideIcon } from "lucide-react";
+import { BarChart3, CalendarRange, Columns3, Download, KanbanSquare, ListChecks, Plus, Search, Table2, Tag, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +26,7 @@ export function CrmTopo({
   qtd,
   onNovoLead,
   onColunas,
+  onExportar,
 }: {
   visao: VisaoCrm;
   onVisao: (v: VisaoCrm) => void;
@@ -34,6 +35,7 @@ export function CrmTopo({
   qtd: number;
   onNovoLead: () => void;
   onColunas: () => void;
+  onExportar?: () => void;
 }) {
   const mudar = (parcial: Partial<FiltroCrm>) => onFiltro({ ...filtro, ...parcial });
   const mudarPeriodo = (parcial: Partial<FiltroPeriodo>) => mudar({ periodo: { ...filtro.periodo, ...parcial } });
@@ -47,6 +49,11 @@ export function CrmTopo({
           <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wider">Funil de vendas</p>
         </div>
         <div className="flex items-center gap-2">
+          {onExportar && (
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={onExportar}>
+              <Download size={14} /> Exportar
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={onColunas}>
             <Columns3 size={14} /> Colunas
           </Button>
