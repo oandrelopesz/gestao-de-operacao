@@ -63,6 +63,18 @@ export interface FormEvento {
   local: string;
 }
 
+/** Conta Google da agenda do sistema: o Meet abre nela mesmo com outra conta como principal no navegador. */
+export const CONTA_DO_MEET = "contato@andrelopes.digital";
+
+/** Link para entrar na reunião já na conta da agenda (parâmetro `authuser`); link que não é do Meet fica igual. */
+export function linkMeetNaConta(link: string, conta = CONTA_DO_MEET): string {
+  let u: URL;
+  try { u = new URL(link); } catch { return link; }
+  if (u.hostname !== "meet.google.com") return link;
+  u.searchParams.set("authuser", conta);
+  return u.toString();
+}
+
 const dois = (n: number) => String(n).padStart(2, "0");
 /** Date → "YYYY-MM-DD" no fuso do navegador (o sistema é usado em Brasília). */
 export function dataLocal(d: Date): string {

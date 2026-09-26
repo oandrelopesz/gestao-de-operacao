@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   novoForm, formParaEvento, eventoParaForm, moverInicio, moverPorArrasto, ancorarNaSerie, validarForm, paraUnidade, deUnidade,
-  removerNulos, dataDe, type EventoGoogle,
+  removerNulos, dataDe, linkMeetNaConta, CONTA_DO_MEET, type EventoGoogle,
 } from "./agendaEvento.ts";
 import { regraDoPreset } from "./recorrencia.ts";
 
@@ -151,4 +151,17 @@ test("dataDe e removerNulos", () => {
   assert.equal(dataDe({ date: "2026-09-24" }), "2026-09-24");
   assert.equal(dataDe({ dateTime: "2026-09-25T01:00:00Z" }), "2026-09-24");
   assert.deepEqual(removerNulos({ a: 1, b: null, c: { d: null, e: "x" }, f: [{ g: null, h: 2 }] }), { a: 1, c: { e: "x" }, f: [{ h: 2 }] });
+});
+
+test("linkMeetNaConta: o Meet abre na conta da agenda (authuser), sem mexer no resto do link", () => {
+  assert.equal(CONTA_DO_MEET, "contato@andrelopes.digital");
+  assert.equal(linkMeetNaConta("https://meet.google.com/abc-defg-hij"), "https://meet.google.com/abc-defg-hij?authuser=contato%40andrelopes.digital");
+  // conta já escolhida no link é trocada pela da agenda; outros parâmetros ficam
+  assert.equal(
+    linkMeetNaConta("https://meet.google.com/abc-defg-hij?authuser=1&hs=122"),
+    "https://meet.google.com/abc-defg-hij?authuser=contato%40andrelopes.digital&hs=122",
+  );
+  // link que não é do Meet (Zoom etc.) e texto inválido ficam como estão
+  assert.equal(linkMeetNaConta("https://zoom.us/j/123"), "https://zoom.us/j/123");
+  assert.equal(linkMeetNaConta("não é link"), "não é link");
 });

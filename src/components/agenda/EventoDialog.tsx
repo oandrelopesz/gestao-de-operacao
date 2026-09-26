@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  eventoParaForm, linhasRecorrencia, moverInicio, temParticipantes, validarForm, type FormEvento,
+  eventoParaForm, linhasRecorrencia, linkMeetNaConta, moverInicio, temParticipantes, validarForm, type FormEvento,
 } from "@/lib/agendaEvento";
 import { AgendaConflitoError, podeEditarEvento, podeEscrever, type AgendaGoogle } from "@/lib/googleCalendar";
 import { excluirComEscopo, salvarComEscopo, type Escopo, type EventoAberto } from "@/lib/agendaSerie";
@@ -230,7 +230,7 @@ export function EventoDialog({ abertura, agendas, onClose, onMudou }: Props) {
                     <span className="truncate font-mono text-xs">{form.linkMeet}</span>
                     <Button type="button" variant="ghost" size="sm" className="h-7 gap-1" onClick={copiarMeet}><Copy size={13} /> Copiar</Button>
                     <Button type="button" size="sm" className="h-7 gap-1" asChild>
-                      <a href={form.linkMeet} target="_blank" rel="noopener noreferrer"><Video size={13} /> Entrar</a>
+                      <a href={linkMeetNaConta(form.linkMeet)} target="_blank" rel="noopener noreferrer"><Video size={13} /> Entrar</a>
                     </Button>
                   </div>
                 )}
