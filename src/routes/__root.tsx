@@ -74,6 +74,10 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: "manifest", href: "/manifest.webmanifest" },
+      // Favicon do Gestor Pro (o mesmo ícone do app): ICO para Safari e afins, SVG nítido onde houver suporte.
+      // O ?v= força o navegador a trocar o favicon antigo (do Lovable), que ele guarda em cache por muito tempo.
+      { rel: "icon", href: "/favicon.ico?v=2", sizes: "32x32" },
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg?v=2" },
       { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
