@@ -1,6 +1,7 @@
 // Menu lateral: grupos e links (a ordem/visibilidade configurável vem do menuConfig)
 import {
   AudioLines,
+  Workflow,
   StickyNote,
   LayoutDashboard,
   Lightbulb,
@@ -74,6 +75,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
       { label: "Links", icon: <Link2 size={17} />, to: "/links", palavras: ["favoritos", "urls", "sites"] },
       { label: "Notas", icon: <StickyNote size={17} />, to: "/notas", palavras: ["anotações", "bloco de notas"] },
       { label: "Arquivos", icon: <FileText size={17} />, to: "/arquivos", palavras: ["pdf", "documentos", "drive", "pdfs"] },
+      { label: "Fluxogramas", icon: <Workflow size={17} />, to: "/fluxogramas", palavras: ["mapa mental", "miro", "quadro", "board", "funil", "diagrama", "canvas", "mindmap"] },
     ],
   },
   {

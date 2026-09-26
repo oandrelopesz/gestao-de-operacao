@@ -26,6 +26,8 @@ import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
 import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
 import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenticated/habilidades'
+import { Route as AuthenticatedFluxogramasIndexRouteImport } from './routes/_authenticated/fluxogramas.index'
+import { Route as AuthenticatedFluxogramasIdRouteImport } from './routes/_authenticated/fluxogramas.$id'
 import { Route as AuthenticatedFirefliesRouteImport } from './routes/_authenticated/fireflies'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -123,6 +125,18 @@ const AuthenticatedHabilidadesRoute =
     path: '/habilidades',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedFluxogramasIndexRoute =
+  AuthenticatedFluxogramasIndexRouteImport.update({
+    id: '/fluxogramas/',
+    path: '/fluxogramas/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedFluxogramasIdRoute =
+  AuthenticatedFluxogramasIdRouteImport.update({
+    id: '/fluxogramas/$id',
+    path: '/fluxogramas/$id',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedFirefliesRoute = AuthenticatedFirefliesRouteImport.update({
   id: '/fireflies',
   path: '/fireflies',
@@ -187,6 +201,8 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/fireflies': typeof AuthenticatedFirefliesRoute
+  '/fluxogramas/$id': typeof AuthenticatedFluxogramasIdRoute
+  '/fluxogramas/': typeof AuthenticatedFluxogramasIndexRoute
   '/habilidades': typeof AuthenticatedHabilidadesRoute
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/links': typeof AuthenticatedLinksRoute
@@ -214,6 +230,8 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/fireflies': typeof AuthenticatedFirefliesRoute
+  '/fluxogramas/$id': typeof AuthenticatedFluxogramasIdRoute
+  '/fluxogramas': typeof AuthenticatedFluxogramasIndexRoute
   '/habilidades': typeof AuthenticatedHabilidadesRoute
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/links': typeof AuthenticatedLinksRoute
@@ -244,6 +262,8 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/fireflies': typeof AuthenticatedFirefliesRoute
+  '/_authenticated/fluxogramas/$id': typeof AuthenticatedFluxogramasIdRoute
+  '/_authenticated/fluxogramas/': typeof AuthenticatedFluxogramasIndexRoute
   '/_authenticated/habilidades': typeof AuthenticatedHabilidadesRoute
   '/_authenticated/ideias': typeof AuthenticatedIdeiasRoute
   '/_authenticated/links': typeof AuthenticatedLinksRoute
@@ -275,6 +295,8 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/financeiro'
     | '/fireflies'
+    | '/fluxogramas/$id'
+    | '/fluxogramas/'
     | '/habilidades'
     | '/ideias'
     | '/links'
@@ -302,6 +324,8 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/financeiro'
     | '/fireflies'
+    | '/fluxogramas/$id'
+    | '/fluxogramas'
     | '/habilidades'
     | '/ideias'
     | '/links'
@@ -331,6 +355,8 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/financeiro'
     | '/_authenticated/fireflies'
+    | '/_authenticated/fluxogramas/$id'
+    | '/_authenticated/fluxogramas/'
     | '/_authenticated/habilidades'
     | '/_authenticated/ideias'
     | '/_authenticated/links'
@@ -474,6 +500,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHabilidadesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/fluxogramas/': {
+      id: '/_authenticated/fluxogramas/'
+      path: '/fluxogramas'
+      fullPath: '/fluxogramas/'
+      preLoaderRoute: typeof AuthenticatedFluxogramasIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/fluxogramas/$id': {
+      id: '/_authenticated/fluxogramas/$id'
+      path: '/fluxogramas/$id'
+      fullPath: '/fluxogramas/$id'
+      preLoaderRoute: typeof AuthenticatedFluxogramasIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/fireflies': {
       id: '/_authenticated/fireflies'
       path: '/fireflies'
@@ -558,6 +598,8 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedFirefliesRoute: typeof AuthenticatedFirefliesRoute
+  AuthenticatedFluxogramasIdRoute: typeof AuthenticatedFluxogramasIdRoute
+  AuthenticatedFluxogramasIndexRoute: typeof AuthenticatedFluxogramasIndexRoute
   AuthenticatedHabilidadesRoute: typeof AuthenticatedHabilidadesRoute
   AuthenticatedIdeiasRoute: typeof AuthenticatedIdeiasRoute
   AuthenticatedLinksRoute: typeof AuthenticatedLinksRoute
@@ -586,6 +628,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedFirefliesRoute: AuthenticatedFirefliesRoute,
+  AuthenticatedFluxogramasIdRoute: AuthenticatedFluxogramasIdRoute,
+  AuthenticatedFluxogramasIndexRoute: AuthenticatedFluxogramasIndexRoute,
   AuthenticatedHabilidadesRoute: AuthenticatedHabilidadesRoute,
   AuthenticatedIdeiasRoute: AuthenticatedIdeiasRoute,
   AuthenticatedLinksRoute: AuthenticatedLinksRoute,
