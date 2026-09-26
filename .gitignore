@@ -43,3 +43,6 @@ dist-ssr
 /*_cookies.txt
 /cookies (*).txt
 /linkedin.txt
+
+# Saídas da auditoria mobile / regressão de desktop
+.auditoria/
