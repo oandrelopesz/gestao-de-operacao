@@ -277,7 +277,7 @@ function NotasPage() {
       </div>
 
       {notas === null ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
         </div>
       ) : visiveis.length === 0 ? (
@@ -289,7 +289,7 @@ function NotasPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {visiveis.map((n) => {
             const tema = n.tema_id ? temaDe.get(n.tema_id) : undefined;
             const marcado = selecionados.has(n.id);
@@ -311,7 +311,8 @@ function NotasPage() {
                 )}
                 style={tema ? { borderTopColor: tema.hex, borderTopWidth: 3 } : undefined}
               >
-                <div className="flex items-start gap-2.5">
+                {/* Caixa de seleção sobreposta no canto: não empurra o título (ele fica alinhado com a prévia) */}
+                <div className="pr-6">
                   <button
                     type="button"
                     role="checkbox"
@@ -319,13 +320,13 @@ function NotasPage() {
                     aria-label={marcado ? "Desmarcar" : "Selecionar"}
                     onClick={(e) => { e.stopPropagation(); alternar(n.id); }}
                     className={cn(
-                      "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-opacity",
+                      "absolute right-3 top-3.5 flex h-4 w-4 items-center justify-center rounded-sm border bg-card transition-opacity",
                       marcado ? "border-primary bg-primary text-primary-foreground" : cn("border-zinc-300 hover:border-primary dark:border-zinc-700", selecaoAtiva ? "opacity-100" : "opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100"),
                     )}
                   >
                     {marcado && <Check size={10} />}
                   </button>
-                  <p className="min-w-0 flex-1 break-words text-sm font-semibold leading-snug">{n.titulo}</p>
+                  <p className="min-w-0 break-words text-sm font-semibold leading-snug">{n.titulo}</p>
                 </div>
                 {capa && (
                   <img src={capa} alt="" loading="lazy" className="mt-2 h-28 w-full rounded-lg border object-cover" />

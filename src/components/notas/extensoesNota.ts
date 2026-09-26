@@ -26,7 +26,17 @@ export function extensoesNota(): Extensions {
     Colunas,
     Coluna,
     Placeholder.configure({
-      placeholder: ({ node }) => (node.type.name === "heading" ? "Título" : "Escreva aqui… cole prints com Ctrl+V, links viram clicáveis"),
+      placeholder: ({ editor, node, pos }) => {
+        if (node.type.name === "heading") return "Título";
+        // Coluna é estreita: texto de ajuda curto (o longo quebrava e vazava da caixa da coluna)
+        try {
+          const $pos = editor.state.doc.resolve(pos);
+          for (let d = $pos.depth; d > 0; d--) if ($pos.node(d).type.name === "coluna") return "Escreva…";
+        } catch {
+          // posição fora do documento durante a atualização: vale o texto padrão
+        }
+        return "Escreva aqui… cole prints com Ctrl+V, links viram clicáveis";
+      },
       includeChildren: true,
     }),
   ];

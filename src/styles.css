@@ -392,6 +392,8 @@ html[data-hidden] [data-state="closed"] {
 .nota-editor-conteudo .nota-colunas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.75rem; }
 .nota-editor-conteudo .nota-coluna { border: 1px dashed var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; min-width: 0; }
 .nota-editor-conteudo .nota-coluna > * + * { margin-top: 0.5em; }
+/* Cada coluna começa rente ao topo (título no início não ganha margem): colunas lado a lado alinhadas */
+.nota-editor-conteudo .nota-coluna > :first-child { margin-top: 0; }
 .nota-editor-conteudo .nota-coluna:focus-within { border-color: color-mix(in oklch, var(--primary) 55%, transparent); }
 @media (max-width: 640px) { .nota-editor-conteudo .nota-colunas { grid-auto-flow: row; } }
 /* Texto de exemplo (placeholder) */
@@ -400,6 +402,8 @@ html[data-hidden] [data-state="closed"] {
 .nota-editor-conteudo h2.is-empty::before,
 .nota-editor-conteudo h3.is-empty::before { content: attr(data-placeholder); color: var(--muted-foreground); opacity: 0.6; float: left; height: 0; pointer-events: none; }
 .nota-editor-conteudo .nota-coluna p.is-empty:not(:first-child)::before { content: none; }
+/* O texto de ajuda não tem altura (float): numa coluna ele nunca quebra linha, senão vaza da caixa */
+.nota-editor-conteudo .nota-coluna .is-empty::before { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .nota-editor-conteudo .ProseMirror-gapcursor::after { border-top-color: var(--foreground); }
 
 /* iPhone: campo com fonte < 16px faz o Safari dar zoom ao focar (só iOS tem -webkit-touch-callout) */
