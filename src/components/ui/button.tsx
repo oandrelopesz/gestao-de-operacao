@@ -17,11 +17,12 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent/60 hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
+      // No toque (celular/tablet), altura mínima de 40 px para o dedo; com mouse, tamanhos de sempre
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-lg px-3 text-xs",
+        default: "h-9 px-4 py-2 pointer-coarse:min-h-10",
+        sm: "h-8 rounded-lg px-3 text-xs pointer-coarse:min-h-10",
         lg: "h-10 rounded-lg px-8",
-        icon: "h-9 w-9",
+        icon: "h-9 w-9 pointer-coarse:min-h-10 pointer-coarse:min-w-10",
       },
     },
     defaultVariants: {
