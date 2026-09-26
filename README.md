@@ -4,7 +4,7 @@
 
 This project was built with [Lovable](https://lovable.dev).
 
-**Live app**: https://gestao-de-operacao.lovable.app
+**Live app**: https://gestao.andrelopes.digital (também em https://gestao-de-operacao.lovable.app)
 
 ## Build with Lovable
 
