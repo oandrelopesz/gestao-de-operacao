@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 import { AgenciasProvider } from "@/lib/agencias";
+import { MobileNav } from "@/components/MobileNav";
 import { PlataformasProvider } from "@/lib/plataformas";
 import { useTheme } from "@/lib/theme";
 import { warmAllCaches } from "@/lib/data";
@@ -160,6 +161,9 @@ function AuthenticatedLayout() {
           />
         )}
 
+        {/* Faixa escura atrás da barra de status do iPhone (app instalado); 0 px no navegador e no desktop */}
+        <div aria-hidden className="lg:hidden fixed inset-x-0 top-0 z-[60] h-[env(safe-area-inset-top)] bg-sidebar" />
+
         {/* Overlay mobile */}
         {isSidebarOpen && (
           <div className="fixed inset-0 bg-background/70 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
@@ -169,6 +173,7 @@ function AuthenticatedLayout() {
         <aside
           className={cn(
             "dark fixed inset-y-0 left-0 z-50 w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300",
+            "max-lg:pt-[env(safe-area-inset-top)] max-lg:pb-[env(safe-area-inset-bottom)]",
             isSidebarOpen ? "translate-x-0" : "-translate-x-full",
             isDesktopCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"
           )}
@@ -239,7 +244,7 @@ function AuthenticatedLayout() {
 
         {/* Conteúdo */}
         <main className={cn("flex-1 flex flex-col min-w-0 transition-[padding] duration-300", isDesktopCollapsed ? "lg:pl-0" : "lg:pl-64")}>
-          <header className="h-14 border-b border-border/60 flex items-center justify-between px-4 lg:px-8 sticky top-0 glass glow-line z-30">
+          <header className="h-14 max-lg:h-[calc(3.5rem+env(safe-area-inset-top))] max-lg:pt-[env(safe-area-inset-top)] border-b border-border/60 flex items-center justify-between px-4 lg:px-8 sticky top-0 glass glow-line z-30">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setIsSidebarOpen(true)}>
                 <ChevronRight size={16} />
@@ -275,12 +280,13 @@ function AuthenticatedLayout() {
                 {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
               </Button>
               <NotificationBell />
-              <span className="ml-1 font-mono text-[10px] uppercase tracking-[0.16em] text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-full">beta</span>
+              <span className="ml-1 max-lg:hidden font-mono text-[10px] uppercase tracking-[0.16em] text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-full">beta</span>
             </div>
           </header>
-          <div key={pathname} className="p-4 lg:p-8 page-enter">
+          <div key={pathname} className="p-4 lg:p-8 max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))] page-enter">
             <Outlet />
           </div>
+          <MobileNav onMais={() => setIsSidebarOpen(true)} maisAberto={isSidebarOpen} />
         </main>
       </div>
     </PlataformasProvider>

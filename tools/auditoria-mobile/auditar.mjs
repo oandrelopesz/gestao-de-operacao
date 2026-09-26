@@ -2,13 +2,17 @@
 // alvos de toque < 40 px e texto < 11 px; abre as janelas "Novo…" e confere se o botão de salvar é alcançável.
 import { chromium, webkit } from "playwright-core";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { ROTAS, nomeDaRota, CHROME, abrirEstavel } from "./rotas.mjs";
+import { ROTAS as TODAS, nomeDaRota, CHROME, abrirEstavel } from "./rotas.mjs";
+
+// ROTAS=/,/financeiro limita a auditoria a essas telas (e às janelas delas)
+const FILTRO = process.env.ROTAS ? process.env.ROTAS.split(",") : null;
+const ROTAS = FILTRO ? TODAS.filter((r) => FILTRO.includes(r)) : TODAS;
 
 const [BASE = "http://localhost:5188", SAIDA = "saida-auditoria", MOTOR = "chromium"] = process.argv.slice(2);
 const TELAS = [{ nome: "iphone-390", width: 390, height: 844 }, { nome: "iphone-430", width: 430, height: 932 }];
 // Telas com botão de criar e o texto dele: a janela precisa caber e o salvar precisa ser alcançável
 const JANELAS = [["/financeiro", /Nova fonte/], ["/cursos", /Novo curso/], ["/clientes", /Novo cliente/],
-  ["/saldo", /Novo registro/], ["/swipe", /Adicionar/], ["/links", /Novo link|Adicionar/], ["/acessos", /Adicionar/]];
+  ["/saldo", /Novo registro/], ["/swipe", /Adicionar/], ["/links", /Novo link|Adicionar/], ["/acessos", /Adicionar/]].filter(([r]) => !FILTRO || FILTRO.includes(r));
 mkdirSync(SAIDA, { recursive: true });
 
 const navegador = MOTOR === "webkit" ? await webkit.launch() : await chromium.launch({ executablePath: CHROME });
