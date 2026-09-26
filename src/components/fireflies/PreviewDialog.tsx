@@ -5,18 +5,50 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  CONTENT_TYPE, FIREFLIES_BUCKET, ROTULO_TIPO, caminhoArquivo, dataCurta, horario, mensagemErroFireflies, nomeArquivo, tituloExibido,
-  type FormatoArquivo, type ReuniaoFireflies, type TipoArquivo,
+  CONTENT_TYPE, FIREFLIES_BUCKET, ROTULO_TIPO, caminhoArquivo, chaveArquivo, dataCurta, horario, mensagemErroFireflies, nomeArquivo,
+  tituloExibido, type FormatoArquivo, type ReuniaoFireflies, type TipoArquivo,
 } from "@/lib/fireflies";
 
 // ---------------------------------------------------------------- Arquivos no Storage
 
 /** Baixa o arquivo do bucket privado `fireflies` (passa pela API com a chave do app), já com o tipo certo. */
-export async function baixarArquivoFireflies(caminho: string, formato: FormatoArquivo): Promise<Blob> {
+async function baixarDoBucket(caminho: string, formato: FormatoArquivo): Promise<Blob> {
   const { data, error } = await supabase.storage.from(FIREFLIES_BUCKET).download(caminho);
   if (error) throw error;
   const tipo = CONTENT_TYPE[formato];
   return data.type === tipo ? data : new Blob([data], { type: tipo });
+}
+
+// Cache da sessão (chave = caminho + updated_at da linha): o arquivo pré-carregado quando o ponteiro chega no
+// botão abre/baixa na hora, e rever o mesmo PDF não baixa de novo. Poucas dezenas de KB cada; guarda os últimos 30.
+const MAX_CACHE = 30;
+const cacheArquivos = new Map<string, Promise<Blob>>();
+
+function doCache(chave: string, caminho: string, formato: FormatoArquivo): Promise<Blob> {
+  const existente = cacheArquivos.get(chave);
+  if (existente) {
+    cacheArquivos.delete(chave);
+    cacheArquivos.set(chave, existente); // mais recente no fim
+    return existente;
+  }
+  const promessa = baixarDoBucket(caminho, formato);
+  promessa.catch(() => cacheArquivos.delete(chave)); // falhou: a próxima tentativa baixa de novo
+  cacheArquivos.set(chave, promessa);
+  while (cacheArquivos.size > MAX_CACHE) cacheArquivos.delete(cacheArquivos.keys().next().value as string);
+  return promessa;
+}
+
+/** O arquivo da reunião (do cache da sessão quando já foi baixado ou pré-carregado). */
+export function baixarArquivoFireflies(r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoArquivo): Promise<Blob> {
+  const caminho = caminhoArquivo(r, tipo, formato);
+  const chave = chaveArquivo(r, tipo, formato);
+  if (!caminho || !chave) return Promise.reject(new Error("Este arquivo ainda não foi gerado."));
+  return doCache(chave, caminho, formato);
+}
+
+/** Pré-carrega em segundo plano (ponteiro sobre o botão, toque começando): erros ficam para quando clicar. */
+export function preCarregarArquivo(r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoArquivo): void {
+  baixarArquivoFireflies(r, tipo, formato).catch(() => {});
 }
 
 /** Salva no computador/celular com o nome dado (o nome do caminho no bucket é genérico). */
@@ -63,7 +95,7 @@ export function PreviewDialog({ alvo, onClose }: PreviewDialogProps) {
       setErro("Este PDF ainda não foi gerado.");
       return;
     }
-    baixarArquivoFireflies(caminho, "pdf")
+    baixarArquivoFireflies(alvo.reuniao, alvo.tipo, "pdf")
       .then((blob) => {
         if (cancelado) return;
         blobRef.current = blob;
@@ -71,7 +103,7 @@ export function PreviewDialog({ alvo, onClose }: PreviewDialogProps) {
         setUrl(objectUrl);
       })
       .catch((e) => { if (!cancelado) setErro(mensagemErroFireflies(e)); });
-    // Ao fechar (ou trocar de arquivo) o endereço temporário do PDF é liberado
+    // Ao fechar (ou trocar de arquivo) o endereço temporário do PDF é liberado (o arquivo segue no cache da sessão)
     return () => {
       cancelado = true;
       blobRef.current = null;
@@ -83,7 +115,7 @@ export function PreviewDialog({ alvo, onClose }: PreviewDialogProps) {
     if (!alvo || !caminho) return;
     setBaixando(true);
     try {
-      const blob = blobRef.current ?? (await baixarArquivoFireflies(caminho, "pdf"));
+      const blob = blobRef.current ?? (await baixarArquivoFireflies(alvo.reuniao, alvo.tipo, "pdf"));
       salvarBlob(blob, nomeArquivo(alvo.reuniao, alvo.tipo, "pdf"));
     } catch (e) {
       toast.error(mensagemErroFireflies(e));

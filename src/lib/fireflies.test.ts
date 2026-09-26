@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {
   tituloExibido, situacao, dataCurta, horario, duracaoTexto, nomeArquivo, filtrar, ordenar, normalizarReuniao,
   caminhoArquivo, arquivoDisponivel, precisaAtualizar, linkFireflies, resumoParticipantes, mensagemErroFireflies,
+  intervaloAtualizacao, chaveArquivo,
 } from "./fireflies.ts";
 import type { ReuniaoFireflies } from "./fireflies.ts";
 
@@ -186,4 +187,20 @@ test("mensagemErroFireflies: tabela/bucket que ainda não existem viram aviso am
   assert.match(mensagemErroFireflies({ message: "{}" }), /baixar/);
   assert.equal(mensagemErroFireflies(new Error("outra coisa")), "outra coisa");
   assert.equal(mensagemErroFireflies(null), "Erro desconhecido");
+});
+
+test("intervaloAtualizacao: 3 s enquanto renomeia/exclui (o usuário espera ver), 15 s importando, nada parado", () => {
+  assert.equal(intervaloAtualizacao([]), null);
+  assert.equal(intervaloAtualizacao([base, r({ status: "erro" })]), null);
+  assert.equal(intervaloAtualizacao([base, r({ status: "importando" })]), 15_000);
+  assert.equal(intervaloAtualizacao([base, r({ titulo_pendente: "Novo" })]), 3_000);
+  assert.equal(intervaloAtualizacao([r({ status: "importando" }), r({ excluir: true })]), 3_000);
+});
+
+test("chaveArquivo: muda quando a linha é atualizada (arquivos gerados de novo ao renomear)", () => {
+  const a = chaveArquivo(r({ updated_at: "2026-09-26T04:00:00Z" }), "resumo", "pdf");
+  const b = chaveArquivo(r({ updated_at: "2026-09-26T04:05:00Z" }), "resumo", "pdf");
+  assert.equal(a, "abc123/resumo.pdf|2026-09-26T04:00:00Z");
+  assert.notEqual(a, b);
+  assert.equal(chaveArquivo(r({ arquivos: {} }), "resumo", "pdf"), null);
 });

@@ -131,6 +131,23 @@ export function precisaAtualizar(lista: ReuniaoFireflies[]): boolean {
   });
 }
 
+/**
+ * De quanto em quanto tempo a aba confere o banco: renomear/excluir o usuário acabou de pedir e espera ver em
+ * segundos (o worker aplica na hora pelo `URL_APLICAR_AGORA`); importação leva minutos. Nada pendente = não confere.
+ */
+export function intervaloAtualizacao(lista: ReuniaoFireflies[]): number | null {
+  let importando = false;
+  for (const r of lista) {
+    const s = situacao(r);
+    if (s === "renomeando" || s === "excluindo") return 3_000;
+    if (s === "importando") importando = true;
+  }
+  return importando ? 15_000 : null;
+}
+
+/** Webhook do n8n que manda o worker aplicar agora os renomear/excluir pedidos (sem esperar o cron de 1 min). */
+export const URL_APLICAR_AGORA = "https://prod.minuanoai.com.br/webhook/fireflies-pendencias";
+
 export function linkFireflies(r: Pick<ReuniaoFireflies, "id" | "link_fireflies">): string {
   return r.link_fireflies?.trim() || `https://app.fireflies.ai/view/${encodeURIComponent(r.id)}`;
 }
@@ -192,6 +209,15 @@ export function duracaoTexto(min: number | null): string {
 
 export function caminhoArquivo(r: Pick<ReuniaoFireflies, "arquivos">, tipo: TipoArquivo, formato: FormatoArquivo): string | null {
   return r.arquivos[`${tipo}_${formato}`] ?? null;
+}
+
+/**
+ * Chave do arquivo no cache da sessão: o caminho no bucket não muda quando o worker gera os arquivos de novo
+ * (renomear), mas o `updated_at` da linha muda — assim a prévia nunca mostra o arquivo antigo.
+ */
+export function chaveArquivo(r: Pick<ReuniaoFireflies, "arquivos" | "updated_at">, tipo: TipoArquivo, formato: FormatoArquivo): string | null {
+  const caminho = caminhoArquivo(r, tipo, formato);
+  return caminho ? `${caminho}|${r.updated_at}` : null;
 }
 
 /** Dá para ver/baixar: o arquivo existe, a importação terminou e a reunião não está sendo excluída. */

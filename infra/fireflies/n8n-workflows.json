@@ -1,20 +1,28 @@
 [
   {
     "name": "[FIREFLIES] Webhook da transcrição",
-    "settings": { "executionOrder": "v1", "timezone": "America/Sao_Paulo" },
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/Sao_Paulo"
+    },
     "nodes": [
       {
         "id": "b7f0f7a2-51f4-4d38-9b54-6f1f0f1a0001",
         "name": "Transcrição pronta",
         "type": "n8n-nodes-base.webhook",
         "typeVersion": 2,
-        "position": [0, 0],
+        "position": [
+          0,
+          0
+        ],
         "webhookId": "5d0c7f3e-3c55-4a8e-9a57-1f7c2b9e0f11",
         "parameters": {
           "httpMethod": "POST",
           "path": "fireflies-transcricao",
           "responseMode": "onReceived",
-          "options": { "rawBody": true }
+          "options": {
+            "rawBody": true
+          }
         }
       },
       {
@@ -22,7 +30,10 @@
         "name": "Corpo cru e assinatura",
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
-        "position": [240, 0],
+        "position": [
+          240,
+          0
+        ],
         "parameters": {
           "jsCode": "// O worker confere a assinatura (HMAC SHA-256) sobre o corpo exatamente como o Fireflies enviou.\nconst item = $input.first();\nlet corpo = '';\nif (item.binary && item.binary.data) {\n  const buf = await this.helpers.getBinaryDataBuffer(0, 'data');\n  corpo = buf.toString('utf8');\n} else {\n  corpo = JSON.stringify(item.json.body ?? {});\n}\nconst headers = item.json.headers || {};\nreturn [{ json: { corpo, assinatura: headers['x-hub-signature'] || '' } }];"
         }
@@ -32,51 +43,121 @@
         "name": "Importar no worker",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
-        "position": [480, 0],
+        "position": [
+          480,
+          0
+        ],
         "parameters": {
           "method": "POST",
           "url": "http://swipe_worker:8080/fireflies/webhook",
           "sendHeaders": true,
-          "headerParameters": { "parameters": [{ "name": "x-worker-key", "value": "SUBSTITUIR_PELA_WORKER_KEY" }] },
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-worker-key",
+                "value": "SUBSTITUIR_PELA_WORKER_KEY"
+              }
+            ]
+          },
           "sendBody": true,
           "specifyBody": "json",
           "jsonBody": "={{ JSON.stringify({ corpo: $json.corpo, assinatura: $json.assinatura }) }}",
-          "options": { "timeout": 300000, "response": { "response": { "neverError": true } } }
+          "options": {
+            "timeout": 300000,
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          }
         }
       }
     ],
     "connections": {
-      "Transcrição pronta": { "main": [[{ "node": "Corpo cru e assinatura", "type": "main", "index": 0 }]] },
-      "Corpo cru e assinatura": { "main": [[{ "node": "Importar no worker", "type": "main", "index": 0 }]] }
+      "Transcrição pronta": {
+        "main": [
+          [
+            {
+              "node": "Corpo cru e assinatura",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Corpo cru e assinatura": {
+        "main": [
+          [
+            {
+              "node": "Importar no worker",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
     }
   },
   {
     "name": "[FIREFLIES] Robô nas reuniões e pendências",
-    "settings": { "executionOrder": "v1", "timezone": "America/Sao_Paulo", "saveDataSuccessExecution": "none" },
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/Sao_Paulo",
+      "saveDataSuccessExecution": "none"
+    },
     "nodes": [
       {
         "id": "b7f0f7a2-51f4-4d38-9b54-6f1f0f1a0011",
         "name": "A cada minuto",
         "type": "n8n-nodes-base.scheduleTrigger",
         "typeVersion": 1.2,
-        "position": [0, 0],
-        "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] } }
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 1
+              }
+            ]
+          }
+        }
       },
       {
         "id": "b7f0f7a2-51f4-4d38-9b54-6f1f0f1a0012",
         "name": "Robô nas reuniões da agenda",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
-        "position": [260, -100],
+        "position": [
+          260,
+          -100
+        ],
         "parameters": {
           "method": "POST",
           "url": "http://swipe_worker:8080/fireflies/agenda",
           "sendHeaders": true,
-          "headerParameters": { "parameters": [{ "name": "x-worker-key", "value": "SUBSTITUIR_PELA_WORKER_KEY" }] },
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-worker-key",
+                "value": "SUBSTITUIR_PELA_WORKER_KEY"
+              }
+            ]
+          },
           "sendBody": true,
           "specifyBody": "json",
           "jsonBody": "{}",
-          "options": { "timeout": 120000, "response": { "response": { "neverError": true } } }
+          "options": {
+            "timeout": 120000,
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          }
         }
       },
       {
@@ -84,60 +165,203 @@
         "name": "Renomear e excluir no Fireflies",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
-        "position": [260, 100],
+        "position": [
+          260,
+          100
+        ],
         "parameters": {
           "method": "POST",
           "url": "http://swipe_worker:8080/fireflies/pendencias",
           "sendHeaders": true,
-          "headerParameters": { "parameters": [{ "name": "x-worker-key", "value": "SUBSTITUIR_PELA_WORKER_KEY" }] },
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-worker-key",
+                "value": "SUBSTITUIR_PELA_WORKER_KEY"
+              }
+            ]
+          },
           "sendBody": true,
           "specifyBody": "json",
           "jsonBody": "{}",
-          "options": { "timeout": 600000, "response": { "response": { "neverError": true } } }
+          "options": {
+            "timeout": 600000,
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          }
         }
       }
     ],
     "connections": {
       "A cada minuto": {
-        "main": [[
-          { "node": "Robô nas reuniões da agenda", "type": "main", "index": 0 },
-          { "node": "Renomear e excluir no Fireflies", "type": "main", "index": 0 }
-        ]]
+        "main": [
+          [
+            {
+              "node": "Robô nas reuniões da agenda",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Renomear e excluir no Fireflies",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     }
   },
   {
     "name": "[FIREFLIES] Sincronizar reuniões",
-    "settings": { "executionOrder": "v1", "timezone": "America/Sao_Paulo" },
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/Sao_Paulo"
+    },
     "nodes": [
       {
         "id": "b7f0f7a2-51f4-4d38-9b54-6f1f0f1a0021",
         "name": "A cada hora",
         "type": "n8n-nodes-base.scheduleTrigger",
         "typeVersion": 1.2,
-        "position": [0, 0],
-        "parameters": { "rule": { "interval": [{ "field": "hours", "hoursInterval": 1 }] } }
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours",
+                "hoursInterval": 1
+              }
+            ]
+          }
+        }
       },
       {
         "id": "b7f0f7a2-51f4-4d38-9b54-6f1f0f1a0022",
         "name": "Importar as que faltam",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
-        "position": [260, 0],
+        "position": [
+          260,
+          0
+        ],
         "parameters": {
           "method": "POST",
           "url": "http://swipe_worker:8080/fireflies/sincronizar",
           "sendHeaders": true,
-          "headerParameters": { "parameters": [{ "name": "x-worker-key", "value": "SUBSTITUIR_PELA_WORKER_KEY" }] },
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-worker-key",
+                "value": "SUBSTITUIR_PELA_WORKER_KEY"
+              }
+            ]
+          },
           "sendBody": true,
           "specifyBody": "json",
           "jsonBody": "{ \"limite\": 40 }",
-          "options": { "timeout": 1800000, "response": { "response": { "neverError": true } } }
+          "options": {
+            "timeout": 1800000,
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          }
         }
       }
     ],
     "connections": {
-      "A cada hora": { "main": [[{ "node": "Importar as que faltam", "type": "main", "index": 0 }]] }
+      "A cada hora": {
+        "main": [
+          [
+            {
+              "node": "Importar as que faltam",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "name": "[FIREFLIES] Aplicar agora (renomear/excluir pedidos na aba)",
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/Sao_Paulo",
+      "saveDataSuccessExecution": "none"
+    },
+    "nodes": [
+      {
+        "id": "b7f0f7a2-51f4-4d38-9b54-6f1f0f1a0031",
+        "name": "Pedido da aba",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          0
+        ],
+        "webhookId": "8a3e2f10-6b7c-4d2e-9f41-2c5d7e9a0b31",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "fireflies-pendencias",
+          "responseMode": "onReceived",
+          "options": {}
+        }
+      },
+      {
+        "id": "b7f0f7a2-51f4-4d38-9b54-6f1f0f1a0032",
+        "name": "Renomear e excluir no Fireflies",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          260,
+          0
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "http://swipe_worker:8080/fireflies/pendencias",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-worker-key",
+                "value": "SUBSTITUIR_PELA_WORKER_KEY"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "{}",
+          "options": {
+            "timeout": 600000,
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Pedido da aba": {
+        "main": [
+          [
+            {
+              "node": "Renomear e excluir no Fireflies",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
     }
   }
 ]

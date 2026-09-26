@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle, CalendarDays, Clock, Download, ExternalLink, Eye, FileText, Loader2, MoreVertical, NotebookPen, Pencil, RefreshCw, Search,
@@ -23,25 +23,32 @@ import { useCachedState } from "@/lib/pageCache";
 import { CACHE_KEYS, loadFireflies } from "@/lib/data";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  ROTULO_SITUACAO, ROTULO_TIPO, arquivoDisponivel, caminhoArquivo, dataCurta, duracaoTexto, filtrar, horario, linkFireflies,
-  mensagemErroFireflies, nomeArquivo, precisaAtualizar, resumoParticipantes, situacao, tituloExibido,
+  ROTULO_SITUACAO, ROTULO_TIPO, URL_APLICAR_AGORA, arquivoDisponivel, caminhoArquivo, dataCurta, duracaoTexto, filtrar, horario,
+  intervaloAtualizacao, linkFireflies, mensagemErroFireflies, nomeArquivo, resumoParticipantes, situacao, tituloExibido,
   type FormatoArquivo, type ReuniaoFireflies, type Situacao, type TipoArquivo,
 } from "@/lib/fireflies";
-import { PreviewDialog, baixarArquivoFireflies, salvarBlob, type AlvoPrevia } from "@/components/fireflies/PreviewDialog";
+import {
+  PreviewDialog, baixarArquivoFireflies, preCarregarArquivo, salvarBlob, type AlvoPrevia,
+} from "@/components/fireflies/PreviewDialog";
 
 // Aba "Fireflies": reuniões gravadas pelo robô do Fireflies, importadas pelo worker da VPS
-// (transcrição e resumo em PDF e DOCX no bucket privado "fireflies"). Renomear e excluir só gravam
-// a intenção na linha; o worker aplica no Fireflies em até ~1 minuto.
+// (transcrição e resumo em PDF e DOCX no bucket privado "fireflies"). Renomear e excluir gravam a intenção na
+// linha e pedem ao worker (pelo n8n) que aplique no Fireflies na hora; o cron de 1 min é só a rede de segurança.
 export const Route = createFileRoute("/_authenticated/fireflies")({ component: FirefliesPage });
 
-/** Enquanto algo está importando, renomeando ou excluindo, a lista se atualiza sozinha nesse intervalo. */
-const ATUALIZAR_MS = 30_000;
+/** Cards desenhados de cada vez: o resto entra conforme a lista rola (141+ reuniões sem travar a troca de aba). */
+const POR_VEZ = 25;
 
 /** Grava na linha e confere que ela existe (a API não reclama quando nenhuma linha é alterada). */
 async function gravarNaReuniao(id: string, patch: { titulo_pendente?: string; excluir?: boolean }): Promise<void> {
   const { data, error } = await supabase.from("fireflies_reunioes").update(patch).eq("id", id).select("id");
   if (error) throw error;
   if (!data?.length) throw new Error("Essa reunião não foi encontrada (pode já ter sido excluída). Atualize a lista.");
+}
+
+/** Pede ao worker que aplique agora os renomear/excluir pendentes; se falhar, o cron de 1 min aplica. */
+function pedirAplicarAgora(): void {
+  fetch(URL_APLICAR_AGORA, { method: "POST", mode: "no-cors", keepalive: true }).catch(() => {});
 }
 
 function FirefliesPage() {
@@ -70,37 +77,56 @@ function FirefliesPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // Importando, renomeando ou excluindo: confere de novo a cada 30 s (só com a aba visível)
-  const aguardandoWorker = useMemo(() => precisaAtualizar(lista ?? []), [lista]);
+  // Renomeando/excluindo: confere a cada 3 s (o worker aplica na hora); importando: a cada 15 s. Só com a aba visível.
+  const intervalo = useMemo(() => intervaloAtualizacao(lista ?? []), [lista]);
   useEffect(() => {
-    if (!aguardandoWorker) return;
-    const t = window.setInterval(() => { if (document.visibilityState === "visible") carregar(); }, ATUALIZAR_MS);
+    if (!intervalo) return;
+    const t = window.setInterval(() => { if (document.visibilityState === "visible") carregar(); }, intervalo);
     return () => window.clearInterval(t);
-  }, [aguardandoWorker, carregar]);
+  }, [intervalo, carregar]);
 
   const visiveis = useMemo(() => filtrar(lista ?? [], busca), [lista, busca]);
 
-  const atualizarLocal = (id: string, patch: Partial<ReuniaoFireflies>) =>
-    setLista((prev) => prev && prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  // Desenha POR_VEZ cards e acrescenta mais quando o fim da lista chega perto da tela
+  const [limite, setLimite] = useState(POR_VEZ);
+  useEffect(() => { setLimite(POR_VEZ); }, [busca]);
+  const fimDaLista = useRef<HTMLDivElement | null>(null);
+  const temMais = visiveis.length > limite;
+  useEffect(() => {
+    const alvo = fimDaLista.current;
+    if (!alvo || !temMais) return;
+    const obs = new IntersectionObserver((entradas) => {
+      if (entradas.some((e) => e.isIntersecting)) setLimite((l) => l + POR_VEZ);
+    }, { rootMargin: "800px 0px" });
+    obs.observe(alvo);
+    return () => obs.disconnect();
+  }, [temMais, limite]);
 
-  const baixar = async (r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoArquivo) => {
-    const caminho = caminhoArquivo(r, tipo, formato);
-    if (!caminho) return;
+  const atualizarLocal = useCallback((id: string, patch: Partial<ReuniaoFireflies>) =>
+    setLista((prev) => prev && prev.map((r) => (r.id === id ? { ...r, ...patch } : r))), [setLista]);
+
+  const baixar = useCallback(async (r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoArquivo) => {
+    if (!caminhoArquivo(r, tipo, formato)) return;
     const chave = `${r.id}:${tipo}_${formato}`;
     setBaixando(chave);
     try {
-      salvarBlob(await baixarArquivoFireflies(caminho, formato), nomeArquivo(r, tipo, formato));
+      salvarBlob(await baixarArquivoFireflies(r, tipo, formato), nomeArquivo(r, tipo, formato));
     } catch (e) {
       toast.error(mensagemErroFireflies(e));
     } finally {
       setBaixando((atual) => (atual === chave ? null : atual));
     }
-  };
+  }, []);
+
+  const ver = useCallback((r: ReuniaoFireflies, tipo: TipoArquivo) => setPrevia({ reuniao: r, tipo }), []);
+  const abrirRenomear = useCallback((r: ReuniaoFireflies) => setRenomear(r), []);
+  const abrirExcluir = useCallback((r: ReuniaoFireflies) => setParaExcluir(r), []);
 
   const salvarNome = async (r: ReuniaoFireflies, novo: string) => {
     await gravarNaReuniao(r.id, { titulo_pendente: novo });
     atualizarLocal(r.id, { titulo_pendente: novo });
-    toast.success("Nome trocado aqui. No Fireflies, em até 1 minuto.");
+    pedirAplicarAgora();
+    toast.success("Nome trocado. No Fireflies, em alguns segundos.");
   };
 
   const confirmarExclusao = async () => {
@@ -109,7 +135,8 @@ function FirefliesPage() {
     try {
       await gravarNaReuniao(paraExcluir.id, { excluir: true });
       atualizarLocal(paraExcluir.id, { excluir: true });
-      toast.success("Excluindo… some daqui e do Fireflies em até 1 minuto.");
+      pedirAplicarAgora();
+      toast.success("Excluindo… some daqui e do Fireflies em alguns segundos.");
       setParaExcluir(null);
     } catch (e) {
       toast.error(mensagemErroFireflies(e));
@@ -191,17 +218,26 @@ function FirefliesPage() {
           {visiveis.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma reunião com esse nome ou participante.</p>
           ) : (
-            visiveis.map((r) => (
-              <CartaoReuniao
-                key={r.id}
-                r={r}
-                baixando={baixando}
-                onVer={(tipo) => setPrevia({ reuniao: r, tipo })}
-                onBaixar={(tipo, formato) => baixar(r, tipo, formato)}
-                onRenomear={() => setRenomear(r)}
-                onExcluir={() => setParaExcluir(r)}
-              />
-            ))
+            <>
+              {visiveis.slice(0, limite).map((r) => (
+                <CartaoReuniao
+                  key={r.id}
+                  r={r}
+                  baixando={baixando?.startsWith(`${r.id}:`) ? baixando : null}
+                  onVer={ver}
+                  onBaixar={baixar}
+                  onRenomear={abrirRenomear}
+                  onExcluir={abrirExcluir}
+                />
+              ))}
+              {temMais && (
+                <div ref={fimDaLista} className="flex justify-center py-4">
+                  <Button variant="ghost" size="sm" onClick={() => setLimite((l) => l + POR_VEZ)}>
+                    Mostrar mais ({visiveis.length - limite})
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </section>
       )}
@@ -256,14 +292,16 @@ function SeloSituacao({ situacao: s }: { situacao: Situacao }) {
 
 interface CartaoReuniaoProps {
   r: ReuniaoFireflies;
+  /** Arquivo desta reunião sendo baixado agora ("<id>:<tipo>_<formato>"), ou null */
   baixando: string | null;
-  onVer: (tipo: TipoArquivo) => void;
-  onBaixar: (tipo: TipoArquivo, formato: FormatoArquivo) => void;
-  onRenomear: () => void;
-  onExcluir: () => void;
+  onVer: (r: ReuniaoFireflies, tipo: TipoArquivo) => void;
+  onBaixar: (r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoArquivo) => void;
+  onRenomear: (r: ReuniaoFireflies) => void;
+  onExcluir: (r: ReuniaoFireflies) => void;
 }
 
-function CartaoReuniao({ r, baixando, onVer, onBaixar, onRenomear, onExcluir }: CartaoReuniaoProps) {
+// Memorizado: baixar um arquivo ou abrir a prévia não redesenha os outros cards
+const CartaoReuniao = memo(function CartaoReuniao({ r, baixando, onVer, onBaixar, onRenomear, onExcluir }: CartaoReuniaoProps) {
   const s = situacao(r);
   const titulo = tituloExibido(r);
   const data = dataCurta(r.data_hora);
@@ -320,9 +358,9 @@ function CartaoReuniao({ r, baixando, onVer, onBaixar, onRenomear, onExcluir }: 
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onRenomear}><Pencil size={14} className="mr-2" /> Renomear</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onRenomear(r)}><Pencil size={14} className="mr-2" /> Renomear</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onExcluir}>
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => onExcluir(r)}>
                 <Trash2 size={14} className="mr-2" /> Excluir
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -341,20 +379,23 @@ function CartaoReuniao({ r, baixando, onVer, onBaixar, onRenomear, onExcluir }: 
       </div>
     </Card>
   );
-}
+});
 
 interface GrupoArquivosProps {
   r: ReuniaoFireflies;
   tipo: TipoArquivo;
   baixando: string | null;
-  onVer: (tipo: TipoArquivo) => void;
-  onBaixar: (tipo: TipoArquivo, formato: FormatoArquivo) => void;
+  onVer: (r: ReuniaoFireflies, tipo: TipoArquivo) => void;
+  onBaixar: (r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoArquivo) => void;
 }
 
 function GrupoArquivos({ r, tipo, baixando, onVer, onBaixar }: GrupoArquivosProps) {
   const pdf = arquivoDisponivel(r, tipo, "pdf");
   const docx = arquivoDisponivel(r, tipo, "docx");
   const rotulo = ROTULO_TIPO[tipo];
+  // Ponteiro chegando no botão (mouse por cima, dedo encostando, foco pelo teclado): o arquivo já começa a vir,
+  // e o clique abre/baixa na hora
+  const preCarregar = (formato: FormatoArquivo, ok: boolean) => (ok ? () => preCarregarArquivo(r, tipo, formato) : undefined);
   const botao = (formato: FormatoArquivo, ok: boolean) => {
     const ativo = baixando === `${r.id}:${tipo}_${formato}`;
     return (
@@ -363,7 +404,10 @@ function GrupoArquivos({ r, tipo, baixando, onVer, onBaixar }: GrupoArquivosProp
         size="sm"
         className="h-8 gap-1.5 px-2.5"
         disabled={!ok || ativo}
-        onClick={() => onBaixar(tipo, formato)}
+        onPointerEnter={preCarregar(formato, ok)}
+        onPointerDown={preCarregar(formato, ok)}
+        onFocus={preCarregar(formato, ok)}
+        onClick={() => onBaixar(r, tipo, formato)}
         title={`Baixar ${rotulo.toLowerCase()} em ${formato.toUpperCase()}`}
         aria-label={`Baixar ${rotulo.toLowerCase()} em ${formato.toUpperCase()}`}
       >
@@ -382,7 +426,10 @@ function GrupoArquivos({ r, tipo, baixando, onVer, onBaixar }: GrupoArquivosProp
           size="sm"
           className="h-8 gap-1.5 px-2.5"
           disabled={!pdf}
-          onClick={() => onVer(tipo)}
+          onPointerEnter={preCarregar("pdf", pdf)}
+          onPointerDown={preCarregar("pdf", pdf)}
+          onFocus={preCarregar("pdf", pdf)}
+          onClick={() => onVer(r, tipo)}
           title={`Ver ${rotulo.toLowerCase()} (PDF)`}
           aria-label={`Ver ${rotulo.toLowerCase()}`}
         >

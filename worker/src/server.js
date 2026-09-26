@@ -85,9 +85,10 @@ export async function executarJob(corpo, deps = {}) {
 
 /**
  * Rotas /fireflies/* (crons e webhook pelo n8n, sempre com x-worker-key). Travas próprias, separadas da do
- * /job: uma sincronização do Fireflies nunca segura download do swipe, e a agenda (robô que precisa entrar na
- * reunião na hora) tem a sua, para não esperar uma sincronização longa. Ocupado = 409 (o cron tenta de novo),
- * menos no webhook, que vai para a fila abaixo.
+ * /job: uma sincronização do Fireflies nunca segura download do swipe; a agenda (robô que precisa entrar na
+ * reunião na hora) e as pendências (renomear/excluir pedidos na aba, que o usuário espera ver em segundos) têm
+ * as suas, para não esperar uma sincronização longa. Ocupado = 409 (o cron tenta de novo), menos no webhook,
+ * que vai para a fila abaixo, e nas pendências, que ganham uma rodada extra assim que a atual terminar.
  */
 function criarRotaFireflies({ config, rotinas, travas }) {
   // Webhook que chega com a trava ocupada entra nesta fila (sem repetir id) e é importado assim que ela soltar:
@@ -95,6 +96,9 @@ function criarRotaFireflies({ config, rotinas, travas }) {
   // deixaria a reunião sem resumo (a sincronização não reimporta linha 'pronto'). Restart perde a fila; a
   // reunião que nem chegou a entrar no banco volta pela sincronização de hora em hora.
   const filaWebhook = new Set();
+  // Pedido de pendências (a aba chama na hora pelo n8n) que chegou durante uma rodada: a rodada atual pode já ter
+  // lido a lista antes do pedido novo, então roda mais uma vez logo depois (uma só, por mais pedidos que cheguem)
+  let repetirPendencias = false;
   async function drenarFila() {
     while (filaWebhook.size && !travas.fireflies) {
       const [id] = filaWebhook;
@@ -123,7 +127,7 @@ function criarRotaFireflies({ config, rotinas, travas }) {
         };
       case "/fireflies/pendencias":
         return {
-          trava: "fireflies",
+          trava: "pendencias",
           evento: "fireflies.pendencias",
           executar: () => r.pendencias(),
           resumo: (x) => (x.renomeados || x.excluidos || x.erros?.length ? { renomeados: x.renomeados, excluidos: x.excluidos, erros: x.erros } : null),
@@ -196,7 +200,11 @@ function criarRotaFireflies({ config, rotinas, travas }) {
     }
 
     // Checar e travar sem `await` no meio: duas requisições próximas não passam as duas
-    if (travas[tarefa.trava]) return responder(409, { ok: false, erro: "ocupado" });
+    if (travas[tarefa.trava]) {
+      if (tarefa.trava !== "pendencias") return responder(409, { ok: false, erro: "ocupado" });
+      repetirPendencias = true;
+      return responder(202, { ok: true, agendado: true });
+    }
     travas[tarefa.trava] = true;
     try {
       const resultado = await tarefa.executar();
@@ -210,14 +218,30 @@ function criarRotaFireflies({ config, rotinas, travas }) {
     } finally {
       travas[tarefa.trava] = false;
       if (tarefa.trava === "fireflies" && filaWebhook.size) drenarFila();
+      if (tarefa.trava === "pendencias" && repetirPendencias) rodadaExtra(tarefa);
     }
   };
+
+  async function rodadaExtra(tarefa) {
+    if (travas.pendencias) return;
+    repetirPendencias = false;
+    travas.pendencias = true;
+    try {
+      const dados = tarefa.resumo(await tarefa.executar());
+      if (dados) log(tarefa.evento, { ...dados, origem: "rodada_extra" });
+    } catch (e) {
+      console.error(JSON.stringify({ evento: "fireflies.erro", rota: "/fireflies/pendencias", erro: String(e?.message || e) }));
+    } finally {
+      travas.pendencias = false;
+      if (repetirPendencias) rodadaExtra(tarefa);
+    }
+  }
 }
 
 /** `fireflies`: rotinas { agenda, pendencias, sincronizar, importar } (testes); sem ela, as reais, criadas no 1º uso. */
 export function criarServidor({ config, executarJob: executar = executarJob, fireflies = null }) {
   let ocupado = false;
-  const travas = { fireflies: false, agenda: false };
+  const travas = { fireflies: false, agenda: false, pendencias: false };
   let rotinas = fireflies;
   const rotaFireflies = criarRotaFireflies({
     config,

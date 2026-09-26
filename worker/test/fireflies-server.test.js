@@ -21,7 +21,7 @@ function rotinasFalsas() {
     travar(nome) { let liberar; const promessa = new Promise((ok) => { liberar = ok; }); travas[nome] = { promessa, liberar }; },
     liberar(nome) { travas[nome]?.liberar(); delete travas[nome]; },
     agenda: async () => { chamadas.push(["agenda"]); await esperar("agenda"); return { ok: true, enviados: [], falhas: [], ignorados: 0 }; },
-    pendencias: async () => { chamadas.push(["pendencias"]); return { ok: true, renomeados: 0, excluidos: 0, erros: [] }; },
+    pendencias: async () => { chamadas.push(["pendencias"]); await esperar("pendencias"); return { ok: true, renomeados: 0, excluidos: 0, erros: [] }; },
     sincronizar: async (op) => { chamadas.push(["sincronizar", op]); await esperar("sincronizar"); return { ok: true, importados: 0, falhas: [], restantes: 0, paginasLidas: 1, historicoCompleto: true }; },
     importar: async (id) => { chamadas.push(["importar", id]); return id === "ruim" ? { ok: false, id, erro: "falhou" } : { ok: true, id, titulo: "X" }; },
   };
@@ -182,7 +182,7 @@ test("webhook sem FIREFLIES_WEBHOOK_SECRET é 503; corpo assinado que não é JS
   await s.fechar();
 });
 
-test("sincronização longa: outra tarefa do Fireflies recebe 409, mas a agenda e o /job seguem", async () => {
+test("sincronização longa: importar recebe 409, mas pendências (renomear/excluir), agenda e /job seguem", async () => {
   const fireflies = rotinasFalsas();
   fireflies.travar("sincronizar");
   let jobs = 0;
@@ -190,7 +190,7 @@ test("sincronização longa: outra tarefa do Fireflies recebe 409, mas a agenda 
   const longa = s.post("/fireflies/sincronizar", {});
   await new Promise((r) => setTimeout(r, 50));
 
-  assert.equal((await s.post("/fireflies/pendencias", {})).status, 409);
+  assert.equal((await s.post("/fireflies/pendencias", {})).status, 200, "renomear/excluir não espera a sincronização");
   assert.equal((await s.post("/fireflies/importar", { id: "m1" })).status, 409);
   assert.equal((await s.post("/fireflies/agenda", {})).status, 200, "a agenda tem trava própria");
   const job = await s.post("/job", { id: "j1", payload: { link: "https://x", drive_folder_id: "p" } });
@@ -199,7 +199,25 @@ test("sincronização longa: outra tarefa do Fireflies recebe 409, mas a agenda 
 
   fireflies.liberar("sincronizar");
   assert.equal((await longa).status, 200);
-  assert.equal((await s.post("/fireflies/pendencias", {})).status, 200, "trava liberada depois do fim");
+  assert.equal((await s.post("/fireflies/importar", { id: "m1" })).status, 200, "trava liberada depois do fim");
+  await s.fechar();
+});
+
+test("pendências pedidas enquanto outra rodada roda: 202 e UMA rodada extra logo depois (o pedido novo não espera o cron)", async () => {
+  const fireflies = rotinasFalsas();
+  fireflies.travar("pendencias");
+  const s = await subir({ fireflies });
+  const primeira = s.post("/fireflies/pendencias", {});
+  await new Promise((r) => setTimeout(r, 50));
+  const r2 = await s.post("/fireflies/pendencias", {});
+  const r3 = await s.post("/fireflies/pendencias", {});
+  assert.equal(r2.status, 202);
+  assert.deepEqual(await r2.json(), { ok: true, agendado: true });
+  assert.equal(r3.status, 202);
+  fireflies.liberar("pendencias");
+  assert.equal((await primeira).status, 200);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(fireflies.chamadas.filter((c) => c[0] === "pendencias").length, 2, "uma rodada extra só, por mais pedidos que cheguem");
   await s.fechar();
 });
 
