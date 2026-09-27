@@ -1,12 +1,12 @@
 // Pasta de fotos do Catálogo: uma seção por produto (subpasta com 2+ fotos, ou foto solta "Produto.jpg"),
 // miniaturas baixadas só quando aparecem na tela (4 por vez) e ampliação com setas e download.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, FolderArchive, ImageOff, Loader2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, FolderArchive, ImageOff, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { ehImagem, ehPasta, formatosDeDownload, nomeDoProduto, type ItemDrive } from "@/lib/dadosInternos";
+import { ehImagem, ehPasta, formatosDeDownload, linkNoGoogle, nomeDoProduto, type ItemDrive } from "@/lib/dadosInternos";
 import { baixarOriginal, listarPasta, salvarItem } from "@/lib/driveLeitura";
 
 // Fila compartilhada: no máximo 4 chamadas ao Drive ao mesmo tempo
@@ -110,7 +110,12 @@ export function GaleriaFotos({ itens, onBaixarZip, onAbrirPasta }: GaleriaFotosP
             </button>
             <span className="text-[11px] text-muted-foreground">{g.fotos ? `${g.fotos.length} foto${g.fotos.length === 1 ? "" : "s"}` : "…"}</span>
             {g.pasta ? (
-              <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => onBaixarZip(g.pasta!)}><FolderArchive size={14} /> .zip</Button>
+              <>
+                <Button variant="ghost" size="sm" onClick={() => window.open(linkNoGoogle(g.pasta!), "_blank", "noopener")} title="Abrir no Google">
+                  <ExternalLink size={14} />
+                </Button>
+                <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => onBaixarZip(g.pasta!)}><FolderArchive size={14} /> .zip</Button>
+              </>
             ) : g.fotos?.length === 1 ? (
               <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void baixarFoto(g.fotos![0])}><Download size={14} /> Baixar</Button>
             ) : null}
@@ -186,6 +191,11 @@ function Ampliar({ estado, obterUrl, onMudar, onBaixar }: {
             <DialogTitle className="truncate text-sm font-semibold">{foto?.name}</DialogTitle>
             <DialogDescription className="text-[11px]">{estado ? `${estado.indice + 1} de ${estado.fotos.length}` : ""}</DialogDescription>
           </div>
+          {foto && (
+            <Button variant="ghost" size="sm" onClick={() => window.open(linkNoGoogle(foto), "_blank", "noopener")} title="Abrir no Google">
+              <ExternalLink size={14} />
+            </Button>
+          )}
           {foto && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => onBaixar(foto)}><Download size={14} /> Baixar</Button>}
           <Button size="sm" className="gap-1.5" onClick={() => onMudar(null)}><X size={14} /> Fechar</Button>
         </div>

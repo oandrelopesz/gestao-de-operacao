@@ -152,9 +152,12 @@ export function novosNaLista(itens: ItemDrive[], avisos: AvisoFormulario[]): Map
       if (itens.some((i) => i.id === a.drive_id)) marcar(a.drive_id, a.id);
       continue;
     }
+    // O fallback por nome/janela só existe para os briefings (contrato e catálogo sempre têm drive_id)
+    if (!ehBriefing(a.formulario)) continue;
     const t = Date.parse(a.recebido_em);
     const naJanela = itens.filter((i) => {
       if (ehPasta(i)) return false;
+      if (extensao(i.name) !== "txt") return false;
       const c = Date.parse(i.createdTime);
       return c >= t - JANELA_ANTES_MS && c <= t + JANELA_DEPOIS_MS;
     });

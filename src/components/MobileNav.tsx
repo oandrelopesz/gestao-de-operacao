@@ -7,7 +7,7 @@ const ICONES: Record<string, LucideIcon> = { "/": LayoutDashboard, "/agenda": Ca
 const ITEM = "flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors active:scale-95";
 
 /** Barra inferior do celular: 4 atalhos + "Mais" (abre o menu lateral completo). Some a partir de lg. */
-export function MobileNav({ onMais, maisAberto }: { onMais: () => void; maisAberto: boolean }) {
+export function MobileNav({ onMais, maisAberto, novos }: { onMais: () => void; maisAberto: boolean; novos?: number }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const emAtalho = ATALHOS_MOBILE.some((a) => atalhoAtivo(pathname, a.to));
   return (
@@ -24,7 +24,14 @@ export function MobileNav({ onMais, maisAberto }: { onMais: () => void; maisAber
           );
         })}
         <button type="button" onClick={onMais} className={cn(ITEM, maisAberto || !emAtalho ? "text-primary" : "text-muted-foreground")}>
-          <Menu size={22} strokeWidth={maisAberto || !emAtalho ? 2.2 : 1.8} />
+          <span className="relative">
+            <Menu size={22} strokeWidth={maisAberto || !emAtalho ? 2.2 : 1.8} />
+            {!!novos && (
+              <span aria-label={`${novos} novos`} className="absolute -right-2 -top-1.5 shrink-0 rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-4 tabular-nums text-primary-foreground">
+                {novos > 99 ? "99+" : novos}
+              </span>
+            )}
+          </span>
           Mais
         </button>
       </div>

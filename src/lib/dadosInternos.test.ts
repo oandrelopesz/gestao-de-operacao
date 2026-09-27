@@ -86,6 +86,18 @@ test("selo Novo: briefing pelo nome (acento/símbolo) dentro da janela; senão o
   assert.deepEqual([...novosNaLista([item({ id: "t5", name: "A - 2026-09-27 08-44-00.txt", createdTime: "2026-09-27T11:44:00Z" })], [aviso({ id: "a5", titulo: "A" })])], []);
 });
 
+test("selo Novo: aviso sem drive_id fora do briefing não marca nada (ex.: contrato:teste-autorizacao)", () => {
+  const itens = [item({ id: "d1", name: "Cliente - Contrato.pdf", mimeType: "application/pdf" })];
+  const avisos = [aviso({ id: "a1", formulario: "contrato", chave: "contrato:teste-autorizacao", titulo: "Cliente" })];
+  assert.deepEqual([...novosNaLista(itens, avisos)], []);
+});
+
+test("selo Novo: briefing ignora arquivo sem extensão .txt dentro da janela", () => {
+  const itens = [item({ id: "d1", name: "Foto.png", mimeType: "image/png" })];
+  const avisos = [aviso({ id: "a1", titulo: "Foto" })];
+  assert.deepEqual([...novosNaLista(itens, avisos)], []);
+});
+
 test("aba inicial: primeira com novidade (ordem das sub-abas), senão a última usada, senão a primeira", () => {
   assert.equal(abaInicial([aviso({ id: "1", formulario: "catalogo" }), aviso({ id: "2", formulario: "negocios" })], "contrato"), "negocios");
   assert.equal(abaInicial([], "estrategia"), "estrategia");

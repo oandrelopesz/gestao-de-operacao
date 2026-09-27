@@ -159,7 +159,7 @@ function DadosInternosPage() {
       />
 
       {zip && (
-        <Card className="fixed bottom-20 right-4 z-40 w-[min(22rem,calc(100vw-2rem))] space-y-2 p-3 shadow-lg lg:bottom-4">
+        <Card className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 w-[min(22rem,calc(100vw-2rem))] space-y-2 p-3 shadow-lg lg:bottom-4">
           <div className="flex items-center gap-2 text-sm">
             <Loader2 size={14} className="animate-spin" />
             <span className="min-w-0 flex-1 truncate">

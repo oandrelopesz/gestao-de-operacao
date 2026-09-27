@@ -277,7 +277,7 @@ function AuthenticatedLayout() {
           <div key={`${pathname}#${recarga}`} className="p-4 lg:p-8 max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))] page-enter">
             <Outlet />
           </div>
-          <MobileNav onMais={() => setIsSidebarOpen(true)} maisAberto={isSidebarOpen} />
+          <MobileNav onMais={() => setIsSidebarOpen(true)} maisAberto={isSidebarOpen} novos={avisosNaoVistos.length} />
           <AtualizarAoVoltar onRecarregarPagina={recarregarPagina} />
         </main>
       </div>

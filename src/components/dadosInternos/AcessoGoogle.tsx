@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BotaoGoogleLogin } from "@/components/swipe/BotaoGoogleLogin";
-import { DRIVE_LEITURA_SCOPE, DriveAuthError, getAccessToken, oauthUrl, statusDoDrive } from "@/lib/googleDrive";
+import { DRIVE_LEITURA_SCOPE, DriveAuthError, getAccessToken, invalidarTokenGoogle, oauthUrl, statusDoDrive } from "@/lib/googleDrive";
 import { FALLBACK_USER_ID, getUserId } from "@/lib/clientesService";
 
 export type EstadoAcesso = "verificando" | "sem_login" | "sem_permissao" | "pronto" | "erro";
@@ -32,6 +32,7 @@ export function useAcessoDrive(): AcessoDrive {
         setEstado("sem_permissao");
         return;
       }
+      if (forcar) invalidarTokenGoogle();
       await getAccessToken();
       setEstado("pronto");
     } catch (e) {

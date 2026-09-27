@@ -1,7 +1,7 @@
 // Tela cheia para um arquivo das respostas: briefing em perguntas e respostas, texto, imagem, PDF,
 // Doc (convertido em PDF só para exibir) e planilha (tabela). Baixar no original ou no formato escolhido.
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Download, ExternalLink, FileText, Loader2, X } from "lucide-react";
+import { ChevronDown, Download, ExternalLink, FileText, ListChecks, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -33,6 +33,7 @@ export function Visualizador({ arquivoId, formulario, onFechar, onAbrirArquivo }
   const [item, setItem] = useState<ItemDrive | null>(null);
   const [conteudo, setConteudo] = useState<Conteudo | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [erroGrande, setErroGrande] = useState(false);
   const [original, setOriginal] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const modo = item ? modoDoItem(item, formulario.id) : null;
@@ -41,6 +42,7 @@ export function Visualizador({ arquivoId, formulario, onFechar, onAbrirArquivo }
     setItem(null);
     setConteudo(null);
     setErro(null);
+    setErroGrande(false);
     setOriginal(false);
     if (!arquivoId) return;
     let cancelado = false;
@@ -69,6 +71,7 @@ export function Visualizador({ arquivoId, formulario, onFechar, onAbrirArquivo }
       setConteudo({ tipo: "url", url: objectUrl });
     })().catch((e) => {
       if (cancelado) return;
+      setErroGrande(e instanceof ExportGrandeError);
       setErro(e instanceof ExportGrandeError ? "Grande demais para visualizar aqui. Use \"Abrir no Google\"." : e instanceof Error ? e.message : "Não consegui abrir");
     });
     return () => {
@@ -112,8 +115,16 @@ export function Visualizador({ arquivoId, formulario, onFechar, onAbrirArquivo }
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {modo === "briefing" && briefing && (
-              <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={() => setOriginal((o) => !o)}>
-                {original ? "Perguntas e respostas" : "Texto original"}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setOriginal((o) => !o)}
+                aria-label={original ? "Perguntas e respostas" : "Texto original"}
+                title={original ? "Perguntas e respostas" : "Texto original"}
+              >
+                {original ? <ListChecks size={14} /> : <FileText size={14} />}
+                <span className="hidden sm:inline">{original ? "Perguntas e respostas" : "Texto original"}</span>
               </Button>
             )}
             {item && (
@@ -146,7 +157,14 @@ export function Visualizador({ arquivoId, formulario, onFechar, onAbrirArquivo }
           {erro ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
               <p className="text-sm text-destructive">{erro}</p>
-              <Button variant="outline" size="sm" onClick={onFechar}>Fechar</Button>
+              <div className="flex items-center gap-2">
+                {erroGrande && item && (
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => window.open(linkNoGoogle(item), "_blank", "noopener")}>
+                    <ExternalLink size={14} /> Abrir no Google
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={onFechar}>Fechar</Button>
+              </div>
             </div>
           ) : !conteudo ? (
             <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-muted-foreground">

@@ -49,25 +49,30 @@ export function NavegadorPasta(p: NavegadorPastaProps) {
   const temLista = useRef(false);
   const naRaiz = p.pastaId === p.formulario.pastaId;
   const { onSemPermissao } = p;
+  // Evita que uma resposta antiga (pasta trocada no meio do caminho) sobrescreva a pasta atual
+  const req = useRef(0);
 
   const carregar = useCallback(async () => {
+    const n = ++req.current;
     setCarregando(true);
     try {
       const [lista, caminho] = await Promise.all([
         listarPasta(p.pastaId),
         naRaiz ? Promise.resolve([] as ItemDrive[]) : trilhaAte(p.pastaId, p.formulario.pastaId),
       ]);
+      if (n !== req.current) return;
       setItens(ordenarItens(lista.filter(visivel)));
       setTrilha(caminho);
       setErro(null);
       temLista.current = true;
     } catch (e) {
+      if (n !== req.current) return;
       if (e instanceof DriveEscopoError) { onSemPermissao(); return; }
       const msg = e instanceof Error ? e.message : "Não consegui ler o Drive";
       if (temLista.current) toast.error(msg, { action: { label: "Tentar de novo", onClick: () => void carregar() } });
       else setErro(msg);
     } finally {
-      setCarregando(false);
+      if (n === req.current) setCarregando(false);
     }
   }, [p.pastaId, p.formulario.pastaId, naRaiz, onSemPermissao]);
 
