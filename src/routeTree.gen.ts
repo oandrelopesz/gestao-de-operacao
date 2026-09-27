@@ -31,6 +31,7 @@ import { Route as AuthenticatedFluxogramasIdRouteImport } from './routes/_authen
 import { Route as AuthenticatedFirefliesRouteImport } from './routes/_authenticated/fireflies'
 import { Route as AuthenticatedFinanceiroRouteImport } from './routes/_authenticated/financeiro'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedDadosInternosRouteImport } from './routes/_authenticated/dados-internos'
 import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
@@ -152,6 +153,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedDadosInternosRoute =
+  AuthenticatedDadosInternosRouteImport.update({
+    id: '/dados-internos',
+    path: '/dados-internos',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCursosRoute = AuthenticatedCursosRouteImport.update({
   id: '/cursos',
   path: '/cursos',
@@ -198,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/clientes': typeof AuthenticatedClientesRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/cursos': typeof AuthenticatedCursosRoute
+  '/dados-internos': typeof AuthenticatedDadosInternosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/fireflies': typeof AuthenticatedFirefliesRoute
@@ -227,6 +235,7 @@ export interface FileRoutesByTo {
   '/clientes': typeof AuthenticatedClientesRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/cursos': typeof AuthenticatedCursosRoute
+  '/dados-internos': typeof AuthenticatedDadosInternosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/financeiro': typeof AuthenticatedFinanceiroRoute
   '/fireflies': typeof AuthenticatedFirefliesRoute
@@ -259,6 +268,7 @@ export interface FileRoutesById {
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/cursos': typeof AuthenticatedCursosRoute
+  '/_authenticated/dados-internos': typeof AuthenticatedDadosInternosRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/financeiro': typeof AuthenticatedFinanceiroRoute
   '/_authenticated/fireflies': typeof AuthenticatedFirefliesRoute
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/crm'
     | '/cursos'
+    | '/dados-internos'
     | '/dashboard'
     | '/financeiro'
     | '/fireflies'
@@ -321,6 +332,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/crm'
     | '/cursos'
+    | '/dados-internos'
     | '/dashboard'
     | '/financeiro'
     | '/fireflies'
@@ -352,6 +364,7 @@ export interface FileRouteTypes {
     | '/_authenticated/clientes'
     | '/_authenticated/crm'
     | '/_authenticated/cursos'
+    | '/_authenticated/dados-internos'
     | '/_authenticated/dashboard'
     | '/_authenticated/financeiro'
     | '/_authenticated/fireflies'
@@ -535,6 +548,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/dados-internos': {
+      id: '/_authenticated/dados-internos'
+      path: '/dados-internos'
+      fullPath: '/dados-internos'
+      preLoaderRoute: typeof AuthenticatedDadosInternosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/cursos': {
       id: '/_authenticated/cursos'
       path: '/cursos'
@@ -595,6 +615,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedCursosRoute: typeof AuthenticatedCursosRoute
+  AuthenticatedDadosInternosRoute: typeof AuthenticatedDadosInternosRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFinanceiroRoute: typeof AuthenticatedFinanceiroRoute
   AuthenticatedFirefliesRoute: typeof AuthenticatedFirefliesRoute
@@ -625,6 +646,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedCursosRoute: AuthenticatedCursosRoute,
+  AuthenticatedDadosInternosRoute: AuthenticatedDadosInternosRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFinanceiroRoute: AuthenticatedFinanceiroRoute,
   AuthenticatedFirefliesRoute: AuthenticatedFirefliesRoute,
