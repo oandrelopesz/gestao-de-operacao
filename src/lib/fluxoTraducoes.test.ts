@@ -31,3 +31,10 @@ test("português, números e palavras soltas dentro de frases ficam como estão"
   assert.equal(traduzirExcalidraw("Texto do card"), null);
   assert.equal(traduzirExcalidraw("My Code snippet"), null);
 });
+
+test("'CtrlOuCmd' que o pt-BR do Excalidraw deixa cru vira Ctrl", () => {
+  assert.equal(
+    traduzirExcalidraw("Pressione CtrlOuCmd e duplo-clique ou pressione CtrlOuCmd + Enter para editar pontos"),
+    "Pressione Ctrl e duplo-clique ou pressione Ctrl + Enter para editar pontos",
+  );
+});

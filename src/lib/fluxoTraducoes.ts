@@ -162,7 +162,8 @@ export function traduzirExcalidraw(texto: string): string | null {
   if (!limpo || !/[A-Za-z]/.test(limpo)) return null;
   const exato = exatos.get(limpo);
   if (exato !== undefined) return texto.replace(limpo, exato);
-  let saida = texto;
+  // O pt-BR do Excalidraw traduziu a variável "CtrlOrCmd" como "CtrlOuCmd", que ele não troca pela tecla
+  let saida = texto.replace(/CtrlOuCmd/g, "Ctrl");
   for (const { re, pt } of padroes) {
     re.lastIndex = 0;
     saida = saida.replace(re, (...args) => {
