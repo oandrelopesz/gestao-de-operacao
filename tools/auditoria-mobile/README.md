@@ -14,3 +14,7 @@ Ferramentas fora do app (não entram no build do Lovable). Instalar uma vez: `np
 - Exportação dos Fluxogramas: `node testar-exportacao.mjs http://localhost:5190 <id de um quadro de TESTE> saida` — monta um
   quadro (funil, cards, cone, imagem WebP, 2 molduras), exporta PDF/PNG/SVG/PPTX/DOCX pela janela e confere cada arquivo
   (pdf.js: páginas, texto vetorial, fonte Nunito; zip: slides e imagens). Apaga o conteúdo do quadro informado.
+- Mapa mental: `node testar-mapa-mental.mjs http://localhost:5190 saida` — cria o quadro "TESTE CLAUDE — mapa" (modelo Mapa
+  mental), testa Enter/Tab digitando, recolher/expandir, apagar e desfazer, arrastar de lado, recarregar; apaga o quadro no fim.
+- Ligações por bolinha: `node testar-ligacoes.mjs http://localhost:5190 saida` — arrastar até outra forma, clicar sem arrastar
+  (nada), mover a origem (seta acompanha), soltar no vazio, Esc cancela, forma desenhada arrastável pelo meio.

@@ -95,7 +95,7 @@ export function esqueletoDoCard(tipo: TipoCard, cor: Cor): Esqueleto {
 }
 
 /** Centro da parte do quadro que está à vista (sem o painel lateral aberto por cima), em coordenadas da cena. */
-function centroVisivel(api: ExcalidrawImperativeAPI): { x: number; y: number } {
+export function centroVisivel(api: ExcalidrawImperativeAPI): { x: number; y: number } {
   const a = api.getAppState();
   const painel = document.querySelector<HTMLElement>(".excalidraw .sidebar");
   // Painel solto fica por cima do quadro; fixado, ele encolhe o quadro e fica fora da conta (o min abaixo resolve os dois)

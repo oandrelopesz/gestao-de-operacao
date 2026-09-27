@@ -52,3 +52,13 @@ test("lugarLivre: centro vazio fica no centro; ocupado, vai para o espaço livre
   // O mais perto possível: não anda mais que a soma das metades + margem em nenhum eixo
   assert.ok(Math.abs(pos.x + 100 - 500) <= 260 && Math.abs(pos.y + 50 - 300) <= 160, JSON.stringify(pos));
 });
+
+test("ladoDeFrente: o lado do destino voltado para a origem; ladoPerto encaixa só perto da bolinha", async () => {
+  const { ladoDeFrente, ladoPerto } = await import("./fluxoConectores.ts");
+  const destino = { x: 400, y: 0, width: 200, height: 100 };
+  assert.equal(ladoDeFrente({ x: 0, y: 0, width: 200, height: 100 }, destino), "esquerda");
+  assert.equal(ladoDeFrente({ x: 400, y: 400, width: 200, height: 100 }, destino), "baixo");
+  assert.equal(ladoDeFrente({ x: 420, y: -300, width: 100, height: 60 }, destino), "cima");
+  assert.equal(ladoPerto(destino, { x: 605, y: 52 }, 20), "direita");
+  assert.equal(ladoPerto(destino, { x: 500, y: 50 }, 20), null);
+});

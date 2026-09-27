@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Copy, FolderInput, MoreVertical, Pencil, Plus, Search, SquareArrowOutUpRight, Tags, Trash2, Workflow } from "lucide-react";
+import { Copy, FolderInput, MoreVertical, Network, Pencil, Plus, Search, Square, SquareArrowOutUpRight, Tags, Trash2, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,11 @@ const TODOS = "__todos__";
 const SEM_TEMA = "__sem_tema__";
 const SEM = "__sem__"; // valor do Select para "Sem tema"
 
+const MODELOS = [
+  { id: null, rotulo: "Em branco", detalhe: "Quadro livre", icone: <Square size={20} strokeWidth={1.75} /> },
+  { id: "mapa-mental", rotulo: "Mapa mental", detalhe: "Ideia central e tópicos", icone: <Network size={20} strokeWidth={1.75} /> },
+] as const;
+
 function quando(iso: string): string {
   const d = new Date(iso);
   const hoje = new Date();
@@ -52,7 +57,7 @@ function FluxogramasPage() {
   const [filtro, setFiltro] = useState<string>(TODOS);
   const [busca, setBusca] = useState("");
   const [temasAberto, setTemasAberto] = useState(false);
-  const [novo, setNovo] = useState<{ titulo: string; tema_id: string | null } | null>(null);
+  const [novo, setNovo] = useState<{ titulo: string; tema_id: string | null; modelo: string | null } | null>(null);
   const [criando, setCriando] = useState(false);
   const [renomeando, setRenomeando] = useState<{ id: string; titulo: string } | null>(null);
   const [paraExcluir, setParaExcluir] = useState<FluxoResumo | null>(null);
@@ -108,7 +113,7 @@ function FluxogramasPage() {
     if (!novo || criando) return;
     setCriando(true);
     try {
-      const f = await criarFluxo({ titulo: novo.titulo, tema_id: novo.tema_id });
+      const f = await criarFluxo({ titulo: novo.titulo, tema_id: novo.tema_id, modelo: novo.modelo });
       setNovo(null);
       navigate({ to: "/fluxogramas/$id", params: { id: f.id } });
     } catch (e) {
@@ -174,7 +179,7 @@ function FluxogramasPage() {
     ...(contagem[SEM_TEMA] ? [{ id: SEM_TEMA, nome: "Sem tema", hex: null }] : []),
   ];
 
-  const abrirNovo = () => setNovo({ titulo: "", tema_id: temaDoFiltro });
+  const abrirNovo = () => setNovo({ titulo: "", tema_id: temaDoFiltro, modelo: null });
 
   return (
     <div className="space-y-5">
@@ -306,10 +311,28 @@ function FluxogramasPage() {
         <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
             <DialogTitle>Novo quadro</DialogTitle>
-            <DialogDescription>Um quadro infinito em branco. Dá para mudar o nome e o tema depois.</DialogDescription>
+            <DialogDescription>Quadro infinito. Dá para mudar o nome e o tema depois.</DialogDescription>
           </DialogHeader>
           {novo && (
             <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); criar(); }}>
+              <div className="grid grid-cols-2 gap-2">
+                {MODELOS.map((m) => (
+                  <button
+                    key={m.rotulo}
+                    type="button"
+                    aria-pressed={novo.modelo === m.id}
+                    onClick={() => setNovo({ ...novo, modelo: m.id })}
+                    className={cn(
+                      "flex flex-col items-center gap-1 rounded-xl border px-3 py-3 text-center transition-all duration-200",
+                      novo.modelo === m.id ? "border-primary bg-primary/10 text-primary shadow-sm" : "text-muted-foreground hover:-translate-y-0.5 hover:border-primary/40 hover:text-foreground",
+                    )}
+                  >
+                    {m.icone}
+                    <span className="text-sm font-semibold">{m.rotulo}</span>
+                    <span className="text-[11px] opacity-75">{m.detalhe}</span>
+                  </button>
+                ))}
+              </div>
               <div className="space-y-1.5">
                 <Label htmlFor="novo-quadro-nome">Nome</Label>
                 <Input id="novo-quadro-nome" autoFocus placeholder="Sem título" value={novo.titulo}

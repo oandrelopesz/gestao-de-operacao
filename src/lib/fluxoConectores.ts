@@ -95,3 +95,23 @@ export function lugarLivre(centro: Ponto, largura: number, altura: number, ocupa
   }
   return canto(centro.x, centro.y);
 }
+
+/** Lado do destino voltado para a origem (pelo eixo em que eles estão mais afastados, proporcional ao tamanho). */
+export function ladoDeFrente(origem: Caixa, destino: Caixa): Lado {
+  const o = centroDa(origem), d = centroDa(destino);
+  const dx = (o.x - d.x) / Math.max(1, destino.width), dy = (o.y - d.y) / Math.max(1, destino.height);
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "direita" : "esquerda";
+  return dy >= 0 ? "baixo" : "cima";
+}
+
+/** Lado cuja bolinha (meio do lado) está a até `limite` do ponto; senão null. */
+export function ladoPerto(c: Caixa, p: Ponto, limite: number): Lado | null {
+  let melhor: Lado | null = null;
+  let menor = limite;
+  for (const lado of LADOS) {
+    const m = pontoDoLado(c, lado);
+    const d = Math.hypot(m.x - p.x, m.y - p.y);
+    if (d <= menor) { menor = d; melhor = lado; }
+  }
+  return melhor;
+}

@@ -77,17 +77,14 @@ try {
   r.ferramentaDepois = await p.evaluate(() => h.state.activeTool.type);
   await foto("05-seta-arrastada", { x: cA.x - 160, y: cA.y - 140, width: Math.max(400, cB.x - cA.x + 320), height: 280 });
 
-  // Clique na bolinha de baixo do A
+  // Clique na bolinha (sem arrastar) não cria nada — detalhes da ligação em testar-ligacoes.mjs
   await limparSelecao();
   await p.mouse.move(cA.x, cA.y, { steps: 3 }); await espera(250);
   const baixo = (await bolinhas()).find((d) => /baixo/.test(d.label));
+  const antesDoClique = (await els()).length;
   await p.mouse.click(baixo.x, baixo.y);
-  await espera(500);
-  lista = await els();
-  const novoCard = lista.filter((e) => e.type === "rectangle" && !e.ancora).find((e) => e.id !== A.id && e.id !== B.id);
-  const seta2 = lista.filter((e) => e.type === "arrow").at(-1);
-  r.cliqueBolinha = novoCard ? { vaoAbaixo: Math.round(novoCard.y - (A.y + A.h)), mesmoX: Math.round(novoCard.x - A.x), setaPresa: seta2.sb === A.id && seta2.eb === novoCard.id } : "não criou";
-  await foto("05b-criado-abaixo", { x: cA.x - 200, y: cA.y - 80, width: 400, height: 380 });
+  await espera(400);
+  r.cliqueBolinhaNaoCria = (await els()).length === antesDoClique;
   await limparSelecao();
 
   // Seta com dois cliques
@@ -144,7 +141,8 @@ try {
   const f2 = await centroNaTela(faixa2);
   await p.mouse.move(f2.x, f2.y, { steps: 4 }); await espera(250);
   const dir3 = (await bolinhas()).find((d) => /direit/.test(d.label));
-  if (dir3) { await p.mouse.click(dir3.x, dir3.y); await espera(500); }
+  // Arrasta da bolinha da faixa para a direita e solta no vazio: seta presa na faixa
+  if (dir3) { await p.mouse.move(dir3.x, dir3.y); await p.mouse.down(); await p.mouse.move(dir3.x + 80, dir3.y, { steps: 6 }); await p.mouse.move(dir3.x + 200, dir3.y + 20, { steps: 6 }); await p.mouse.up(); await espera(400); }
   lista = await els();
   const setaFaixa = lista.filter((e) => e.type === "arrow").at(-1);
   r.faixaLigada = setaFaixa?.sb === faixa2.id;

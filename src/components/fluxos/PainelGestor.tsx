@@ -1,12 +1,23 @@
 // Painel "Formas" do quadro (barra lateral do Excalidraw): formas extras e cards prontos, na cor escolhida.
 // O visual (abas em pílula, blocos com transição) está em styles.css, em ".painel-gestor".
 import { useState } from "react";
-import { Check, Minus, MousePointerClick, Plus } from "lucide-react";
+import { Check, Minus, MousePointerClick, Network, Plus } from "lucide-react";
 import { Sidebar } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { FORMAS_EXTRAS, pecasDa, type FormaExtra, type Peca } from "@/lib/fluxoFormas";
 import { cn } from "@/lib/utils";
 import { CARDS, CORES, esqueletoDoCard, inserirNoCentro, pecasParaEsqueletos, type Cor, type TipoCard } from "./inserir";
+import { criarMapa } from "./mapaMental";
+
+const ATALHOS_MAPA: [string, string][] = [
+  ["Tab", "Tópico filho"],
+  ["Enter", "Tópico irmão (Shift+Enter quebra linha)"],
+  ["F2 ou duplo clique", "Editar o texto"],
+  ["Delete", "Apagar o ramo"],
+  ["Ctrl + .", "Recolher / expandir"],
+  ["Ctrl + Shift + L", "Organizar o mapa"],
+  ["Arrastar", "Muda a ordem ou o lado do tópico"],
+];
 
 export const NOME_PAINEL = "gestor";
 
@@ -115,6 +126,7 @@ export function PainelGestor({ api, docked, onDock }: { api: ExcalidrawImperativ
           <Sidebar.TabTriggers>
             <Sidebar.TabTrigger tab="formas" className="pg-aba">Formas</Sidebar.TabTrigger>
             <Sidebar.TabTrigger tab="cards" className="pg-aba">Cards</Sidebar.TabTrigger>
+            <Sidebar.TabTrigger tab="mapa" className="pg-aba">Mapa</Sidebar.TabTrigger>
           </Sidebar.TabTriggers>
         </Sidebar.Header>
         <Sidebar.Tab tab="formas" className="pg-conteudo">
@@ -158,6 +170,26 @@ export function PainelGestor({ api, docked, onDock }: { api: ExcalidrawImperativ
             </div>
           </section>
           {dica("Duplo clique no card edita o texto. Arraste de uma bolinha da borda até outro card para ligar os dois com seta.")}
+        </Sidebar.Tab>
+        <Sidebar.Tab tab="mapa" className="pg-conteudo">
+          <section className="pg-secao">
+            <p className="pg-titulo">Mapa mental</p>
+            <button type="button" className="pg-bloco pg-mapa-novo"
+              onClick={() => inserir((a) => criarMapa(a, document.querySelector<HTMLElement>(".excalidraw")))}>
+              <Network size={22} strokeWidth={1.75} />
+              <span className="pg-rotulo">Novo mapa mental</span>
+              <span className="pg-mapa-detalhe">Ideia central com 4 tópicos, já organizados</span>
+            </button>
+          </section>
+          <section className="pg-secao">
+            <p className="pg-titulo">Com um tópico selecionado</p>
+            <ul className="pg-atalhos">
+              {ATALHOS_MAPA.map(([tecla, faz]) => (
+                <li key={tecla}><kbd>{tecla}</kbd><span>{faz}</span></li>
+              ))}
+            </ul>
+          </section>
+          {dica("A barra que aparece sobre o tópico selecionado faz o mesmo que os atalhos. Ramos recolhidos não saem na exportação.")}
         </Sidebar.Tab>
       </Sidebar.Tabs>
     </Sidebar>

@@ -109,12 +109,16 @@ export default function EditorFluxo({ fluxoId }: { fluxoId: string }) {
   const ultimaMiniatura = useRef(0);
   const miniaturaAtrasada = useRef(false);
 
+  // Só vale a resposta do último pedido (no desenvolvimento o React monta duas vezes; um "Tentar de novo" rápido também)
+  const pedidoAtual = useRef(0);
   const carregar = useCallback(async () => {
+    const pedido = ++pedidoAtual.current;
     setDados(null);
     setErroCarga(null);
     try {
       const fluxo = await carregarFluxo(fluxoId);
       const imagens = await baixarImagens(fluxo.cena.arquivos);
+      if (pedido !== pedidoAtual.current) return;
       updatedAt.current = fluxo.updated_at;
       arquivosSalvos.current = { ...fluxo.cena.arquivos };
       assinaturaSalva.current = assinatura(fluxo.cena.elements, fluxo.cena.appState);
@@ -129,7 +133,7 @@ export default function EditorFluxo({ fluxoId }: { fluxoId: string }) {
       setMontagem((n) => n + 1);
       if (imagens.length < Object.keys(fluxo.cena.arquivos).length) toast.error("Algumas imagens do quadro não carregaram.");
     } catch (e) {
-      setErroCarga(traduzErroFluxos(e));
+      if (pedido === pedidoAtual.current) setErroCarga(traduzErroFluxos(e));
     }
   }, [fluxoId]);
 
@@ -374,6 +378,9 @@ export default function EditorFluxo({ fluxoId }: { fluxoId: string }) {
             onPronto={aoPronto}
             onMudou={aoMudar}
             onExportar={abrirExportar}
+            // Quadro recém-criado com o modelo "Mapa mental" (ainda nunca salvo): monta o mapa ao abrir
+            criarMapaAoAbrir={dados.fluxo.modelo === "mapa-mental" && !dados.fluxo.cena.elements.length &&
+              Math.abs(Date.parse(dados.fluxo.updated_at) - Date.parse(dados.fluxo.created_at)) < 5000}
           />
         )}
       </div>

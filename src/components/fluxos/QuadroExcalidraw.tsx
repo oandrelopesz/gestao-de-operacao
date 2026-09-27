@@ -1,6 +1,6 @@
 // Quadro infinito (Excalidraw) com os padrões de traço limpo, painel "Gestor Pro" e biblioteca guardada no navegador.
 // Só roda no navegador: é carregado sob demanda pelo EditorFluxo (nada do Excalidraw no SSR nem no pacote principal).
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Download, Shapes } from "lucide-react";
 import { Excalidraw, FONT_FAMILY, MainMenu, Sidebar, WelcomeScreen, useHandleLibrary } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
@@ -11,6 +11,8 @@ import type { CenaSalva } from "@/lib/fluxoCena";
 import type { Ponto } from "@/lib/fluxoConectores";
 import { traduzirExcalidraw } from "@/lib/fluxoTraducoes";
 import { ConectoresFluxo } from "./ConectoresFluxo";
+import { criarMapa } from "./mapaMental";
+import { MapaMentalCamada } from "./MapaMentalCamada";
 import { NOME_PAINEL, PainelGestor } from "./PainelGestor";
 
 const ATRIBUTOS_TRADUZIDOS = ["title", "aria-label", "placeholder"];
@@ -87,9 +89,12 @@ export interface QuadroExcalidrawProps {
   onPronto: (api: ExcalidrawImperativeAPI) => void;
   onMudou: (elements: readonly OrderedExcalidrawElement[], appState: AppState, files: BinaryFiles) => void;
   onExportar: () => void;
+  /** Quadro novo criado com o modelo "Mapa mental": monta o mapa ao abrir */
+  criarMapaAoAbrir?: boolean;
 }
 
-export function QuadroExcalidraw({ inicial, imagens, tema, onPronto, onMudou, onExportar }: QuadroExcalidrawProps) {
+// memo: o editor muda de estado a cada "Salvando…/Salvo"; sem isto o Excalidraw inteiro seria redesenhado junto
+export const QuadroExcalidraw = memo(function QuadroExcalidraw({ inicial, imagens, tema, onPronto, onMudou, onExportar, criarMapaAoAbrir }: QuadroExcalidrawProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [painelFixo, setPainelFixo] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
@@ -101,6 +106,16 @@ export function QuadroExcalidraw({ inicial, imagens, tema, onPronto, onMudou, on
   useEffect(() => {
     if (api) setRaiz(caixa.current?.querySelector<HTMLElement>(".excalidraw") ?? null);
   }, [api]);
+
+  const mapaCriado = useRef(false);
+  useEffect(() => {
+    if (!api || !raiz || !criarMapaAoAbrir || mapaCriado.current) return;
+    mapaCriado.current = true;
+    // Espera o quadro medir a tela antes de achar o meio
+    setTimeout(() => {
+      if (!api.getSceneElements().length) criarMapa(api, raiz);
+    }, 150);
+  }, [api, raiz, criarMapaAoAbrir]);
 
   // Só vale na montagem (o Excalidraw ignora mudanças depois)
   const dadosIniciais = useMemo<ExcalidrawInitialDataState>(() => {
@@ -115,6 +130,9 @@ export function QuadroExcalidraw({ inicial, imagens, tema, onPronto, onMudou, on
         currentItemFontFamily: FONT_FAMILY.Nunito,
         currentItemStrokeWidth: 2,
         currentItemRoundness: "round",
+        // Formas desenhadas nascem preenchidas (branco): dá para pegar e arrastar clicando no meio, não só na borda
+        currentItemBackgroundColor: "#ffffff",
+        currentItemFillStyle: "solid",
       },
       files: Object.fromEntries(
         imagens.map((i) => [i.id, { ...i, created: agora } as unknown as BinaryFileData]),
@@ -134,6 +152,16 @@ export function QuadroExcalidraw({ inicial, imagens, tema, onPronto, onMudou, on
       }}
       onChange={onMudou}
       onPointerUpdate={(e) => ouvintePonteiro.current?.(e.pointer)}
+      // Cópia de tópico/ligação do mapa mental vira card/seta comum (senão entraria na árvore do mapa original)
+      onDuplicate={(proximos, anteriores) => {
+        const antigos = new Set(anteriores.map((e) => e.id));
+        return proximos.map((e) => {
+          const extra = e.customData as Record<string, unknown> | undefined;
+          if (antigos.has(e.id) || !extra || (!("mm" in extra) && !("mmLigacao" in extra))) return e;
+          const { mm: _mm, mmLigacao: _l, ...resto } = extra;
+          return { ...e, customData: resto };
+        });
+      }}
       langCode="pt-BR"
       theme={tema}
       UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: false, saveAsImage: false, toggleTheme: null } }}
@@ -170,6 +198,7 @@ export function QuadroExcalidraw({ inicial, imagens, tema, onPronto, onMudou, on
       <PainelGestor api={api} docked={painelFixo} onDock={setPainelFixo} />
     </Excalidraw>
     <ConectoresFluxo api={api} raiz={raiz} ouvintePonteiro={ouvintePonteiro} />
+    <MapaMentalCamada api={api} raiz={raiz} />
     </div>
   );
-}
+});
