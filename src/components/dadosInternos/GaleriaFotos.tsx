@@ -43,13 +43,15 @@ export interface GaleriaFotosProps {
 
 export function GaleriaFotos({ itens, onBaixarZip, onAbrirPasta }: GaleriaFotosProps) {
   const urls = useRef(new Map<string, Promise<string>>());
+  const controlador = useRef(new AbortController());
   const [subpastas, setSubpastas] = useState<Record<string, ItemDrive[] | "erro">>({});
   const [ampliada, setAmpliada] = useState<{ fotos: ItemDrive[]; indice: number } | null>(null);
 
-  // Revoga as miniaturas ao sair da pasta
+  // Revoga as miniaturas e cancela os downloads pendentes ao sair da pasta
   useEffect(() => {
     const mapa = urls.current;
     return () => {
+      controlador.current.abort();
       for (const p of mapa.values()) void p.then((u) => URL.revokeObjectURL(u)).catch(() => {});
       mapa.clear();
     };
@@ -58,7 +60,7 @@ export function GaleriaFotos({ itens, onBaixarZip, onAbrirPasta }: GaleriaFotosP
   const obterUrl = useCallback((item: ItemDrive): Promise<string> => {
     let p = urls.current.get(item.id);
     if (!p) {
-      p = naFila(() => baixarOriginal(item.id)).then((b) => URL.createObjectURL(b));
+      p = naFila(() => baixarOriginal(item.id, controlador.current.signal)).then((b) => URL.createObjectURL(b));
       p.catch(() => urls.current.delete(item.id));
       urls.current.set(item.id, p);
     }
@@ -175,7 +177,7 @@ function Ampliar({ estado, obterUrl, onMudar, onBaixar }: {
     const tecla = (e: KeyboardEvent) => { if (e.key === "ArrowLeft") ir(-1); if (e.key === "ArrowRight") ir(1); };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  });
+  }, [estado]);
   return (
     <Dialog open={!!estado} onOpenChange={(o) => { if (!o) onMudar(null); }}>
       <DialogContent className="flex h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none flex-col gap-0 p-0 sm:max-w-none [&>button:last-child]:hidden">

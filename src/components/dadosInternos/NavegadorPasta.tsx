@@ -168,7 +168,7 @@ export function NavegadorPasta(p: NavegadorPastaProps) {
           <Loader2 size={18} className="animate-spin" /> Lendo o Drive…
         </div>
       ) : galeria && !busca ? (
-        <GaleriaFotos itens={itens} onBaixarZip={p.onBaixarZip} onAbrirPasta={(item) => abrir(item)} />
+        <GaleriaFotos key={p.pastaId} itens={itens} onBaixarZip={p.onBaixarZip} onAbrirPasta={(item) => abrir(item)} />
       ) : visiveis.length === 0 ? (
         <Card className="px-6 py-12 text-center text-sm text-muted-foreground">
           {busca ? "Nada com esse nome." : "Nenhuma resposta ainda."}
