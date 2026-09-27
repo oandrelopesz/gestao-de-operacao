@@ -48,6 +48,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
       { label: "Planilha/CRM", icon: <KeyRound size={17} />, to: "/acessos", palavras: ["acessos", "senhas", "logins", "credenciais"] },
       { label: "Saldo", icon: <Wallet size={17} />, to: "/saldo", palavras: ["verba", "recarga", "anúncios", "ads", "créditos"] },
       { label: "NPS de Clientes", icon: <MessageSquare size={17} />, to: "/nps", palavras: ["satisfação", "pesquisa", "avaliação"] },
+      { label: "Dados internos", icon: <Inbox size={17} />, to: "/dados-internos", palavras: ["briefing", "contrato", "catálogo", "formulários", "respostas", "drive", "e-commerce"] },
     ],
   },
   {
@@ -55,7 +56,6 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     links: [
       { label: "Clientes Ativos", icon: <Users size={17} />, to: "/clientes", palavras: ["carteira", "contas"] },
       { label: "CRM", icon: <Target size={17} />, to: "/crm", palavras: ["prospecção", "leads", "funil", "vendas", "pipeline", "comercial"] },
-      { label: "Dados internos", icon: <Inbox size={17} />, to: "/dados-internos", palavras: ["briefing", "contrato", "catálogo", "formulários", "respostas", "drive", "e-commerce"] },
     ],
   },
   {

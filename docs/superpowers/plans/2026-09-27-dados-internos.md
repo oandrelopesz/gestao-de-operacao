@@ -19,7 +19,7 @@
 - "Original" = `files.get?alt=media` (mesmos bytes, mesmo nome). Doc → Word (.docx) ou PDF; Planilha → Excel (.xlsx) ou CSV.
 - "Abrir no Google" sempre com `?authuser=contato@andrelopes.digital`.
 - Sub-abas, na ordem: Dados para contrato · Briefing – Negócios · Briefing – Estratégia · Catálogos – E-Commerce. Botões de copiar link, na ordem: Contrato · Estratégia · Negócios · Catálogo.
-- Menu: item "Dados internos" no grupo **Comercial**, logo depois de CRM, rota `/dados-internos`.
+- Menu: item "Dados internos" como último item do grupo **Operação** (pedido do usuário em 27/09/2026), rota `/dados-internos`.
 - Libs puras deste repo não importam nada (nem umas das outras) e são testadas com `npm test` (`node --test src/lib/*.test.ts`).
 - Não escrever `\u` + dígitos em código novo (as ferramentas de edição transformam em caractere literal): usar `\p{M}`, `\p{Cc}` com flag `u`, `charCodeAt` ou o próprio caractere.
 - Arquivos do repo usam CRLF; migrations deste repo são aplicadas à mão pelo SQL editor do Lovable Cloud (ver memória `supabase-migrations-manual`).

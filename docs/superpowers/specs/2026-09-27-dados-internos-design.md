@@ -143,7 +143,7 @@ Um web app que roda como o dono **falha em todo envio** se o código novo pedir 
 
 - Rota `/dados-internos` (em `src/routes/_authenticated/`), search params `aba` (`contrato` | `negocios` |
   `estrategia` | `catalogo`), `pasta` (id de pasta) e `arquivo` (id de arquivo).
-- Menu: grupo **Comercial**, depois de CRM, rótulo "Dados internos", com contador de não vistos (some quando zero).
+- Menu: grupo **Operação**, último item (pedido do usuário em 27/09/2026), rótulo "Dados internos", com contador de não vistos (some quando zero).
   Palavras de busca: briefing, contrato, catálogo, formulários, respostas.
 - Clicar no item (ou no contador) abre a primeira sub-aba com novidades; sem novidades, a última usada.
 
