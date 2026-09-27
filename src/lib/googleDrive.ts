@@ -13,12 +13,14 @@ const FOLDER_MIME = "application/vnd.google-apps.folder";
 const KEY_STORAGE = "swipe_key";
 
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+/** Leitura de todo o Drive (aba Dados internos: pastas onde os formulários gravam). */
+export const DRIVE_LEITURA_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 export const CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 ];
-/** Tudo que a conexão do Google pede: Drive (swipe file) + Agenda. */
-export const GOOGLE_SCOPES = [DRIVE_SCOPE, ...CALENDAR_SCOPES];
+/** Tudo que a conexão do Google pede: Drive (swipe file e leitura), Agenda. */
+export const GOOGLE_SCOPES = [DRIVE_SCOPE, DRIVE_LEITURA_SCOPE, ...CALENDAR_SCOPES];
 
 /**
  * Link de configuração: abrir `/qualquer-rota#swipe_key=XXX` grava a chave neste navegador e
@@ -175,7 +177,7 @@ export async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-async function driveFetch(path: string, init: RequestInit = {}, base = DRIVE): Promise<Response> {
+export async function driveFetch(path: string, init: RequestInit = {}, base = DRIVE): Promise<Response> {
   const token = await getAccessToken();
   const r = await fetch(`${base}${path}`, {
     ...init,
