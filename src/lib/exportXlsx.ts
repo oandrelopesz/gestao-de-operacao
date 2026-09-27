@@ -27,7 +27,7 @@ export function crc32(dados: Uint8Array): number {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-function zipSemCompressao(arquivos: { nome: string; dados: Uint8Array }[]): Uint8Array {
+export function zipSemCompressao(arquivos: { nome: string; dados: Uint8Array }[]): Uint8Array {
   const enc = new TextEncoder();
   const partes: Uint8Array[] = [];
   const central: Uint8Array[] = [];

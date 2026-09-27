@@ -3,5 +3,10 @@
   "private": true,
   "type": "module",
   "description": "Auditoria de uso no celular e regressão de desktop do Gestor Pro (fora do app)",
-  "dependencies": { "playwright-core": "1.47.2", "pngjs": "7.0.0", "pixelmatch": "6.0.0" }
+  "dependencies": {
+    "pdfjs-dist": "^4.10.38",
+    "pixelmatch": "6.0.0",
+    "playwright-core": "1.47.2",
+    "pngjs": "7.0.0"
+  }
 }

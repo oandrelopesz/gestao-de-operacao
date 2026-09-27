@@ -2,7 +2,7 @@
 // avisa se outro aparelho salvou antes e gera a miniatura da lista. Carregado sob demanda pela rota /fluxogramas/$id.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, Check, Circle, CloudOff, Loader2, Maximize, Minimize, RotateCw, Shapes } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Circle, CloudOff, Download, Loader2, Maximize, Minimize, RotateCw, Shapes } from "lucide-react";
 import { toast } from "sonner";
 import { exportToBlob } from "@excalidraw/excalidraw";
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
@@ -22,6 +22,7 @@ import {
   type Fluxo,
 } from "@/lib/fluxosDados";
 import { cn } from "@/lib/utils";
+import { ExportarDialog } from "./ExportarDialog";
 import { NOME_PAINEL } from "./PainelGestor";
 import { QuadroExcalidraw } from "./QuadroExcalidraw";
 
@@ -90,6 +91,7 @@ export default function EditorFluxo({ fluxoId }: { fluxoId: string }) {
   const [erroSalvar, setErroSalvar] = useState("");
   const [salvoEm, setSalvoEm] = useState<Date | null>(null);
   const [telaCheia, setTelaCheia] = useState(false);
+  const [exportarAberto, setExportarAberto] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
 
   // Estado do salvamento em refs: o onChange do Excalidraw dispara a cada movimento do mouse
@@ -250,6 +252,24 @@ export default function EditorFluxo({ fluxoId }: { fluxoId: string }) {
     return () => document.removeEventListener("fullscreenchange", aoMudarTela);
   }, []);
 
+  // Janelas do app não aparecem por cima da tela cheia: sai dela antes de abrir o Exportar
+  const abrirExportar = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    setExportarAberto(true);
+  }, []);
+
+  useEffect(() => {
+    const atalho = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        e.stopPropagation();
+        abrirExportar();
+      }
+    };
+    window.addEventListener("keydown", atalho, true);
+    return () => window.removeEventListener("keydown", atalho, true);
+  }, [abrirExportar]);
+
   const aoPronto = useCallback((a: ExcalidrawImperativeAPI) => {
     api.current = a;
   }, []);
@@ -316,6 +336,11 @@ export default function EditorFluxo({ fluxoId }: { fluxoId: string }) {
         <div className="ml-auto flex shrink-0 items-center gap-1 text-xs">
           {dados && <span key={estado + (salvoEm?.getTime() ?? "")}>{indicador}</span>}
           {dados && (
+            <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2" onClick={abrirExportar} title="Exportar (Ctrl+Shift+E)">
+              <Download size={15} /> <span className="max-md:hidden">Exportar</span>
+            </Button>
+          )}
+          {dados && (
             // Até 730 px o Excalidraw usa o layout de celular (sem o botão Formas no quadro)
             <Button variant="ghost" size="icon" className="h-8 w-8 min-[731px]:hidden" title="Formas e cards"
               onClick={() => api.current?.toggleSidebar({ name: NOME_PAINEL, tab: "formas" })}>
@@ -348,9 +373,12 @@ export default function EditorFluxo({ fluxoId }: { fluxoId: string }) {
             tema={tema}
             onPronto={aoPronto}
             onMudou={aoMudar}
+            onExportar={abrirExportar}
           />
         )}
       </div>
+
+      <ExportarDialog open={exportarAberto} onOpenChange={setExportarAberto} api={api.current} titulo={titulo.trim() || "Sem título"} />
 
       <AlertDialog open={estado === "conflito"}>
         <AlertDialogContent>

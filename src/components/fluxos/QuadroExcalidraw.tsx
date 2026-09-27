@@ -1,7 +1,7 @@
 // Quadro infinito (Excalidraw) com os padrões de traço limpo, painel "Gestor Pro" e biblioteca guardada no navegador.
 // Só roda no navegador: é carregado sob demanda pelo EditorFluxo (nada do Excalidraw no SSR nem no pacote principal).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Shapes } from "lucide-react";
+import { Download, Shapes } from "lucide-react";
 import { Excalidraw, FONT_FAMILY, MainMenu, Sidebar, WelcomeScreen, useHandleLibrary } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import type { LibraryPersistenceAdapter } from "@excalidraw/excalidraw/data/library";
@@ -86,9 +86,10 @@ export interface QuadroExcalidrawProps {
   tema: "light" | "dark";
   onPronto: (api: ExcalidrawImperativeAPI) => void;
   onMudou: (elements: readonly OrderedExcalidrawElement[], appState: AppState, files: BinaryFiles) => void;
+  onExportar: () => void;
 }
 
-export function QuadroExcalidraw({ inicial, imagens, tema, onPronto, onMudou }: QuadroExcalidrawProps) {
+export function QuadroExcalidraw({ inicial, imagens, tema, onPronto, onMudou, onExportar }: QuadroExcalidrawProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [painelFixo, setPainelFixo] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
@@ -135,7 +136,7 @@ export function QuadroExcalidraw({ inicial, imagens, tema, onPronto, onMudou }: 
       onPointerUpdate={(e) => ouvintePonteiro.current?.(e.pointer)}
       langCode="pt-BR"
       theme={tema}
-      UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: false, toggleTheme: null } }}
+      UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: false, saveAsImage: false, toggleTheme: null } }}
       // No celular a linha de cima é só das ferramentas; o botão Formas vai para a barra do editor
       renderTopRightUI={(celular) =>
         celular ? null : (
@@ -146,7 +147,9 @@ export function QuadroExcalidraw({ inicial, imagens, tema, onPronto, onMudou }: 
       }
     >
       <MainMenu>
-        <MainMenu.DefaultItems.SaveAsImage />
+        <MainMenu.Item icon={<Download size={16} strokeWidth={1.75} />} onSelect={onExportar} shortcut="Ctrl+Shift+E">
+          Exportar…
+        </MainMenu.Item>
         <MainMenu.DefaultItems.SearchMenu />
         <MainMenu.DefaultItems.CommandPalette />
         <MainMenu.DefaultItems.Help />

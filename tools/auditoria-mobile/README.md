@@ -11,3 +11,6 @@ Ferramentas fora do app (não entram no build do Lovable). Instalar uma vez: `np
 - Ícones do app: `node gerar-icones.mjs` (grava em `public/icons`).
 - Fluxogramas (editor): `node testar-fluxogramas.mjs http://localhost:5190 <id de um quadro de TESTE> saida` — apaga o conteúdo
   desse quadro; imprime o resultado de cada interação e grava capturas na pasta.
+- Exportação dos Fluxogramas: `node testar-exportacao.mjs http://localhost:5190 <id de um quadro de TESTE> saida` — monta um
+  quadro (funil, cards, cone, imagem WebP, 2 molduras), exporta PDF/PNG/SVG/PPTX/DOCX pela janela e confere cada arquivo
+  (pdf.js: páginas, texto vetorial, fonte Nunito; zip: slides e imagens). Apaga o conteúdo do quadro informado.
