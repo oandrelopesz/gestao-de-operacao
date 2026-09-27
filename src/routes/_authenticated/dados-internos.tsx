@@ -15,6 +15,7 @@ import { zipDaPasta, type ProgressoZip } from "@/lib/driveZip";
 import { BotoesLinks } from "@/components/dadosInternos/BotoesLinks";
 import { AcessoGoogle, useAcessoDrive } from "@/components/dadosInternos/AcessoGoogle";
 import { NavegadorPasta } from "@/components/dadosInternos/NavegadorPasta";
+import { Visualizador } from "@/components/dadosInternos/Visualizador";
 
 // Aba "Dados internos": respostas dos formulários públicos, lidas do Drive (somente leitura).
 interface Busca {
@@ -149,6 +150,13 @@ function DadosInternosPage() {
           onSemPermissao={acesso.semPermissao}
         />
       )}
+
+      <Visualizador
+        arquivoId={acesso.estado === "pronto" ? busca.arquivo ?? null : null}
+        formulario={formulario}
+        onFechar={() => void navigate({ search: { aba, pasta: busca.pasta } })}
+        onAbrirArquivo={(id) => void navigate({ search: { aba, pasta: busca.pasta, arquivo: id } })}
+      />
 
       {zip && (
         <Card className="fixed bottom-20 right-4 z-40 w-[min(22rem,calc(100vw-2rem))] space-y-2 p-3 shadow-lg lg:bottom-4">
