@@ -874,7 +874,8 @@ body .excalidraw-tooltip {
   font-weight: 600;
   text-align: center;
 }
-.excalidraw.mm-ativo .HintViewer {
+.excalidraw.mm-ativo .HintViewer,
+.excalidraw.conector-ativo .HintViewer {
   visibility: hidden;
 }
 
@@ -901,7 +902,11 @@ body.fluxo-ligando * {
   stroke-linecap: round;
 }
 .excalidraw .fluxo-previa marker path {
-  fill: var(--color-primary);
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .excalidraw .fluxo-previa-alvo {
   fill: color-mix(in srgb, var(--color-primary) 8%, transparent);
@@ -923,4 +928,32 @@ body.fluxo-ligando * {
 .excalidraw .fluxo-encaixe-ativo {
   transform: scale(1.5);
   background: var(--color-primary);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+/* Pontas de um conector selecionado (no lugar dos pontos do Excalidraw): arrastar religa aquela ponta */
+.excalidraw .fluxo-ponta {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  padding: 0;
+  border: 2px solid var(--color-primary);
+  border-radius: 999px;
+  background: var(--island-bg-color);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  animation: conector-entrar 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s ease;
+}
+.excalidraw .fluxo-ponta::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: 999px;
+}
+.excalidraw .fluxo-ponta:hover {
+  transform: scale(1.3);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-primary) 22%, transparent);
 }

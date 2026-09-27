@@ -13,7 +13,7 @@ p.on("console", (m) => { if (m.type() === "error" && !/hydrat|cz-shortcut/i.test
 const r = {};
 const foto = (nome, clip) => p.screenshot({ path: `${SAIDA}/${nome}.png`, ...(clip ? { clip } : {}) });
 const espera = (ms) => p.waitForTimeout(ms);
-const els = () => p.evaluate(() => h.elements.filter((e) => !e.isDeleted).map((e) => ({ id: e.id, type: e.type, x: e.x, y: e.y, w: e.width, h: e.height, cont: e.containerId ?? null, text: e.text ?? null, ancora: !!e.customData?.ancora, sb: e.startBinding?.elementId ?? null, eb: e.endBinding?.elementId ?? null, pts: e.points?.length ?? null, grupos: e.groupIds })));
+const els = () => p.evaluate(() => h.elements.filter((e) => !e.isDeleted).map((e) => ({ id: e.id, type: e.type, x: e.x, y: e.y, w: e.width, h: e.height, cont: e.containerId ?? null, text: e.text ?? null, ancora: !!e.customData?.ancora, sb: e.startBinding?.elementId ?? null, eb: e.endBinding?.elementId ?? null, de: e.customData?.conector?.de?.id ?? null, para: e.customData?.conector?.para?.id ?? null, pts: e.points?.length ?? null, grupos: e.groupIds })));
 const naTela = (x, y) => p.evaluate(([x, y]) => { const s = h.state; return { x: (x + s.scrollX) * s.zoom.value + s.offsetLeft, y: (y + s.scrollY) * s.zoom.value + s.offsetTop }; }, [x, y]);
 const centroNaTela = async (e) => naTela(e.x + e.w / 2, e.y + e.h / 2);
 const bolinhas = () => p.locator(".fluxo-conector").evaluateAll((ds) => ds.map((d) => { const b = d.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2, label: d.getAttribute("aria-label") }; }));
@@ -73,7 +73,7 @@ try {
   await espera(500);
   lista = await els();
   const seta1 = lista.filter((e) => e.type === "arrow").at(-1);
-  r.setaArrastada = seta1 ? { presaEmA: seta1.sb === A.id, presaEmB: seta1.eb === B.id } : "sem seta";
+  r.setaArrastada = seta1 ? { presaEmA: seta1.de === A.id, presaEmB: seta1.para === B.id } : "sem seta";
   r.ferramentaDepois = await p.evaluate(() => h.state.activeTool.type);
   await foto("05-seta-arrastada", { x: cA.x - 160, y: cA.y - 140, width: Math.max(400, cB.x - cA.x + 320), height: 280 });
 
@@ -145,7 +145,7 @@ try {
   if (dir3) { await p.mouse.move(dir3.x, dir3.y); await p.mouse.down(); await p.mouse.move(dir3.x + 80, dir3.y, { steps: 6 }); await p.mouse.move(dir3.x + 200, dir3.y + 20, { steps: 6 }); await p.mouse.up(); await espera(400); }
   lista = await els();
   const setaFaixa = lista.filter((e) => e.type === "arrow").at(-1);
-  r.faixaLigada = setaFaixa?.sb === faixa2.id;
+  r.faixaLigada = setaFaixa?.de === faixa2.id;
   await limparSelecao();
 
   await p.keyboard.press("Shift+1"); await espera(700);

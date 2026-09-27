@@ -16,5 +16,7 @@ Ferramentas fora do app (não entram no build do Lovable). Instalar uma vez: `np
   (pdf.js: páginas, texto vetorial, fonte Nunito; zip: slides e imagens). Apaga o conteúdo do quadro informado.
 - Mapa mental: `node testar-mapa-mental.mjs http://localhost:5190 saida` — cria o quadro "TESTE CLAUDE — mapa" (modelo Mapa
   mental), testa Enter/Tab digitando, recolher/expandir, apagar e desfazer, arrastar de lado, recarregar; apaga o quadro no fim.
-- Ligações por bolinha: `node testar-ligacoes.mjs http://localhost:5190 saida` — arrastar até outra forma, clicar sem arrastar
-  (nada), mover a origem (seta acompanha), soltar no vazio, Esc cancela, forma desenhada arrastável pelo meio.
+- Ligações por bolinha: `node testar-ligacoes.mjs http://localhost:5190 saida` — mede se cada ponta fica na bolinha (distância
+  0) e se a curva desenhada corta alguma forma; ímã da bolinha, melhor lado ao soltar no meio da forma, clicar sem arrastar
+  (nada), mover a origem (seta acompanha), seta desenhada com a ferramenta, alças das pontas (Esc, soltar, religar, desfazer),
+  cotovelo e funil. Cria e apaga o próprio quadro.

@@ -5,9 +5,9 @@ import { CaptureUpdateAction, FONT_FAMILY, ROUNDNESS, convertToExcalidrawElement
 import type { ExcalidrawElementSkeleton } from "@excalidraw/excalidraw/data/transform";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { lugarLivre } from "@/lib/fluxoConectores";
+import { lugarLivre, rotaDoConector } from "@/lib/fluxoConectores";
 import {
-  COR_RAIZ, corDoRamo, curvaDaLigacao, descendentes, ladoParaNovoFilho, organizar, type LadoMapa, type NoMapa,
+  COR_RAIZ, corDoRamo, descendentes, ladoParaNovoFilho, organizar, type LadoMapa, type NoMapa,
 } from "@/lib/fluxoMapaMental";
 import { centroVisivel } from "./inserir";
 
@@ -98,19 +98,36 @@ export function organizarMapa(
     if (t) muda(t.id, { x: t.x + dx, y: t.y + dy });
   }
 
-  // Ligações: reaproveita a do filho (se houver) ou cria uma nova, presa nos dois tópicos
+  // Ligações: conectores cravados na lateral do pai e do filho (conectores.ts os mantém colados ao arrastar);
+  // reaproveita a do filho (se houver) ou cria uma nova
   const ligacoes = new Map(vivos.filter((e) => e.type === "arrow" && ligacaoDe(e)?.raiz === raizId).map((e) => [ligacaoDe(e)!.filho, e]));
+  const idsLigacoes = new Set([...ligacoes.values()].map((e) => e.id));
   const novas: El[] = [];
+  const noDe = new Map(nos.map((n) => [n.id, n]));
+  // Caixa do tópico já no lugar novo (a mesma que conectores.ts usa depois; assim a ligação não é refeita)
+  const caixaNova = (id: string) => {
+    const el = porId.get(id)!;
+    const pos = org.posicoes[id] ?? el;
+    return { x: pos.x, y: pos.y, width: el.width, height: el.height, angle: el.angle };
+  };
   for (const l of org.ligacoes) {
-    const pontos = curvaDaLigacao(l.de, l.para);
-    const xs = pontos.map((p) => p[0]), ys = pontos.map((p) => p[1]);
+    const direita = noDe.get(l.filho)!.lado === "dir";
+    const saida = { x: direita ? 1 : -1, y: 0 };
+    const pontos = rotaDoConector(
+      { ponto: l.de, normal: saida, caixa: caixaNova(l.pai) },
+      { ponto: l.para, normal: { x: -saida.x, y: 0 }, caixa: caixaNova(l.filho) },
+      "curva",
+      { inicio: false, fim: false },
+    ).pontos.map((q) => [q.x - l.de.x, q.y - l.de.y] as [number, number]);
+    const xs = pontos.map((q) => q[0]), ys = pontos.map((q) => q[1]);
+    const conector = { de: { id: l.pai, lado: direita ? "direita" : "esquerda" }, para: { id: l.filho, lado: direita ? "esquerda" : "direita" } };
     const geometria = {
       x: l.de.x, y: l.de.y, points: pontos, width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys),
-      startBinding: { elementId: l.pai, focus: 0, gap: 2 }, endBinding: { elementId: l.filho, focus: 0, gap: 2 },
+      startBinding: null, endBinding: null,
     };
     const existente = ligacoes.get(l.filho);
     if (existente) {
-      muda(existente.id, geometria);
+      muda(existente.id, { ...geometria, customData: { ...(existente.customData ?? {}), conector } });
       continue;
     }
     const filho = porId.get(l.filho)!;
@@ -118,14 +135,15 @@ export function organizarMapa(
     const [seta] = convertToExcalidrawElements([{
       id, type: "arrow", x: l.de.x, y: l.de.y, points: pontos as never, strokeColor: filho.strokeColor, strokeWidth: 2,
       roughness: 0, roundness: { type: ROUNDNESS.PROPORTIONAL_RADIUS }, startArrowhead: null, endArrowhead: null,
-      customData: { mmLigacao: { raiz: raizId, filho: l.filho } },
+      customData: { mmLigacao: { raiz: raizId, filho: l.filho }, conector },
     }], { regenerateIds: false });
     novas.push(newElementWith(seta as never, geometria as never) as El);
-    for (const alvo of [l.pai, l.filho]) {
-      const atual = porId.get(alvo)!;
-      const ja = (pendentes.get(alvo)?.boundElements as El["boundElements"]) ?? atual.boundElements ?? [];
-      muda(alvo, { boundElements: [...ja, { id, type: "arrow" }] });
-    }
+  }
+  // Tópicos não guardam mais as ligações como "presas" do Excalidraw (quadros de antes disto guardavam)
+  for (const n of nos) {
+    const el = porId.get(n.id)!;
+    const sobra = (el.boundElements ?? []).filter((b) => !(b.type === "arrow" && idsLigacoes.has(b.id)));
+    if (sobra.length !== (el.boundElements ?? []).length) muda(el.id, { boundElements: sobra });
   }
 
   todos = [...todos.map((e) => {

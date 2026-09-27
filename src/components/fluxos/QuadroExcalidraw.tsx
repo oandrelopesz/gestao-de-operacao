@@ -133,6 +133,8 @@ export const QuadroExcalidraw = memo(function QuadroExcalidraw({ inicial, imagen
         // Formas desenhadas nascem preenchidas (branco): dá para pegar e arrastar clicando no meio, não só na borda
         currentItemBackgroundColor: "#ffffff",
         currentItemFillStyle: "solid",
+        // Setas desenhadas com a ferramenta nascem curvas (como os conectores do Miro)
+        currentItemArrowType: "round",
       },
       files: Object.fromEntries(
         imagens.map((i) => [i.id, { ...i, created: agora } as unknown as BinaryFileData]),

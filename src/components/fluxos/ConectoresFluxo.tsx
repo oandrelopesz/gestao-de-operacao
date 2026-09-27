@@ -1,14 +1,20 @@
 // Pontos de conexão (bolinhas nas bordas das formas, como no Miro) e seta de dois cliques:
-// - arrastar de uma bolinha mostra a seta seguindo o mouse e destaca a forma de destino; ao soltar nela, a seta nasce
-//   presa nas duas (acompanha quando qualquer uma se move); soltar no vazio cria a seta até ali; Esc cancela;
+// - arrastar de uma bolinha mostra o conector seguindo o mouse e destaca a forma de destino; perto de uma bolinha dela a
+//   ponta gruda ali (ímã), no resto da forma vai para o lado que dá a ligação mais limpa; soltar no vazio deixa a ponta
+//   solta; Esc cancela. A prévia é exatamente a seta que fica (mesma rota, mesmo desenho);
 // - clicar na bolinha, sem arrastar, não faz nada;
+// - conector selecionado: no lugar dos pontos do Excalidraw, duas alças nas pontas — arrastar uma religa aquela ponta;
 // - com a ferramenta seta, clicar no início e clicar no fim termina a seta (o padrão do Excalidraw seguia pedindo pontos).
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
-import { CaptureUpdateAction, convertToExcalidrawElements, newElementWith } from "@excalidraw/excalidraw";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { LADOS, contem, ladoDeFrente, ladoPerto, pontoDoLado, type Lado, type Ponto } from "@/lib/fluxoConectores";
+import { caminhoDaCurva, contem, type Lado, type Ponto } from "@/lib/fluxoConectores";
+import {
+  conexaoDe, criarConector, dadosConector, ehConector, escolherLado, esconderConector, extremidadeDaPonta, extremidadeDe,
+  formaLigavelSob, ladosDe, moverPonta, podeLigar, pontosEntre, reavaliarPontas, setasDe, setasParaConverter, sincronizarConectores,
+  type Ponta,
+} from "./conectores";
 import { MARCA_ANCORA } from "./inserir";
 
 const CONECTAVEIS = new Set(["rectangle", "ellipse", "diamond", "image"]);
@@ -17,18 +23,18 @@ const AFASTAMENTO = 22;
 /** Em cima, com a forma selecionada, a bolinha sobe além da alça de girar */
 const AFASTAMENTO_TOPO_SELECIONADA = 40;
 const ARRASTE_MINIMO = 4;
-/** Soltar a até esta distância (px na tela) de uma bolinha do destino encaixa naquele lado */
-const ENCAIXE = 28;
+/** Folga (px na tela) em volta da forma que ainda conta como "soltar nela" */
+const MARGEM_DO_ALVO = 16;
 const NOME_DO_LADO: Record<Lado, string> = { cima: "de cima", direita: "direito", baixo: "de baixo", esquerda: "esquerdo" };
-const VAO_SETA = 4;
 
 type El = ExcalidrawElement;
+type SetaEl = El & { points: readonly [number, number][]; startArrowhead: string | null; endArrowhead: string | null };
 
 const ehAncora = (e: El) => !!(e.customData as Record<string, unknown> | undefined)?.[MARCA_ANCORA];
 // Tópicos do mapa mental têm a barra própria (filho, irmão, recolher): sem bolinhas neles
 const conectavel = (e: El) =>
   !e.isDeleted && !e.locked && CONECTAVEIS.has(e.type) && (e.opacity > 0 || ehAncora(e)) && !(e.customData as { mm?: unknown } | undefined)?.mm;
-const novoId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+const ehLigacaoDoMapa = (e: El) => !!(e.customData as { mmLigacao?: unknown } | undefined)?.mmLigacao;
 
 /** Forma sob o ponteiro (a de cima primeiro); com `margem`, perto da borda também vale. */
 function formaSob(elementos: readonly El[], p: Ponto, margem: number, ignorar?: string): El | null {
@@ -52,8 +58,12 @@ function ocupado(a: AppState): boolean {
 }
 
 interface Ligacao {
-  origem: string;
-  lado: Lado;
+  /** A ponta que fica parada: a bolinha de onde saiu (conector novo) ou a outra ponta do conector */
+  fixa: Ponta;
+  /** Qual ponta da seta segue o mouse ("para" num conector novo) */
+  movendo: "de" | "para";
+  /** Conector cuja ponta está sendo arrastada (null = conector novo) */
+  seta: string | null;
   /** Ponteiro, em coordenadas da cena */
   ponteiro: Ponto;
   alvo: string | null;
@@ -100,13 +110,80 @@ export function ConectoresFluxo({
       const ids = Object.keys(a.selectedElementIds);
       const alvo = sobre ?? (ids.length === 1 ? ids[0] : null);
       const e = alvo ? elements.find((x) => x.id === alvo) : null;
-      const nova = `${alvo}|${e?.version}|${a.scrollX}|${a.scrollY}|${a.zoom.value}|${ids.join(",")}|${ocupado(a)}`;
+      const sel = ids.length === 1 ? elements.find((x) => x.id === ids[0]) : null;
+      const nova = `${alvo}|${e?.version}|${sel?.version}|${a.scrollX}|${a.scrollY}|${a.zoom.value}|${ids.join(",")}|${ocupado(a)}`;
       if (nova !== assinatura.current) {
         assinatura.current = nova;
         setVersao((v) => v + 1);
       }
     });
   }, [api, sobre]);
+
+  // Conector selecionado não mostra os pontos do Excalidraw (seriam dezenas, a curva é feita de pontos próximos) nem abre
+  // o editor de pontos: as pontas dele são as nossas alças
+  useEffect(() => {
+    if (!api) return;
+    return api.onChange((elements, a) => {
+      const id = a.editingLinearElement?.elementId ?? a.selectedLinearElement?.elementId;
+      if (!id || a.selectedLinearElement?.isDragging) return;
+      const e = elements.find((x) => x.id === id);
+      if (!ehConector(e)) return;
+      if (a.editingLinearElement) api.updateScene({ appState: { selectedLinearElement: null, editingLinearElement: null } });
+      else api.updateScene({ appState: { selectedLinearElement: null } });
+    });
+  }, [api]);
+
+  // Conectores sempre colados nas bolinhas: a cada mudança (uma vez por quadro de animação), converte setas presas do
+  // jeito do Excalidraw e recalcula as que mudaram. Pontas sendo arrastadas pela pessoa ficam de fora até ela soltar.
+  useEffect(() => {
+    if (!api) return;
+    let pontaArrastada: string | null = null;
+    const reavaliar = new Set<string>();
+    let agendado = 0;
+    const rodar = () => {
+      agendado = 0;
+      const a = api.getAppState();
+      const pular = new Set<string>();
+      if (a.newElement) pular.add(a.newElement.id);
+      if (a.multiElement) pular.add(a.multiElement.id);
+      if (a.selectedLinearElement?.isDragging) pular.add(a.selectedLinearElement.elementId);
+      if (a.selectedElementsAreBeingDragged) Object.keys(a.selectedElementIds).forEach((id) => pular.add(id));
+      const vivos = api.getSceneElements();
+      const ids = [...new Set([...setasParaConverter(vivos, pular), ...[...reavaliar].filter((id) => !pular.has(id))])];
+      reavaliar.clear();
+      if (ids.length) reavaliarPontas(api, ids);
+      sincronizarConectores(api, pular);
+    };
+    const cancelar = api.onChange((_elements, a) => {
+      const agora = a.selectedLinearElement?.isDragging ? a.selectedLinearElement.elementId : null;
+      if (pontaArrastada && pontaArrastada !== agora) reavaliar.add(pontaArrastada);
+      pontaArrastada = agora;
+      if (!agendado) agendado = requestAnimationFrame(rodar);
+    });
+    return () => {
+      cancelar();
+      if (agendado) cancelAnimationFrame(agendado);
+    };
+  }, [api]);
+
+  // Duplo clique numa forma agrupada (cone, funil…): o Excalidraw só "entra" no grupo e seleciona a âncora sob o
+  // ponteiro; aqui já abre o texto dela (Enter = escrever na forma selecionada)
+  useEffect(() => {
+    if (!api || !raiz) return;
+    const aoDuploClique = () => {
+      setTimeout(() => {
+        const a = api.getAppState();
+        if (a.editingTextElement || !a.editingGroupId) return;
+        const ids = Object.keys(a.selectedElementIds);
+        const el = ids.length === 1 ? api.getSceneElements().find((e) => e.id === ids[0]) : undefined;
+        if (el && ehAncora(el)) {
+          raiz.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
+        }
+      }, 30);
+    };
+    raiz.addEventListener("dblclick", aoDuploClique);
+    return () => raiz.removeEventListener("dblclick", aoDuploClique);
+  }, [api, raiz]);
 
   // Seta de dois cliques: no segundo clique com a mesma seta em andamento, termina (Esc = "finalizar" do Excalidraw)
   useEffect(() => {
@@ -143,7 +220,11 @@ export function ConectoresFluxo({
   const zoom = a.zoom.value;
   const naTela = (p: Ponto) => ({ left: (p.x + a.scrollX) * zoom, top: (p.y + a.scrollY) * zoom });
   const elementos = api.getSceneElements();
+  const porIdMapa = new Map(elementos.map((e) => [e.id, e]));
   const porId = (id: string | null) => (id ? elementos.find((e) => e.id === id && conectavel(e)) : undefined);
+  // A dica do Excalidraw para setas ("Ctrl + duplo clique edita os pontos") não vale para conectores
+  const idsSel = Object.keys(a.selectedElementIds);
+  raiz.classList.toggle("conector-ativo", idsSel.length === 1 && ehConector(porIdMapa.get(idsSel[0])));
 
   /** Ponto da tela (clientX/Y) → coordenadas da cena, pela posição real do quadro na página */
   const paraCena = (clientX: number, clientY: number): Ponto => {
@@ -152,110 +233,125 @@ export function ConectoresFluxo({
     return { x: (clientX - r.left) / st.zoom.value - st.scrollX, y: (clientY - r.top) / st.zoom.value - st.scrollY };
   };
 
-  /** Seta presa na origem (e no destino, se houver), numa só alteração com desfazer. */
-  const criarSeta = (l: Ligacao) => {
-    const todos = api.getSceneElementsIncludingDeleted();
-    const origem = todos.find((e) => e.id === l.origem && !e.isDeleted);
-    if (!origem) return;
-    const alvo = l.alvo ? todos.find((e) => e.id === l.alvo && !e.isDeleted) : undefined;
-    const inicio = pontoDoLado(origem, l.lado, VAO_SETA);
-    const fim = alvo && l.ladoAlvo ? pontoDoLado(alvo, l.ladoAlvo, VAO_SETA) : l.ponteiro;
-    if (Math.hypot(fim.x - inicio.x, fim.y - inicio.y) < 8) return;
-    const st = api.getAppState();
-    const id = novoId();
-    const [base] = convertToExcalidrawElements([{
-      id, type: "arrow", x: inicio.x, y: inicio.y, points: [[0, 0], [fim.x - inicio.x, fim.y - inicio.y]] as never,
-      strokeColor: st.currentItemStrokeColor || "#1e1e1e", strokeWidth: 2, roughness: 0, endArrowhead: "arrow",
-    }], { regenerateIds: false });
-    const seta = newElementWith(base as never, {
-      startBinding: { elementId: origem.id, focus: 0, gap: VAO_SETA },
-      endBinding: alvo ? { elementId: alvo.id, focus: 0, gap: VAO_SETA } : null,
-    } as never) as El;
-    const ligada = (e: El) => newElementWith(e as never, { boundElements: [...(e.boundElements ?? []), { id, type: "arrow" }] } as never) as El;
-    api.updateScene({
-      elements: [...todos.map((e) => (e.id === origem.id || e.id === alvo?.id ? ligada(e) : e)), seta],
-      appState: { selectedElementIds: { [id]: true }, selectedGroupIds: {} },
-      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-    });
-  };
+  /** Ponta que segue o mouse: a bolinha do destino (ímã ou melhor lado) ou o próprio ponteiro */
+  const pontaMovel = (l: Ligacao): Ponta => (l.alvo && l.ladoAlvo ? { id: l.alvo, lado: l.ladoAlvo } : { x: l.ponteiro.x, y: l.ponteiro.y });
 
-  const aoApertar = (origem: El, lado: Lado) => (e: React.PointerEvent<HTMLButtonElement>) => {
+  /**
+   * Arraste de uma bolinha ou de uma alça de ponta. Eventos na janela, em captura e sem propagar: o Excalidraw não vê
+   * este arraste (senão selecionaria ou moveria por baixo). Clique sem arrastar não faz nada.
+   */
+  const arrastar = (
+    base: Omit<Ligacao, "ponteiro" | "alvo" | "ladoAlvo">,
+    aoSoltar: (l: Ligacao) => void,
+    aoComecar?: () => void,
+    aoDesistir?: () => void,
+  ) => (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     const x0 = e.clientX, y0 = e.clientY;
     let arrastou = false;
-    const atualizar = (ev: PointerEvent) => {
+    const destino = (ev: PointerEvent): Ligacao => {
       const p = paraCena(ev.clientX, ev.clientY);
-      const z = api.getAppState().zoom.value;
-      const alvo = formaSob(api.getSceneElements(), p, 10 / z, origem.id);
-      const ladoAlvo = alvo ? ladoPerto(alvo, p, ENCAIXE / z) ?? ladoDeFrente(origem, alvo) : null;
-      setLigando({ origem: origem.id, lado, ponteiro: p, alvo: alvo?.id ?? null, ladoAlvo });
+      const st = api.getAppState();
+      const vivos = api.getSceneElements();
+      const alvo = formaLigavelSob(vivos, p, MARGEM_DO_ALVO / st.zoom.value, "id" in base.fixa ? base.fixa.id : undefined);
+      if (!alvo) return { ...base, ponteiro: p, alvo: null, ladoAlvo: null };
+      const fixa = extremidadeDaPonta(base.fixa, new Map(vivos.map((x) => [x.id, x])), vivos);
+      const lado = fixa ? escolherLado(alvo, p, st.zoom.value, fixa, vivos, base.movendo === "para").lado : ladosDe(alvo, vivos)[0];
+      return { ...base, ponteiro: p, alvo: alvo.id, ladoAlvo: lado };
     };
-    // Fase de captura na janela + stopPropagation: o Excalidraw não vê este arraste (senão selecionaria/moveria por baixo)
     const mover = (ev: PointerEvent) => {
       ev.stopPropagation();
       if (!arrastou && Math.hypot(ev.clientX - x0, ev.clientY - y0) < ARRASTE_MINIMO) return;
+      if (!arrastou) aoComecar?.();
       arrastou = true;
-      atualizar(ev);
+      setLigando(destino(ev));
     };
     const soltar = (ev: PointerEvent) => {
       ev.stopPropagation();
       encerrar();
-      if (!arrastou) return; // clique sem arrastar: não faz nada
-      const p = paraCena(ev.clientX, ev.clientY);
-      const z = api.getAppState().zoom.value;
-      const alvo = formaSob(api.getSceneElements(), p, 10 / z, origem.id);
-      const ladoAlvo = alvo ? ladoPerto(alvo, p, ENCAIXE / z) ?? ladoDeFrente(origem, alvo) : null;
-      criarSeta({ origem: origem.id, lado, ponteiro: p, alvo: alvo?.id ?? null, ladoAlvo });
+      if (arrastou) aoSoltar(destino(ev));
     };
     const tecla = (ev: KeyboardEvent) => {
       if (ev.key !== "Escape") return;
       ev.preventDefault();
       ev.stopPropagation();
       encerrar();
+      if (arrastou) aoDesistir?.();
     };
     const encerrar = () => {
       window.removeEventListener("pointermove", mover, true);
       window.removeEventListener("pointerup", soltar, true);
-      window.removeEventListener("pointercancel", encerrar, true);
+      window.removeEventListener("pointercancel", cancelar, true);
       window.removeEventListener("keydown", tecla, true);
       document.body.classList.remove("fluxo-ligando");
       setLigando(null);
       setSobre(null);
     };
+    const cancelar = () => {
+      encerrar();
+      if (arrastou) aoDesistir?.();
+    };
     document.body.classList.add("fluxo-ligando");
     window.addEventListener("pointermove", mover, true);
     window.addEventListener("pointerup", soltar, true);
-    window.addEventListener("pointercancel", encerrar, true);
+    window.addEventListener("pointercancel", cancelar, true);
     window.addEventListener("keydown", tecla, true);
   };
 
-  // Ligando: prévia da seta e destaque do destino
+  // Conector novo saindo de uma bolinha; soltar no vazio, perto da própria bolinha, desiste
+  const aoApertarBolinha = (origem: El, lado: Lado) =>
+    arrastar({ fixa: { id: origem.id, lado }, movendo: "para", seta: null }, (l) => {
+      const inicio = conexaoDe(origem, lado, api.getSceneElements()).ponto;
+      if (!l.alvo && Math.hypot(l.ponteiro.x - inicio.x, l.ponteiro.y - inicio.y) < 12 / api.getAppState().zoom.value) return;
+      criarConector(api, { id: origem.id, lado }, pontaMovel(l));
+    });
+
+  // Ponta de um conector selecionado: a seta some enquanto a prévia mostra a versão nova; Esc devolve como estava
+  const aoApertarPonta = (seta: SetaEl, qual: "de" | "para") => {
+    const dados = dadosConector(seta)!;
+    const opacidade = seta.opacity;
+    return arrastar(
+      { fixa: qual === "de" ? dados.para : dados.de, movendo: qual, seta: seta.id },
+      (l) => moverPonta(api, seta.id, qual, pontaMovel(l), opacidade),
+      () => esconderConector(api, seta.id, true, opacidade),
+      () => esconderConector(api, seta.id, false, opacidade),
+    );
+  };
+
+  // Ligando: prévia da seta (a mesma rota e o mesmo desenho da seta que vai ficar) e destaque do destino
   if (ligando) {
-    const origem = porId(ligando.origem);
-    if (!origem) return null;
-    const alvo = porId(ligando.alvo);
-    const ini = naTela(pontoDoLado(origem, ligando.lado, VAO_SETA));
-    const fimCena = alvo && ligando.ladoAlvo ? pontoDoLado(alvo, ligando.ladoAlvo, VAO_SETA) : ligando.ponteiro;
-    const fim = naTela(fimCena);
+    const fixa = extremidadeDaPonta(ligando.fixa, porIdMapa, elementos);
+    if (!fixa) return null;
+    const alvo = ligando.alvo ? elementos.find((e) => e.id === ligando.alvo && podeLigar(e)) : undefined;
+    const movel = alvo && ligando.ladoAlvo ? extremidadeDe(alvo, ligando.ladoAlvo, elementos) : { ponto: ligando.ponteiro, normal: null, caixa: null };
+    const seta = ligando.seta ? (porIdMapa.get(ligando.seta) as SetaEl | undefined) : undefined;
+    const [de, para] = ligando.movendo === "para" ? [fixa, movel] : [movel, fixa];
+    const pontos = pontosEntre(de, para, !!seta && !seta.roundness, seta ? setasDe(seta) : undefined).map((p) => {
+      const t = naTela(p);
+      return { x: t.left, y: t.top };
+    });
+    const pontaNoFim = seta ? !!seta.endArrowhead : true;
+    const pontaNoInicio = seta ? !!seta.startArrowhead : false;
     const caixa = alvo && { ...naTela({ x: alvo.x, y: alvo.y }), w: alvo.width * zoom, h: alvo.height * zoom };
     return createPortal(
       <div className="pointer-events-none absolute inset-0 z-[3] overflow-hidden">
         <svg className="fluxo-previa" width="100%" height="100%">
           <defs>
-            <marker id="fluxo-ponta" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M0,0 L10,5 L0,10 z" />
+            <marker id="fluxo-ponta" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+              <path d="M1,1 L10,6 L1,11" />
             </marker>
           </defs>
           {caixa && (
             <rect className="fluxo-previa-alvo" x={caixa.left - 6} y={caixa.top - 6} width={caixa.w + 12} height={caixa.h + 12} rx={10}
               transform={alvo!.angle ? `rotate(${(alvo!.angle * 180) / Math.PI} ${caixa.left + caixa.w / 2} ${caixa.top + caixa.h / 2})` : undefined} />
           )}
-          <line className="fluxo-previa-linha" x1={ini.left} y1={ini.top} x2={fim.left} y2={fim.top} markerEnd="url(#fluxo-ponta)" />
+          <path className="fluxo-previa-linha" d={caminhoDaCurva(pontos)} fill="none"
+            markerEnd={pontaNoFim ? "url(#fluxo-ponta)" : undefined} markerStart={pontaNoInicio ? "url(#fluxo-ponta)" : undefined} />
         </svg>
-        {alvo && LADOS.map((l) => {
-          const p = naTela(pontoDoLado(alvo, l));
+        {alvo && ladosDe(alvo, elementos).map((l) => {
+          const p = naTela(conexaoDe(alvo, l, elementos).ponto);
           return <span key={l} className={l === ligando.ladoAlvo ? "fluxo-encaixe fluxo-encaixe-ativo" : "fluxo-encaixe"} style={{ left: p.left, top: p.top }} />;
         })}
       </div>,
@@ -263,33 +359,58 @@ export function ConectoresFluxo({
     );
   }
 
+  if (ocupado(a)) return null;
   const ids = Object.keys(a.selectedElementIds);
-  const alvo = porId(sobre ?? (ids.length === 1 ? ids[0] : null));
-  if (!alvo || ocupado(a)) return null;
-  const selecionada = !!a.selectedElementIds[alvo.id] || alvo.groupIds.some((g) => a.selectedGroupIds[g]);
-  // Faixa de funil/pirâmide: só esquerda e direita (em cima e embaixo estão as faixas vizinhas)
-  const grupoDoAlvo = ehAncora(alvo) ? alvo.groupIds[alvo.groupIds.length - 1] : undefined;
-  const faixa = !!grupoDoAlvo && elementos.filter((e) => ehAncora(e) && e.groupIds.includes(grupoDoAlvo)).length > 1;
-  const lados: Lado[] = faixa ? ["direita", "esquerda"] : LADOS;
+  const selecionado = ids.length === 1 ? porIdMapa.get(ids[0]) : undefined;
+  // Conector selecionado: alças nas duas pontas (as ligações do mapa mental seguem a árvore, sem alças)
+  const conector = ehConector(selecionado) && !ehLigacaoDoMapa(selecionado) ? (selecionado as SetaEl) : null;
+  const alvo = porId(sobre ?? (conector ? null : ids.length === 1 ? ids[0] : null));
+  if (!alvo && !conector) return null;
+
+  const bolinhas = (() => {
+    if (!alvo) return null;
+    const selecionada = !!a.selectedElementIds[alvo.id] || alvo.groupIds.some((g) => a.selectedGroupIds[g]);
+    return ladosDe(alvo, elementos).map((lado) => {
+      const afast = (lado === "cima" && selecionada ? AFASTAMENTO_TOPO_SELECIONADA : AFASTAMENTO) / zoom;
+      const c = conexaoDe(alvo, lado, elementos);
+      const pos = naTela({ x: c.ponto.x + c.normal.x * afast, y: c.ponto.y + c.normal.y * afast });
+      return (
+        <button
+          key={`${alvo.id}-${lado}`}
+          type="button"
+          className="fluxo-conector"
+          style={{ left: pos.left, top: pos.top }}
+          title="Arraste até outra forma para ligar com seta"
+          aria-label={`Ligar pelo lado ${NOME_DO_LADO[lado]}`}
+          onPointerDown={aoApertarBolinha(alvo, lado)}
+          onContextMenu={(e) => e.preventDefault()}
+        />
+      );
+    });
+  })();
+
+  const pontas = conector && conector.points.length >= 2
+    ? ([["de", conector.points[0]], ["para", conector.points[conector.points.length - 1]]] as const).map(([qual, p]) => {
+      const pos = naTela({ x: conector.x + p[0], y: conector.y + p[1] });
+      return (
+        <button
+          key={`${conector.id}-${qual}`}
+          type="button"
+          className="fluxo-ponta"
+          style={{ left: pos.left, top: pos.top }}
+          title="Arraste para ligar esta ponta em outro lugar"
+          aria-label={qual === "de" ? "Mover o início da seta" : "Mover a ponta da seta"}
+          onPointerDown={aoApertarPonta(conector, qual)}
+          onContextMenu={(e) => e.preventDefault()}
+        />
+      );
+    })
+    : null;
 
   return createPortal(
     <div className="pointer-events-none absolute inset-0 z-[3] overflow-hidden">
-      {lados.map((lado) => {
-        const afast = (lado === "cima" && selecionada ? AFASTAMENTO_TOPO_SELECIONADA : AFASTAMENTO) / zoom;
-        const pos = naTela(pontoDoLado(alvo, lado, afast));
-        return (
-          <button
-            key={`${alvo.id}-${lado}`}
-            type="button"
-            className="fluxo-conector"
-            style={{ left: pos.left, top: pos.top }}
-            title="Arraste até outra forma para ligar com seta"
-            aria-label={`Ligar pelo lado ${NOME_DO_LADO[lado]}`}
-            onPointerDown={aoApertar(alvo, lado)}
-            onContextMenu={(e) => e.preventDefault()}
-          />
-        );
-      })}
+      {bolinhas}
+      {pontas}
     </div>,
     raiz,
   );

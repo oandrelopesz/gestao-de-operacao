@@ -26,9 +26,20 @@ const topicos = () => p.evaluate(() => {
     x: e.x, y: e.y, w: e.width, h: e.height,
   }));
 });
-const ligacoes = () => p.evaluate(() => h.elements.filter((e) => !e.isDeleted && e.customData?.mmLigacao).map((e) => ({
-  filho: e.customData.mmLigacao.filho, de: e.startBinding?.elementId, para: e.endBinding?.elementId, pts: e.points.length,
-})));
+// Ligação = conector cravado na lateral do pai e do filho; mede a distância das pontas até o meio dessas laterais
+const ligacoes = () => p.evaluate(() => {
+  const porId = new Map(h.elements.map((e) => [e.id, e]));
+  const meio = (e, lado) => (lado === "direita" ? [e.x + e.width, e.y + e.height / 2] : [e.x, e.y + e.height / 2]);
+  return h.elements.filter((e) => !e.isDeleted && e.customData?.mmLigacao).map((e) => {
+    const c = e.customData.conector;
+    const ini = [e.x + e.points[0][0], e.y + e.points[0][1]], fim = [e.x + e.points.at(-1)[0], e.y + e.points.at(-1)[1]];
+    const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    return {
+      filho: e.customData.mmLigacao.filho, de: c?.de?.id, para: c?.para?.id, pts: e.points.length,
+      folga: c ? Math.round(Math.max(d(ini, meio(porId.get(c.de.id), c.de.lado)), d(fim, meio(porId.get(c.para.id), c.para.lado))) * 10) / 10 : null,
+    };
+  });
+});
 const sobreposicoes = (ts) => {
   let n = 0;
   for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
@@ -83,7 +94,7 @@ try {
   };
   r.sobreposicoes = sobreposicoes(ts);
   const ls = await ligacoes();
-  r.ligacoes = { total: ls.length, todasPresas: ls.every((l) => l.para === l.filho && ts.find((t) => t.id === l.filho)?.pai === l.de), curvas: ls.every((l) => l.pts === 4) };
+  r.ligacoes = { total: ls.length, todasPresas: ls.every((l) => l.para === l.filho && ts.find((t) => t.id === l.filho)?.pai === l.de), curvas: ls.every((l) => l.pts === 2 || l.pts >= 4), maiorFolga: Math.max(...ls.map((l) => l.folga ?? 99)) };
   await foto("03-com-topicos");
 
   // Barra flutuante com Marketing selecionado
