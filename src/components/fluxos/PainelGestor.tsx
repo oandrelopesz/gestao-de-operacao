@@ -1,6 +1,7 @@
-// Painel "Gestor Pro" do quadro (barra lateral do Excalidraw): formas extras e cards prontos, na cor escolhida.
+// Painel "Formas" do quadro (barra lateral do Excalidraw): formas extras e cards prontos, na cor escolhida.
+// O visual (abas em pílula, blocos com transição) está em styles.css, em ".painel-gestor".
 import { useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { Check, Minus, MousePointerClick, Plus } from "lucide-react";
 import { Sidebar } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { FORMAS_EXTRAS, pecasDa, type FormaExtra, type Peca } from "@/lib/fluxoFormas";
@@ -11,11 +12,11 @@ export const NOME_PAINEL = "gestor";
 
 const COM_ETAPAS: FormaExtra[] = ["funil", "piramide"];
 
-/** Desenho pequeno da forma, a partir da mesma geometria que vai para o quadro. */
+/** Desenho pequeno da forma, a partir da mesma geometria que vai para o quadro (sem as âncoras invisíveis). */
 function DesenhoForma({ pecas, largura, altura, cor }: { pecas: Peca[]; largura: number; altura: number; cor: Cor }) {
   const folga = 6;
   return (
-    <svg viewBox={`${-folga} ${-folga} ${largura + folga * 2} ${altura + folga * 2}`} className="h-12 w-full" aria-hidden>
+    <svg viewBox={`${-folga} ${-folga} ${largura + folga * 2} ${altura + folga * 2}`} className="pg-desenho" aria-hidden>
       {pecas.map((p, i) => {
         if (p.tipo === "poligono") {
           return (
@@ -36,111 +37,127 @@ function DesenhoForma({ pecas, largura, altura, cor }: { pecas: Peca[]; largura:
 }
 
 function DesenhoCard({ tipo, cor }: { tipo: TipoCard; cor: Cor }) {
-  const base = "flex items-center justify-center text-[9px] font-semibold text-zinc-800";
-  if (tipo === "postit") return <div className={cn(base, "h-11 w-11 items-start justify-start p-1")} style={{ background: "#fff3a3" }}>Anotação</div>;
-  if (tipo === "etiqueta") return <div className={cn(base, "h-5 w-16 rounded-md text-white")} style={{ background: cor.traco }}>Etiqueta</div>;
+  if (tipo === "postit") {
+    return <div className="pg-card-previa pg-postit"><span className="pg-linha w-7" /><span className="pg-linha w-5" /></div>;
+  }
+  if (tipo === "destaque") {
+    return <div className="pg-card-previa pg-destaque" style={{ background: cor.traco }}>Destaque</div>;
+  }
+  if (tipo === "etiqueta") {
+    return <div className="pg-card-previa pg-etiqueta" style={{ background: cor.traco }}>Etiqueta</div>;
+  }
   if (tipo === "etapa") {
     return (
-      <div className="flex h-10 w-16 flex-col items-start gap-0.5 rounded-md border-2 p-1" style={{ background: cor.fundo, borderColor: cor.traco }}>
-        <span className="h-1 w-9 rounded bg-zinc-700" />
-        <span className="h-0.5 w-11 rounded bg-zinc-500" />
-        <span className="h-0.5 w-8 rounded bg-zinc-500" />
+      <div className="pg-card-previa pg-etapa" style={{ background: cor.fundo, borderColor: cor.traco }}>
+        <span className="pg-linha w-9 bg-zinc-700" />
+        <span className="pg-linha w-11" />
+        <span className="pg-linha w-8" />
       </div>
     );
   }
   return (
-    <div className={cn(base, "h-9 w-16 border-2", tipo === "arredondado" ? "rounded-lg" : "rounded-none")}
-      style={{ background: cor.fundo, borderColor: cor.traco }}>
+    <div className={cn("pg-card-previa pg-simples", tipo === "arredondado" && "rounded-lg")} style={{ background: cor.fundo, borderColor: cor.traco }}>
       Card
     </div>
   );
 }
 
-// O className do gatilho substitui o do Excalidraw: repete as classes dele e só solta a largura (texto em vez de ícone)
-const ABA = "excalidraw-button sidebar-tab-trigger !w-auto !px-3 text-[13px]";
-
-const BOTAO =
-  "flex flex-col items-center gap-1 rounded-lg border border-transparent p-1.5 text-[11px] leading-tight text-[var(--text-primary-color)] transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-high)]";
-
 export function PainelGestor({ api, docked, onDock }: { api: ExcalidrawImperativeAPI | null; docked: boolean; onDock: (d: boolean) => void }) {
   const [cor, setCor] = useState<Cor>(CORES[0]);
   const [etapas, setEtapas] = useState(4);
 
-  const inserirForma = (forma: FormaExtra) => {
+  // No celular o painel cobre quase o quadro: fecha antes, e a forma aparece no meio da tela
+  const inserir = (fazer: (a: ExcalidrawImperativeAPI) => void) => {
     if (!api) return;
-    const { esqueletos, centros } = pecasParaEsqueletos(pecasDa(forma, 0, 0, { etapas }), cor);
-    inserirNoCentro(api, esqueletos, centros);
+    if (window.matchMedia("(max-width: 730px)").matches) {
+      api.toggleSidebar({ name: NOME_PAINEL, force: false });
+      setTimeout(() => fazer(api), 80);
+    } else {
+      fazer(api);
+    }
   };
-  const inserirCard = (tipo: TipoCard) => {
-    if (api) inserirNoCentro(api, [esqueletoDoCard(tipo, cor)]);
-  };
+  const inserirForma = (forma: FormaExtra) => inserir((a) => inserirNoCentro(a, pecasParaEsqueletos(pecasDa(forma, 0, 0, { etapas }), cor)));
+  const inserirCard = (tipo: TipoCard) => inserir((a) => inserirNoCentro(a, [esqueletoDoCard(tipo, cor)]));
 
   const seletorCor = (
-    <div className="mb-3">
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide opacity-70">Cor</p>
-      <div className="flex flex-wrap gap-1.5">
-        {CORES.map((c) => (
-          <button
-            key={c.nome}
-            type="button"
-            title={c.nome}
-            aria-label={`Cor ${c.nome}`}
-            aria-pressed={c.nome === cor.nome}
-            onClick={() => setCor(c)}
-            className={cn("h-6 w-6 rounded-md border-2 transition-transform hover:scale-110", c.nome === cor.nome && "ring-2 ring-[var(--color-primary)] ring-offset-1")}
-            style={{ background: c.fundo, borderColor: c.traco }}
-          />
-        ))}
+    <section className="pg-secao">
+      <p className="pg-titulo">Cor</p>
+      <div className="pg-cores">
+        {CORES.map((c) => {
+          const ativa = c.nome === cor.nome;
+          return (
+            <button
+              key={c.nome}
+              type="button"
+              title={c.nome}
+              aria-label={`Cor ${c.nome}`}
+              aria-pressed={ativa}
+              onClick={() => setCor(c)}
+              className={cn("pg-cor", ativa && "pg-cor-ativa")}
+              style={{ background: c.fundo, borderColor: c.traco }}
+            >
+              {ativa && <Check size={12} strokeWidth={3} style={{ color: c.traco }} />}
+            </button>
+          );
+        })}
       </div>
-    </div>
+    </section>
+  );
+
+  const dica = (texto: string) => (
+    <p className="pg-dica"><MousePointerClick size={13} className="shrink-0" /> {texto}</p>
   );
 
   return (
-    <Sidebar name={NOME_PAINEL} docked={docked} onDock={onDock}>
+    <Sidebar name={NOME_PAINEL} docked={docked} onDock={onDock} className="painel-gestor">
       <Sidebar.Tabs>
         <Sidebar.Header>
           <Sidebar.TabTriggers>
-            <Sidebar.TabTrigger tab="formas" className={ABA}>Formas</Sidebar.TabTrigger>
-            <Sidebar.TabTrigger tab="cards" className={ABA}>Cards</Sidebar.TabTrigger>
+            <Sidebar.TabTrigger tab="formas" className="pg-aba">Formas</Sidebar.TabTrigger>
+            <Sidebar.TabTrigger tab="cards" className="pg-aba">Cards</Sidebar.TabTrigger>
           </Sidebar.TabTriggers>
         </Sidebar.Header>
-        <Sidebar.Tab tab="formas" className="overflow-y-auto px-3 pb-4">
+        <Sidebar.Tab tab="formas" className="pg-conteudo">
           {seletorCor}
-          <div className="mb-3 flex items-center justify-between gap-2 text-[12px]">
-            <span className="opacity-80">Etapas do funil e da pirâmide</span>
-            <span className="flex items-center gap-1">
-              <button type="button" className="rounded p-1 hover:bg-[var(--color-surface-high)] disabled:opacity-40" aria-label="Menos etapas"
-                disabled={etapas <= 2} onClick={() => setEtapas((n) => Math.max(2, n - 1))}><Minus size={13} /></button>
-              <span className="w-4 text-center font-semibold tabular-nums">{etapas}</span>
-              <button type="button" className="rounded p-1 hover:bg-[var(--color-surface-high)] disabled:opacity-40" aria-label="Mais etapas"
-                disabled={etapas >= 8} onClick={() => setEtapas((n) => Math.min(8, n + 1))}><Plus size={13} /></button>
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-1">
-            {FORMAS_EXTRAS.map((f) => (
-              <button key={f.id} type="button" className={BOTAO} onClick={() => inserirForma(f.id)} title={`Inserir ${f.rotulo.toLowerCase()}`}>
-                <DesenhoForma pecas={pecasDa(f.id, 0, 0, COM_ETAPAS.includes(f.id) ? { etapas } : {})} largura={f.largura} altura={f.altura} cor={cor} />
-                {f.rotulo}
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 text-[11px] leading-snug opacity-60">
-            Clique para colocar no meio da tela. Para mudar o tamanho, arraste as alças; com Shift mantém a proporção.
-          </p>
+          <section className="pg-secao">
+            <p className="pg-titulo">Formas</p>
+            <div className="pg-linha-etapas">
+              <span className="pg-etapas-rotulo">Etapas do funil e da pirâmide</span>
+              <span className="pg-contador">
+                <button type="button" aria-label="Menos etapas" disabled={etapas <= 2} onClick={() => setEtapas((n) => Math.max(2, n - 1))}>
+                  <Minus size={12} />
+                </button>
+                <span className="tabular-nums">{etapas}</span>
+                <button type="button" aria-label="Mais etapas" disabled={etapas >= 8} onClick={() => setEtapas((n) => Math.min(8, n + 1))}>
+                  <Plus size={12} />
+                </button>
+              </span>
+            </div>
+            <div className="pg-grade pg-grade-3">
+              {FORMAS_EXTRAS.map((f) => (
+                <button key={f.id} type="button" className="pg-bloco" onClick={() => inserirForma(f.id)} title={`Inserir ${f.rotulo.toLowerCase()}`}>
+                  <DesenhoForma pecas={pecasDa(f.id, 0, 0, COM_ETAPAS.includes(f.id) ? { etapas } : {})} largura={f.largura} altura={f.altura} cor={cor} />
+                  <span className="pg-rotulo">{f.rotulo}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+          {dica("Clique para colocar no meio da tela. Duplo clique na forma escreve dentro; as bolinhas nas bordas ligam uma forma à outra.")}
         </Sidebar.Tab>
-        <Sidebar.Tab tab="cards" className="overflow-y-auto px-3 pb-4">
+        <Sidebar.Tab tab="cards" className="pg-conteudo">
           {seletorCor}
-          <div className="grid grid-cols-2 gap-1">
-            {CARDS.map((c) => (
-              <button key={c.id} type="button" className={cn(BOTAO, "min-h-[76px] justify-center")} onClick={() => inserirCard(c.id)}>
-                <DesenhoCard tipo={c.id} cor={cor} />
-                {c.rotulo}
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 text-[11px] leading-snug opacity-60">
-            Duplo clique no card edita o texto. Para ligar dois cards, use a seta (A) partindo de um card até o outro.
-          </p>
+          <section className="pg-secao">
+            <p className="pg-titulo">Cards</p>
+            <div className="pg-grade pg-grade-2">
+              {CARDS.map((c) => (
+                <button key={c.id} type="button" className="pg-bloco pg-bloco-card" onClick={() => inserirCard(c.id)}>
+                  <DesenhoCard tipo={c.id} cor={cor} />
+                  <span className="pg-rotulo">{c.rotulo}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+          {dica("Duplo clique no card edita o texto. Arraste de uma bolinha da borda até outro card para ligar os dois com seta.")}
         </Sidebar.Tab>
       </Sidebar.Tabs>
     </Sidebar>

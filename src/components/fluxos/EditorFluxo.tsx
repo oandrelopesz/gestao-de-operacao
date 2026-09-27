@@ -2,7 +2,7 @@
 // avisa se outro aparelho salvou antes e gera a miniatura da lista. Carregado sob demanda pela rota /fluxogramas/$id.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, Check, Circle, CloudOff, Loader2, Maximize, Minimize, RotateCw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Circle, CloudOff, Loader2, Maximize, Minimize, RotateCw, Shapes } from "lucide-react";
 import { toast } from "sonner";
 import { exportToBlob } from "@excalidraw/excalidraw";
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
@@ -18,16 +18,18 @@ import {
   type ArquivoSalvo, type ElementoMinimo,
 } from "@/lib/fluxoCena";
 import {
-  apagarImagens, baixarImagens, carregarFluxo, renomearFluxo, salvarFluxo, subirImagem, traduzErroFluxos, type Fluxo,
+  EVENTO_FLUXO_SALVO, apagarImagens, baixarImagens, carregarFluxo, renomearFluxo, salvarFluxo, subirImagem, traduzErroFluxos,
+  type Fluxo,
 } from "@/lib/fluxosDados";
 import { cn } from "@/lib/utils";
+import { NOME_PAINEL } from "./PainelGestor";
 import { QuadroExcalidraw } from "./QuadroExcalidraw";
 
 type Estado = "salvo" | "pendente" | "salvando" | "erro" | "conflito";
 type Ultimo = { elements: readonly OrderedExcalidrawElement[]; appState: AppState; files: BinaryFiles };
 
 const ESPERA_SALVAR_MS = 1500;
-const INTERVALO_MINIATURA_MS = 20_000;
+const INTERVALO_MINIATURA_MS = 6_000;
 
 /** O Excalidraw segue o tema do app (classe "dark" no <html>). */
 function useTemaApp(): "light" | "dark" {
@@ -188,6 +190,8 @@ export default function EditorFluxo({ fluxoId }: { fluxoId: string }) {
         }
         setSalvoEm(new Date());
         setEstado(assinaturaVista.current === a ? "salvo" : "pendente");
+        // Saindo do editor, a lista já pode estar aberta com a versão anterior: avisa para ela recarregar
+        window.dispatchEvent(new Event(EVENTO_FLUXO_SALVO));
       } catch (e) {
         setErroSalvar(traduzErroFluxos(e));
         setEstado("erro");
@@ -273,7 +277,7 @@ export default function EditorFluxo({ fluxoId }: { fluxoId: string }) {
 
   // No celular só o ícone (menos o erro, que precisa ser clicado)
   const indicador = (() => {
-    const base = "flex items-center gap-1.5";
+    const base = "fluxo-estado flex items-center gap-1.5";
     if (estado === "salvando") return <span className={cn(base, "text-muted-foreground")}><Loader2 size={13} className="animate-spin" /><span className="max-sm:hidden">Salvando…</span></span>;
     if (estado === "pendente") return <span className={cn(base, "text-muted-foreground")}><Circle size={8} className="fill-current" /><span className="max-sm:hidden">Alterações não salvas</span></span>;
     if (estado === "conflito") return <span className={cn(base, "text-amber-600 dark:text-amber-400")}><AlertTriangle size={13} /><span className="max-sm:hidden">Alterado em outro aparelho</span></span>;
@@ -310,7 +314,14 @@ export default function EditorFluxo({ fluxoId }: { fluxoId: string }) {
           className="h-8 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 text-sm font-semibold outline-none transition-colors hover:border-border focus:border-primary/60 sm:max-w-md"
         />
         <div className="ml-auto flex shrink-0 items-center gap-1 text-xs">
-          {dados && indicador}
+          {dados && <span key={estado + (salvoEm?.getTime() ?? "")}>{indicador}</span>}
+          {dados && (
+            // Até 730 px o Excalidraw usa o layout de celular (sem o botão Formas no quadro)
+            <Button variant="ghost" size="icon" className="h-8 w-8 min-[731px]:hidden" title="Formas e cards"
+              onClick={() => api.current?.toggleSidebar({ name: NOME_PAINEL, tab: "formas" })}>
+              <Shapes size={16} />
+            </Button>
+          )}
           {podeTelaCheia && (
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={alternarTelaCheia} title={telaCheia ? "Sair da tela cheia" : "Tela cheia"}>
               {telaCheia ? <Minimize size={16} /> : <Maximize size={16} />}

@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { useCachedState } from "@/lib/pageCache";
 import { normalizar } from "@/lib/buscaAbas";
 import {
-  EVENTO_TEMAS_FLUXOS, criarFluxo, duplicarFluxo, excluirFluxo, fetchTemasFluxo, listarFluxos, moverFluxo, renomearFluxo,
+  EVENTO_FLUXO_SALVO, EVENTO_TEMAS_FLUXOS, criarFluxo, duplicarFluxo, excluirFluxo, fetchTemasFluxo, listarFluxos, moverFluxo, renomearFluxo,
   traduzErroFluxos, type FluxoResumo,
 } from "@/lib/fluxosDados";
 import type { Tema } from "@/components/temas/TemasLista";
@@ -73,7 +73,11 @@ function FluxogramasPage() {
   useEffect(() => {
     carregar();
     window.addEventListener(EVENTO_TEMAS_FLUXOS, carregar);
-    return () => window.removeEventListener(EVENTO_TEMAS_FLUXOS, carregar);
+    window.addEventListener(EVENTO_FLUXO_SALVO, carregar);
+    return () => {
+      window.removeEventListener(EVENTO_TEMAS_FLUXOS, carregar);
+      window.removeEventListener(EVENTO_FLUXO_SALVO, carregar);
+    };
   }, [carregar]);
 
   // Tema excluído enquanto estava filtrado: volta para Todos
@@ -229,21 +233,21 @@ function FluxogramasPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {visiveis.map((f) => {
+          {visiveis.map((f, i) => {
             const tema = f.tema_id ? temaDe.get(f.tema_id) : undefined;
             return (
               <div
                 key={f.id}
-                className="group relative overflow-hidden rounded-xl border bg-card transition-[box-shadow,border-color] hover:border-primary/40 hover:shadow-md"
-                style={tema ? { borderTopColor: tema.hex, borderTopWidth: 3 } : undefined}
+                className="group relative overflow-hidden rounded-xl border bg-card animate-in fade-in slide-in-from-bottom-2 duration-300 transition-[box-shadow,border-color,translate] hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
+                style={{ animationDelay: `${Math.min(i, 12) * 35}ms`, animationFillMode: "both", ...(tema ? { borderTopColor: tema.hex, borderTopWidth: 3 } : {}) }}
               >
                 <Link to="/fluxogramas/$id" params={{ id: f.id }} className="block">
-                  <div className="flex aspect-video items-center justify-center border-b bg-muted/30">
+                  <div className="flex aspect-video items-center justify-center overflow-hidden border-b bg-muted/30">
                     {f.miniatura ? (
                       // Miniatura sempre clara; no tema escuro inverte como o próprio Excalidraw faz
-                      <img src={f.miniatura} alt="" loading="lazy" className="h-full w-full object-contain p-2 dark:[filter:invert(93%)_hue-rotate(180deg)]" />
+                      <img src={f.miniatura} alt="" loading="lazy" className="h-full w-full object-contain p-2 transition-transform duration-500 ease-out group-hover:scale-[1.03] dark:[filter:invert(93%)_hue-rotate(180deg)]" />
                     ) : (
-                      <Workflow size={28} className="text-muted-foreground/40" />
+                      <Workflow size={28} className="text-muted-foreground/40 transition-transform duration-500 group-hover:scale-110" />
                     )}
                   </div>
                   <div className="p-3 pr-10">

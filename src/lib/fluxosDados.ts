@@ -8,6 +8,8 @@ import type { ApiTemas, Tema } from "@/components/temas/TemasLista";
 export const BUCKET_FLUXOS = "fluxogramas";
 /** Disparado a cada mudança nos temas, para a aba e o Admin recarregarem. */
 export const EVENTO_TEMAS_FLUXOS = "fluxos-temas";
+/** Disparado quando um quadro termina de salvar (a lista, se aberta, recarrega a miniatura e a data). */
+export const EVENTO_FLUXO_SALVO = "fluxo-salvo";
 
 export interface FluxoResumo {
   id: string;

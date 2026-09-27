@@ -1,13 +1,16 @@
 // Formas extras do quadro (funil, cone, cilindro…): geometria pura em "peças" que o editor converte em elementos do
-// Excalidraw — polígono fechado (linha cujo último ponto repete o primeiro, preenchível), elipse e texto. Sem dependências.
+// Excalidraw — polígono fechado (linha cujo último ponto repete o primeiro, preenchível), elipse e âncora. Sem dependências.
+// Âncora: retângulo/elipse invisível por cima do desenho; é nela que as setas se prendem e onde o duplo clique escreve
+// (o Excalidraw só prende seta e põe texto dentro de retângulo, elipse e losango, não em linhas).
 
 export type FormaExtra =
-  | "funil" | "piramide" | "cone" | "cilindro" | "trapezio" | "triangulo" | "hexagono" | "estrela" | "chevron" | "nuvem";
+  | "funil" | "piramide" | "cone" | "cilindro" | "trapezio" | "triangulo" | "hexagono" | "estrela" | "chevron" | "nuvem"
+  | "dados" | "documento";
 
 export type Peca =
   | { tipo: "poligono"; x: number; y: number; pontos: [number, number][] }
   | { tipo: "elipse"; x: number; y: number; largura: number; altura: number }
-  | { tipo: "texto"; x: number; y: number; largura: number; texto: string };
+  | { tipo: "ancora"; forma: "retangulo" | "elipse"; x: number; y: number; largura: number; altura: number; texto?: string };
 
 export const FORMAS_EXTRAS: { id: FormaExtra; rotulo: string; largura: number; altura: number; etapas?: number }[] = [
   { id: "funil", rotulo: "Funil", largura: 360, altura: 300, etapas: 4 },
@@ -18,8 +21,10 @@ export const FORMAS_EXTRAS: { id: FormaExtra; rotulo: string; largura: number; a
   { id: "triangulo", rotulo: "Triângulo", largura: 200, altura: 170 },
   { id: "hexagono", rotulo: "Hexágono", largura: 200, altura: 170 },
   { id: "estrela", rotulo: "Estrela", largura: 200, altura: 190 },
-  { id: "chevron", rotulo: "Etapa (chevron)", largura: 220, altura: 100 },
+  { id: "chevron", rotulo: "Etapa", largura: 220, altura: 100 },
   { id: "nuvem", rotulo: "Nuvem", largura: 240, altura: 150 },
+  { id: "dados", rotulo: "Dados", largura: 220, altura: 110 },
+  { id: "documento", rotulo: "Documento", largura: 200, altura: 130 },
 ];
 
 type P = [number, number];
@@ -32,6 +37,10 @@ function poligono(x0: number, y0: number, pts: P[]): Peca {
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+function ancora(forma: "retangulo" | "elipse", x0: number, y0: number, x: number, y: number, largura: number, altura: number, texto?: string): Peca {
+  return { tipo: "ancora", forma, x: round(x0 + x), y: round(y0 + y), largura: round(largura), altura: round(altura), ...(texto ? { texto } : {}) };
+}
 
 function elipseAmostrada(cx: number, cy: number, rx: number, ry: number, de: number, ate: number, passos: number): P[] {
   return Array.from({ length: passos + 1 }, (_, i) => {
@@ -58,10 +67,14 @@ function faixas(x0: number, y0: number, W: number, H: number, n: number, pontaEm
   }
   for (let i = 0; i < n; i++) {
     const topo = i * (h + vao);
-    // Faixa em ponta (topo da pirâmide): o rótulo desce para 2/3 da altura, onde o triângulo tem mais largura
-    const emPonta = largura(topo / H) < 0.5;
-    const centro = topo + (emPonta ? (h * 2) / 3 : h / 2);
-    pecas.push({ tipo: "texto", x: round(x0), y: round(y0 + centro - 10), largura: W, texto: rotulos[i] ?? `Etapa ${i + 1}` });
+    const base = topo + h;
+    const wT = largura(topo / H);
+    const wB = largura(base / H);
+    // Faixa em ponta (topo da pirâmide): a âncora cobre só os 2/3 de baixo, onde o triângulo tem largura para o rótulo
+    const emPonta = wT < 0.5;
+    const cima = emPonta ? topo + h / 3 : topo;
+    const larg = Math.max(wT, wB);
+    pecas.push(ancora("retangulo", x0, y0, (W - larg) / 2, cima, larg, base - cima, rotulos[i] ?? `Etapa ${i + 1}`));
   }
   return pecas;
 }
@@ -87,6 +100,7 @@ export function pecasDa(
       return [
         poligono(x0, y0, [[W / 2, 0], [W, H - eh / 2], [0, H - eh / 2]]),
         { tipo: "elipse", x: round(x0), y: round(y0 + H - eh), largura: W, altura: round(eh) },
+        ancora("retangulo", x0, y0, 0, 0, W, H),
       ];
     }
     case "cilindro": {
@@ -95,14 +109,18 @@ export function pecasDa(
       return [
         poligono(x0, y0, [[0, eh / 2], [0, H - eh / 2], ...fundo.slice(1, -1), [W, H - eh / 2], [W, eh / 2]]),
         { tipo: "elipse", x: round(x0), y: round(y0), largura: W, altura: round(eh) },
+        ancora("retangulo", x0, y0, 0, 0, W, H),
       ];
     }
     case "trapezio":
-      return [poligono(x0, y0, [[W * 0.2, 0], [W * 0.8, 0], [W, H], [0, H]])];
+      return [poligono(x0, y0, [[W * 0.2, 0], [W * 0.8, 0], [W, H], [0, H]]), ancora("retangulo", x0, y0, 0, 0, W, H)];
     case "triangulo":
-      return [poligono(x0, y0, [[W / 2, 0], [W, H], [0, H]])];
+      return [poligono(x0, y0, [[W / 2, 0], [W, H], [0, H]]), ancora("retangulo", x0, y0, 0, 0, W, H)];
     case "hexagono":
-      return [poligono(x0, y0, [[W * 0.25, 0], [W * 0.75, 0], [W, H / 2], [W * 0.75, H], [W * 0.25, H], [0, H / 2]])];
+      return [
+        poligono(x0, y0, [[W * 0.25, 0], [W * 0.75, 0], [W, H / 2], [W * 0.75, H], [W * 0.25, H], [0, H / 2]]),
+        ancora("retangulo", x0, y0, 0, 0, W, H),
+      ];
     case "estrela": {
       const pts: P[] = [];
       for (let i = 0; i < 10; i++) {
@@ -113,10 +131,13 @@ export function pecasDa(
       // Encaixa na caixa (a estrela não encosta embaixo)
       const ys = pts.map(([, y]) => y);
       const minY = Math.min(...ys), maxY = Math.max(...ys);
-      return [poligono(x0, y0, pts.map(([x, y]) => [x, ((y - minY) / (maxY - minY)) * H] as P))];
+      return [poligono(x0, y0, pts.map(([x, y]) => [x, ((y - minY) / (maxY - minY)) * H] as P)), ancora("elipse", x0, y0, 0, 0, W, H)];
     }
     case "chevron":
-      return [poligono(x0, y0, [[0, 0], [W * 0.8, 0], [W, H / 2], [W * 0.8, H], [0, H], [W * 0.2, H / 2]])];
+      return [
+        poligono(x0, y0, [[0, 0], [W * 0.8, 0], [W, H / 2], [W * 0.8, H], [0, H], [W * 0.2, H / 2]]),
+        ancora("retangulo", x0, y0, 0, 0, W, H),
+      ];
     case "nuvem": {
       const pts: P[] = [];
       for (let i = 0; i < 72; i++) {
@@ -124,7 +145,19 @@ export function pecasDa(
         const r = 0.86 + 0.14 * Math.abs(Math.sin(4 * a));
         pts.push([W / 2 + (W / 2) * r * Math.cos(a), H / 2 + (H / 2) * r * Math.sin(a)]);
       }
-      return [poligono(x0, y0, pts)];
+      return [poligono(x0, y0, pts), ancora("elipse", x0, y0, 0, 0, W, H)];
+    }
+    case "dados":
+      // Paralelogramo (entrada/saída de dados no fluxograma)
+      return [poligono(x0, y0, [[W * 0.18, 0], [W, 0], [W * 0.82, H], [0, H]]), ancora("retangulo", x0, y0, 0, 0, W, H)];
+    case "documento": {
+      // Folha com a borda de baixo ondulada
+      const onda: P[] = [];
+      for (let i = 0; i <= 24; i++) {
+        const t = i / 24;
+        onda.push([W * (1 - t), H * 0.86 + H * 0.08 * Math.sin(t * Math.PI * 2)]);
+      }
+      return [poligono(x0, y0, [[0, 0], [W, 0], ...onda]), ancora("retangulo", x0, y0, 0, 0, W, H * 0.86)];
     }
   }
 }

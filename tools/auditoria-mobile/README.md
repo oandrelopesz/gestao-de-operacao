@@ -9,3 +9,5 @@ Ferramentas fora do app (não entram no build do Lovable). Instalar uma vez: `np
   (`npx vite --port 5188`); depois `node comparar-desktop.mjs http://localhost:5191 http://localhost:5188`.
   Critério: 0 px de diferença em todas as telas (ou diferença explicada por dado vivo, conferida no PNG).
 - Ícones do app: `node gerar-icones.mjs` (grava em `public/icons`).
+- Fluxogramas (editor): `node testar-fluxogramas.mjs http://localhost:5190 <id de um quadro de TESTE> saida` — apaga o conteúdo
+  desse quadro; imprime o resultado de cada interação e grava capturas na pasta.

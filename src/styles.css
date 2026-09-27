@@ -444,3 +444,313 @@ html[data-hidden] [data-state="closed"] {
   height: 100vh;
   margin: 0;
 }
+
+/* ---------- Fluxogramas: Excalidraw com a fonte do app e o painel "Formas" ---------- */
+/* body na frente: o CSS do Excalidraw chega depois (pedaço carregado sob demanda) com o mesmo seletor */
+body .excalidraw,
+body .excalidraw-tooltip {
+  --ui-font: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+/* Boas-vindas do quadro vazio na fonte do app (a de rabisco destoa do resto do sistema) */
+.excalidraw .welcome-screen-decor.excalifont,
+.excalidraw .welcome-screen-decor .excalifont,
+.excalidraw .welcome-screen-center .excalifont {
+  font-family: var(--ui-font);
+  letter-spacing: -0.005em;
+}
+.excalidraw .welcome-screen-center__heading {
+  max-width: 26rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--color-gray-50);
+}
+
+.excalidraw .painel-gestor .sidebar__header {
+  padding: 0.75rem 0.75rem 0.25rem;
+}
+/* O Excalidraw faz da lista de abas um grid de colunas "mínimo 0" (pensado para ícones): aqui é pílula com texto */
+.excalidraw .painel-gestor .sidebar-tabs-root [role="tablist"].sidebar-triggers {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  margin: 0;
+  border-radius: 999px;
+  border: 1px solid var(--default-border-color);
+  background: var(--color-surface-low);
+}
+.excalidraw .painel-gestor .pg-aba {
+  width: auto;
+  background: transparent;
+  cursor: pointer;
+  height: 2rem;
+  padding: 0 1rem;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--color-gray-50);
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.excalidraw .painel-gestor .pg-aba:hover {
+  color: var(--text-primary-color);
+}
+.excalidraw .painel-gestor .pg-aba[data-state="active"] {
+  background: var(--island-bg-color);
+  color: var(--color-primary);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 1px 6px rgb(0 0 0 / 0.06);
+}
+.excalidraw .painel-gestor .pg-conteudo {
+  overflow-y: auto;
+  padding: 0.5rem 0.875rem 1rem;
+  gap: 1rem;
+}
+.excalidraw .painel-gestor .pg-conteudo[data-state="active"] {
+  animation: pg-entrar 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes pg-entrar {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.excalidraw .painel-gestor .pg-secao {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.excalidraw .painel-gestor .pg-titulo {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-gray-50);
+}
+.excalidraw .painel-gestor .pg-cores {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.375rem;
+}
+.excalidraw .painel-gestor .pg-cor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  width: 100%;
+  padding: 0;
+  border: 2px solid;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.excalidraw .painel-gestor .pg-cor:hover {
+  transform: translateY(-1px) scale(1.06);
+}
+.excalidraw .painel-gestor .pg-cor-ativa {
+  box-shadow: 0 0 0 2px var(--island-bg-color), 0 0 0 4px var(--color-primary);
+}
+.excalidraw .painel-gestor .pg-etapas-rotulo {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-primary-color);
+}
+.excalidraw .painel-gestor .pg-linha-etapas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.excalidraw .painel-gestor .pg-contador {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--default-border-color);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-primary-color);
+}
+.excalidraw .painel-gestor .pg-contador span {
+  min-width: 1.25rem;
+  text-align: center;
+}
+.excalidraw .painel-gestor .pg-contador button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary-color);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.excalidraw .painel-gestor .pg-contador button:hover:not(:disabled) {
+  background: var(--color-surface-high);
+}
+.excalidraw .painel-gestor .pg-contador button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.excalidraw .painel-gestor .pg-grade {
+  display: grid;
+  gap: 0.5rem;
+}
+.excalidraw .painel-gestor .pg-grade-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.excalidraw .painel-gestor .pg-grade-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.excalidraw .painel-gestor .pg-bloco {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-width: 0;
+  padding: 0.625rem 0.375rem 0.5rem;
+  border: 1px solid var(--default-border-color);
+  border-radius: 0.75rem;
+  background: var(--island-bg-color);
+  color: var(--text-primary-color);
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.excalidraw .painel-gestor .pg-bloco:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+  background: var(--color-surface-high);
+  box-shadow: 0 6px 16px -8px rgb(0 0 0 / 0.25);
+}
+.excalidraw .painel-gestor .pg-bloco:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 0.08s;
+}
+.excalidraw .painel-gestor .pg-bloco:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.excalidraw .painel-gestor .pg-bloco-card {
+  min-height: 5.5rem;
+}
+.excalidraw .painel-gestor .pg-desenho {
+  width: 100%;
+  height: 2.75rem;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.excalidraw .painel-gestor .pg-bloco:hover .pg-desenho {
+  transform: scale(1.06);
+}
+.excalidraw .painel-gestor .pg-desenho :is(polygon, ellipse) {
+  transition: fill 0.2s ease, stroke 0.2s ease;
+}
+.excalidraw .painel-gestor .pg-rotulo {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.excalidraw .painel-gestor .pg-card-previa {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.5rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #1e1e1e;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.excalidraw .painel-gestor .pg-simples { width: 4.25rem; border: 2px solid; }
+.excalidraw .painel-gestor .pg-etapa {
+  width: 4.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 0.4rem;
+  border: 2px solid;
+  border-radius: 0.5rem;
+}
+.excalidraw .painel-gestor .pg-postit {
+  width: 2.75rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 3px;
+  padding: 0.4rem;
+  background: #fff3a3;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.12);
+}
+.excalidraw .painel-gestor .pg-destaque {
+  width: 4.25rem;
+  border-radius: 0.5rem;
+  color: #fff;
+}
+.excalidraw .painel-gestor .pg-etiqueta {
+  height: 1.25rem;
+  padding: 0 0.6rem;
+  border-radius: 0.375rem;
+  color: #fff;
+}
+.excalidraw .painel-gestor .pg-linha {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 0.35);
+}
+.excalidraw .painel-gestor .pg-dica {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.625rem;
+  background: var(--color-surface-low);
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--color-gray-50);
+}
+
+/* Pontos de conexão das formas (bolinhas nas bordas): cor de seleção do Excalidraw, entram com uma leve escala */
+.excalidraw .fluxo-conector {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  padding: 0;
+  border: 2px solid var(--color-primary);
+  border-radius: 999px;
+  background: var(--island-bg-color);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+  cursor: crosshair;
+  pointer-events: auto;
+  touch-action: none;
+  animation: conector-entrar 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.excalidraw .fluxo-conector:hover {
+  transform: scale(1.35);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+@keyframes conector-entrar {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Entrada do quadro: só opacidade (transform aqui viraria referência dos elementos fixos do Excalidraw) */
+.fluxo-quadro {
+  animation: fluxo-aparecer 0.35s ease both;
+}
+@keyframes fluxo-aparecer {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* Indicador de salvamento: cada troca de estado entra suave */
+.fluxo-estado {
+  animation: fluxo-aparecer 0.25s ease both;
+}
