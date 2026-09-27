@@ -1,6 +1,7 @@
 // Menu lateral: grupos e links (a ordem/visibilidade configurável vem do menuConfig)
 import {
   AudioLines,
+  Inbox,
   Workflow,
   StickyNote,
   LayoutDashboard,
@@ -54,6 +55,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     links: [
       { label: "Clientes Ativos", icon: <Users size={17} />, to: "/clientes", palavras: ["carteira", "contas"] },
       { label: "CRM", icon: <Target size={17} />, to: "/crm", palavras: ["prospecção", "leads", "funil", "vendas", "pipeline", "comercial"] },
+      { label: "Dados internos", icon: <Inbox size={17} />, to: "/dados-internos", palavras: ["briefing", "contrato", "catálogo", "formulários", "respostas", "drive", "e-commerce"] },
     ],
   },
   {

@@ -30,9 +30,20 @@ interface NavLateralProps {
   onNavegar: () => void;
   /** Ctrl+K com o menu escondido: mostra o menu antes de focar a busca */
   onAbrirMenu?: () => void;
+  /** Número ao lado do link (ex.: respostas não vistas em "/dados-internos") */
+  contadores?: Record<string, number>;
 }
 
-export function NavLateral({ grupos, onNavegar, onAbrirMenu }: NavLateralProps) {
+function Contador({ n }: { n?: number }) {
+  if (!n) return null;
+  return (
+    <span aria-label={`${n} novos`} className="ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-4 tabular-nums text-primary-foreground">
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
+
+export function NavLateral({ grupos, onNavegar, onAbrirMenu, contadores }: NavLateralProps) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [busca, setBusca] = useState("");
@@ -159,6 +170,7 @@ export function NavLateral({ grupos, onNavegar, onAbrirMenu }: NavLateralProps) 
                     {link.icon}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{link.label}</span>
+                  <Contador n={contadores?.[link.to]} />
                   <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">{link.grupo}</span>
                 </Link>
               ))
@@ -182,6 +194,7 @@ export function NavLateral({ grupos, onNavegar, onAbrirMenu }: NavLateralProps) 
                     <span className="normal-case tracking-normal text-muted-foreground/60">
                       · {group.links.length}
                       {temAtual ? " · aba atual" : ""}
+                      {(() => { const n = group.links.reduce((s, l) => s + (contadores?.[l.to] ?? 0), 0); return n ? ` · ${n} novo${n > 1 ? "s" : ""}` : ""; })()}
                     </span>
                   )}
                   <ChevronDown
@@ -202,7 +215,8 @@ export function NavLateral({ grupos, onNavegar, onAbrirMenu }: NavLateralProps) 
                         <span className="text-muted-foreground group-hover/nav:text-foreground group-data-[status=active]/nav:text-primary transition-colors">
                           {link.icon}
                         </span>
-                        {link.label}
+                        <span className="min-w-0 flex-1 truncate">{link.label}</span>
+                        <Contador n={contadores?.[link.to]} />
                       </Link>
                     ))}
                   </div>

@@ -16,6 +16,7 @@ import { warmAllCaches } from "@/lib/data";
 import { getConfig } from "@/lib/appConfig";
 import { aplicarMenu, type MenuConfig } from "@/lib/menuConfig";
 import { NAV_GROUPS } from "@/lib/nav";
+import { useAvisosFormularios } from "@/lib/formulariosEnvios";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -64,6 +65,8 @@ function AuthenticatedLayout() {
     };
   }, []);
   const grupos = useMemo(() => aplicarMenu(NAV_GROUPS, menuCfg), [menuCfg]);
+  const { naoVistos: avisosNaoVistos } = useAvisosFormularios();
+  const contadoresMenu = useMemo(() => ({ "/dados-internos": avisosNaoVistos.length }), [avisosNaoVistos]);
   const fecharMenuCelular = useCallback(() => setIsSidebarOpen(false), []);
   // Ctrl+K com o menu escondido: no computador reabre o menu recolhido; no celular abre a gaveta
   const abrirMenu = useCallback(() => {
@@ -214,7 +217,7 @@ function AuthenticatedLayout() {
             </Button>
           </div>
 
-          <NavLateral grupos={grupos} onNavegar={fecharMenuCelular} onAbrirMenu={abrirMenu} />
+          <NavLateral grupos={grupos} onNavegar={fecharMenuCelular} onAbrirMenu={abrirMenu} contadores={contadoresMenu} />
 
           <div className="p-3 border-t border-sidebar-border">
             <div className="flex items-center gap-3 px-2 py-1.5 rounded-lg">
