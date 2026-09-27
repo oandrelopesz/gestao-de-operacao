@@ -12,10 +12,11 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { IconeArquivo } from "@/components/pdfs/IconeArquivo";
+import { GaleriaFotos } from "@/components/dadosInternos/GaleriaFotos";
 import { cn } from "@/lib/utils";
 import {
-  MIME_DOC, MIME_PASTA, MIME_PLANILHA, ehPasta, formatarDataHora, formatosDeDownload, linkNoGoogle, normalizarNome, novosNaLista, ordenarItens,
-  rotuloDoItem, visivel, type AvisoFormulario, type Formulario, type ItemDrive,
+  MIME_DOC, MIME_PASTA, MIME_PLANILHA, ehImagem, ehPasta, formatarDataHora, formatosDeDownload, linkNoGoogle, normalizarNome, novosNaLista,
+  ordenarItens, rotuloDoItem, visivel, type AvisoFormulario, type Formulario, type ItemDrive,
 } from "@/lib/dadosInternos";
 import { DriveEscopoError, listarPasta, salvarItem, trilhaAte } from "@/lib/driveLeitura";
 
@@ -94,6 +95,9 @@ export function NavegadorPasta(p: NavegadorPastaProps) {
     return (itens ?? []).filter((i) => normalizarNome(rotuloDoItem(i, p.formulario.id).titulo).includes(q));
   }, [itens, busca, p.formulario.id]);
 
+  // Pasta só de fotos e subpastas (a pasta "Fotos" do Catálogo e as de cada produto): vira galeria
+  const galeria = !!itens && itens.some(ehImagem) && itens.every((i) => ehImagem(i) || ehPasta(i));
+
   const pastaAtual = naRaiz ? { id: p.formulario.pastaId, name: p.formulario.pastaNome } : trilha[trilha.length - 1];
 
   const baixar = async (item: ItemDrive, indice = 0) => {
@@ -163,6 +167,8 @@ export function NavegadorPasta(p: NavegadorPastaProps) {
         <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
           <Loader2 size={18} className="animate-spin" /> Lendo o Drive…
         </div>
+      ) : galeria && !busca ? (
+        <GaleriaFotos itens={itens} onBaixarZip={p.onBaixarZip} onAbrirPasta={(item) => abrir(item)} />
       ) : visiveis.length === 0 ? (
         <Card className="px-6 py-12 text-center text-sm text-muted-foreground">
           {busca ? "Nada com esse nome." : "Nenhuma resposta ainda."}
