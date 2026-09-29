@@ -115,7 +115,9 @@ passam a aceitar `finalidade` (no `state` e como parâmetro); sem ela, o comport
 
 ## 4. Imagens no Cloudflare R2
 
-- Bucket `gmn-midia`, acesso público pelo `r2.dev`. Chave de API do R2 só com escrita nesse bucket. Secrets:
+- Bucket `gmn-midia` (criado em 29/09/2026 na conta Cloudflare da contato@, id `b4e84eaa8099c0e841a2eb35824027ca`,
+  região ENAM), acesso público em `https://pub-ae3cb23015f64d9183be1720f7c52e2e.r2.dev`. A chave de API é criada na
+  implementação e vai direto para os secrets, sem passar pelo repositório. Chave de API do R2 só com escrita nesse bucket. Secrets:
   `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE`.
 - Chave do objeto: `{perfil_id}/{post_id}.{jpg|png}`. Só entram imagens de fato usadas em post: foto do Drive
   copiada ou imagem da IA. Fotos do perfil no Google usam a `googleUrl` do próprio Google, sem cópia.
