@@ -227,11 +227,18 @@ A lista fixa de saúde fica num módulo compartilhado (`src/lib/gmnChecagem.ts`)
 - Migration (seção 3), R2 (seção 4) e secrets da OpenAI.
 - Aba `/gmn` completa, com perfis criados **à mão** (nome + cliente opcional, `location_name` nulo) para testar.
 - `gmn-briefing-ia` (sem dados do Google), **Gerar prévia** (texto + imagem do Drive ou da IA + R2) e checagem.
+- **Nada vai ao ar na Fase 1** (decisão do usuário, 29/09/2026). A aba não é publicada no Lovable, os crons não são
+  criados e nenhum perfil é ativado. Os testes rodam no dev server local; as tabelas novas existem no banco, mas ficam
+  sem uso.
+- **Perfil de teste: Brazilian Car** (Brasília, compra e venda de seminovos). Objetivo do cliente: fortalecer a
+  percepção de "a melhor loja de Brasília para comprar e vender seminovos". Não é perfil de saúde, então o
+  superlativo é permitido; a IA deve usá-lo com naturalidade, e não em todos os posts.
 
 ### 7.2 Fase 2: depois da aprovação (quota de 300 QPM no Cloud Console)
 
 - Ativar no projeto as APIs My Business Account Management, Business Information e My Business (v4).
 - Conexão GMN da andfalopes@ (3.5), `gmn-sincronizar`, publicação, conferência e crons.
+- Só então a aba é publicada no Lovable e os perfis começam a ser ativados.
 - Primeiro post real num perfil escolhido pelo usuário; depois os demais são ativados aos poucos.
 
 ### 7.3 Perfis manuais × sincronizados
