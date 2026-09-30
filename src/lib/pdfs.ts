@@ -27,8 +27,8 @@ export interface PdfBiblioteca {
 
 /**
  * Limite padrão por arquivo. O valor em uso vem de app_config.pdf_tamanho_max_mb (Admin → PDFs),
- * que é a guarda real. O bucket (migration 20260923120000_pdfs.sql) aceita até 200 MB: acima
- * disso, ajuste também o Storage.
+ * que é a única guarda: o envio vai direto para o R2 por URL assinada, sem limite de tamanho do lado
+ * do servidor. (O bucket antigo do Supabase, que aceitava até 200 MB, só é lido como reserva até 30/10/2026.)
  */
 export const PDF_TAMANHO_MAX_PADRAO_MB = 50;
 
@@ -100,7 +100,7 @@ export async function reordenarPastas(irmas: PdfPasta[]): Promise<void> {
 }
 
 /**
- * Exclui a pasta, as subpastas e os PDFs de todas elas: primeiro os arquivos no Storage,
+ * Exclui a pasta, as subpastas e os PDFs de todas elas: primeiro os arquivos (R2 e bucket antigo),
  * depois a linha (o ON DELETE CASCADE leva subpastas e registros de PDF).
  */
 export async function excluirPasta(id: string, biblioteca: PdfBiblioteca): Promise<void> {
@@ -118,7 +118,7 @@ async function removerDoStorage(caminhos: string[]): Promise<void> {
   await apagarNosDois("arquivos", caminhos);
 }
 
-/** Caminho novo no bucket, com a extensão do arquivo original (ou sem, se ele não tiver). */
+/** Caminho novo do arquivo (no R2 vira `arquivos/<caminho>`), com a extensão do original (ou sem, se ele não tiver). */
 function novoCaminho(nomeOriginal: string): string {
   const id = typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -133,7 +133,7 @@ async function subirObjeto(arquivo: File, caminho: string, onProgresso?: (fracao
 }
 
 /**
- * Envia o arquivo direto do navegador para o Storage e registra na pasta.
+ * Envia o arquivo direto do navegador para o R2 e registra na pasta.
  * Se o registro falhar, o arquivo enviado é apagado.
  */
 export async function enviarPdf(
@@ -197,7 +197,7 @@ export async function trocarArquivo(
     await apagarNosDois("arquivos", [caminho]).catch(() => {});
     throw error;
   }
-  // O antigo sai por último: se falhar, sobra só um objeto órfão no Storage, nunca um card vazio
+  // O antigo sai por último: se falhar, sobra só um arquivo órfão, nunca um card vazio
   await apagarNosDois("arquivos", [atual.storage_path]).catch(() => {});
   return data as PdfArquivo;
 }
