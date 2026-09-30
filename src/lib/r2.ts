@@ -59,6 +59,8 @@ export async function baixarComReserva(modulo: ModuloR2, caminho: string): Promi
     if (!r.ok) throw new Error(`O R2 respondeu ${r.status} ao baixar o arquivo`);
     return await r.blob();
   } catch (erroR2) {
+    // "Ainda não migrado" é esperado; qualquer outra falha do R2 ficaria escondida pela reserva até 30/10
+    if (!(erroR2 instanceof NaoEstaNoR2)) console.warn("[r2] leitura caiu na reserva do Supabase:", erroR2);
     const { data, error } = await supabase.storage.from(MODULOS_R2[modulo]).download(caminho);
     if (data && !error) return data;
     throw erroR2 instanceof NaoEstaNoR2 ? (error ?? erroR2) : erroR2;

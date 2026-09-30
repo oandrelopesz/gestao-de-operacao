@@ -326,9 +326,13 @@ Deno.serve(async (req) => {
         if (chaves.length > 1000) throw new ErroHttp(400, "No máximo 1.000 arquivos por chamada.");
         return json({ apagados: await apagar(chaves) });
       }
-      case "copiar":
-        await copiar(exigirChave(body.de), exigirChave(body.para));
+      case "copiar": {
+        const de = exigirChave(body.de);
+        const para = exigirChave(body.para);
+        if (de.split("/")[0] !== para.split("/")[0]) throw new ErroHttp(400, "Só dá para copiar dentro do mesmo módulo.");
+        await copiar(de, para);
         return json({ ok: true });
+      }
       case "listar":
         return json({ chaves: [...(await listar(exigirPrefixo(body.prefixo))).keys()] });
       case "migrar":
