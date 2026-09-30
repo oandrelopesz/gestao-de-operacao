@@ -1,6 +1,7 @@
 // Documento das notas (formato JSON do TipTap/ProseMirror). Regras puras: rodam no navegador e
 // no `node --test`. A nota guarda o documento em `doc` e o texto puro em `conteudo` (busca, prévia
 // do card e "Copiar").
+import { arquivoDaImagemNota } from "./r2Chaves.ts";
 
 export interface NoDoc {
   type: string;
@@ -9,8 +10,6 @@ export interface NoDoc {
   text?: string;
   marks?: { type: string; attrs?: Record<string, unknown> }[];
 }
-
-export const BUCKET_IMAGENS_NOTAS = "notas";
 
 /** Notas antigas (só texto): cada linha vira um parágrafo; linha vazia vira parágrafo vazio. */
 export function textoParaDoc(texto: string): NoDoc {
@@ -41,12 +40,11 @@ export function primeiraImagem(doc: NoDoc | null | undefined): string | null {
 }
 
 /**
- * Caminho no Storage de uma imagem que está no bucket das notas (as de fora — coladas de um site —
- * não são nossas e não se apagam). Ex.: ".../object/public/notas/abc.webp" → "abc.webp".
+ * Nome do arquivo de uma imagem que é nossa, no endereço antigo (Storage público do Supabase) ou no novo (função
+ * r2). As de fora (coladas de um site) não são nossas e não se apagam: devolve null.
  */
-export function caminhoNoBucket(src: string, bucket = BUCKET_IMAGENS_NOTAS): string | null {
-  const m = new RegExp(`/storage/v1/object/public/${bucket}/([^?#]+)`).exec(src);
-  return m ? decodeURIComponent(m[1]) : null;
+export function caminhoNoBucket(src: string): string | null {
+  return arquivoDaImagemNota(src);
 }
 
 /** Imagens nossas que estavam no documento antigo e saíram do novo (para apagar do Storage). */

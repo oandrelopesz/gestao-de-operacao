@@ -54,3 +54,15 @@ test("textoDoDoc: texto puro para busca, prévia e copiar", () => {
   assert.equal(docVazio(textoParaDoc("")), true);
   assert.equal(docVazio({ type: "doc", content: [img(`${URL}/x.webp`)] }), false);
 });
+
+test("caminhoNoBucket reconhece também o endereço novo (função r2)", () => {
+  assert.equal(caminhoNoBucket("https://x.supabase.co/functions/v1/r2?c=notas%2Fabc%20d.webp"), "abc d.webp");
+  assert.equal(caminhoNoBucket("https://x.supabase.co/functions/v1/r2?c=arquivos%2Fa.pdf"), null);
+});
+
+test("imagensRemovidas reconhece imagens no endereço novo", () => {
+  const novo = "https://x.supabase.co/functions/v1/r2?c=notas%2Fn.webp";
+  const antes: NoDoc = { type: "doc", content: [img(novo), img(`${URL}/a.webp`)] };
+  assert.deepEqual(imagensRemovidas(antes, { type: "doc", content: [] }), ["n.webp", "a.webp"]);
+  assert.deepEqual(imagensRemovidas(antes, antes), []);
+});
