@@ -9,6 +9,9 @@ Ferramentas fora do app (não entram no build do Lovable). Instalar uma vez: `np
   (`npx vite --port 5188`); depois `node comparar-desktop.mjs http://localhost:5191 http://localhost:5188`.
   Critério: 0 px de diferença em todas as telas (ou diferença explicada por dado vivo, conferida no PNG).
 - Ícones do app: `node gerar-icones.mjs` (grava em `public/icons`).
+- Arrastar das Demandas em tela estreita: `node testar-arrastar-estreito.mjs http://localhost:5188` — em 1024 e 768 px, levar
+  um card até a borda direita tem de rolar o quadro, sem esticar a página nem rolar a janela (não salva nada: cancela com
+  Esc). Abre a página com animações, de propósito (o defeito de 30/09/2026 vinha da animação de entrada).
 - Fluxogramas (editor): `node testar-fluxogramas.mjs http://localhost:5190 <id de um quadro de TESTE> saida` — apaga o conteúdo
   desse quadro; imprime o resultado de cada interação e grava capturas na pasta.
 - Exportação dos Fluxogramas: `node testar-exportacao.mjs http://localhost:5190 <id de um quadro de TESTE> saida` — monta um
