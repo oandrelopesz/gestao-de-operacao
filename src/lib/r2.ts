@@ -18,7 +18,8 @@ async function chamar<T>(corpo: Record<string, unknown>): Promise<T> {
     body: JSON.stringify(corpo),
   });
   const d = await r.json().catch(() => ({}));
-  if (r.status === 404) throw new NaoEstaNoR2(d.error || "Arquivo não está no R2");
+  // 404 com { error } é a resposta da função para "não está no R2" (ler, copiar); outro 404 é a função fora do ar.
+  if (r.status === 404 && typeof d.error === "string") throw new NaoEstaNoR2(d.error);
   if (!r.ok) throw new Error(d.error || `A função r2 respondeu ${r.status}`);
   return d as T;
 }
@@ -37,7 +38,7 @@ export async function enviarR2(
     xhr.open("PUT", url);
     xhr.setRequestHeader("Content-Type", tipo || "application/octet-stream");
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgresso?.(e.loaded / e.total);
+      if (e.lengthComputable && e.total > 0) onProgresso?.(e.loaded / e.total);
     };
     xhr.onload = () => (xhr.status >= 200 && xhr.status < 300
       ? resolve()
@@ -64,11 +65,21 @@ export async function baixarComReserva(modulo: ModuloR2, caminho: string): Promi
   }
 }
 
+/** Chave no R2, ou null quando o nome não vale como chave (arquivo antigo, que nunca foi para o R2). */
+function chaveSeValida(modulo: ModuloR2, caminho: string): string | null {
+  try {
+    return chaveR2(modulo, caminho);
+  } catch {
+    return null;
+  }
+}
+
 /** Apaga nos dois lados (R2 e bucket antigo), em lotes de 1.000. Arquivo ausente em um deles não é erro. */
 export async function apagarNosDois(modulo: ModuloR2, caminhos: string[]): Promise<void> {
   for (let i = 0; i < caminhos.length; i += 1000) {
     const lote = caminhos.slice(i, i + 1000);
-    await chamar({ acao: "apagar", chaves: lote.map((c) => chaveR2(modulo, c)) });
+    const chaves = lote.map((c) => chaveSeValida(modulo, c)).filter((c): c is string => c !== null);
+    if (chaves.length) await chamar({ acao: "apagar", chaves });
     const { error } = await supabase.storage.from(MODULOS_R2[modulo]).remove(lote);
     if (error) throw error;
   }
