@@ -4,7 +4,7 @@ Data: 29/09/2026. Status: aprovado no brainstorming, aguardando revisão da spec
 
 ## 1. Objetivo
 
-Publicar de 1 a 3 posts por semana, sem intervenção, nos perfis do Google Meu Negócio (GMN) dos clientes. Cada post segue
+Publicar posts toda semana (de 1 a 7 por perfil, nos dias e horários escolhidos na tela), sem intervenção, nos perfis do Google Meu Negócio (GMN) dos clientes. Cada post segue
 o briefing de marca do perfil e é escrito para SEO local. Uma aba nova do sistema concentra tudo: liga/desliga por perfil,
 briefing, pasta de fotos, fila e histórico. Perfis novos que aparecem na conta gerente entram sozinhos na aba, desligados.
 
@@ -24,8 +24,8 @@ aceitar pelo sistema os convites de gerente; aviso por WhatsApp; aprovação hum
 | Dados | Tabelas no Supabase (Lovable Cloud) do sistema. Sem Cloudflare D1 |
 | Ligação com `clientes` | Opcional (`cliente_id` nulo permitido); um cliente pode ter vários perfis |
 | Motor | `pg_cron` + edge functions, um post por chamada. Sem n8n e sem worker da VPS |
-| Frequência | 1, 2 ou 3 posts/semana por perfil (padrão 2). Dias padrão: ter/qui (2) e seg/qua/sex (3); 1 post = qua; editáveis |
-| Horário | Sorteado entre 9h e 11h (America/Sao_Paulo) |
+| Frequência | Escolhida por perfil na aba Agenda, só com cliques: de 1 a 7 dias por semana, um post por dia ligado. Padrão: terça e quinta (decisão de 30/09/2026, substituiu 1–3 posts com dias fixos) |
+| Horário | Um horário por dia ligado, escolhido de 30 em 30 min entre 06:00 e 22:00 (America/Sao_Paulo); padrão 09:00. Horário exato (o processamento roda a cada 10 min, então o post sai até 10 min depois) |
 | Tipo de post | `STANDARD` ("Novidade") com botão: Saiba mais (`LEARN_MORE` + URL com UTM), Ligar (`CALL`) ou Agendar (`BOOK` + URL) |
 | Temas | Rodízio: serviço em destaque, dúvida frequente, bairro/região, diferencial, bastidores |
 
@@ -45,8 +45,7 @@ atual do sistema.
 | `cliente_id` | uuid NULL → `clientes(id)` ON DELETE SET NULL | |
 | `ativo` | bool default false | o liga/desliga |
 | `sem_acesso` | bool default false | perfil sumiu da conta gerente |
-| `posts_semana` | smallint 1–3 default 2 | CHECK |
-| `dias` | smallint[] | 0=dom … 6=sáb; preenchido pelo padrão da frequência |
+| `agenda` | jsonb default `[{"dia":2,"hora":"09:00"},{"dia":4,"hora":"09:00"}]` | um item `{dia, hora}` por dia (0=dom … 6=sáb; hora `HH:MM`, BRT), de 1 a 7 itens, sem dia repetido; CHECK `jsonb_typeof(agenda) = 'array'`; posts por semana = número de itens |
 | `cta_tipo` | text: `LEARN_MORE` \| `CALL` \| `BOOK` | default `LEARN_MORE` |
 | `cta_url` | text NULL | obrigatório para LEARN_MORE e BOOK; a UTM é aplicada na publicação (`utm_source=google&utm_medium=organic&utm_campaign=gmn-post`) |
 | `drive_pasta_url` | text NULL | link da pasta de fotos |
@@ -137,7 +136,11 @@ posts, seo local.
 - **Fila da semana:** posts dos próximos 7 dias de todos os perfis, com status ao vivo (realtime).
 - **Gaveta do perfil** (padrão da gaveta de Demandas), em abas:
   - **Briefing:** os campos de 3.2, a marcação "saúde", o cliente ligado (opcional) e o botão **Gerar com IA** (seção 6.5).
-  - **Agenda:** posts por semana, dias, tipo de botão e URL, pasta do Drive e imagem de IA ligada ou desligada.
+  - **Agenda:** dias e horários, tipo de botão e URL, pasta do Drive e imagem de IA ligada ou desligada. Dias e horários só com
+    cliques: 7 botões de dia (clique liga ou desliga); cada dia ligado ganha uma lista de horários de 30 em 30 min (06:00 a
+    22:00); dia novo entra com o horário do primeiro dia já ligado (ou 09:00); "Usar HH:MM em todos" aparece quando os
+    horários diferem; texto "N posts por semana"; salvar exige pelo menos 1 dia. Na lista de perfis, a agenda aparece
+    resumida ("Ter 09:00 · Qui 14:30").
   - **Posts:** próximos e histórico, com texto, miniatura, origem da imagem, estado no Google, link e erro. Ações:
     **Gerar prévia**, **Publicar agora** e **Tentar de novo** (em `erro` ou `pulado`).
 
@@ -148,7 +151,7 @@ posts, seo local.
 | Job | Quando (UTC) | O que faz |
 |---|---|---|
 | `gmn-sincronizar` | diário 08:30 (05:30 BRT) | chama a função `gmn-sincronizar` |
-| `gmn-planejar-dia` | diário 09:00 (06:00 BRT) | função SQL `gmn_planejar_dia()`: para cada perfil `ativo AND NOT sem_acesso` cujo `dias` contém o dia da semana de hoje (BRT), insere um `gmn_posts` `origem='agenda'` com horário sorteado entre 9h e 11h BRT (`ON CONFLICT DO NOTHING`) |
+| `gmn-planejar-dia` | diário 03:05 (00:05 BRT) | função SQL `gmn_planejar_dia()`: para cada perfil `ativo AND NOT sem_acesso` cuja `agenda` tem o dia da semana de hoje (BRT), insere um `gmn_posts` `origem='agenda'` com `agendado_para` = hoje no horário do item (BRT) (`ON CONFLICT DO NOTHING`). Ao salvar a agenda de um perfil, os posts `agendado` de origem `agenda` que não batem mais com ela são apagados |
 | `gmn-processar` | a cada 10 min | chama a função `gmn-processar` |
 
 As chamadas usam `net.http_post`, no padrão de `20260429023356_…sql`.
@@ -250,8 +253,8 @@ o briefing e o histórico ficam no manual e a linha sincronizada duplicada é re
 
 ## 8. Testes
 
-- **`node --test`:** checagem do texto (6.3), rodízio de tema e palavras-chave, escolha da imagem usada há mais tempo, dias
-  padrão por frequência, montagem da URL com UTM e extração do id da pasta a partir do link do Drive.
+- **`node --test`:** checagem do texto (6.3), rodízio de tema e palavras-chave, escolha da imagem usada há mais tempo, agenda
+  (normalização, ligar e desligar dia, mesmo horário em todos, resumo), montagem da URL com UTM e extração do id da pasta a partir do link do Drive.
 - **Fase 1, manual:** prévia em um perfil manual com pasta do Drive, em outro sem pasta (imagem da IA) e em um perfil
   `saude` com termo proibido no briefing (tem de pular ou regenerar).
 - **Fase 2, manual:** sincronização, um post publicado de verdade, conferência do estado `LIVE`, erro de conexão simulado

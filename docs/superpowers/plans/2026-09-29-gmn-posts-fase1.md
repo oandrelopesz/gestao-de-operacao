@@ -51,6 +51,8 @@
 
 ### Task 1: Migration e ajustes da spec
 
+> **Emenda de 2026-09-30 (agenda de dias e horários, aprovada pelo André):** a migration commitada em 140eaa3 troca `posts_semana` + `dias` por `agenda` (o bloco do Step 1 abaixo já está emendado). Os ajustes da spec desta emenda foram feitos pelo controlador. Implementador: deixar o arquivo da migration idêntico ao bloco do Step 1 e commitar; não mexer na spec.
+
 **Files:**
 - Create: `supabase/migrations/20260929120000_gmn.sql`
 - Modify: `docs/superpowers/specs/2026-09-29-gmn-posts-design.md`
@@ -77,8 +79,8 @@ CREATE TABLE IF NOT EXISTS public.gmn_perfis (
   cliente_id UUID REFERENCES public.clientes(id) ON DELETE SET NULL,
   ativo BOOLEAN NOT NULL DEFAULT false,
   sem_acesso BOOLEAN NOT NULL DEFAULT false,
-  posts_semana SMALLINT NOT NULL DEFAULT 2 CHECK (posts_semana BETWEEN 1 AND 3),
-  dias SMALLINT[] NOT NULL DEFAULT '{2,4}',
+  agenda JSONB NOT NULL DEFAULT '[{"dia": 2, "hora": "09:00"}, {"dia": 4, "hora": "09:00"}]'::jsonb
+    CHECK (jsonb_typeof(agenda) = 'array'),
   cta_tipo TEXT NOT NULL DEFAULT 'LEARN_MORE' CHECK (cta_tipo IN ('LEARN_MORE', 'CALL', 'BOOK')),
   cta_url TEXT,
   drive_pasta_url TEXT,
@@ -182,7 +184,8 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
   - `escolherPalavras(palavras: string[], historico: string[][], n = 2): string[]`
   - `checarTexto(texto: string, o: { termosProibidos: string[]; saude: boolean }): { ok: boolean; motivos: string[] }`
   - `escolherImagem(candidatos: string[], usos: Record<string, string>): string | null`
-  - `diasPadrao(postsSemana: number): number[]`, `comUtm(url: string): string | null`, `idPastaDrive(link: string): string | null`
+  - Agenda: `interface ItemAgenda { dia: number; hora: string }`, `DIAS_CURTOS`, `HORA_PADRAO`, `AGENDA_PADRAO`, `HORARIOS` (06:00 a 22:00, de 30 em 30 min), `normalizarAgenda(v: unknown): ItemAgenda[]`, `alternarDia(agenda: ItemAgenda[], dia: number): ItemAgenda[]`, `mudarHora(agenda: ItemAgenda[], dia: number, hora: string): ItemAgenda[]`, `mesmoHorario(agenda: ItemAgenda[], hora: string): ItemAgenda[]`, `resumoAgenda(agenda: ItemAgenda[]): string`
+  - `comUtm(url: string): string | null`, `idPastaDrive(link: string): string | null`
   - `montarMensagensPost(e: EntradaPost): Mensagens`, `montarMensagensBriefing(e: EntradaBriefing): Mensagens`, `montarPromptImagem(e: { nome: string; categoria: string | null; briefing: Briefing; tema: Tema }): string`
   - `ESQUEMA_POST`, `ESQUEMA_BRIEFING` (JSON Schema estrito para a OpenAI)
 
@@ -193,8 +196,9 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  BRIEFING_VAZIO, TEMAS, checarTexto, comUtm, diasPadrao, escolherImagem, escolherPalavras, idPastaDrive,
-  montarMensagensBriefing, montarMensagensPost, montarPromptImagem, normalizarBriefing, proximoTema,
+  AGENDA_PADRAO, BRIEFING_VAZIO, HORARIOS, TEMAS, alternarDia, checarTexto, comUtm, escolherImagem, escolherPalavras,
+  idPastaDrive, mesmoHorario, montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda,
+  normalizarBriefing, proximoTema, resumoAgenda,
 } from "../../supabase/functions/gmn/regras.ts";
 
 const textoBom =
@@ -257,10 +261,37 @@ test("escolherImagem: nunca usada primeiro, depois a usada há mais tempo", () =
   assert.equal(escolherImagem(["a", "b"], { a: "2026-09-02T00:00:00Z", b: "2026-09-01T00:00:00Z" }), "b");
 });
 
-test("diasPadrao por frequência", () => {
-  assert.deepEqual(diasPadrao(1), [3]);
-  assert.deepEqual(diasPadrao(2), [2, 4]);
-  assert.deepEqual(diasPadrao(3), [1, 3, 5]);
+test("normalizarAgenda: um item por dia, ordenado, descarta lixo", () => {
+  assert.deepEqual(normalizarAgenda(null), []);
+  assert.deepEqual(
+    normalizarAgenda([
+      { dia: 4, hora: "14:30" }, { dia: 2, hora: "09:00" }, { dia: 4, hora: "10:00" }, { dia: 7, hora: "09:00" },
+      { dia: 1, hora: "25:00" }, "x", null,
+    ]),
+    [{ dia: 2, hora: "09:00" }, { dia: 4, hora: "14:30" }],
+  );
+  assert.deepEqual(normalizarAgenda(AGENDA_PADRAO), [{ dia: 2, hora: "09:00" }, { dia: 4, hora: "09:00" }]);
+});
+
+test("alternarDia liga com o horário do primeiro dia ligado e desliga", () => {
+  const a = [{ dia: 2, hora: "14:30" }];
+  assert.deepEqual(alternarDia(a, 5), [{ dia: 2, hora: "14:30" }, { dia: 5, hora: "14:30" }]);
+  assert.deepEqual(alternarDia(a, 2), []);
+  assert.deepEqual(alternarDia([], 0), [{ dia: 0, hora: "09:00" }]);
+  assert.deepEqual(alternarDia(alternarDia([], 3), 1), [{ dia: 1, hora: "09:00" }, { dia: 3, hora: "09:00" }]);
+});
+
+test("mudarHora, mesmoHorario, resumoAgenda e HORARIOS", () => {
+  const a = [{ dia: 2, hora: "09:00" }, { dia: 4, hora: "09:00" }];
+  const b = mudarHora(a, 4, "14:30");
+  assert.deepEqual(b, [{ dia: 2, hora: "09:00" }, { dia: 4, hora: "14:30" }]);
+  assert.deepEqual(mesmoHorario(b, "10:00"), [{ dia: 2, hora: "10:00" }, { dia: 4, hora: "10:00" }]);
+  assert.equal(resumoAgenda(b), "Ter 09:00 · Qui 14:30");
+  assert.equal(resumoAgenda([]), "Sem dias");
+  assert.equal(HORARIOS.length, 33);
+  assert.equal(HORARIOS[0], "06:00");
+  assert.equal(HORARIOS[1], "06:30");
+  assert.equal(HORARIOS[HORARIOS.length - 1], "22:00");
 });
 
 test("comUtm acrescenta a UTM sem apagar parâmetros e recusa lixo", () => {
@@ -462,11 +493,56 @@ export function escolherImagem(candidatos: string[], usos: Record<string, string
   return [...candidatos].sort((a, b) => Date.parse(usos[a]) - Date.parse(usos[b]))[0];
 }
 
-/** Dias da semana padrão (0 = domingo) para 1, 2 ou 3 posts. */
-export function diasPadrao(postsSemana: number): number[] {
-  if (postsSemana <= 1) return [3];
-  if (postsSemana === 2) return [2, 4];
-  return [1, 3, 5];
+// ------------------------------------------------------------------ agenda (dias e horários dos posts)
+
+/** Um dia da semana com o horário do post. `dia`: 0 = domingo … 6 = sábado; `hora`: "HH:MM" (horário de Brasília). */
+export interface ItemAgenda { dia: number; hora: string }
+
+export const DIAS_CURTOS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
+export const HORA_PADRAO = "09:00";
+export const AGENDA_PADRAO: ItemAgenda[] = [{ dia: 2, hora: HORA_PADRAO }, { dia: 4, hora: HORA_PADRAO }];
+
+/** Horários oferecidos na tela: de 30 em 30 minutos, das 06:00 às 22:00. */
+export const HORARIOS: string[] = Array.from({ length: 33 }, (_, i) => {
+  const min = 6 * 60 + i * 30;
+  return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+});
+
+const RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Qualquer valor (jsonb do banco, estado da tela) → agenda válida: um item por dia (o primeiro vence), em ordem de dia. */
+export function normalizarAgenda(v: unknown): ItemAgenda[] {
+  const porDia = new Map<number, string>();
+  for (const x of Array.isArray(v) ? v : []) {
+    const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    const dia = typeof o.dia === "number" ? o.dia : Number.NaN;
+    const hora = typeof o.hora === "string" ? o.hora.trim() : "";
+    if (Number.isInteger(dia) && dia >= 0 && dia <= 6 && RE_HORA.test(hora) && !porDia.has(dia)) porDia.set(dia, hora);
+  }
+  return [...porDia.entries()].sort((a, b) => a[0] - b[0]).map(([dia, hora]) => ({ dia, hora }));
+}
+
+/** Liga ou desliga um dia. Dia novo entra com o horário do primeiro dia já ligado (ou 09:00). */
+export function alternarDia(agenda: ItemAgenda[], dia: number): ItemAgenda[] {
+  const a = normalizarAgenda(agenda);
+  if (a.some((x) => x.dia === dia)) return a.filter((x) => x.dia !== dia);
+  return normalizarAgenda([...a, { dia, hora: a[0]?.hora ?? HORA_PADRAO }]);
+}
+
+/** Troca o horário de um dia já ligado. */
+export function mudarHora(agenda: ItemAgenda[], dia: number, hora: string): ItemAgenda[] {
+  return normalizarAgenda(agenda.map((x) => (x.dia === dia ? { dia, hora } : x)));
+}
+
+/** O mesmo horário em todos os dias ligados. */
+export function mesmoHorario(agenda: ItemAgenda[], hora: string): ItemAgenda[] {
+  return normalizarAgenda(agenda.map((x) => ({ dia: x.dia, hora })));
+}
+
+/** "Ter 09:00 · Qui 14:30" (sem nenhum dia: "Sem dias"). */
+export function resumoAgenda(agenda: ItemAgenda[]): string {
+  const a = normalizarAgenda(agenda);
+  return a.length ? a.map((x) => `${DIAS_CURTOS[x.dia]} ${x.hora}`).join(" · ") : "Sem dias";
 }
 
 export const UTM = { utm_source: "google", utm_medium: "organic", utm_campaign: "gmn-post" };
@@ -629,7 +705,7 @@ export const ESQUEMA_BRIEFING = {
 - [ ] **Step 4: Rodar os testes e ver passarem**
 
 Run: `node --test src/lib/gmnRegras.test.ts`
-Expected: PASS (12 testes). Depois `npm test` inteiro: nenhum teste antigo quebrado.
+Expected: PASS (14 testes). Depois `npm test` inteiro: nenhum teste antigo quebrado.
 
 - [ ] **Step 5: Commit**
 
@@ -1128,10 +1204,10 @@ Expected: `{"openai":true,"r2":true,"acesso":true}`.
 - Create: `src/lib/gmn.ts`
 
 **Interfaces:**
-- Consumes: `regras.ts` (`Briefing`, `normalizarBriefing`, `diasPadrao`); função `gmn` (Task 3).
+- Consumes: `regras.ts` (`Briefing`, `normalizarBriefing`, `ItemAgenda`, `normalizarAgenda`); função `gmn` (Task 3).
 - Produces (`src/lib/gmn.ts`):
   - `PUBLICACAO_LIBERADA = false`
-  - `interface PerfilGmn { id; location_name: string | null; nome: string; endereco; categoria; site; telefone: string | null; cliente_id: string | null; ativo: boolean; sem_acesso: boolean; posts_semana: number; dias: number[]; cta_tipo: "LEARN_MORE" | "CALL" | "BOOK"; cta_url: string | null; drive_pasta_url: string | null; usa_ia_imagem: boolean; saude: boolean; briefing: Briefing; briefing_salvo_em: string | null; created_at: string }`
+  - `interface PerfilGmn { id; location_name: string | null; nome: string; endereco; categoria; site; telefone: string | null; cliente_id: string | null; ativo: boolean; sem_acesso: boolean; agenda: ItemAgenda[]; cta_tipo: "LEARN_MORE" | "CALL" | "BOOK"; cta_url: string | null; drive_pasta_url: string | null; usa_ia_imagem: boolean; saude: boolean; briefing: Briefing; briefing_salvo_em: string | null; created_at: string }`
   - `interface PostGmn { id; perfil_id; origem: "agenda" | "manual" | "previa"; status: "agendado" | "gerando" | "gerado" | "publicado" | "erro" | "pulado"; tema: string | null; palavras_chave: string[]; texto: string | null; imagem_origem: "drive" | "google" | "ia" | null; imagem_url: string | null; google_url: string | null; erro: string | null; created_at: string }`
   - `interface ClienteOpcao { id: string; nome: string }`
   - `fetchPerfis(): Promise<PerfilGmn[]>`, `fetchClientesOpcoes(): Promise<ClienteOpcao[]>`, `criarPerfil(nome: string, cliente_id: string | null): Promise<PerfilGmn>`, `salvarPerfil(id: string, patch: Partial<PerfilGmn>): Promise<void>`, `salvarBriefing(id: string, b: Briefing): Promise<string>` (devolve o `briefing_salvo_em`), `excluirPerfil(id: string): Promise<void>`, `fetchPosts(perfilId: string): Promise<PostGmn[]>`, `gerarBriefingIa(perfilId: string, textoDadosInternos: string | null): Promise<Briefing>`, `gerarPrevia(perfilId: string): Promise<PostGmn>`, `traduzErroGmn(e: unknown): string`
@@ -1188,7 +1264,7 @@ export async function cabecalhosDeAcesso(): Promise<Record<string, string>> {
 // O types.ts gerado ainda não conhece as tabelas novas: por isso `as any` nos `.from(...)`.
 import { supabase } from "@/integrations/supabase/client";
 import { cabecalhosDeAcesso } from "@/lib/googleDrive";
-import { normalizarBriefing, type Briefing } from "../../supabase/functions/gmn/regras.ts";
+import { normalizarAgenda, normalizarBriefing, type Briefing, type ItemAgenda } from "../../supabase/functions/gmn/regras.ts";
 
 /** Fase 1: nada é publicado no Google; o liga/desliga fica desabilitado até a API ser aprovada. */
 export const PUBLICACAO_LIBERADA = false;
@@ -1206,8 +1282,7 @@ export interface PerfilGmn {
   cliente_id: string | null;
   ativo: boolean;
   sem_acesso: boolean;
-  posts_semana: number;
-  dias: number[];
+  agenda: ItemAgenda[];
   cta_tipo: CtaTipo;
   cta_url: string | null;
   drive_pasta_url: string | null;
@@ -1240,12 +1315,12 @@ const posts = () => supabase.from("gmn_posts" as any) as any;
 const FUNCAO = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmn`;
 
 const CAMPOS_PERFIL =
-  "id, location_name, nome, endereco, categoria, site, telefone, cliente_id, ativo, sem_acesso, posts_semana, dias, " +
+  "id, location_name, nome, endereco, categoria, site, telefone, cliente_id, ativo, sem_acesso, agenda, " +
   "cta_tipo, cta_url, drive_pasta_url, usa_ia_imagem, saude, briefing, briefing_salvo_em, created_at";
 const CAMPOS_POST = "id, perfil_id, origem, status, tema, palavras_chave, texto, imagem_origem, imagem_url, google_url, erro, created_at";
 
 function comBriefing(p: any): PerfilGmn {
-  return { ...p, briefing: normalizarBriefing(p.briefing), dias: p.dias ?? [] } as PerfilGmn;
+  return { ...p, briefing: normalizarBriefing(p.briefing), agenda: normalizarAgenda(p.agenda) } as PerfilGmn;
 }
 
 /** Tabela ainda não criada no banco (migration pendente) vira uma mensagem clara. */
@@ -1340,7 +1415,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Modify: `src/routeTree.gen.ts` (regenerado)
 
 **Interfaces:**
-- Consumes: `src/lib/gmn.ts` (Task 5); `regras.ts` (`Briefing`, `CAMPOS_*` não usados aqui, `diasPadrao`, `ROTULO_TEMA`, `comUtm`, `idPastaDrive`); `listarPasta`, `baixarOriginal` (`src/lib/driveLeitura.ts`); `FORMULARIOS`, `rotuloDoItem`, `formatarDataHora`, `extensao` (`src/lib/dadosInternos.ts`).
+- Consumes: `src/lib/gmn.ts` (Task 5); `regras.ts` (`Briefing`, `DIAS_CURTOS`, `HORARIOS`, `alternarDia`, `mudarHora`, `mesmoHorario`, `normalizarAgenda`, `resumoAgenda`, `ROTULO_TEMA`, `comUtm`, `idPastaDrive`); `listarPasta`, `baixarOriginal` (`src/lib/driveLeitura.ts`); `FORMULARIOS`, `rotuloDoItem`, `formatarDataHora`, `extensao` (`src/lib/dadosInternos.ts`).
 - Produces: rota `/gmn`; `PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou })`; `BriefingForm({ valor, onChange })`; `GerarBriefingDialog({ perfil, aberto, onFechar, onGerado })`; `PostsLista({ perfil })`.
 
 - [ ] **Step 1: Formulário do briefing**
@@ -1619,13 +1694,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   excluirPerfil, salvarBriefing, salvarPerfil, traduzErroGmn, type ClienteOpcao, type CtaTipo, type PerfilGmn,
 } from "@/lib/gmn";
-import { comUtm, diasPadrao, idPastaDrive, type Briefing } from "../../../supabase/functions/gmn/regras.ts";
+import {
+  DIAS_CURTOS, HORARIOS, alternarDia, comUtm, idPastaDrive, mesmoHorario, mudarHora, normalizarAgenda, type Briefing,
+} from "../../../supabase/functions/gmn/regras.ts";
 import { BriefingForm } from "./BriefingForm";
 import { GerarBriefingDialog } from "./GerarBriefingDialog";
 import { PostsLista } from "./PostsLista";
 
 const SEM_CLIENTE = "__sem__";
-const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const CTAS: { v: CtaTipo; rotulo: string }[] = [
   { v: "LEARN_MORE", rotulo: "Saiba mais (abre o link)" },
   { v: "BOOK", rotulo: "Agendar (abre o link)" },
@@ -1665,12 +1741,12 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
     const d = dados!;
     if (d.cta_tipo !== "CALL" && d.cta_url && !comUtm(d.cta_url)) return toast.error("O link do botão não parece um endereço válido.");
     if (d.drive_pasta_url && !idPastaDrive(d.drive_pasta_url)) return toast.error("O link da pasta do Drive não foi reconhecido.");
-    if (d.dias.length !== d.posts_semana) return toast.error(`Escolha ${d.posts_semana} dia(s) da semana.`);
+    if (!d.agenda.length) return toast.error("Escolha pelo menos um dia da semana.");
     setSalvando(true);
     try {
       await salvarPerfil(d.id, {
         nome: d.nome.trim(), categoria: d.categoria || null, site: d.site || null, endereco: d.endereco || null,
-        cliente_id: d.cliente_id, saude: d.saude, posts_semana: d.posts_semana, dias: [...d.dias].sort(), cta_tipo: d.cta_tipo,
+        cliente_id: d.cliente_id, saude: d.saude, agenda: normalizarAgenda(d.agenda), cta_tipo: d.cta_tipo,
         cta_url: d.cta_url || null, drive_pasta_url: d.drive_pasta_url || null, usa_ia_imagem: d.usa_ia_imagem,
       });
       toast.success("Configurações salvas.");
@@ -1695,7 +1771,6 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
   }
 
   const set = (patch: Partial<PerfilGmn>) => setDados({ ...dados, ...patch });
-  const alternarDia = (d: number) => set({ dias: dados.dias.includes(d) ? dados.dias.filter((x) => x !== d) : [...dados.dias, d] });
 
   return (
     <Sheet open={aberto} onOpenChange={(v) => !v && onFechar()}>
@@ -1761,25 +1836,42 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
               Perfil da área da saúde (aplica as regras do CFM/CFO)
             </label>
 
-            <div className="space-y-1.5">
-              <Label>Posts por semana</Label>
-              <Select value={String(dados.posts_semana)} onValueChange={(v) => set({ posts_semana: Number(v), dias: diasPadrao(Number(v)) })}>
-                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Dias</Label>
-              <div className="flex flex-wrap gap-2">
-                {DIAS.map((rotulo, d) => (
-                  <Button key={d} type="button" size="sm" variant={dados.dias.includes(d) ? "default" : "outline"}
-                    aria-pressed={dados.dias.includes(d)} onClick={() => alternarDia(d)}>
-                    {rotulo}
-                  </Button>
-                ))}
+            <div className="space-y-2">
+              <Label>Dias e horários dos posts</Label>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Dias da semana">
+                {DIAS_CURTOS.map((rotulo, d) => {
+                  const ligado = dados.agenda.some((x) => x.dia === d);
+                  return (
+                    <Button key={d} type="button" size="sm" variant={ligado ? "default" : "outline"} aria-pressed={ligado}
+                      onClick={() => set({ agenda: alternarDia(dados.agenda, d) })}>
+                      {rotulo}
+                    </Button>
+                  );
+                })}
               </div>
+              {dados.agenda.map((item) => (
+                <div key={item.dia} className="flex items-center gap-3">
+                  <span className="w-10 text-sm font-medium">{DIAS_CURTOS[item.dia]}</span>
+                  <Select value={item.hora} onValueChange={(h) => set({ agenda: mudarHora(dados.agenda, item.dia, h) })}>
+                    <SelectTrigger className="w-28" aria-label={`Horário de ${DIAS_CURTOS[item.dia]}`}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(HORARIOS.includes(item.hora) ? HORARIOS : [item.hora, ...HORARIOS]).map((h) => (
+                        <SelectItem key={h} value={h}>{h}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+              {new Set(dados.agenda.map((x) => x.hora)).size > 1 && (
+                <Button type="button" size="sm" variant="outline" onClick={() => set({ agenda: mesmoHorario(dados.agenda, dados.agenda[0].hora) })}>
+                  Usar {dados.agenda[0].hora} em todos
+                </Button>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {dados.agenda.length === 0
+                  ? "Nenhum dia escolhido: ligue pelo menos um."
+                  : `${dados.agenda.length} ${dados.agenda.length === 1 ? "post" : "posts"} por semana, no horário de Brasília.`}
+              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1870,6 +1962,7 @@ import {
   type ClienteOpcao, type PerfilGmn,
 } from "@/lib/gmn";
 import { PerfilGaveta } from "@/components/gmn/PerfilGaveta";
+import { resumoAgenda } from "../../../supabase/functions/gmn/regras.ts";
 
 export const Route = createFileRoute("/_authenticated/gmn")({ component: GmnPage });
 
@@ -1968,7 +2061,7 @@ function GmnPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{p.nome}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {nomeCliente(p.cliente_id) ?? "Sem cliente"} · {p.posts_semana} post(s)/semana
+                  {nomeCliente(p.cliente_id) ?? "Sem cliente"} · {resumoAgenda(p.agenda)}
                   {p.briefing_salvo_em ? "" : " · sem briefing"}
                 </p>
               </div>
@@ -2042,7 +2135,8 @@ Matar vites antigos (memória `dev-server-local`) e rodar `npm run dev`. Abrir `
 - [ ] **Step 2: Criar o perfil e o briefing**
 
 - "Novo perfil" → nome `Brazilian Car`, cliente correspondente se existir em `clientes`.
-- Agenda: categoria `Loja de carros usados`, endereço `SCIA Quadra 15 Conjunto 10 loja 03, Cidade do Automóvel, Brasília - DF`, 2 posts/semana, botão Saiba mais com o site da loja (perguntar ao usuário) → Salvar configurações.
+- Agenda: categoria `Loja de carros usados`, endereço `SCIA Quadra 15 Conjunto 10 loja 03, Cidade do Automóvel, Brasília - DF`, botão Saiba mais com o site da loja (perguntar ao usuário) → Salvar configurações.
+- Dias e horários (só cliques): conferir o padrão terça e quinta às 09:00; ligar sexta (entra às 09:00); mudar quinta para 14:30 (aparece "Usar 09:00 em todos"); clicar nele; desligar sexta; desligar todos e conferir que "Salvar configurações" recusa sem nenhum dia; voltar para terça e quinta e salvar. Na lista, a linha mostra "Ter 09:00 · Qui 09:00"; reabrir a gaveta mostra o salvo.
 - Briefing → "Gerar com IA" (sem briefing de Dados internos, a menos que exista um da Brazilian Car). Conferir que o rascunho aparece e **incluir no Posicionamento**: "a melhor loja de Brasília para comprar e vender carros seminovos". Salvar briefing.
 
 - [ ] **Step 3: Prévias**
