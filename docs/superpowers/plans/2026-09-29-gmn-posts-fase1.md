@@ -260,6 +260,25 @@ test("checarTexto só aplica as regras de saúde em perfil de saúde", () => {
   const r = checarTexto(t, { termosProibidos: [], saude: true });
   assert.equal(r.ok, false);
   assert.ok(r.motivos.length >= 3);
+  assert.match(checarTexto(textoBom + " Desconto de 20% nesta semana.", { termosProibidos: [], saude: true }).motivos.join(), /desconto/);
+});
+
+test("checarTexto: anos e números de carro não são telefone; telefone, 0800, WhatsApp e e-mail são pegos", () => {
+  const ok = (s: string) => checarTexto(textoBom + " " + s, { termosProibidos: [], saude: false }).ok;
+  for (const s of ["Modelos 2019-2020 e 2021.", "Fiat Argo 2024 2025.", "Safra 2023.2024.", "A partir de R$ 45.000.", "Só 10.000 km rodados."]) {
+    assert.equal(ok(s), true, s);
+  }
+  for (const s of ["Ligue (61) 99999-1234.", "Fale no +55 61 3333-4444.", "Ligue 3333-4444.", "Ligue 0800 123 4567.", "Chame no wa.me/5561999991234.", "Escreva para contato@loja.com.br.", "Veja bit.ly/abc."]) {
+    assert.equal(ok(s), false, s);
+  }
+});
+
+test("checarTexto: termo proibido vale como palavra inteira, sem acento e sem repetir motivo", () => {
+  assert.equal(checarTexto(textoBom + " Quem procura carro bom vem aqui.", { termosProibidos: ["cura"], saude: false }).ok, true);
+  const r = checarTexto(textoBom + " Carro de leilão, LEILAO nunca.", { termosProibidos: ["Leilão", "leilao"], saude: false });
+  assert.equal(r.ok, false);
+  assert.equal(r.motivos.filter((m) => m.startsWith("termo proibido")).length, 2);
+  assert.equal(checarTexto(textoBom, { termosProibidos: ["  "], saude: false }).ok, true);
 });
 
 test("escolherImagem: nunca usada primeiro, depois a usada há mais tempo", () => {
@@ -299,6 +318,9 @@ test("mudarHora, mesmoHorario, resumoAgenda e HORARIOS", () => {
   assert.equal(HORARIOS[0], "06:00");
   assert.equal(HORARIOS[1], "06:30");
   assert.equal(HORARIOS[HORARIOS.length - 1], "22:00");
+  // hora inválida não apaga nada
+  assert.deepEqual(mudarHora(a, 4, "25:00"), a);
+  assert.deepEqual(mesmoHorario(a, ""), a);
 });
 
 test("comUtm acrescenta a UTM sem apagar parâmetros e recusa lixo", () => {
@@ -405,7 +427,7 @@ export function normalizarBriefing(v: unknown): Briefing {
 }
 
 export function semAcento(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
 // ------------------------------------------------------------------ temas e palavras-chave
@@ -454,8 +476,11 @@ export function escolherPalavras(palavras: string[], historico: string[][], n = 
 export const TEXTO_MIN = 100;
 export const TEXTO_MAX = 1500;
 
-const RE_TELEFONE = /(?:\+?55[\s-]?)?(?:\(?\d{2}\)?[\s-]?)?9?\d{4}[\s.-]?\d{4}\b/;
-const RE_LINK = /\bhttps?:\/\/|\bwww\.|\b[a-z0-9-]+\.(?:com|net|org|br|digital|app|site|online|store)\b/i;
+// Telefone brasileiro (com ou sem +55 e DDD) e 0800. Não começa no meio de outro número.
+const RE_TELEFONE = /(?<![\d.,])(?:\+?55[\s-]?)?(?:\(?\d{2}\)?[\s-]?)?9?\d{4}[\s.-]?\d{4}\b|\b0800[\s.-]?\d{3}[\s.-]?\d{4}\b/;
+// Pares de anos ("2019-2020", "2024 2025", "2023.2024") parecem telefone de 8 dígitos: saem antes da checagem.
+const RE_PAR_DE_ANOS = /\b(?:19|20)\d{2}\s?[-–/.\s]\s?(?:19|20)\d{2}\b/g;
+const RE_LINK = /\bhttps?:\/\/|\bwww\.|\bwa\.me\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|\b[a-z0-9-]+\.(?:com|net|org|br|digital|app|site|online|store|io|me|ly|ee|co|dev|link|shop)\b/i;
 
 // Aplicadas ao texto sem acento e em minúsculas (perfis de saúde: CFM/CFO).
 const REGRAS_SAUDE: { re: RegExp; motivo: string }[] = [
@@ -466,11 +491,14 @@ const REGRAS_SAUDE: { re: RegExp; motivo: string }[] = [
   { re: /antes e depois/, motivo: "antes e depois" },
   { re: /r\$\s?\d/, motivo: "preço de procedimento" },
   { re: /promoc/, motivo: "promoção" },
+  { re: /descont|\bgratis\b|brinde/, motivo: "desconto, brinde ou grátis" },
   { re: /\b(o|a) melhor\b/, motivo: "superlativo (o melhor)" },
   { re: /\b(o|a) unic[oa]\b/, motivo: "superlativo (o único)" },
   { re: /numero 1|\bn[o°º]\.?\s?1\b/, motivo: "superlativo (número 1)" },
   { re: /mais barat/, motivo: "superlativo (mais barato)" },
 ];
+
+const escaparRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export function checarTexto(
   texto: string,
@@ -480,11 +508,15 @@ export function checarTexto(
   const t = texto.trim();
   if (t.length < TEXTO_MIN) motivos.push(`texto curto (${t.length} caracteres, mínimo ${TEXTO_MIN})`);
   if (t.length > TEXTO_MAX) motivos.push(`texto longo (${t.length} caracteres, máximo ${TEXTO_MAX})`);
-  if (RE_TELEFONE.test(t)) motivos.push("contém telefone");
+  if (RE_TELEFONE.test(t.replace(RE_PAR_DE_ANOS, " "))) motivos.push("contém telefone");
   if (RE_LINK.test(t)) motivos.push("contém link ou site");
   const n = semAcento(t);
   for (const termo of o.termosProibidos) {
-    if (termo.trim() && n.includes(semAcento(termo.trim()))) motivos.push(`termo proibido: ${termo.trim()}`);
+    const x = semAcento(termo.trim());
+    if (!x) continue;
+    // Palavra ou expressão inteira: "cura" não reprova "procura".
+    const re = new RegExp("(^|[^a-z0-9])" + escaparRe(x) + "([^a-z0-9]|$)");
+    if (re.test(n) && !motivos.includes(`termo proibido: ${termo.trim()}`)) motivos.push(`termo proibido: ${termo.trim()}`);
   }
   if (o.saude) for (const r of REGRAS_SAUDE) if (r.re.test(n)) motivos.push(r.motivo);
   return { ok: motivos.length === 0, motivos };
@@ -538,11 +570,13 @@ export function alternarDia(agenda: ItemAgenda[], dia: number): ItemAgenda[] {
 
 /** Troca o horário de um dia já ligado. */
 export function mudarHora(agenda: ItemAgenda[], dia: number, hora: string): ItemAgenda[] {
+  if (!RE_HORA.test(hora)) return normalizarAgenda(agenda); // hora inválida não apaga o dia
   return normalizarAgenda(agenda.map((x) => (x.dia === dia ? { dia, hora } : x)));
 }
 
 /** O mesmo horário em todos os dias ligados. */
 export function mesmoHorario(agenda: ItemAgenda[], hora: string): ItemAgenda[] {
+  if (!RE_HORA.test(hora)) return normalizarAgenda(agenda);
   return normalizarAgenda(agenda.map((x) => ({ dia: x.dia, hora })));
 }
 
@@ -614,7 +648,8 @@ function blocoBriefing(b: Briefing): string {
 export function montarMensagensPost(e: EntradaPost): Mensagens {
   const regras = [
     "Você escreve posts para o Perfil da Empresa no Google (Google Meu Negócio) de negócios locais brasileiros.",
-    "Escreva em português do Brasil, entre 150 e 300 palavras, no máximo 1.400 caracteres.",
+    "Escreva em português do Brasil, entre 120 e 220 palavras, no máximo 1.400 caracteres.",
+    "Texto simples, sem markdown (sem asteriscos, títulos ou listas com marcadores).",
     "Otimize para SEO local: use a palavra-chave e a cidade ou bairro de forma natural, sem repetir à exaustão.",
     "Não inclua número de telefone, WhatsApp, e-mail, links ou nomes de site: o botão do post já leva ao contato.",
     "No máximo 3 hashtags, só se fizerem sentido. Sem emojis em excesso (no máximo 2).",
@@ -625,7 +660,7 @@ export function montarMensagensPost(e: EntradaPost): Mensagens {
   if (e.saude) {
     regras.push(
       "Este é um perfil da área da saúde: siga as regras de publicidade do CFM e do CFO. Não prometa resultado nem cura, " +
-        "não use 'antes e depois', não cite preços, valores ou promoções, não use superlativos ('o melhor', 'o único', 'número 1', 'mais barato').",
+        "não use 'antes e depois', não cite preços, valores, descontos, brindes ou promoções, não use superlativos ('o melhor', 'o único', 'número 1', 'mais barato').",
     );
   }
   const partes = [
@@ -712,7 +747,7 @@ export const ESQUEMA_BRIEFING = {
 - [ ] **Step 4: Rodar os testes e ver passarem**
 
 Run: `node --test src/lib/gmnRegras.test.ts`
-Expected: PASS (14 testes). Depois `npm test` inteiro: nenhum teste antigo quebrado.
+Expected: PASS (16 testes). Depois `npm test` inteiro: nenhum teste antigo quebrado.
 
 - [ ] **Step 5: Commit**
 
@@ -1013,7 +1048,8 @@ export async function gerarConteudo(sb: Sb, perfil: any, postId: string): Promis
     motivo = c.ok ? null : c.motivos.join("; ");
     if (c.ok) break;
   }
-  const usadas = resposta.palavras_chave?.length ? resposta.palavras_chave : palavras;
+  // O rodízio conta as palavras escolhidas aqui (a IA pode reescrever a palavra e ela nunca "sairia da fila").
+  const usadas = palavras.length ? palavras : resposta.palavras_chave ?? [];
   if (motivo) {
     return {
       status: "pulado", tema, palavras_chave: usadas, texto: resposta.texto, imagem_origem: null, imagem_ref: null,

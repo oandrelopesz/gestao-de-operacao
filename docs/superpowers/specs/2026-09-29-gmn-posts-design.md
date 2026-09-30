@@ -165,7 +165,7 @@ As chamadas usam `net.http_post`, no padrão de `20260429023356_…sql`.
    palavras-chave do briefing, as usadas há mais tempo (pelo histórico de `gmn_posts.palavras_chave`).
 3. **Texto:** chamada à OpenAI com saída em JSON (`{ "texto": "…", "palavras_chave": ["…"] }`). O prompt leva o briefing,
    o tema, as palavras-chave, os textos dos últimos 10 posts do perfil e as regras:
-   - português do Brasil, de 150 a 300 palavras, no máximo 1.500 caracteres;
+   - português do Brasil, de 120 a 220 palavras, no máximo 1.400 caracteres (a checagem aceita até 1.500), texto simples sem markdown;
    - palavra-chave e bairro ou cidade aparecem de forma natural, sem repetição forçada;
    - sem telefone, sem URL e sem hashtags em excesso;
    - se `saude`, as regras de 6.3.
@@ -193,10 +193,10 @@ chamam a mesma função com `post_id` explícito.
 
 Reprova quando:
 - o texto contém algum item de `termos_proibidos` (comparação sem acentos e sem diferenciar maiúsculas);
-- o texto contém telefone (regex de números BR) ou URL/domínio;
+- o texto contém telefone (regex de números BR e 0800; pares de anos como "2019-2020" não contam) ou URL/domínio, `wa.me` ou e-mail;
 - o texto tem menos de 100 ou mais de 1.500 caracteres;
 - o perfil é `saude` e o texto casa com a lista fixa: promessa de resultado ("garantid", "100%", "resultado
-  definitivo", "cura"), "antes e depois", preço/valor/desconto de procedimento (`R$`, "promoção"), superlativos
+  definitivo", "cura"), "antes e depois", preço/valor/desconto de procedimento (`R$`, "promoção", "desconto", "brinde", "grátis"), superlativos
   ("o melhor", "o único", "número 1", "mais barato").
 
 A lista fixa de saúde fica em `supabase/functions/gmn/regras.ts` e é testada com `node --test` (`src/lib/gmnRegras.test.ts`).
