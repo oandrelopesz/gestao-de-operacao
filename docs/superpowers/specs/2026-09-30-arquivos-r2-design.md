@@ -50,7 +50,7 @@ o app já manda — o mesmo nível de hoje. As ações `migrar` exigem também `
 | `POST {acao:"apagar", chaves}` | apaga no R2 (até 1.000 por chamada; ausente conta como apagado) | `{ apagados }` |
 | `POST {acao:"copiar", de, para}` | copia um objeto dentro do R2 | `{ ok }` ou 404 |
 | `POST {acao:"listar", prefixo}` | lista as chaves de uma pasta | `{ chaves }` |
-| `POST {acao:"migrar", modulo, direcao, limite}` | copia entre Supabase e R2 o que falta no destino (idempotente, em lotes). `direcao`: `"para-r2"` (migração) ou `"para-supabase"` (caminho de volta) | `{ copiados, existentes, faltam }` |
+| `POST {acao:"migrar", modulo, direcao, limite}` | copia entre Supabase e R2 o que falta no destino (idempotente, em lotes de até ~100 s). `direcao`: `"para-r2"` (migração) ou `"para-supabase"` (caminho de volta). Um arquivo com erro não trava os outros: vai para `erros` e é tentado de novo na próxima chamada | `{ copiados, erros, existentes, faltam }` |
 | `GET ?c=notas/<arquivo>` | redireciona (302) para uma URL assinada de leitura | — |
 
 - **Módulos e buckets de origem:** `arquivos` ↔ bucket `pdfs`; `notas` ↔ `notas`; `fluxogramas` ↔ `fluxogramas`.
@@ -60,7 +60,7 @@ o app já manda — o mesmo nível de hoje. As ações `migrar` exigem também `
 - **Secrets:** `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_ARQUIVOS` (= `gestao-arquivos`).
   O GMN usa os mesmos três primeiros com `R2_BUCKET` (= `gmn-midia`) e `R2_PUBLIC_BASE`.
 - **Erros:** `{ error }` com 4xx/5xx e mensagem legível em português. Um `GET` de status (`GET` sem `c`) devolve
-  `{ r2: boolean }` para conferir se os secrets estão lá.
+  `{ r2: boolean, bucket }` para conferir se os secrets estão lá e se o bucket responde (`bucket: "ok"`).
 
 ## 5. Front
 
