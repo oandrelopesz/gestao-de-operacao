@@ -1,12 +1,12 @@
 // Arquivos do sistema no Cloudflare R2 (spec docs/superpowers/specs/2026-09-30-arquivos-r2-design.md).
-//   GET                                   -> { r2 }                          os secrets do R2 estão configurados?
+//   GET                                   -> { r2, bucket }                  secrets configurados e bucket respondendo?
 //   GET ?c=notas/<arquivo>                -> 302 para URL assinada           endereço fixo das imagens das notas
 //   POST { acao: "enviar", chave }        -> { url }                         URL assinada de PUT (15 min)
 //   POST { acao: "ler", chave }           -> { url } | 404                   URL assinada de GET (1 h)
 //   POST { acao: "apagar", chaves }       -> { apagados }
 //   POST { acao: "copiar", de, para }     -> { ok } | 404
 //   POST { acao: "listar", prefixo }      -> { chaves }
-//   POST { acao: "migrar", modulo, direcao, limite } -> { copiados, existentes, faltam, total, invalidos }  (x-swipe-key)
+//   POST { acao: "migrar", modulo, direcao, limite } -> { copiados, erros, existentes, faltam, total, invalidos }  (x-swipe-key)
 //   POST { acao: "conferir", modulo }     -> { iguais, soNoSupabase, soNoR2, tamanhoDiferente }         (x-swipe-key)
 // POST exige o cabeçalho apikey com a chave pública do projeto: o mesmo nível de acesso que o Storage tinha.
 // deno-lint-ignore-file no-explicit-any
@@ -47,6 +47,11 @@ function chaveValida(chave: unknown): chave is string {
   for (const ch of caminho) {
     const codigo = ch.charCodeAt(0);
     if (codigo < 32 || codigo === 127) return false;
+  }
+  try {
+    encodeURIComponent(caminho); // surrogate solto: não vira URL
+  } catch {
+    return false;
   }
   return true;
 }
@@ -106,7 +111,8 @@ function r2() {
   const faltam = SECRETS_R2.filter((k) => !env(k));
   if (faltam.length) throw new ErroHttp(503, `Faltam secrets do R2: ${faltam.join(", ")}.`);
   return {
-    aws: new AwsClient({ accessKeyId: env("R2_ACCESS_KEY_ID"), secretAccessKey: env("R2_SECRET_ACCESS_KEY"), service: "s3", region: "auto" }),
+    // retries: 3 (o padrão do aws4fetch é 10, com espera crescente: estouraria o tempo da função)
+    aws: new AwsClient({ accessKeyId: env("R2_ACCESS_KEY_ID"), secretAccessKey: env("R2_SECRET_ACCESS_KEY"), service: "s3", region: "auto", retries: 3 }),
     base: `https://${env("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com/${env("R2_BUCKET_ARQUIVOS")}`,
   };
 }
@@ -153,8 +159,22 @@ async function copiar(de: string, para: string): Promise<void> {
   if (!r.ok) throw new ErroHttp(502, `R2 respondeu ${r.status} ao copiar: ${(await r.text()).slice(0, 200)}`);
 }
 
+/** Status: secrets presentes e o bucket responde (lista 1 objeto); pega bucket com nome errado. */
+async function status() {
+  if (!r2Configurado()) return { r2: false, bucket: "faltam secrets" };
+  const { aws, base } = r2();
+  const u = new URL(base);
+  u.searchParams.set("list-type", "2");
+  u.searchParams.set("max-keys", "1");
+  const r = await aws.fetch(u.toString());
+  return { r2: true, bucket: r.ok ? "ok" : `R2 respondeu ${r.status}` };
+}
+
 function desfazerXml(s: string): string {
-  return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+  return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 }
 
 /** Objetos com o prefixo: chave → tamanho em bytes (segue a paginação do ListObjectsV2). */
@@ -207,34 +227,61 @@ async function listarModuloNoR2(modulo: string): Promise<Map<string, number>> {
   return new Map([...noR2].map(([chave, tamanho]) => [chave.slice(modulo.length + 1), tamanho]));
 }
 
+/** Tempo máximo de uma chamada de `migrar` (a função tem limite de execução); o que faltar vai na próxima. */
+const PRAZO_MIGRAR_MS = 100_000;
+
+/** Copia um arquivo entre o bucket antigo e o R2, na direção pedida. */
+async function copiarUm(sb: any, bucket: string, modulo: string, caminho: string, direcao: "para-r2" | "para-supabase") {
+  const { aws, base } = r2();
+  const url = `${base}/${codificar(`${modulo}/${caminho}`)}`;
+  if (direcao === "para-r2") {
+    const { data, error } = await sb.storage.from(bucket).download(caminho);
+    if (error || !data) throw new Error(`Supabase não entregou o arquivo: ${error?.message ?? "arquivo vazio"}`);
+    const r = await aws.fetch(url, { method: "PUT", body: data, headers: { "Content-Type": data.type || "application/octet-stream" } });
+    if (!r.ok) throw new Error(`R2 respondeu ${r.status} ao gravar.`);
+    return;
+  }
+  const r = await aws.fetch(url);
+  if (!r.ok) throw new Error(`R2 respondeu ${r.status} ao ler.`);
+  const blob = await r.blob();
+  const { error } = await sb.storage.from(bucket).upload(caminho, blob, {
+    contentType: r.headers.get("content-type") || "application/octet-stream",
+    upsert: false,
+  });
+  if (error) throw new Error(`Supabase recusou o arquivo: ${error.message}`);
+}
+
+/**
+ * Copia o que falta no destino, até `limite` arquivos copiados ou o prazo. Um arquivo com erro não trava os
+ * outros: vai para `erros` e continua em `faltam` (será tentado de novo na próxima chamada).
+ */
 async function migrar(sb: any, modulo: string, direcao: "para-r2" | "para-supabase", limite: number) {
+  const inicio = Date.now();
   const bucket = MODULOS[modulo];
   const noSupabase = await listarSupabase(sb, bucket);
   const noR2 = await listarModuloNoR2(modulo);
   const [origem, destino] = direcao === "para-r2" ? [noSupabase, noR2] : [noR2, noSupabase];
   const invalidos = [...origem.keys()].filter((c) => !chaveValida(`${modulo}/${c}`));
   const faltando = [...origem.keys()].filter((c) => !destino.has(c) && chaveValida(`${modulo}/${c}`));
-  const lote = faltando.slice(0, limite);
-  const { aws, base } = r2();
-  for (const caminho of lote) {
-    const url = `${base}/${codificar(`${modulo}/${caminho}`)}`;
-    if (direcao === "para-r2") {
-      const { data, error } = await sb.storage.from(bucket).download(caminho);
-      if (error || !data) throw new ErroHttp(502, `Supabase não entregou ${caminho}: ${error?.message ?? "arquivo vazio"}`);
-      const r = await aws.fetch(url, { method: "PUT", body: data, headers: { "Content-Type": data.type || "application/octet-stream" } });
-      if (!r.ok) throw new ErroHttp(502, `R2 respondeu ${r.status} ao gravar ${caminho}.`);
-    } else {
-      const r = await aws.fetch(url);
-      if (!r.ok) throw new ErroHttp(502, `R2 respondeu ${r.status} ao ler ${caminho}.`);
-      const blob = await r.blob();
-      const { error } = await sb.storage.from(bucket).upload(caminho, blob, {
-        contentType: r.headers.get("content-type") || "application/octet-stream",
-        upsert: false,
-      });
-      if (error) throw new ErroHttp(502, `Supabase recusou ${caminho}: ${error.message}`);
+  const erros: { caminho: string; motivo: string }[] = [];
+  let copiados = 0;
+  for (const caminho of faltando) {
+    if (copiados >= limite || Date.now() - inicio > PRAZO_MIGRAR_MS) break;
+    try {
+      await copiarUm(sb, bucket, modulo, caminho, direcao);
+      copiados++;
+    } catch (e) {
+      erros.push({ caminho, motivo: e instanceof Error ? e.message : String(e) });
     }
   }
-  return { copiados: lote.length, existentes: origem.size - faltando.length - invalidos.length, faltam: faltando.length - lote.length, total: origem.size, invalidos };
+  return {
+    copiados,
+    erros,
+    existentes: origem.size - faltando.length - invalidos.length,
+    faltam: faltando.length - copiados,
+    total: origem.size,
+    invalidos,
+  };
 }
 
 async function conferir(sb: any, modulo: string) {
@@ -243,8 +290,8 @@ async function conferir(sb: any, modulo: string) {
   const soNoSupabase = [...noSupabase.keys()].filter((c) => !noR2.has(c));
   const soNoR2 = [...noR2.keys()].filter((c) => !noSupabase.has(c));
   const tamanhoDiferente = [...noSupabase].filter(([c, t]) => noR2.has(c) && noR2.get(c) !== t).map(([c]) => c);
-  const iguais = [...noSupabase].filter(([c, t]) => noR2.get(c) === t).length;
-  return { iguais, soNoSupabase, soNoR2, tamanhoDiferente };
+  const quantosIguais = [...noSupabase].filter(([c, t]) => noR2.get(c) === t).length;
+  return { iguais: quantosIguais, soNoSupabase, soNoR2, tamanhoDiferente };
 }
 
 // ------------------------------------------------------------------ rotas
@@ -254,7 +301,7 @@ Deno.serve(async (req) => {
   try {
     if (req.method === "GET") {
       const c = new URL(req.url).searchParams.get("c");
-      if (!c) return json({ r2: r2Configurado() });
+      if (!c) return json(await status());
       const chave = exigirChave(c);
       if (!chave.startsWith("notas/")) throw new ErroHttp(403, "Só as imagens das notas têm endereço público.");
       return new Response(null, {
@@ -265,7 +312,7 @@ Deno.serve(async (req) => {
     if (req.method !== "POST") return json({ error: "Método não suportado" }, 405);
     if (!chavePublicaValida(req.headers.get("apikey") || "")) return json({ error: "Acesso não autorizado." }, 401);
 
-    const body = await req.json().catch(() => ({}));
+    const body = (await req.json().catch(() => null)) ?? {};
     switch (body.acao) {
       case "enviar":
         return json({ url: await assinar("PUT", exigirChave(body.chave), 900) });
@@ -300,6 +347,6 @@ Deno.serve(async (req) => {
   } catch (e) {
     if (e instanceof ErroHttp) return json({ error: e.message }, e.status);
     console.error(e);
-    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    return json({ error: `Erro inesperado na função r2: ${e instanceof Error ? e.message : String(e)}` }, 500);
   }
 });
