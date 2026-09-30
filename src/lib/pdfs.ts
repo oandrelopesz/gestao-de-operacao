@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 // Aba "Arquivos" (antes só PDFs): os nomes internos (tabelas pdfs/pdf_pastas, bucket "pdfs")
 // ficaram os mesmos para não mexer nos dados; hoje guardam qualquer documento (sem imagem/vídeo).
+import { apagarNosDois, baixarComReserva, enviarR2 } from "@/lib/r2";
 import {
   contentTypeDe, extensaoDe, idsDescendentes, nomeParaDownload, nomeSemExtensao, proximaOrdem, tipoDoArquivo, type PdfPasta,
 } from "@/lib/pdfsArvore";
@@ -24,7 +25,6 @@ export interface PdfBiblioteca {
   pdfs: PdfArquivo[];
 }
 
-export const PDF_BUCKET = "pdfs";
 /**
  * Limite padrão por arquivo. O valor em uso vem de app_config.pdf_tamanho_max_mb (Admin → PDFs),
  * que é a guarda real. O bucket (migration 20260923120000_pdfs.sql) aceita até 200 MB: acima
@@ -114,11 +114,8 @@ export async function excluirPasta(id: string, biblioteca: PdfBiblioteca): Promi
 // ---------------------------------------------------------------- Arquivos
 
 async function removerDoStorage(caminhos: string[]): Promise<void> {
-  // A API remove no máximo 1000 objetos por chamada
-  for (let i = 0; i < caminhos.length; i += 1000) {
-    const { error } = await supabase.storage.from(PDF_BUCKET).remove(caminhos.slice(i, i + 1000));
-    if (error) throw error;
-  }
+  // Durante a transição, apaga no R2 e no bucket antigo do Supabase
+  await apagarNosDois("arquivos", caminhos);
 }
 
 /** Caminho novo no bucket, com a extensão do arquivo original (ou sem, se ele não tiver). */
@@ -130,38 +127,9 @@ function novoCaminho(nomeOriginal: string): string {
   return ext ? `${id}.${ext}` : id;
 }
 
-/** Sobe o conteúdo para o Storage (XHR, para ter progresso). */
-async function subirObjeto(arquivo: File, caminho: string, onProgresso?: (fracao: number) => void, limiteMb: number = PDF_TAMANHO_MAX_PADRAO_MB): Promise<void> {
-  const url = import.meta.env.VITE_SUPABASE_URL as string;
-  const chave = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-  const { data: sessao } = await supabase.auth.getSession();
-  const token = sessao.session?.access_token || chave;
-
-  await new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${url}/storage/v1/object/${PDF_BUCKET}/${caminho}`);
-    xhr.setRequestHeader("apikey", chave);
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    xhr.setRequestHeader("Content-Type", contentTypeDe(arquivo));
-    xhr.setRequestHeader("x-upsert", "false");
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgresso?.(e.loaded / e.total);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) return resolve();
-      let msg = `Falha no envio (HTTP ${xhr.status})`;
-      try {
-        const corpo = JSON.parse(xhr.responseText);
-        msg = corpo.message || corpo.error || msg;
-      } catch {
-        // resposta sem JSON: fica a mensagem com o status
-      }
-      if (xhr.status === 413) msg = msgLimite(limiteMb);
-      reject(new Error(msg));
-    };
-    xhr.onerror = () => reject(new Error("Falha de rede ao enviar o arquivo"));
-    xhr.send(arquivo);
-  });
+/** Sobe o conteúdo para o R2 (direto do navegador, com progresso). */
+async function subirObjeto(arquivo: File, caminho: string, onProgresso?: (fracao: number) => void): Promise<void> {
+  await enviarR2("arquivos", caminho, arquivo, contentTypeDe(arquivo), onProgresso);
 }
 
 /**
@@ -177,7 +145,7 @@ export async function enviarPdf(
 ): Promise<PdfArquivo> {
   if (arquivo.size > mbParaBytes(limiteMb)) throw new Error(msgLimite(limiteMb));
   const caminho = novoCaminho(arquivo.name);
-  await subirObjeto(arquivo, caminho, onProgresso, limiteMb);
+  await subirObjeto(arquivo, caminho, onProgresso);
 
   const { data, error } = await supabase
     .from("pdfs")
@@ -193,7 +161,7 @@ export async function enviarPdf(
     .select("id, pasta_id, nome, arquivo_nome, player, storage_path, tamanho, created_at")
     .single();
   if (error) {
-    await supabase.storage.from(PDF_BUCKET).remove([caminho]).catch(() => {});
+    await apagarNosDois("arquivos", [caminho]).catch(() => {});
     throw error;
   }
   return data as PdfArquivo;
@@ -211,7 +179,7 @@ export async function trocarArquivo(
 ): Promise<PdfArquivo> {
   if (arquivo.size > mbParaBytes(limiteMb)) throw new Error(msgLimite(limiteMb));
   const caminho = novoCaminho(arquivo.name);
-  await subirObjeto(arquivo, caminho, onProgresso, limiteMb);
+  await subirObjeto(arquivo, caminho, onProgresso);
   const nomeEraDoArquivo = atual.nome.trim() === nomeSemExtensao(atual.arquivo_nome).trim();
   const patch = {
     storage_path: caminho,
@@ -226,11 +194,11 @@ export async function trocarArquivo(
     .select("id, pasta_id, nome, arquivo_nome, player, storage_path, tamanho, created_at")
     .single();
   if (error) {
-    await supabase.storage.from(PDF_BUCKET).remove([caminho]).catch(() => {});
+    await apagarNosDois("arquivos", [caminho]).catch(() => {});
     throw error;
   }
   // O antigo sai por último: se falhar, sobra só um objeto órfão no Storage, nunca um card vazio
-  await supabase.storage.from(PDF_BUCKET).remove([atual.storage_path]).catch(() => {});
+  await apagarNosDois("arquivos", [atual.storage_path]).catch(() => {});
   return data as PdfArquivo;
 }
 
@@ -248,10 +216,9 @@ export async function excluirPdf(pdf: PdfArquivo): Promise<void> {
   if (error) throw error;
 }
 
-/** Baixa o conteúdo do PDF (o bucket é privado, então passa pela API com a chave do app). */
+/** Baixa o conteúdo do arquivo (R2, com reserva no bucket antigo do Supabase durante a transição). */
 export async function baixarConteudo(pdf: PdfArquivo): Promise<Blob> {
-  const { data, error } = await supabase.storage.from(PDF_BUCKET).download(pdf.storage_path);
-  if (error) throw error;
+  const data = await baixarComReserva("arquivos", pdf.storage_path);
   // Garante o tipo certo para o visualizador do navegador
   const tipo = tipoDoArquivo(pdf.arquivo_nome) === "pdf" ? "application/pdf" : contentTypeDe({ name: pdf.arquivo_nome, type: "" });
   return data.type === tipo ? data : new Blob([data], { type: tipo });
