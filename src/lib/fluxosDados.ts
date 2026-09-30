@@ -1,11 +1,11 @@
-// Aba Fluxogramas: quadros (tabela fluxos), temas (fluxo_temas) e imagens coladas (bucket privado "fluxogramas").
+// Aba Fluxogramas: quadros (tabela fluxos), temas (fluxo_temas) e imagens coladas (Cloudflare R2, pasta "fluxogramas").
 // O types.ts gerado ainda não conhece as tabelas novas: por isso `as any` nos `.from(...)`.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "@/integrations/supabase/client";
 import { extensaoDoMime, lerCena, type ArquivoSalvo, type CenaSalva } from "@/lib/fluxoCena";
 import type { ApiTemas, Tema } from "@/components/temas/TemasLista";
+import { apagarNosDois, baixarComReserva, copiarComReserva, enviarR2, listarNosDois } from "@/lib/r2";
 
-export const BUCKET_FLUXOS = "fluxogramas";
 /** Disparado a cada mudança nos temas, para a aba e o Admin recarregarem. */
 export const EVENTO_TEMAS_FLUXOS = "fluxos-temas";
 /** Disparado quando um quadro termina de salvar (a lista, se aberta, recarrega a miniatura e a data). */
@@ -30,7 +30,6 @@ const COLUNAS_RESUMO = "id, titulo, tema_id, miniatura, textos, modelo, created_
 
 const temas = () => supabase.from("fluxo_temas" as any) as any;
 const fluxos = () => supabase.from("fluxos" as any) as any;
-const bucket = () => supabase.storage.from(BUCKET_FLUXOS);
 
 function avisarTemas() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(EVENTO_TEMAS_FLUXOS));
@@ -131,8 +130,7 @@ export async function duplicarFluxo(id: string): Promise<Fluxo> {
   const arquivos: Record<string, ArquivoSalvo> = {};
   for (const [fileId, a] of Object.entries(original.cena.arquivos)) {
     const destino = `${idNovo}/${a.caminho.split("/").pop()}`;
-    const { error } = await bucket().copy(a.caminho, destino);
-    if (error) throw error;
+    await copiarComReserva("fluxogramas", a.caminho, destino, a.mimeType);
     arquivos[fileId] = { caminho: destino, mimeType: a.mimeType };
   }
   const { data, error } = await fluxos()
@@ -158,8 +156,8 @@ export async function duplicarFluxo(id: string): Promise<Fluxo> {
 export async function excluirFluxo(id: string): Promise<void> {
   const { error } = await fluxos().delete().eq("id", id);
   if (error) throw error;
-  const { data } = await bucket().list(id, { limit: 1000 });
-  await apagarImagens((data || []).map((o) => `${id}/${o.name}`));
+  const caminhos = await listarNosDois("fluxogramas", id).catch(() => [] as string[]);
+  await apagarImagens(caminhos);
 }
 
 // ---------------------------------------------------------------- Imagens
@@ -168,8 +166,7 @@ export async function excluirFluxo(id: string): Promise<void> {
 export async function subirImagem(fluxoId: string, fileId: string, dataURL: string, mimeType: string): Promise<ArquivoSalvo> {
   const blob = await (await fetch(dataURL)).blob();
   const caminho = `${fluxoId}/${fileId}.${extensaoDoMime(mimeType)}`;
-  const { error } = await bucket().upload(caminho, blob, { contentType: mimeType, upsert: true });
-  if (error) throw error;
+  await enviarR2("fluxogramas", caminho, blob, mimeType);
   return { caminho, mimeType };
 }
 
@@ -186,8 +183,7 @@ function paraDataURL(blob: Blob): Promise<string> {
 export async function baixarImagens(arquivos: Record<string, ArquivoSalvo>): Promise<{ id: string; dataURL: string; mimeType: string }[]> {
   const resultados = await Promise.allSettled(
     Object.entries(arquivos).map(async ([id, a]) => {
-      const { data, error } = await bucket().download(a.caminho);
-      if (error || !data) throw error ?? new Error("Imagem não encontrada");
+      const data = await baixarComReserva("fluxogramas", a.caminho);
       return { id, dataURL: await paraDataURL(data), mimeType: a.mimeType };
     }),
   );
@@ -196,7 +192,8 @@ export async function baixarImagens(arquivos: Record<string, ArquivoSalvo>): Pro
 
 export async function apagarImagens(caminhos: string[]): Promise<void> {
   if (!caminhos.length) return;
-  await bucket().remove(caminhos).catch(() => {});
+  // Durante a transição, apaga no R2 e no bucket antigo do Supabase
+  await apagarNosDois("fluxogramas", caminhos).catch(() => {});
 }
 
 // ---------------------------------------------------------------- Temas
