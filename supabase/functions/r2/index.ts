@@ -4,7 +4,7 @@
 //   POST { acao: "enviar", chave }        -> { url }                         URL assinada de PUT (15 min)
 //   POST { acao: "ler", chave }           -> { url } | 404                   URL assinada de GET (1 h)
 //   POST { acao: "apagar", chaves }       -> { apagados }
-//   POST { acao: "copiar", de, para }     -> { ok } | 404
+//   POST { acao: "copiar", de, para }     -> { ok } | 404 | 400 (módulos diferentes)
 //   POST { acao: "listar", prefixo }      -> { chaves }
 //   POST { acao: "migrar", modulo, direcao, limite } -> { copiados, erros, existentes, faltam, total, invalidos }  (x-swipe-key)
 //   POST { acao: "conferir", modulo }     -> { iguais, soNoSupabase, soNoR2, tamanhoDiferente }         (x-swipe-key)
