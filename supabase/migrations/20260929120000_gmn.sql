@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS public.gmn_perfis (
   cliente_id UUID REFERENCES public.clientes(id) ON DELETE SET NULL,
   ativo BOOLEAN NOT NULL DEFAULT false,
   sem_acesso BOOLEAN NOT NULL DEFAULT false,
-  posts_semana SMALLINT NOT NULL DEFAULT 2 CHECK (posts_semana BETWEEN 1 AND 3),
-  dias SMALLINT[] NOT NULL DEFAULT '{2,4}',
+  agenda JSONB NOT NULL DEFAULT '[{"dia": 2, "hora": "09:00"}, {"dia": 4, "hora": "09:00"}]'::jsonb
+    CHECK (jsonb_typeof(agenda) = 'array'),
   cta_tipo TEXT NOT NULL DEFAULT 'LEARN_MORE' CHECK (cta_tipo IN ('LEARN_MORE', 'CALL', 'BOOK')),
   cta_url TEXT,
   drive_pasta_url TEXT,
