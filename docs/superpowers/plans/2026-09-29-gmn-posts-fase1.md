@@ -140,6 +140,13 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- Status dos posts ao vivo na aba (spec §3.3).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'gmn_posts') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.gmn_posts;
+  END IF;
+END $$;
 ```
 
 - [ ] **Step 2: Registrar na spec os ajustes deste plano**
