@@ -59,6 +59,7 @@ test("checarTexto só aplica as regras de saúde em perfil de saúde", () => {
   assert.equal(r.ok, false);
   assert.ok(r.motivos.length >= 3);
   assert.match(checarTexto(textoBom + " Desconto de 20% nesta semana.", { termosProibidos: [], saude: true }).motivos.join(), /desconto/);
+  assert.equal(checarTexto(textoBom + " Atendimento descontraído para diabetes descontrolada.", { termosProibidos: [], saude: true }).ok, true);
 });
 
 test("checarTexto: anos e números de carro não são telefone; telefone, 0800, WhatsApp e e-mail são pegos", () => {
@@ -73,6 +74,7 @@ test("checarTexto: anos e números de carro não são telefone; telefone, 0800, 
 
 test("checarTexto: termo proibido vale como palavra inteira, sem acento e sem repetir motivo", () => {
   assert.equal(checarTexto(textoBom + " Quem procura carro bom vem aqui.", { termosProibidos: ["cura"], saude: false }).ok, true);
+  assert.equal(checarTexto(textoBom + " Temos seminovos revisados.", { termosProibidos: ["seminovo"], saude: false }).ok, false);
   const r = checarTexto(textoBom + " Carro de leilão, LEILAO nunca.", { termosProibidos: ["Leilão", "leilao"], saude: false });
   assert.equal(r.ok, false);
   assert.equal(r.motivos.filter((m) => m.startsWith("termo proibido")).length, 2);
@@ -152,12 +154,15 @@ test("montarMensagensPost leva briefing, tema, palavras, anteriores e regras de 
   assert.match(m.user, /seminovos brasília/);
   assert.match(m.user, /Post antigo/);
   assert.match(m.system, /telefone/i);
+  assert.match(m.system, /entre 120 e 220 palavras/);
+  assert.match(m.system, /sem markdown/);
   assert.doesNotMatch(m.system, /CFM/);
   const s = montarMensagensPost({
     nome: "Clínica", categoria: null, briefing, saude: true, tema: "servico", palavras: [], anteriores: [],
     motivoReprovacao: "contém telefone",
   });
   assert.match(s.system, /CFM/);
+  assert.match(s.system, /descontos/);
   assert.match(s.user, /contém telefone/);
 });
 

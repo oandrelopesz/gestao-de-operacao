@@ -93,7 +93,7 @@ export const TEXTO_MAX = 1500;
 const RE_TELEFONE = /(?<![\d.,])(?:\+?55[\s-]?)?(?:\(?\d{2}\)?[\s-]?)?9?\d{4}[\s.-]?\d{4}\b|\b0800[\s.-]?\d{3}[\s.-]?\d{4}\b/;
 // Pares de anos ("2019-2020", "2024 2025", "2023.2024") parecem telefone de 8 dígitos: saem antes da checagem.
 const RE_PAR_DE_ANOS = /\b(?:19|20)\d{2}\s?[-–/.\s]\s?(?:19|20)\d{2}\b/g;
-const RE_LINK = /\bhttps?:\/\/|\bwww\.|\bwa\.me\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|\b[a-z0-9-]+\.(?:com|net|org|br|digital|app|site|online|store|io|me|ly|ee|co|dev|link|shop)\b/i;
+const RE_LINK = /\bhttps?:\/\/|\bwww\.|\bwa\.me\b|(?<![\w.+-])[\w.+-]+@[\w-]+\.[a-z]{2,}|\b[a-z0-9-]+\.(?:com|net|org|br|digital|app|site|online|store|io|me|ly|ee|co|dev|link|shop)\b/i;
 
 // Aplicadas ao texto sem acento e em minúsculas (perfis de saúde: CFM/CFO).
 const REGRAS_SAUDE: { re: RegExp; motivo: string }[] = [
@@ -104,7 +104,7 @@ const REGRAS_SAUDE: { re: RegExp; motivo: string }[] = [
   { re: /antes e depois/, motivo: "antes e depois" },
   { re: /r\$\s?\d/, motivo: "preço de procedimento" },
   { re: /promoc/, motivo: "promoção" },
-  { re: /descont|\bgratis\b|brinde/, motivo: "desconto, brinde ou grátis" },
+  { re: /\bdescontos?\b|\bgratis\b|\bgratuit|\bbrindes?\b/, motivo: "desconto, brinde ou grátis" },
   { re: /\b(o|a) melhor\b/, motivo: "superlativo (o melhor)" },
   { re: /\b(o|a) unic[oa]\b/, motivo: "superlativo (o único)" },
   { re: /numero 1|\bn[o°º]\.?\s?1\b/, motivo: "superlativo (número 1)" },
@@ -128,7 +128,7 @@ export function checarTexto(
     const x = semAcento(termo.trim());
     if (!x) continue;
     // Palavra ou expressão inteira: "cura" não reprova "procura".
-    const re = new RegExp("(^|[^a-z0-9])" + escaparRe(x) + "([^a-z0-9]|$)");
+    const re = new RegExp("(^|[^a-z0-9])" + escaparRe(x) + "(?:s|es)?([^a-z0-9]|$)"); // aceita o plural
     if (re.test(n) && !motivos.includes(`termo proibido: ${termo.trim()}`)) motivos.push(`termo proibido: ${termo.trim()}`);
   }
   if (o.saude) for (const r of REGRAS_SAUDE) if (r.re.test(n)) motivos.push(r.motivo);

@@ -261,6 +261,7 @@ test("checarTexto só aplica as regras de saúde em perfil de saúde", () => {
   assert.equal(r.ok, false);
   assert.ok(r.motivos.length >= 3);
   assert.match(checarTexto(textoBom + " Desconto de 20% nesta semana.", { termosProibidos: [], saude: true }).motivos.join(), /desconto/);
+  assert.equal(checarTexto(textoBom + " Atendimento descontraído para diabetes descontrolada.", { termosProibidos: [], saude: true }).ok, true);
 });
 
 test("checarTexto: anos e números de carro não são telefone; telefone, 0800, WhatsApp e e-mail são pegos", () => {
@@ -275,6 +276,7 @@ test("checarTexto: anos e números de carro não são telefone; telefone, 0800, 
 
 test("checarTexto: termo proibido vale como palavra inteira, sem acento e sem repetir motivo", () => {
   assert.equal(checarTexto(textoBom + " Quem procura carro bom vem aqui.", { termosProibidos: ["cura"], saude: false }).ok, true);
+  assert.equal(checarTexto(textoBom + " Temos seminovos revisados.", { termosProibidos: ["seminovo"], saude: false }).ok, false);
   const r = checarTexto(textoBom + " Carro de leilão, LEILAO nunca.", { termosProibidos: ["Leilão", "leilao"], saude: false });
   assert.equal(r.ok, false);
   assert.equal(r.motivos.filter((m) => m.startsWith("termo proibido")).length, 2);
@@ -354,12 +356,15 @@ test("montarMensagensPost leva briefing, tema, palavras, anteriores e regras de 
   assert.match(m.user, /seminovos brasília/);
   assert.match(m.user, /Post antigo/);
   assert.match(m.system, /telefone/i);
+  assert.match(m.system, /entre 120 e 220 palavras/);
+  assert.match(m.system, /sem markdown/);
   assert.doesNotMatch(m.system, /CFM/);
   const s = montarMensagensPost({
     nome: "Clínica", categoria: null, briefing, saude: true, tema: "servico", palavras: [], anteriores: [],
     motivoReprovacao: "contém telefone",
   });
   assert.match(s.system, /CFM/);
+  assert.match(s.system, /descontos/);
   assert.match(s.user, /contém telefone/);
 });
 
@@ -480,7 +485,7 @@ export const TEXTO_MAX = 1500;
 const RE_TELEFONE = /(?<![\d.,])(?:\+?55[\s-]?)?(?:\(?\d{2}\)?[\s-]?)?9?\d{4}[\s.-]?\d{4}\b|\b0800[\s.-]?\d{3}[\s.-]?\d{4}\b/;
 // Pares de anos ("2019-2020", "2024 2025", "2023.2024") parecem telefone de 8 dígitos: saem antes da checagem.
 const RE_PAR_DE_ANOS = /\b(?:19|20)\d{2}\s?[-–/.\s]\s?(?:19|20)\d{2}\b/g;
-const RE_LINK = /\bhttps?:\/\/|\bwww\.|\bwa\.me\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|\b[a-z0-9-]+\.(?:com|net|org|br|digital|app|site|online|store|io|me|ly|ee|co|dev|link|shop)\b/i;
+const RE_LINK = /\bhttps?:\/\/|\bwww\.|\bwa\.me\b|(?<![\w.+-])[\w.+-]+@[\w-]+\.[a-z]{2,}|\b[a-z0-9-]+\.(?:com|net|org|br|digital|app|site|online|store|io|me|ly|ee|co|dev|link|shop)\b/i;
 
 // Aplicadas ao texto sem acento e em minúsculas (perfis de saúde: CFM/CFO).
 const REGRAS_SAUDE: { re: RegExp; motivo: string }[] = [
@@ -491,7 +496,7 @@ const REGRAS_SAUDE: { re: RegExp; motivo: string }[] = [
   { re: /antes e depois/, motivo: "antes e depois" },
   { re: /r\$\s?\d/, motivo: "preço de procedimento" },
   { re: /promoc/, motivo: "promoção" },
-  { re: /descont|\bgratis\b|brinde/, motivo: "desconto, brinde ou grátis" },
+  { re: /\bdescontos?\b|\bgratis\b|\bgratuit|\bbrindes?\b/, motivo: "desconto, brinde ou grátis" },
   { re: /\b(o|a) melhor\b/, motivo: "superlativo (o melhor)" },
   { re: /\b(o|a) unic[oa]\b/, motivo: "superlativo (o único)" },
   { re: /numero 1|\bn[o°º]\.?\s?1\b/, motivo: "superlativo (número 1)" },
@@ -515,7 +520,7 @@ export function checarTexto(
     const x = semAcento(termo.trim());
     if (!x) continue;
     // Palavra ou expressão inteira: "cura" não reprova "procura".
-    const re = new RegExp("(^|[^a-z0-9])" + escaparRe(x) + "([^a-z0-9]|$)");
+    const re = new RegExp("(^|[^a-z0-9])" + escaparRe(x) + "(?:s|es)?([^a-z0-9]|$)"); // aceita o plural
     if (re.test(n) && !motivos.includes(`termo proibido: ${termo.trim()}`)) motivos.push(`termo proibido: ${termo.trim()}`);
   }
   if (o.saude) for (const r of REGRAS_SAUDE) if (r.re.test(n)) motivos.push(r.motivo);
@@ -2184,7 +2189,7 @@ Matar vites antigos (memória `dev-server-local`) e rodar `npm run dev`. Abrir `
 
 - [ ] **Step 3: Prévias**
 
-- Sem pasta do Drive: "Gerar prévia" → esperar status "Prévia pronta" com **Imagem de IA** exibida (URL `pub-…r2.dev`), texto de 150–300 palavras sem telefone/link, tema "Serviço ou produto em destaque".
+- Sem pasta do Drive: "Gerar prévia" → esperar status "Prévia pronta" com **Imagem de IA** exibida (URL `pub-…r2.dev`), texto de 120–220 palavras (até 1.500 caracteres) sem telefone/link e sem markdown, tema "Serviço ou produto em destaque".
 - Segunda prévia: tema diferente ("Dúvida frequente de clientes") e texto que não repete o primeiro.
 - Com pasta do Drive: pedir ao usuário um link de pasta com fotos da loja (acessível pela contato@), salvar e gerar prévia → **Foto do Drive**; a seguinte usa outra foto.
 - Checagem: acrescentar temporariamente um termo proibido que certamente aparecerá (ex.: "seminovos") → prévia termina **Pulado** com o motivo; remover o termo e salvar de novo.
