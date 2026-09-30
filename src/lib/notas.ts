@@ -3,8 +3,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "@/integrations/supabase/client";
 import type { NotaBase } from "@/lib/notasTexto";
-import { BUCKET_IMAGENS_NOTAS, caminhoNoBucket, imagensDoDoc, type NoDoc } from "@/lib/notasDoc";
+import { caminhoNoBucket, imagensDoDoc, type NoDoc } from "@/lib/notasDoc";
 import type { ApiTemas, Tema } from "@/components/temas/TemasLista";
+
+const BUCKET_IMAGENS_NOTAS = "notas";
 
 export interface Nota extends NotaBase {
   created_at: string;
