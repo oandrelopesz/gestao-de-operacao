@@ -4,9 +4,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { NotaBase } from "@/lib/notasTexto";
 import { caminhoNoBucket, imagensDoDoc, type NoDoc } from "@/lib/notasDoc";
+import { apagarNosDois, enviarR2, urlDaImagemNota } from "@/lib/r2";
 import type { ApiTemas, Tema } from "@/components/temas/TemasLista";
-
-const BUCKET_IMAGENS_NOTAS = "notas";
 
 export interface Nota extends NotaBase {
   created_at: string;
@@ -108,23 +107,20 @@ async function comprimir(arquivo: File): Promise<{ blob: Blob; ext: string; tipo
   }
 }
 
-/** Sobe a imagem colada/arrastada e devolve o endereço público para o editor. */
+/** Sobe a imagem colada/arrastada e devolve o endereço fixo da imagem para o editor. */
 export async function enviarImagemNota(arquivo: File): Promise<string> {
   if (!arquivo.type.startsWith("image/")) throw new Error("Só imagens podem entrar na nota");
   const { blob, ext, tipo } = await comprimir(arquivo);
   const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const caminho = `${id}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET_IMAGENS_NOTAS).upload(caminho, blob, { contentType: tipo, upsert: false });
-  if (error) {
-    if (/bucket not found/i.test(error.message)) throw new Error("O armazenamento das imagens das notas ainda não existe (migration 20260924210000_notas_editor.sql).");
-    throw error;
-  }
-  return supabase.storage.from(BUCKET_IMAGENS_NOTAS).getPublicUrl(caminho).data.publicUrl;
+  await enviarR2("notas", caminho, blob, tipo);
+  return urlDaImagemNota(caminho);
 }
 
 export async function removerImagensNotas(caminhos: string[]): Promise<void> {
   if (!caminhos.length) return;
-  await supabase.storage.from(BUCKET_IMAGENS_NOTAS).remove(caminhos).catch(() => {});
+  // Durante a transição, apaga no R2 e no bucket antigo do Supabase
+  await apagarNosDois("notas", caminhos).catch(() => {});
 }
 
 /** Operações de tema usadas pelo gerenciador de temas (aba Notas e Admin). */
