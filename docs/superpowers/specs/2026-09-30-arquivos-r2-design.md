@@ -101,7 +101,8 @@ o app já manda — o mesmo nível de hoje. As ações `migrar` exigem também `
 6. Publicar o site (André clica, com aviso). Daí em diante tudo novo vai para o R2; o que faltar cai no Supabase.
 7. `migrar` para o R2 de novo (pega o que alguém enviou entre os passos 4 e 6 pelo site antigo).
 8. Teste de ponta a ponta no site publicado, com arquivos "TESTE" apagados no fim.
-9. **30/10/2026:** apagar as cópias no Supabase e tirar a leitura de reserva do código.
+9. **30/10/2026:** reescrever em `notas.doc` os endereços antigos de imagem (`/storage/v1/object/public/notas/…`) para o
+   endereço fixo novo; só então apagar as cópias no Supabase e tirar a leitura de reserva do código.
 
 **Caminho de volta:** se algo der errado depois do passo 6, `migrar` com `direcao: "para-supabase"` devolve ao
 Supabase o que só existe no R2 e o site volta à versão anterior (republicar o commit antigo), sem perder arquivo.
