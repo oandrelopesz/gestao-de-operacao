@@ -111,7 +111,7 @@ cada foto do Drive ou do Google foi usada pela última vez. Não há cópia da l
 A conexão da andfalopes@ ganha uma linha própria em `google_oauth_tokens`, identificada por uma coluna nova
 `finalidade text default 'geral'` (`'gmn'` para esta conta). A linha atual da contato@ continua como `geral`. Os escopos
 pedidos na conexão GMN são `business.manage` e `drive.readonly`. As funções `google-oauth-exchange` e `google-token`
-passam a aceitar `finalidade` (no `state` e como parâmetro); sem ela, o comportamento atual não muda.
+passam a aceitar `finalidade` (no `state` e como parâmetro); sem ela, o comportamento atual não muda. (Fase 2 — na Fase 1 a função usa a linha mais recente, que é a da contato@.)
 
 ## 4. Imagens no Cloudflare R2
 
@@ -169,9 +169,8 @@ As chamadas usam `net.http_post`, no padrão de `20260429023356_…sql`.
 4. **Checagem** (seção 6.3). Se reprovar, gera de novo uma vez com o motivo no prompt. Se reprovar outra vez, o post vira
    `pulado` com o motivo e entra um aviso no sino.
 5. **Imagem:**
-   1. Pasta do Drive do perfil (link → id da pasta): lista as imagens (jpg/png/webp, até 5 MB) com o token GMN e, se
-      falhar, com o token geral. Escolhe a usada há mais tempo (ou nunca usada) em `gmn_imagens_uso`, baixa, converte
-      webp para jpg se necessário e envia ao R2.
+   1. Pasta do Drive do perfil (link → id da pasta): lista as imagens (JPG ou PNG, até 5 MB; WebP é ignorado) com o token GMN e, se
+      falhar, com o token geral. Escolhe a usada há mais tempo (ou nunca usada) em `gmn_imagens_uso`, baixa e envia ao R2.
    2. Fotos do perfil no Google (`GET v4/{account}/{location}/media`): a usada há mais tempo; usa a `googleUrl`.
    3. Se `usa_ia_imagem`: gera a imagem com a OpenAI (foto realista do tipo de negócio e do tema, sem texto na arte) e
       envia ao R2.
@@ -197,7 +196,7 @@ Reprova quando:
   definitivo", "cura"), "antes e depois", preço/valor/desconto de procedimento (`R$`, "promoção"), superlativos
   ("o melhor", "o único", "número 1", "mais barato").
 
-A lista fixa de saúde fica num módulo compartilhado (`src/lib/gmnChecagem.ts`), importado pela edge function e testado com Vitest.
+A lista fixa de saúde fica em `supabase/functions/gmn/regras.ts` e é testada com `node --test` (`src/lib/gmnRegras.test.ts`).
 
 ### 6.4 Erros e novas tentativas
 
@@ -251,7 +250,7 @@ o briefing e o histórico ficam no manual e a linha sincronizada duplicada é re
 
 ## 8. Testes
 
-- **Vitest:** checagem do texto (6.3), rodízio de tema e palavras-chave, escolha da imagem usada há mais tempo, dias
+- **`node --test`:** checagem do texto (6.3), rodízio de tema e palavras-chave, escolha da imagem usada há mais tempo, dias
   padrão por frequência, montagem da URL com UTM e extração do id da pasta a partir do link do Drive.
 - **Fase 1, manual:** prévia em um perfil manual com pasta do Drive, em outro sem pasta (imagem da IA) e em um perfil
   `saude` com termo proibido no briefing (tem de pular ou regenerar).
