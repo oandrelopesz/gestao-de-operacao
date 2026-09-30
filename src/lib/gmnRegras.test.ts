@@ -58,6 +58,25 @@ test("checarTexto só aplica as regras de saúde em perfil de saúde", () => {
   const r = checarTexto(t, { termosProibidos: [], saude: true });
   assert.equal(r.ok, false);
   assert.ok(r.motivos.length >= 3);
+  assert.match(checarTexto(textoBom + " Desconto de 20% nesta semana.", { termosProibidos: [], saude: true }).motivos.join(), /desconto/);
+});
+
+test("checarTexto: anos e números de carro não são telefone; telefone, 0800, WhatsApp e e-mail são pegos", () => {
+  const ok = (s: string) => checarTexto(textoBom + " " + s, { termosProibidos: [], saude: false }).ok;
+  for (const s of ["Modelos 2019-2020 e 2021.", "Fiat Argo 2024 2025.", "Safra 2023.2024.", "A partir de R$ 45.000.", "Só 10.000 km rodados."]) {
+    assert.equal(ok(s), true, s);
+  }
+  for (const s of ["Ligue (61) 99999-1234.", "Fale no +55 61 3333-4444.", "Ligue 3333-4444.", "Ligue 0800 123 4567.", "Chame no wa.me/5561999991234.", "Escreva para contato@loja.com.br.", "Veja bit.ly/abc."]) {
+    assert.equal(ok(s), false, s);
+  }
+});
+
+test("checarTexto: termo proibido vale como palavra inteira, sem acento e sem repetir motivo", () => {
+  assert.equal(checarTexto(textoBom + " Quem procura carro bom vem aqui.", { termosProibidos: ["cura"], saude: false }).ok, true);
+  const r = checarTexto(textoBom + " Carro de leilão, LEILAO nunca.", { termosProibidos: ["Leilão", "leilao"], saude: false });
+  assert.equal(r.ok, false);
+  assert.equal(r.motivos.filter((m) => m.startsWith("termo proibido")).length, 2);
+  assert.equal(checarTexto(textoBom, { termosProibidos: ["  "], saude: false }).ok, true);
 });
 
 test("escolherImagem: nunca usada primeiro, depois a usada há mais tempo", () => {
@@ -97,6 +116,9 @@ test("mudarHora, mesmoHorario, resumoAgenda e HORARIOS", () => {
   assert.equal(HORARIOS[0], "06:00");
   assert.equal(HORARIOS[1], "06:30");
   assert.equal(HORARIOS[HORARIOS.length - 1], "22:00");
+  // hora inválida não apaga nada
+  assert.deepEqual(mudarHora(a, 4, "25:00"), a);
+  assert.deepEqual(mesmoHorario(a, ""), a);
 });
 
 test("comUtm acrescenta a UTM sem apagar parâmetros e recusa lixo", () => {
