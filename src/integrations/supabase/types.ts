@@ -876,6 +876,335 @@ export type Database = {
         }
         Relationships: []
       }
+      fluxo_temas: {
+        Row: {
+          created_at: string
+          hex: string
+          id: string
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          created_at?: string
+          hex?: string
+          id?: string
+          nome: string
+          ordem?: number
+        }
+        Update: {
+          created_at?: string
+          hex?: string
+          id?: string
+          nome?: string
+          ordem?: number
+        }
+        Relationships: []
+      }
+      fluxo_vinculos: {
+        Row: {
+          alvo_id: string
+          created_at: string
+          elemento_id: string
+          fluxo_id: string
+          id: string
+          tipo: string
+        }
+        Insert: {
+          alvo_id: string
+          created_at?: string
+          elemento_id: string
+          fluxo_id: string
+          id?: string
+          tipo: string
+        }
+        Update: {
+          alvo_id?: string
+          created_at?: string
+          elemento_id?: string
+          fluxo_id?: string
+          id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fluxo_vinculos_fluxo_id_fkey"
+            columns: ["fluxo_id"]
+            isOneToOne: false
+            referencedRelation: "fluxos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fluxos: {
+        Row: {
+          cena: Json
+          created_at: string
+          id: string
+          miniatura: string | null
+          modelo: string | null
+          tema_id: string | null
+          textos: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          cena?: Json
+          created_at?: string
+          id?: string
+          miniatura?: string | null
+          modelo?: string | null
+          tema_id?: string | null
+          textos?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Update: {
+          cena?: Json
+          created_at?: string
+          id?: string
+          miniatura?: string | null
+          modelo?: string | null
+          tema_id?: string | null
+          textos?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fluxos_tema_id_fkey"
+            columns: ["tema_id"]
+            isOneToOne: false
+            referencedRelation: "fluxo_temas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formularios_envios: {
+        Row: {
+          chave: string
+          drive_id: string | null
+          formulario: string
+          id: string
+          recebido_em: string
+          titulo: string
+          visto_em: string | null
+        }
+        Insert: {
+          chave: string
+          drive_id?: string | null
+          formulario: string
+          id?: string
+          recebido_em?: string
+          titulo: string
+          visto_em?: string | null
+        }
+        Update: {
+          chave?: string
+          drive_id?: string | null
+          formulario?: string
+          id?: string
+          recebido_em?: string
+          titulo?: string
+          visto_em?: string | null
+        }
+        Relationships: []
+      }
+      gmn_imagens_uso: {
+        Row: {
+          origem: string
+          perfil_id: string
+          ref: string
+          usado_em: string
+        }
+        Insert: {
+          origem: string
+          perfil_id: string
+          ref: string
+          usado_em?: string
+        }
+        Update: {
+          origem?: string
+          perfil_id?: string
+          ref?: string
+          usado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmn_imagens_uso_perfil_id_fkey"
+            columns: ["perfil_id"]
+            isOneToOne: false
+            referencedRelation: "gmn_perfis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gmn_perfis: {
+        Row: {
+          account_name: string | null
+          agenda: Json
+          ativo: boolean
+          briefing: Json
+          briefing_salvo_em: string | null
+          categoria: string | null
+          cliente_id: string | null
+          created_at: string
+          cta_tipo: string
+          cta_url: string | null
+          drive_pasta_url: string | null
+          endereco: string | null
+          id: string
+          location_name: string | null
+          nome: string
+          saude: boolean
+          sem_acesso: boolean
+          sincronizado_em: string | null
+          site: string | null
+          telefone: string | null
+          updated_at: string
+          usa_ia_imagem: boolean
+        }
+        Insert: {
+          account_name?: string | null
+          agenda?: Json
+          ativo?: boolean
+          briefing?: Json
+          briefing_salvo_em?: string | null
+          categoria?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          cta_tipo?: string
+          cta_url?: string | null
+          drive_pasta_url?: string | null
+          endereco?: string | null
+          id?: string
+          location_name?: string | null
+          nome: string
+          saude?: boolean
+          sem_acesso?: boolean
+          sincronizado_em?: string | null
+          site?: string | null
+          telefone?: string | null
+          updated_at?: string
+          usa_ia_imagem?: boolean
+        }
+        Update: {
+          account_name?: string | null
+          agenda?: Json
+          ativo?: boolean
+          briefing?: Json
+          briefing_salvo_em?: string | null
+          categoria?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          cta_tipo?: string
+          cta_url?: string | null
+          drive_pasta_url?: string | null
+          endereco?: string | null
+          id?: string
+          location_name?: string | null
+          nome?: string
+          saude?: boolean
+          sem_acesso?: boolean
+          sincronizado_em?: string | null
+          site?: string | null
+          telefone?: string | null
+          updated_at?: string
+          usa_ia_imagem?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmn_perfis_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gmn_perfis_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gmn_posts: {
+        Row: {
+          agendado_para: string
+          conferir_em: string | null
+          created_at: string
+          dia: string
+          erro: string | null
+          google_estado: string | null
+          google_post_name: string | null
+          google_url: string | null
+          id: string
+          imagem_origem: string | null
+          imagem_ref: string | null
+          imagem_url: string | null
+          origem: string
+          palavras_chave: string[]
+          perfil_id: string
+          status: string
+          tema: string | null
+          tentativas: number
+          texto: string | null
+          updated_at: string
+        }
+        Insert: {
+          agendado_para?: string
+          conferir_em?: string | null
+          created_at?: string
+          dia?: string
+          erro?: string | null
+          google_estado?: string | null
+          google_post_name?: string | null
+          google_url?: string | null
+          id?: string
+          imagem_origem?: string | null
+          imagem_ref?: string | null
+          imagem_url?: string | null
+          origem: string
+          palavras_chave?: string[]
+          perfil_id: string
+          status?: string
+          tema?: string | null
+          tentativas?: number
+          texto?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agendado_para?: string
+          conferir_em?: string | null
+          created_at?: string
+          dia?: string
+          erro?: string | null
+          google_estado?: string | null
+          google_post_name?: string | null
+          google_url?: string | null
+          id?: string
+          imagem_origem?: string | null
+          imagem_ref?: string | null
+          imagem_url?: string | null
+          origem?: string
+          palavras_chave?: string[]
+          perfil_id?: string
+          status?: string
+          tema?: string | null
+          tentativas?: number
+          texto?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmn_posts_perfil_id_fkey"
+            columns: ["perfil_id"]
+            isOneToOne: false
+            referencedRelation: "gmn_perfis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_oauth_tokens: {
         Row: {
           access_token: string
@@ -2829,6 +3158,15 @@ export type Database = {
         Returns: number
       }
       proximo_dia_semana: { Args: { p_dia: number }; Returns: string }
+      registrar_envio_formulario: {
+        Args: {
+          p_chave: string
+          p_drive_id?: string
+          p_formulario: string
+          p_titulo: string
+        }
+        Returns: undefined
+      }
       sincronizar_passo: {
         Args: { p_forcar?: boolean; p_passo: string }
         Returns: undefined
