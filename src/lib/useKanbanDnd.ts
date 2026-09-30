@@ -147,6 +147,10 @@ export function useKanbanDnd<T extends KanbanItem>(opts: Options<T>) {
     (event: DragOverEvent) => {
       const { active, over } = event;
       if (!over) return;
+      // Uma troca de coluna por quadro: logo depois de mover, o layout muda e a colisão pode apontar de volta
+      // para a coluna anterior; aceitar isso no mesmo quadro vira um pula-pula A→B→A que estoura o React
+      // ("Maximum update depth exceeded") e derruba o arrasto — acontecia ao atravessar colunas rolando o quadro.
+      if (recentlyMovedToNewContainer.current) return;
       const activeId = String(active.id);
       const overId = String(over.id);
       const list = itemsRef.current;
