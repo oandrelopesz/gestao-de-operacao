@@ -135,14 +135,11 @@ export async function statusDoDrive(forcar = false): Promise<DriveStatus> {
   return data;
 }
 
-export async function getAccessToken(): Promise<string> {
-  if (tokenCache && tokenCache.expiresAt - Date.now() > 60_000) return tokenCache.token;
-  const daSessao = tokenDaSessao();
-  if (daSessao) {
-    tokenCache = daSessao;
-    return daSessao.token;
-  }
-
+/**
+ * Cabeçalhos que liberam as edge functions protegidas (google-token, gmn): ID token do login Google
+ * (tenta o login silencioso) ou, na falta dele, a chave do swipe file.
+ */
+export async function cabecalhosDeAcesso(): Promise<Record<string, string>> {
   // 1) Login Google (funciona em qualquer navegador/dispositivo), quando disponível
   let idToken = idTokenEmCache();
   if (!idToken) {
@@ -164,6 +161,18 @@ export async function getAccessToken(): Promise<string> {
   const headers: Record<string, string> = { apikey: ANON_KEY, "Content-Type": "application/json" };
   if (idToken) headers["x-google-id-token"] = idToken;
   else headers["x-swipe-key"] = key;
+  return headers;
+}
+
+export async function getAccessToken(): Promise<string> {
+  if (tokenCache && tokenCache.expiresAt - Date.now() > 60_000) return tokenCache.token;
+  const daSessao = tokenDaSessao();
+  if (daSessao) {
+    tokenCache = daSessao;
+    return daSessao.token;
+  }
+
+  const headers = await cabecalhosDeAcesso();
 
   const r = await fetch(`${FUNCTIONS_URL}/google-token`, { method: "POST", headers, body: "{}" });
   const data = await r.json().catch(() => ({}));
