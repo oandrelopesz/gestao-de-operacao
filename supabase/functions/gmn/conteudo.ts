@@ -7,7 +7,7 @@ import {
 import { checarImagem, gerarImagem, gerarJson, type Logo } from "./openai.ts";
 import { enviarR2 } from "./r2.ts";
 import { baixarDoDrive, imagensDaPasta, tokenGoogle } from "./google.ts";
-import { foiPrazo, PRAZO, PRAZO_TOTAL_MS, sinal } from "./prazo.ts";
+import { foiPrazo, PRAZO, sinal } from "./prazo.ts";
 
 type Sb = any;
 type Imagem = { origem: "drive" | "ia"; ref: string; url: string };
@@ -104,13 +104,13 @@ async function imagemDaIa(
 /**
  * `opcoes.comImagem` (padrão true): false gera só texto, sem buscar nem gerar imagem. Com pasta do Drive preenchida a
  * imagem sai sempre dela (falhou, vazia ou link não reconhecido: sem imagem e com aviso, sem cair para a IA); sem pasta,
- * da IA se estiver ligada. `opcoes.prazoFinal` (ms desde 1970): fim do prazo total da execução (a nova tentativa da
- * imagem da IA só acontece se sobrarem 45 s); sem ele, vale PRAZO_TOTAL_MS a partir de agora.
+ * da IA se estiver ligada. `opcoes.prazoFinal` (ms desde 1970, obrigatório): fim do prazo total da execução, o mesmo
+ * de `total` (a nova tentativa da imagem da IA só acontece se sobrarem 45 s).
  */
 export async function gerarConteudo(
-  sb: Sb, perfil: any, postId: string, total?: AbortSignal, opcoes?: { comImagem?: boolean; prazoFinal?: number },
+  sb: Sb, perfil: any, postId: string, total: AbortSignal | undefined, opcoes: { comImagem?: boolean; prazoFinal: number },
 ): Promise<CamposPost> {
-  const prazoFinal = opcoes?.prazoFinal ?? Date.now() + PRAZO_TOTAL_MS;
+  const prazoFinal = opcoes.prazoFinal;
   const briefing = normalizarBriefing(perfil.briefing);
   const { data: hist } = await sb
     .from("gmn_posts")
@@ -150,7 +150,7 @@ export async function gerarConteudo(
   let imagem: Imagem | null = null;
   const avisos: string[] = [];
   const origem = decidirImagem({
-    comImagem: opcoes?.comImagem ?? true,
+    comImagem: opcoes.comImagem ?? true,
     temPasta: String(perfil.drive_pasta_url ?? "").trim() !== "",
     usaIa: !!perfil.usa_ia_imagem,
   });

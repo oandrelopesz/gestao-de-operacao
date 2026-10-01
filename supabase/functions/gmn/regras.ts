@@ -472,7 +472,9 @@ export function promptChecagemImagem(comLogo: boolean): string {
     "tem_texto é true só se houver escrita legível e em destaque na arte (frases, letras, números, preços, slogans, letreiros, " +
     "placas de carro legíveis, marcas de terceiros); ignore marcas minúsculas e ilegíveis.";
   return comLogo
-    ? `${base} A segunda imagem é a logo da marca: o que for dela, inclusive a escrita, não conta como texto.`
+    ? `${base} A segunda imagem é a logo da marca e serve só de referência: as duas marcações valem para a primeira ` +
+      "imagem, e o que for da logo aplicada nela (escrita, mascote, desenho ou rosto da própria logo) não conta como " +
+      "texto nem como pessoa."
     : base;
 }
 

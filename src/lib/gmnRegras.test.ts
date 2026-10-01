@@ -406,7 +406,9 @@ test("promptChecagemImagem: pessoas sempre; texto só em destaque; com logo, a s
   assert.doesNotMatch(sem, /logos com escrita/i);
   const com = promptChecagemImagem(true);
   assert.ok(com.startsWith(sem));
-  assert.match(com, /A segunda imagem é a logo da marca: o que for dela, inclusive a escrita, não conta como texto\./);
+  assert.match(com, /A segunda imagem é a logo da marca e serve só de referência/);
+  assert.match(com, /valem para a primeira imagem/);
+  assert.match(com, /mascote, desenho ou rosto da própria logo\) não conta como texto nem como pessoa\./);
 });
 
 test("montarMensagensPost: com contexto a regra de não inventar vale para o contexto e o briefing; sem contexto fica como era", () => {
