@@ -1,7 +1,10 @@
 // Token do Google guardado em google_oauth_tokens (Fase 1: linha mais recente = contato@) e leitura do Drive.
 // deno-lint-ignore-file no-explicit-any
 import { foiPrazo, PRAZO, sinal } from "./prazo.ts";
-import { miniaturaGrande } from "./regras.ts";
+import { linkDoGoogle, miniaturaGrande, tipoPelaAssinatura } from "./regras.ts";
+
+const LIMITE_MINIATURA_BYTES = 5 * 1024 * 1024;
+const AVISO_PASTA = "Não foi possível ler a pasta do Drive.";
 
 type Sb = any;
 
@@ -64,7 +67,10 @@ export interface ImagemDrive {
   thumbnailLink: string | null;
 }
 
-/** Toda imagem direto na pasta (sem subpastas), mais novas primeiro; o formato e o tamanho são tratados por quem baixa. */
+/**
+ * Toda imagem direto na pasta (sem subpastas), mais novas primeiro (as 200 mais novas: não há paginação); o formato e o
+ * tamanho são tratados por quem baixa. Falha do Google vira um aviso fixo em português (o texto dele fica só no log).
+ */
 export async function imagensDaPasta(token: string, pastaId: string, total?: AbortSignal): Promise<ImagemDrive[]> {
   const q = `'${pastaId.replace(/'/g, "\\'")}' in parents and trashed = false and mimeType contains 'image/'`;
   const params = new URLSearchParams({
@@ -78,7 +84,10 @@ export async function imagensDaPasta(token: string, pastaId: string, total?: Abo
       if (foiPrazo(e)) throw e;
       return {};
     });
-    if (!r.ok) throw new Error(corpo?.error?.message || `Drive respondeu ${r.status} ao listar a pasta`);
+    if (!r.ok) {
+      console.error("Drive respondeu", r.status, "ao listar a pasta:", String(corpo?.error?.message ?? "").slice(0, 300));
+      throw new Error(AVISO_PASTA);
+    }
     return corpo;
   }, total);
   return (d.files ?? []).map((f: any): ImagemDrive => ({
@@ -98,16 +107,21 @@ export async function baixarDoDrive(token: string, id: string, total?: AbortSign
   }, total);
 }
 
-/** Miniatura grande que o Google gera (JPG ou PNG), para formatos como HEIC/WEBP ou arquivos acima de 5 MB. */
+/**
+ * Miniatura grande que o Google gera (JPG ou PNG), para formatos como HEIC/WEBP ou arquivos acima de 5 MB. O token só vai
+ * para um endereço do próprio Google; o tamanho (Content-Length e bytes lidos) e a assinatura completa são conferidos.
+ */
 export async function baixarMiniatura(token: string, link: string, total?: AbortSignal): Promise<{ bytes: Uint8Array; tipo: "image/jpeg" | "image/png" }> {
+  const url = miniaturaGrande(link);
+  if (!linkDoGoogle(url)) throw new Error("o link da miniatura não é do Google");
   return await comPrazo("miniatura do Drive", async (signal) => {
-    const r = await fetch(miniaturaGrande(link), { headers: { Authorization: `Bearer ${token}` }, signal });
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal });
     if (!r.ok) throw new Error(`Drive respondeu ${r.status} ao baixar a miniatura`);
+    if (Number(r.headers.get("content-length")) > LIMITE_MINIATURA_BYTES) throw new Error("miniatura do Drive grande demais");
     const bytes = new Uint8Array(await r.arrayBuffer());
-    const png = bytes[0] === 0x89 && bytes[1] === 0x50;
-    const jpg = bytes[0] === 0xff && bytes[1] === 0xd8;
-    if (!png && !jpg) throw new Error("miniatura do Drive não veio em JPG nem PNG");
-    if (bytes.length > 5 * 1024 * 1024) throw new Error("miniatura do Drive grande demais");
-    return { bytes, tipo: png ? "image/png" : "image/jpeg" };
+    if (bytes.length > LIMITE_MINIATURA_BYTES) throw new Error("miniatura do Drive grande demais");
+    const tipo = tipoPelaAssinatura(bytes);
+    if (!tipo) throw new Error("miniatura do Drive não veio em JPG nem PNG");
+    return { bytes, tipo };
   }, total);
 }

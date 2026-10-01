@@ -1,9 +1,9 @@
 // Um post completo, sem publicar: tema → texto (com checagem e 1 nova tentativa) → imagem (Drive, IA ou nenhuma).
 // deno-lint-ignore-file no-explicit-any
 import {
-  ESQUEMA_POST, base64ParaBytes, checarTexto, decidirImagem, decisaoChecagem, descricaoDaFoto, escolherImagem, escolherPalavras,
-  fotoDiretaDoDrive, idPastaDrive, montarMensagensPost, montarPromptImagem, normalizarBriefing, opcoesDaLogo, proximoTema,
-  LOGO_LADO_MAX, type Tema,
+  ESQUEMA_POST, base64ParaBytes, checarTexto, decidirImagem, decisaoChecagem, descricaoDaFoto, escolherPalavras,
+  fotoDiretaDoDrive, idPastaDrive, montarMensagensPost, montarPromptImagem, normalizarBriefing, opcoesDaLogo, ordemDeTentativa,
+  proximoTema, tipoPelaAssinatura, LOGO_LADO_MAX, type Tema,
 } from "./regras.ts";
 import { checarImagem, gerarImagem, gerarJson } from "./openai.ts";
 import { lerPng, gravarPng, type ImagemRgba } from "./png.ts";
@@ -32,36 +32,37 @@ export interface CamposPost {
 const FOTOS_TENTADAS = 3;
 
 /**
- * Bytes da foto do Drive: JPG/PNG de até 5 MB vão como estão; o resto (HEIC, WEBP, TIFF… ou arquivo grande) usa a miniatura
- * grande que o Google gera. Sem miniatura (ou com erro) lança, e quem chama passa para a próxima foto.
+ * Bytes da foto do Drive: JPG/PNG de até 5 MB vão como estão, desde que os bytes confirmem o tipo (um WEBP salvo como .jpg
+ * não passa); o resto (HEIC, WEBP, TIFF… ou arquivo grande) usa a miniatura grande que o Google gera. O tipo devolvido é
+ * sempre o lido dos bytes. Sem miniatura (ou com erro) lança, e quem chama passa para a próxima foto.
  */
 async function baixarFoto(
   token: string, foto: ImagemDrive, total?: AbortSignal,
 ): Promise<{ bytes: Uint8Array; tipo: "image/jpeg" | "image/png" }> {
   if (fotoDiretaDoDrive(foto.mimeType, foto.size)) {
-    return { bytes: await baixarDoDrive(token, foto.id, total), tipo: foto.mimeType as "image/jpeg" | "image/png" };
+    const bytes = await baixarDoDrive(token, foto.id, total);
+    const tipo = tipoPelaAssinatura(bytes);
+    if (tipo) return { bytes, tipo };
+    console.error(`Foto do Drive ${foto.id}: o Drive diz ${foto.mimeType}, mas os bytes não são JPG nem PNG; usando a miniatura.`);
   }
   if (!foto.thumbnailLink) throw new Error("o Drive não gerou miniatura para esta foto");
   return await baixarMiniatura(token, foto.thumbnailLink, total);
 }
 
 /**
- * null: o link da pasta do Drive não foi reconhecido; "vazia": nenhuma das fotos tentadas deu para usar. Tenta até 3 fotos,
- * na ordem do rodízio (a escolhida e, se ela falhar, as próximas); o uso só é registrado para a foto que entrou.
+ * null: o link da pasta do Drive não foi reconhecido; "vazia": nenhuma das fotos tentadas deu para usar. Só entram no rodízio
+ * as fotos que têm como ser baixadas (JPG/PNG de até 5 MB ou com miniatura): as que nunca servem não ocupam as 3 tentativas.
+ * Tenta até 3 fotos, na ordem do rodízio (a escolhida e, se ela falhar, as próximas); o uso só é registrado para a foto que entrou.
  */
 async function imagemDoDrive(sb: Sb, perfil: any, postId: string, total?: AbortSignal): Promise<Imagem | "vazia" | null> {
   const pastaId = idPastaDrive(String(perfil.drive_pasta_url ?? ""));
   if (!pastaId) return null;
   const token = await tokenGoogle(sb, total);
-  const fotos = await imagensDaPasta(token, pastaId, total);
+  const fotos = (await imagensDaPasta(token, pastaId, total)).filter((f) => fotoDiretaDoDrive(f.mimeType, f.size) || f.thumbnailLink);
   if (!fotos.length) return "vazia";
   const { data: usos } = await sb.from("gmn_imagens_uso").select("ref, usado_em").eq("perfil_id", perfil.id).eq("origem", "drive");
   const mapa: Record<string, string> = Object.fromEntries((usos ?? []).map((u: any) => [u.ref, u.usado_em]));
-  let restantes = fotos.map((f) => f.id);
-  for (let i = 0; i < FOTOS_TENTADAS; i++) {
-    const ref = escolherImagem(restantes, mapa);
-    if (!ref) break;
-    restantes = restantes.filter((id) => id !== ref);
+  for (const ref of ordemDeTentativa(fotos.map((f) => f.id), mapa, FOTOS_TENTADAS)) {
     const foto = fotos.find((f) => f.id === ref)!;
     let baixada: { bytes: Uint8Array; tipo: "image/jpeg" | "image/png" };
     try {

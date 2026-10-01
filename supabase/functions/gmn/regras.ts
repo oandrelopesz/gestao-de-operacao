@@ -152,16 +152,67 @@ export function fotoDiretaDoDrive(mime: string, tamanho: number): boolean {
   return (mime === "image/jpeg" || mime === "image/png") && tamanho <= LIMITE_FOTO_DIRETA;
 }
 
-/** Link de miniatura do Drive no tamanho grande (o sufixo `=s220`, `=w400-h300` etc. vira `=s2048`). */
-export function miniaturaGrande(link: string, lado = 2048): string {
-  return /=[a-z0-9-]+$/i.test(link) ? link.replace(/=[a-z0-9-]+$/i, `=s${lado}`) : `${link}=s${lado}`;
+/**
+ * Até `max` fotos, na ordem em que serão tentadas: a do rodízio (`escolherImagem`) e, tirando-a, a próxima pela mesma regra,
+ * e assim por diante. Quem falha ao baixar não entra no registro de uso, então a ordem é só esta.
+ */
+export function ordemDeTentativa(ids: string[], usos: Record<string, string>, max = 3): string[] {
+  const ordem: string[] = [];
+  let restantes = ids;
+  while (ordem.length < max) {
+    const id = escolherImagem(restantes, usos);
+    if (id === null) break;
+    ordem.push(id);
+    restantes = restantes.filter((x) => x !== id);
+  }
+  return ordem;
 }
 
-/** O que a foto mostra, para o texto do post: a descrição do arquivo no Drive ou, sem ela, o nome sem extensão. */
+const ASSINATURA_PNG_DRIVE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/** Tipo real da imagem pelos primeiros bytes (JPEG `FF D8 FF`, PNG com os 8 bytes); qualquer outra coisa: `null`. */
+export function tipoPelaAssinatura(bytes: Uint8Array): "image/jpeg" | "image/png" | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length >= 8 && ASSINATURA_PNG_DRIVE.every((v, i) => bytes[i] === v)) return "image/png";
+  return null;
+}
+
+/**
+ * Link de miniatura do Drive no tamanho grande. Só o caminho é tocado (query string e fragmento ficam como estão): um sufixo
+ * de tamanho no fim (`=s220`, `=s220-c`, `=w400-h300`, `=w220-h220-p-k-no-nu`) vira `=s2048`; sem esse sufixo, `=s2048` é acrescentado.
+ */
+export function miniaturaGrande(link: string, lado = 2048): string {
+  const corte = link.search(/[?#]/);
+  const caminho = corte === -1 ? link : link.slice(0, corte);
+  const resto = corte === -1 ? "" : link.slice(corte);
+  return `${caminho.replace(/=(?:s\d+|w\d+-h\d+)(?:-[a-z]+)*$/i, "")}=s${lado}${resto}`;
+}
+
+/** O link é https e fica em googleusercontent.com ou google.com (ou subdomínio): só para esses o token do Google pode ir. */
+export function linkDoGoogle(link: string): boolean {
+  try {
+    const u = new URL(link);
+    return u.protocol === "https:" && (u.hostname.endsWith(".googleusercontent.com") || u.hostname.endsWith(".google.com"));
+  } catch {
+    return false;
+  }
+}
+
+// Nomes que câmeras, celulares e prints dão ao arquivo (já sem acento, em minúsculas e com _ e - trocados por espaço).
+const RE_NOME_AUTOMATICO = /^(?:(?:img|dscn|dscf|dsc|pxl|mvimg|vid|pano|burst)\s*\d|whatsapp\b|screenshot\b|screen shot\b|captura de tela\b)/;
+
+/**
+ * O que a foto mostra, para o texto do post: a descrição do arquivo no Drive ou, sem ela, o nome sem extensão. Nome que
+ * não descreve nada (de câmera, de print, ou quase só número) devolve vazio.
+ */
 export function descricaoDaFoto(descricao: string | null | undefined, nome: string): string {
   const d = (descricao ?? "").trim();
   if (d) return d.slice(0, 300);
-  return nome.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+  const limpo = nome.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+  const n = semAcento(limpo);
+  const letras = (n.match(/\p{L}/gu) ?? []).length;
+  const digitos = (n.match(/\d/g) ?? []).length;
+  return RE_NOME_AUTOMATICO.test(n) || letras < 3 || digitos > letras ? "" : limpo;
 }
 
 // ------------------------------------------------------------------ agenda (dias e horários dos posts)

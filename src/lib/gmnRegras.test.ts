@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   AGENDA_PADRAO, BRIEFING_VAZIO, ESQUEMA_CHECAGEM_IMAGEM, HORARIOS, PROMPT_CHECAGEM_IMAGEM, TEMAS, alternarDia,
   alternarImagem, base64ParaBytes, checarTexto, comUtm, decidirImagem, decisaoChecagem, descricaoDaFoto, escolherImagem,
-  escolherPalavras, fotoDiretaDoDrive, idPastaDrive, miniaturaGrande,
+  escolherPalavras, fotoDiretaDoDrive, idPastaDrive, linkDoGoogle, miniaturaGrande, ordemDeTentativa, tipoPelaAssinatura,
   mesmoHorario, montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda,
   normalizarBriefing, normalizarImagensSite, opcoesDaLogo, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64,
   type PosicaoLogo,
@@ -104,9 +104,91 @@ test("miniaturaGrande: troca o tamanho do link de miniatura (ou acrescenta) por 
   assert.equal(miniaturaGrande("https://lh3.googleusercontent.com/abc"), "https://lh3.googleusercontent.com/abc=s2048");
 });
 
+test("miniaturaGrande: só troca o sufixo de tamanho no fim do caminho; query, fragmento e padding ficam intactos", () => {
+  const h = "https://lh3.googleusercontent.com";
+  assert.equal(miniaturaGrande(`${h}/abc=s220-c`), `${h}/abc=s2048`);
+  assert.equal(miniaturaGrande(`${h}/abc=w220-h220-p-k-no-nu`), `${h}/abc=s2048`);
+  assert.equal(miniaturaGrande(`${h}/abc=s220-p-k-no-nu`), `${h}/abc=s2048`);
+  // query string e fragmento não são tocados (o tamanho vai no caminho)
+  assert.equal(miniaturaGrande(`${h}/abc=s220?authuser=0`), `${h}/abc=s2048?authuser=0`);
+  assert.equal(miniaturaGrande(`${h}/abc?id=7`), `${h}/abc=s2048?id=7`);
+  assert.equal(miniaturaGrande(`${h}/abc=w400-h300#x`), `${h}/abc=s2048#x`);
+  // id com "=" de padding: o padding fica; só o sufixo de tamanho sai
+  assert.equal(miniaturaGrande(`${h}/abc==s220`), `${h}/abc==s2048`);
+  assert.equal(miniaturaGrande(`${h}/abc==`), `${h}/abc===s2048`);
+  // "=" que não é tamanho não é apagado
+  assert.equal(miniaturaGrande(`${h}/abc=xyz`), `${h}/abc=xyz=s2048`);
+  assert.equal(miniaturaGrande(`${h}/abc=s220`, 1024), `${h}/abc=s1024`);
+});
+
+test("linkDoGoogle: só https em googleusercontent.com ou google.com (e subdomínios) recebe o token", () => {
+  assert.equal(linkDoGoogle("https://lh3.googleusercontent.com/drive-storage/abc=s220"), true);
+  assert.equal(linkDoGoogle("https://docs.google.com/a/b"), true);
+  assert.equal(linkDoGoogle("http://lh3.googleusercontent.com/abc"), false);
+  assert.equal(linkDoGoogle("https://googleusercontent.com/abc"), false);
+  assert.equal(linkDoGoogle("https://evilgoogleusercontent.com/abc"), false);
+  assert.equal(linkDoGoogle("https://lh3.googleusercontent.com.evil.com/abc"), false);
+  assert.equal(linkDoGoogle("https://evil.com/lh3.googleusercontent.com"), false);
+  assert.equal(linkDoGoogle("https://usuario@evil.com/x"), false);
+  assert.equal(linkDoGoogle("não é link"), false);
+  assert.equal(linkDoGoogle(""), false);
+});
+
+test("tipoPelaAssinatura: JPEG (3 bytes) e PNG (8 bytes) completos; o resto, null", () => {
+  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  assert.equal(tipoPelaAssinatura(Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00])), "image/jpeg");
+  assert.equal(tipoPelaAssinatura(Uint8Array.from([...png, 0x00, 0x00])), "image/png");
+  assert.equal(tipoPelaAssinatura(Uint8Array.from([0xff, 0xd8])), null); // curto demais
+  assert.equal(tipoPelaAssinatura(Uint8Array.from([0xff, 0xd8, 0x00])), null);
+  assert.equal(tipoPelaAssinatura(Uint8Array.from([0x89, 0x50])), null); // só o começo do PNG
+  assert.equal(tipoPelaAssinatura(Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0b])), null);
+  assert.equal(tipoPelaAssinatura(new TextEncoder().encode("RIFF....WEBPVP8 ")), null); // WEBP
+  assert.equal(tipoPelaAssinatura(new TextEncoder().encode("<svg xmlns=")), null);
+  assert.equal(tipoPelaAssinatura(new Uint8Array(0)), null);
+});
+
 test("descricaoDaFoto: descrição do Drive vence; sem ela, o nome sem extensão e sem _-", () => {
   assert.equal(descricaoDaFoto("Fachada da loja à noite", "IMG_1.jpg"), "Fachada da loja à noite");
   assert.equal(descricaoDaFoto("", "fachada-da-loja_2024.HEIC"), "fachada da loja 2024");
+  assert.equal(descricaoDaFoto(null, "Pátio coberto.png"), "Pátio coberto");
+  assert.equal(descricaoDaFoto("  ", "Sala de espera.jpg"), "Sala de espera");
+  // a descrição escrita pelo cliente vale mesmo que lembre um nome de câmera
+  assert.equal(descricaoDaFoto("IMG 2024 da vitrine", "IMG_1.jpg"), "IMG 2024 da vitrine");
+});
+
+test("descricaoDaFoto: nome de câmera, de captura de tela ou quase só número não diz nada e vira vazio", () => {
+  for (const nome of [
+    "IMG_20240101_123456.jpg", "IMG_1234.HEIC", "DSC_0001.JPG", "DSCN0042.jpg", "DSCF1234.jpg", "PXL_20240101_123456789.MP.jpg",
+    "MVIMG_20240101_123456.jpg", "WhatsApp Image 2024-01-01 at 10.20.30.jpeg", "WhatsApp Imagem 2024-01-01.jpeg",
+    "Screenshot 2024-01-01 at 10.20.30.png", "Screenshot_20240101-123456.png", "Captura de tela 2026-09-24 113806.png",
+    "20240101_123456.jpg", "123456.png", "2024-01-01 10.20.30.jpg", "a1.jpg", "",
+  ]) {
+    assert.equal(descricaoDaFoto("", nome), "", nome);
+    assert.equal(descricaoDaFoto(undefined, nome), "", nome);
+  }
+  // nomes descritivos continuam valendo, mesmo com números
+  for (const [nome, esperado] of [
+    ["Fiat Argo 2024.jpg", "Fiat Argo 2024"], ["fachada-da-loja_2024.jpg", "fachada da loja 2024"], ["Sala 12.png", "Sala 12"],
+    ["dsc fachada.jpg", "dsc fachada"], ["Vitrine.webp", "Vitrine"],
+  ]) {
+    assert.equal(descricaoDaFoto("", nome), esperado, nome);
+  }
+});
+
+test("ordemDeTentativa: nunca usadas primeiro (na ordem), depois as usadas há mais tempo; até 3 e sem repetir", () => {
+  assert.deepEqual(ordemDeTentativa([], {}), []);
+  assert.deepEqual(ordemDeTentativa(["a", "b", "c", "d", "e"], {}), ["a", "b", "c"]);
+  assert.deepEqual(ordemDeTentativa(["a", "b", "c", "d"], { a: "2026-09-03T00:00:00Z", c: "2026-09-01T00:00:00Z" }), ["b", "d", "c"]);
+  assert.deepEqual(
+    ordemDeTentativa(["a", "b", "c"], { a: "2026-09-03T00:00:00Z", b: "2026-09-01T00:00:00Z", c: "2026-09-02T00:00:00Z" }),
+    ["b", "c", "a"],
+  );
+  assert.deepEqual(ordemDeTentativa(["a", "b"], {}), ["a", "b"]); // menos fotos que o máximo
+  assert.deepEqual(ordemDeTentativa(["a", "b", "c"], {}, 1), ["a"]);
+  assert.deepEqual(ordemDeTentativa(["a", "b", "c"], {}, 0), []);
+  // o primeiro é sempre o que escolherImagem escolheria
+  const usos = { a: "2026-09-02T00:00:00Z", b: "2026-09-01T00:00:00Z" };
+  assert.equal(ordemDeTentativa(["a", "b"], usos)[0], escolherImagem(["a", "b"], usos));
 });
 
 test("normalizarAgenda: um item por dia, ordenado, descarta lixo", () => {
