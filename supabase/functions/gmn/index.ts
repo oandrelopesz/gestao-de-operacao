@@ -5,8 +5,10 @@
 //   POST { acao: "previa", perfil_id, com_imagem? } -> { post }                   (gmn_posts, origem 'previa')
 //        com_imagem (padrão true): false gera só texto, sem buscar nem gerar imagem
 //        409 se o perfil já tem uma prévia 'gerando' criada há menos de 3 minutos
-//   POST { acao: "logo", perfil_id, tipo, base64 } -> { logo_url }                (PNG ou JPG até 5 MB, no R2; grava gmn_perfis.logo_url)
-//   POST { acao: "remover_logo", perfil_id }     -> { ok: true }                  (logo_url = null; o arquivo fica no R2)
+//   POST { acao: "logo", perfil_id, tipo: "image/png", base64, origem_url? } -> { logo_url }
+//        PNG convertido pela tela, até 5 MB, no R2; origem_url opcional (http/https, até 2.000 caracteres);
+//        grava gmn_perfis.logo_url e logo_origem_url
+//   POST { acao: "remover_logo", perfil_id }     -> { ok: true }                  (logo_url e logo_origem_url = null; o arquivo fica no R2)
 // POST exige x-google-id-token (e-mail em ALLOWED_GOOGLE_EMAILS) ou x-swipe-key, como o google-token.
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
@@ -15,6 +17,7 @@ import { gerarJson, openaiConfigurada } from "./openai.ts";
 import { PRAZO_TOTAL_MS } from "./prazo.ts";
 import { enviarR2, r2Configurado } from "./r2.ts";
 import { gerarConteudo } from "./conteudo.ts";
+import { lerPng } from "./png.ts";
 import { ESQUEMA_BRIEFING, base64ParaBytes, montarMensagensBriefing, normalizarBriefing, tamanhoBase64 } from "./regras.ts";
 
 const cors = {
@@ -117,15 +120,34 @@ async function acaoPrevia(sb: any, body: any, total: AbortSignal, prazoFinal: nu
 const LOGO_MAX_BYTES = 5 * 1024 * 1024;
 // Corpo de uma requisição: a logo em base64 (5 MB viram uns 6,7 MB) mais o resto do JSON cabe com folga em 8 MB.
 const CORPO_MAX_BYTES = 8 * 1024 * 1024;
-const ASSINATURA_LOGO: Record<string, number[]> = { "image/png": [0x89, 0x50, 0x4e, 0x47], "image/jpeg": [0xff, 0xd8, 0xff] };
+const ASSINATURA_PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+// Lado máximo da logo: um arquivo pequeno pode declarar dimensões enormes, e a leitura aloca largura x altura x 4 bytes.
+const LOGO_LADO_MAX = 2048;
+const LOGO_ILEGIVEL = "Não foi possível ler a logo enviada.";
+const ORIGEM_URL_MAX = 2000;
 
-/** Guarda a logo do perfil no R2 (`logos/<perfil_id>-<carimbo>.<png|jpg>`) e grava a URL em `gmn_perfis.logo_url`. */
+/** Largura e altura que o PNG declara no IHDR (1º bloco, bytes 16 a 23, big-endian); `null` se o IHDR não está onde deveria. */
+function dimensoesDoPng(b: Uint8Array): { largura: number; altura: number } | null {
+  if (b.length < 24 || String.fromCharCode(b[12], b[13], b[14], b[15]) !== "IHDR") return null;
+  const u32 = (i: number) => ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) >>> 0;
+  return { largura: u32(16), altura: u32(20) };
+}
+
+/** Endereço http(s) de até 2.000 caracteres, ou `null` (a origem é só informativa: valor inválido não barra a logo). */
+function origemUrl(v: unknown): string | null {
+  const t = typeof v === "string" ? v.trim() : "";
+  return t && t.length <= ORIGEM_URL_MAX && /^https?:\/\//i.test(t) ? t : null;
+}
+
+/**
+ * Guarda a logo do perfil (PNG) no R2 (`logos/<perfil_id>-<carimbo>.png`) e grava a URL em `gmn_perfis.logo_url`, junto
+ * com `logo_origem_url` (de onde a logo veio, se a tela informou). A tela converte qualquer imagem para PNG antes de enviar.
+ */
 async function acaoLogo(sb: any, body: any, total: AbortSignal): Promise<Response> {
   const perfil = await carregarPerfil(sb, body);
-  const tipo = typeof body.tipo === "string" ? body.tipo : "";
-  if (tipo !== "image/png" && tipo !== "image/jpeg") throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
+  if (body.tipo !== "image/png") throw new ErroHttp(400, LOGO_ILEGIVEL);
   const texto = typeof body.base64 === "string" ? body.base64 : "";
-  if (!texto) throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
+  if (!texto) throw new ErroHttp(400, LOGO_ILEGIVEL);
   // Confere o tamanho pelo texto, antes de copiar ou decodificar qualquer coisa.
   if (tamanhoBase64(texto) > LOGO_MAX_BYTES) throw new ErroHttp(400, "A logo pode ter até 5 MB.");
   // O atob ignora espaços e quebras de linha; só o prefixo "data:...;base64," precisa sair.
@@ -134,22 +156,35 @@ async function acaoLogo(sb: any, body: any, total: AbortSignal): Promise<Respons
   try {
     bytes = base64ParaBytes(b64);
   } catch {
-    throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
+    throw new ErroHttp(400, LOGO_ILEGIVEL);
   }
   if (bytes.length > LOGO_MAX_BYTES) throw new ErroHttp(400, "A logo pode ter até 5 MB.");
-  // O conteúdo precisa ser mesmo o do tipo informado: o arquivo fica público e a OpenAI recusa o que não for imagem.
-  if (!ASSINATURA_LOGO[tipo].every((b, i) => bytes[i] === b)) throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
+  // O conteúdo precisa ser mesmo PNG: o arquivo fica público e a composição só lê PNG.
+  if (!ASSINATURA_PNG.every((b, i) => bytes[i] === b)) throw new ErroHttp(400, LOGO_ILEGIVEL);
+  // Dimensões do IHDR antes de ler o PNG: recusa o arquivo que declara um tamanho que esgotaria a memória.
+  const dim = dimensoesDoPng(bytes);
+  if (!dim || dim.largura > LOGO_LADO_MAX || dim.altura > LOGO_LADO_MAX) throw new ErroHttp(400, LOGO_ILEGIVEL);
+  // Garante que a composição vai conseguir ler a logo (8 bits, RGB/RGBA, sem entrelaçamento, deflate válido).
+  try {
+    await lerPng(bytes);
+  } catch (e) {
+    console.error("Logo: PNG ilegível:", msg(e));
+    throw new ErroHttp(400, LOGO_ILEGIVEL);
+  }
   if (!r2Configurado()) throw new ErroHttp(503, SEM_R2);
   // Falha do R2 ou do banco: mensagem fixa (o detalhe, em inglês, vai só para o log).
   const SEM_GUARDAR = "Não foi possível guardar a logo. Tente de novo.";
   let url: string;
   try {
-    url = await enviarR2(`logos/${perfil.id}-${Date.now()}.${tipo === "image/png" ? "png" : "jpg"}`, bytes, tipo, total);
+    url = await enviarR2(`logos/${perfil.id}-${Date.now()}.png`, bytes, "image/png", total);
   } catch (e) {
     console.error("Logo: falha ao enviar para o R2:", e);
     throw new ErroHttp(500, SEM_GUARDAR);
   }
-  const { error } = await sb.from("gmn_perfis").update({ logo_url: url, updated_at: new Date().toISOString() }).eq("id", perfil.id);
+  const { error } = await sb
+    .from("gmn_perfis")
+    .update({ logo_url: url, logo_origem_url: origemUrl(body.origem_url), updated_at: new Date().toISOString() })
+    .eq("id", perfil.id);
   if (error) {
     console.error("Logo: falha ao gravar logo_url:", error.message);
     throw new ErroHttp(500, SEM_GUARDAR);
@@ -160,7 +195,7 @@ async function acaoLogo(sb: any, body: any, total: AbortSignal): Promise<Respons
 /** Tira a logo do perfil (o arquivo antigo pode ficar no R2). */
 async function acaoRemoverLogo(sb: any, body: any): Promise<Response> {
   const perfil = await carregarPerfil(sb, body);
-  const { error } = await sb.from("gmn_perfis").update({ logo_url: null, updated_at: new Date().toISOString() }).eq("id", perfil.id);
+  const { error } = await sb.from("gmn_perfis").update({ logo_url: null, logo_origem_url: null, updated_at: new Date().toISOString() }).eq("id", perfil.id);
   if (error) throw new Error(error.message);
   return json({ ok: true });
 }

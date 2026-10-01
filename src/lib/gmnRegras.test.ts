@@ -5,7 +5,7 @@ import {
   alternarImagem, base64ParaBytes, checarTexto, comUtm, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras,
   idPastaDrive,
   mesmoHorario, montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda,
-  normalizarBriefing, opcoesDaLogo, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64,
+  normalizarBriefing, opcoesDaLogo, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64, type PosicaoLogo,
 } from "../../supabase/functions/gmn/regras.ts";
 
 const textoBom =
@@ -250,7 +250,7 @@ test("montarMensagensBriefing sem contexto e montarPromptImagem", () => {
   assert.doesNotMatch(b.system, /extra[ií]/i);
   const p = montarPromptImagem({
     nome: "Brazilian Car", categoria: "Loja de carros usados", briefing: BRIEFING_VAZIO, tema: "bastidores",
-    contextoImagens: null, permitirPessoas: false, comLogo: false,
+    contextoImagens: null, permitirPessoas: false, cantoLivre: null,
   });
   assert.match(p, /sem texto/i);
   assert.match(p, /Loja de carros usados/);
@@ -280,7 +280,7 @@ test("montarMensagensBriefing com contexto: extrai do texto, que vai no user (at
 test("montarPromptImagem sem pessoas (padrão): proíbe pessoas e traz as regras fixas", () => {
   const p = montarPromptImagem({
     nome: "Brazilian Car", categoria: "Loja de carros usados", briefing: BRIEFING_VAZIO, tema: "servico",
-    contextoImagens: null, permitirPessoas: false, comLogo: false,
+    contextoImagens: null, permitirPessoas: false, cantoLivre: null,
   });
   assert.match(p, /Sem pessoas: nenhum rosto, corpo, mão, silhueta ou reflexo de pessoa\./);
   assert.match(p, /sem texto, letras, números, preços ou slogans na arte/i);
@@ -295,7 +295,7 @@ test("montarPromptImagem sem pessoas (padrão): proíbe pessoas e traz as regras
 test("montarPromptImagem com permitirPessoas não proíbe pessoas, mas mantém o resto", () => {
   const p = montarPromptImagem({
     nome: "Clínica", categoria: null, briefing: BRIEFING_VAZIO, tema: "bastidores",
-    contextoImagens: null, permitirPessoas: true, comLogo: false,
+    contextoImagens: null, permitirPessoas: true, cantoLivre: null,
   });
   assert.doesNotMatch(p, /Sem pessoas/);
   assert.match(p, /sem texto, letras, números, preços ou slogans na arte/i);
@@ -303,41 +303,22 @@ test("montarPromptImagem com permitirPessoas não proíbe pessoas, mas mantém o
   assert.match(p, /formato paisagem/i);
 });
 
-test("montarPromptImagem com logo manda aplicá-la pequena e discreta", () => {
-  const com = montarPromptImagem({
-    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico",
-    contextoImagens: null, permitirPessoas: false, comLogo: true,
-  });
-  assert.match(
-    com,
-    /Use a imagem de referência como a logo da marca: aplique-a pequena e discreta \(num canto, parede ou fachada\), sem distorcer, sem mudar cores, sem cobrir o assunto principal\./,
-  );
-  const sem = montarPromptImagem({
-    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico",
-    contextoImagens: null, permitirPessoas: false, comLogo: false,
-  });
-  assert.doesNotMatch(sem, /logo da marca/);
-  // "sem logos ou marcas de terceiros" vale nos dois casos
-  assert.match(sem, /sem logos ou marcas de terceiros/i);
-  assert.match(com, /sem logos ou marcas de terceiros/i);
-});
-
 test("montarPromptImagem com contexto das imagens: entra como diretrizes (até 8.000 caracteres), antes das regras fixas", () => {
   const p = montarPromptImagem({
     nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico",
-    contextoImagens: "Fundo claro, carros prata, vitrine do SIA.", permitirPessoas: false, comLogo: false,
+    contextoImagens: "Fundo claro, carros prata, vitrine do SIA.", permitirPessoas: false, cantoLivre: null,
   });
   assert.match(p, /Diretrizes de imagem do cliente: Fundo claro, carros prata, vitrine do SIA\./);
   assert.ok(p.indexOf("Diretrizes de imagem do cliente") < p.indexOf("Sem pessoas"));
   const longo = montarPromptImagem({
     nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico",
-    contextoImagens: "c".repeat(9000), permitirPessoas: false, comLogo: false,
+    contextoImagens: "c".repeat(9000), permitirPessoas: false, cantoLivre: null,
   });
   assert.ok(longo.includes("c".repeat(8000)));
   assert.ok(!longo.includes("c".repeat(8001)));
   const vazio = montarPromptImagem({
     nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico",
-    contextoImagens: "  ", permitirPessoas: false, comLogo: false,
+    contextoImagens: "  ", permitirPessoas: false, cantoLivre: null,
   });
   assert.doesNotMatch(vazio, /Diretrizes de imagem do cliente/);
 });
@@ -364,23 +345,34 @@ test("decidirImagem: sem imagem no dia nada; com pasta, Drive (sem cair para a I
   assert.equal(decidirImagem({ comImagem: true, temPasta: false, usaIa: false }), null);
 });
 
-test("montarPromptImagem com logo abre a exceção da própria logo no 'sem texto'; sem logo fica a frase de sempre", () => {
+test("montarPromptImagem: com canto livre pede o canto limpo e nunca fala em desenhar a logo", () => {
+  const base = { nome: "Loja", categoria: "Loja de carros", briefing: BRIEFING_VAZIO, tema: "servico" as const, contextoImagens: null, permitirPessoas: false };
+  const com = montarPromptImagem({ ...base, cantoLivre: "inferior_direito" });
+  assert.match(com, /Deixe o canto inferior direito da imagem limpo/);
+  assert.match(com, /Sem texto, letras, números, preços ou slogans na arte./);
+  assert.doesNotMatch(com, /referência|aplique-a|exceto a própria logo/i);
+  const sem = montarPromptImagem({ ...base, cantoLivre: null });
+  assert.doesNotMatch(sem, /Deixe o canto/);
+  assert.match(sem, /Sem pessoas/);
+});
+
+test("montarPromptImagem: o canto livre segue a posição escolhida e as regras fixas valem com e sem logo", () => {
   const base = { nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico" as const, contextoImagens: null, permitirPessoas: false };
-  const com = montarPromptImagem({ ...base, comLogo: true });
-  assert.match(
-    com,
-    /Sem texto, letras, números, preços ou slogans na arte, exceto a própria logo da marca \(imagem de referência\), que aparece exatamente como é\./,
-  );
-  const sem = montarPromptImagem({ ...base, comLogo: false });
-  assert.match(sem, /Sem texto, letras, números, preços ou slogans na arte\./);
-  assert.doesNotMatch(sem, /exceto a própria logo/);
-  // "sem marcas d'água" vale nos dois casos
-  assert.match(com, /sem marcas d'água/i);
-  assert.match(sem, /sem marcas d'água/i);
+  const canto = (c: PosicaoLogo) => montarPromptImagem({ ...base, cantoLivre: c });
+  assert.match(canto("superior_esquerdo"), /Deixe o canto superior esquerdo da imagem limpo, com fundo simples e sem nenhum objeto importante: a logo da marca será aplicada ali depois./);
+  assert.match(canto("superior_direito"), /Deixe o canto superior direito da imagem limpo/);
+  assert.match(canto("inferior_esquerdo"), /Deixe o canto inferior esquerdo da imagem limpo/);
+  for (const c of ["superior_esquerdo", "inferior_direito"] as const) {
+    const p = canto(c);
+    assert.match(p, /sem marcas d'água/i);
+    assert.match(p, /sem logos ou marcas de terceiros/i);
+    assert.match(p, /formato paisagem/i);
+  }
+  assert.match(montarPromptImagem({ ...base, cantoLivre: null }), /sem logos ou marcas de terceiros/i);
 });
 
 test("montarPromptImagem na nova tentativa diz o que a versão anterior tinha", () => {
-  const base = { nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico" as const, contextoImagens: null, permitirPessoas: false, comLogo: false };
+  const base = { nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico" as const, contextoImagens: null, permitirPessoas: false, cantoLivre: null };
   assert.doesNotMatch(montarPromptImagem(base), /versão anterior/);
   assert.doesNotMatch(montarPromptImagem({ ...base, versaoAnterior: null }), /versão anterior/);
   assert.match(
@@ -397,23 +389,12 @@ test("montarPromptImagem na nova tentativa diz o que a versão anterior tinha", 
   );
 });
 
-test("promptChecagemImagem: pessoas sempre; texto só em destaque; com logo, a segunda imagem não conta como texto", () => {
-  const sem = promptChecagemImagem(false);
-  assert.equal(PROMPT_CHECAGEM_IMAGEM, sem);
-  for (const re of [/pessoa/i, /rosto/i, /m[aã]o/i, /corpo/i, /silhueta/i, /reflexo/i, /ao fundo/i]) assert.match(sem, re);
-  assert.match(sem, /leg[ií]vel e em destaque/i);
-  for (const re of [/frases/i, /pre[cç]os/i, /slogans/i, /letreiros/i, /placas de carro/i, /terceiros/i, /ilegíveis/i]) assert.match(sem, re);
-  assert.doesNotMatch(sem, /segunda imagem/i);
-  assert.doesNotMatch(sem, /logos com escrita/i);
-  const com = promptChecagemImagem(true);
-  assert.ok(com.startsWith(sem));
-  assert.match(com, /A segunda imagem é a logo da marca e serve só de referência/);
-  assert.match(com, /valem para a primeira imagem/);
-  // A exceção vale só para o que está dentro da marca da logo aplicada; o que estiver fora continua contando.
-  assert.match(com, /dentro da própria marca da logo aplicada na arte/);
-  assert.match(com, /escrita, mascote ou rosto dela/);
-  assert.match(com, /não conta como texto nem como pessoa/);
-  assert.match(com, /Qualquer pessoa, rosto, mão ou silhueta fora da marca da logo conta como pessoa, mesmo que lembre o mascote\./);
+test("promptChecagemImagem: pessoas e texto em destaque, sem exceção de logo", () => {
+  const p = promptChecagemImagem();
+  assert.equal(PROMPT_CHECAGEM_IMAGEM, p);
+  for (const re of [/pessoa/i, /rosto/i, /silhueta/i, /ao fundo/i, /leg[ií]vel e em destaque/i]) assert.match(p, re);
+  assert.doesNotMatch(p, /segunda imagem|logo/i);
+  for (const re of [/m[aã]o/i, /corpo/i, /reflexo/i, /frases/i, /pre[cç]os/i, /slogans/i, /letreiros/i, /placas de carro/i, /terceiros/i, /ilegíveis/i]) assert.match(p, re);
 });
 
 test("montarMensagensPost: com contexto a regra de não inventar vale para o contexto e o briefing; sem contexto fica como era", () => {

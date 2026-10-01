@@ -414,8 +414,8 @@ export interface EntradaImagem {
   contextoImagens: string | null;
   /** Só o André liga: sem isso a IA nunca gera pessoas. */
   permitirPessoas: boolean;
-  /** A logo do cliente vai junto como imagem de referência. */
-  comLogo: boolean;
+  /** Canto onde a logo será aplicada depois (a IA deixa o canto limpo); null sem logo. A IA nunca desenha a logo. */
+  cantoLivre: PosicaoLogo | null;
   /** Nova tentativa: o que a checagem achou na versão anterior (o prompt pede para não repetir). */
   versaoAnterior?: { tem_pessoas: boolean; tem_texto: boolean } | null;
 }
@@ -431,13 +431,11 @@ export function montarPromptImagem(e: EntradaImagem): string {
     diretrizes ? `Diretrizes de imagem do cliente: ${diretrizes}` : "",
     diretrizes ? "As regras a seguir valem sempre, mesmo que as diretrizes digam o contrário." : "",
     e.permitirPessoas ? "" : "Sem pessoas: nenhum rosto, corpo, mão, silhueta ou reflexo de pessoa.",
-    e.comLogo
-      ? "Sem texto, letras, números, preços ou slogans na arte, exceto a própria logo da marca (imagem de referência), que aparece exatamente como é."
-      : "Sem texto, letras, números, preços ou slogans na arte.",
+    "Sem texto, letras, números, preços ou slogans na arte.",
     "Sem marcas d'água. Sem logos ou marcas de terceiros. Sem placas de carro legíveis.",
     "Aparência de fotografia real e profissional, em formato paisagem.",
-    e.comLogo
-      ? "Use a imagem de referência como a logo da marca: aplique-a pequena e discreta (num canto, parede ou fachada), sem distorcer, sem mudar cores, sem cobrir o assunto principal."
+    e.cantoLivre
+      ? `Deixe o canto ${ROTULO_POSICAO_LOGO[e.cantoLivre].replace(/^Canto /, "").toLowerCase()} da imagem limpo, com fundo simples e sem nenhum objeto importante: a logo da marca será aplicada ali depois.`
       : "",
     e.versaoAnterior && (e.versaoAnterior.tem_pessoas || e.versaoAnterior.tem_texto)
       ? `A versão anterior tinha ${
@@ -489,25 +487,18 @@ export const ESQUEMA_CHECAGEM_IMAGEM = {
 
 /**
  * Pedido da checagem da imagem. Pessoas: qualquer uma, até pequena ao fundo. Texto: só escrita legível e em destaque na
- * arte (marcas minúsculas e ilegíveis, como o emblema de um carro, não contam). Com logo, a logo vai como segunda imagem
- * e a escrita dela não conta como texto.
+ * arte (marcas minúsculas e ilegíveis, como o emblema de um carro, não contam). A imagem conferida é a da IA, ainda sem
+ * a logo (a logo é aplicada depois, por cima, e não passa pela checagem).
  */
-export function promptChecagemImagem(comLogo: boolean): string {
-  const base =
-    "Olhe a imagem e responda em JSON. " +
+export function promptChecagemImagem(): string {
+  return "Olhe a imagem e responda em JSON. " +
     "tem_pessoas é true se houver qualquer pessoa, rosto, mão, corpo, silhueta ou reflexo de pessoa, mesmo pequena, parcial ou ao fundo. " +
     "tem_texto é true só se houver escrita legível e em destaque na arte (frases, letras, números, preços, slogans, letreiros, " +
     "placas de carro legíveis, marcas de terceiros); ignore marcas minúsculas e ilegíveis.";
-  return comLogo
-    ? `${base} A segunda imagem é a logo da marca e serve só de referência: as duas marcações valem para a primeira ` +
-      "imagem. Só não conta como texto nem como pessoa o que estiver dentro da própria marca da logo aplicada na arte " +
-      "(o desenho pequeno da logo, num canto, parede ou fachada: escrita, mascote ou rosto dela, como na referência). " +
-      "Qualquer pessoa, rosto, mão ou silhueta fora da marca da logo conta como pessoa, mesmo que lembre o mascote."
-    : base;
 }
 
-/** O pedido da checagem sem logo. */
-export const PROMPT_CHECAGEM_IMAGEM = promptChecagemImagem(false);
+/** O pedido da checagem (a imagem conferida é a da IA, ainda sem a logo). */
+export const PROMPT_CHECAGEM_IMAGEM = promptChecagemImagem();
 
 /** Antes de gerar de novo, a execução precisa ter pelo menos isto sobrando do prazo total. */
 export const MARGEM_NOVA_TENTATIVA_MS = 45_000;

@@ -1,5 +1,5 @@
-// OpenAI: resposta em JSON (Chat Completions + JSON Schema estrito), geração de imagem (com ou sem logo de referência)
-// e checagem da imagem gerada.
+// OpenAI: resposta em JSON (Chat Completions + JSON Schema estrito), geração de imagem (PNG, sem a logo) e checagem da
+// imagem gerada.
 // deno-lint-ignore-file no-explicit-any
 import { foiPrazo, PRAZO, sinal } from "./prazo.ts";
 import { ESQUEMA_CHECAGEM_IMAGEM, promptChecagemImagem } from "./regras.ts";
@@ -88,54 +88,35 @@ export async function gerarJson<T>(
   return conteudoJson<T>(d);
 }
 
-/** Logo do cliente: `bytes` vão na edição da imagem; `url` (pública no R2) vai direto à OpenAI na checagem. */
-export interface Logo { bytes: Uint8Array; tipo: string; url: string }
-
 /**
- * JPEG gerado pela OpenAI (paisagem), em base64, como a OpenAI devolveu (quem precisar dos bytes decodifica uma vez, ao
- * gravar; a checagem usa o mesmo texto, sem codificar de novo). Sem `logo`: geração a partir do prompt. Com `logo`:
- * edição de imagem (multipart), com a logo como referência em `image[]`.
+ * PNG gerado pela OpenAI (paisagem), em base64, como a OpenAI devolveu. Sempre sem a logo: ela é aplicada depois, por
+ * cima, pela função (compor.ts), para nunca ser redesenhada. PNG porque a composição lê PNG sem biblioteca.
  */
-export async function gerarImagem(prompt: string, total?: AbortSignal, logo?: Logo): Promise<string> {
+export async function gerarImagem(prompt: string, total?: AbortSignal): Promise<string> {
   const model = Deno.env.get("OPENAI_MODELO_IMAGEM") || "gpt-image-1";
   // quality "medium": o padrão ("auto") pode sair em "high", mais lento e caro.
-  // Sem `input_fidelity`: nos modelos gpt-image-2 o parâmetro deve ser omitido (toda imagem de entrada, a logo, já é
-  // processada em alta fidelidade) e enviá-lo dá 400.
-  const opcoes = { size: "1536x1024", quality: "medium", n: 1, output_format: "jpeg" };
-  let d: any;
-  if (logo) {
-    const f = new FormData();
-    f.append("model", model);
-    f.append("prompt", prompt);
-    for (const [k, v] of Object.entries(opcoes)) f.append(k, String(v));
-    // A cópia dá um Uint8Array sobre ArrayBuffer comum (BlobPart aceita só esse).
-    const arquivo = new File([new Uint8Array(logo.bytes)], logo.tipo === "image/png" ? "logo.png" : "logo.jpg", { type: logo.tipo });
-    f.append("image[]", arquivo);
-    d = await chamar("/images/edits", f, PRAZO.imagem, total, "imagem");
-  } else {
-    d = await chamar("/images/generations", { model, prompt, ...opcoes }, PRAZO.imagem, total, "imagem");
-  }
+  const d = await chamar("/images/generations", {
+    model, prompt, size: "1536x1024", quality: "medium", n: 1, output_format: "png",
+  }, PRAZO.imagem, total, "imagem");
   const b64 = d?.data?.[0]?.b64_json;
   if (!b64 || typeof b64 !== "string") throw new Error("OpenAI não devolveu a imagem.");
   return b64;
 }
 
 /**
- * O modelo de visão olha a imagem gerada (`imagemB64`, o base64 que a OpenAI devolveu): tem pessoas? tem texto legível
- * e em destaque? Com `logo`, ela vai como segunda imagem, pela URL pública (sem recodificar os MB da logo), e o que for
- * da marca dela não conta como texto nem como pessoa. `detail: "high"`: gente pequena ao fundo conta.
+ * O modelo de visão olha a imagem gerada (`imagemB64`, o base64 que a OpenAI devolveu, ainda sem a logo): tem pessoas?
+ * tem texto legível e em destaque? `detail: "high"`: gente pequena ao fundo conta.
  */
 export async function checarImagem(
-  imagemB64: string, tipoMime: string, total?: AbortSignal, logo?: Logo,
+  imagemB64: string, tipoMime: string, total?: AbortSignal,
 ): Promise<{ tem_pessoas: boolean; tem_texto: boolean }> {
   const d = await chamar("/chat/completions", {
     model: modeloVisao(),
     messages: [{
       role: "user",
       content: [
-        { type: "text", text: promptChecagemImagem(!!logo) },
+        { type: "text", text: promptChecagemImagem() },
         { type: "image_url", image_url: { url: `data:${tipoMime};base64,${imagemB64}`, detail: "high" } },
-        ...(logo ? [{ type: "image_url", image_url: { url: logo.url, detail: "high" } }] : []),
       ],
     }],
     response_format: { type: "json_schema", json_schema: { name: "checagem_imagem_gmn", strict: true, schema: ESQUEMA_CHECAGEM_IMAGEM } },
