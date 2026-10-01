@@ -22,6 +22,9 @@ test("mesesCobrados: do mês de desde até o de hoje; padrão set/2026; desde in
   assert.deepEqual(mesesCobrados("2026-12-01", "2026-10-02"), []);
   assert.deepEqual(mesesCobrados("lixo", "2026-10-02"), ["2026-09", "2026-10"]);
   assert.deepEqual(mesesCobrados("2026-11-01", "2027-02-01"), ["2026-11", "2026-12", "2027-01", "2027-02"]);
+  // mês 00 e mês 13 ou mais não são meses: valem como o padrão
+  assert.deepEqual(mesesCobrados("2026-13-01", "2026-10-02"), ["2026-09", "2026-10"]);
+  assert.deepEqual(mesesCobrados("2026-00-01", "2026-10-02"), ["2026-09", "2026-10"]);
 });
 
 test("ultimosMeses: n meses terminando no de hoje, mais antigo primeiro", () => {
@@ -114,4 +117,20 @@ test("mesesNavegaveis e mesEscolhido: do cobranca_desde mais antigo até hoje; v
   assert.equal(mesEscolhido("2026-10", nav, "2026-11-03"), "2026-10");
   assert.equal(mesEscolhido("2026-08", nav, "2026-11-03"), "2026-11");
   assert.equal(mesEscolhido(undefined, nav, "2026-11-03"), "2026-11");
+});
+
+test("mesesNavegaveis: nunca fica vazio, sempre inclui o mês atual e trata data inválida como o padrão", () => {
+  assert.deepEqual(mesesNavegaveis([], "2026-11-03"), ["2026-09", "2026-10", "2026-11"]);
+  // fonte que só começa a cobrar depois de hoje: a lista ainda tem o mês atual
+  assert.deepEqual(mesesNavegaveis([{ ...unica, cobranca_desde: "2027-01-01" }], "2026-10-02"), ["2026-10"]);
+  // cobranca_desde inválido cobra desde setembro (como em mesesCobrados), então a navegação também começa lá
+  assert.deepEqual(mesesNavegaveis([{ ...unica, cobranca_desde: "2026-10-01" }, { ...unica, cobranca_desde: "lixo" }], "2026-10-02"), ["2026-09", "2026-10"]);
+  assert.deepEqual(mesesNavegaveis([{ ...unica, cobranca_desde: "2026-13-01" }], "2026-10-02"), ["2026-09", "2026-10"]);
+});
+
+test("mesEscolhido: nunca devolve mês fora da lista (nem quebra) quando a lista não tem o mês atual", () => {
+  assert.equal(mesEscolhido("2026-12", ["2026-09", "2026-10"], "2026-11-03"), "2026-10");
+  assert.equal(mesEscolhido(undefined, ["2026-09", "2026-10"], "2026-11-03"), "2026-10");
+  assert.equal(mesEscolhido(42, ["2026-09", "2026-10", "2026-11"], "2026-11-03"), "2026-11");
+  assert.equal(mesEscolhido("2026-09", [], "2026-11-03"), "2026-11");
 });

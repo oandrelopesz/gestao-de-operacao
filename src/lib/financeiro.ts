@@ -52,6 +52,14 @@ export interface ParcelaDoMes extends Parcela {
   vencimento: string;
   status: StatusMes;
   recebimento: RecebimentoMes | null;
+  /** O que a parcela vale neste mês: o valor congelado no acerto (`valor_devido`) ou, sem ele, `valor`. */
+  devido: number;
+  /** O que já entrou na parcela, no máximo o devido (o que passa disso não abate outra parcela). */
+  pago: number;
+  /** O que ainda falta receber: 0 se recebida ou isenta. É o valor que o sino cobra. */
+  falta: number;
+  /** O que a isenção abonou: devido menos o que já tinha sido pago; 0 se não é isenta. */
+  abonado: number;
 }
 
 export interface SituacaoDoMes {
@@ -121,33 +129,36 @@ function statusGeral(parcelas: ParcelaDoMes[]): StatusMes {
 }
 
 const CENTAVO = 0.005;
+/** Arredonda em centavos (soma de valores quebrados não pode sair 0,30000000000000004). */
+const arred = (v: number) => Math.round(v * 100) / 100;
 
 export function situacaoDoMes(fonte: FonteDoMes, hoje: string): SituacaoDoMes {
   const lista = parcelasDaFonte(fonte);
   const recebimentos = fonte.recebimentos_mes || [];
-  // O que a parcela vale neste mês (o valor congelado no acerto, se houver) e o que já entrou nela
-  const devidoDe = (p: ParcelaDoMes) => Number(p.recebimento?.valor_devido ?? p.valor);
-  const pagoDe = (p: ParcelaDoMes) => (p.recebimento?.recebido ? Number(p.recebimento.valor_recebido ?? devidoDe(p)) : 0);
-  const faltaDe = (p: ParcelaDoMes) => Math.max(0, Math.round((devidoDe(p) - pagoDe(p)) * 100) / 100);
   const parcelas = lista.map((p, i): ParcelaDoMes => {
     const recebimento = recebimentos.find((r) => r.parcela === i + 1) || null;
     const vencimento = vencimentoNoMes(p.dia, hoje);
-    const devido = Number(recebimento?.valor_devido ?? p.valor);
+    // O valor congelado no acerto vence o atual; o pago conta no máximo o devido (o excesso não abate outra parcela)
+    const devido = arred(Number(recebimento?.valor_devido ?? p.valor));
+    const pago = recebimento?.recebido ? arred(Math.max(0, Math.min(Number(recebimento.valor_recebido ?? devido), devido))) : 0;
+    const isenta = !!recebimento?.isento;
     // Recebido de verdade só quando o pago cobre o devido; valor menor é parcial e a parcela segue em aberto pela data
-    const quitada = !!recebimento?.recebido && (recebimento.valor_recebido == null || recebimento.valor_recebido >= devido - CENTAVO);
-    const status = recebimento?.isento ? "isento" : statusDaParcela(vencimento, quitada, hoje);
-    return { ...p, numero: i + 1, total: lista.length, vencimento, recebimento, status };
+    const quitada = !!recebimento?.recebido && pago >= devido - CENTAVO;
+    const status: StatusMes = isenta ? "isento" : statusDaParcela(vencimento, quitada, hoje);
+    const falta = isenta || quitada ? 0 : arred(devido - pago);
+    const abonado = isenta ? arred(devido - pago) : 0;
+    return { ...p, numero: i + 1, total: lista.length, vencimento, recebimento, status, devido, pago, falta, abonado };
   });
-  const soma = (ps: ParcelaDoMes[], valor: (p: ParcelaDoMes) => number) => ps.reduce((t, p) => t + valor(p), 0);
+  const soma = (ps: ParcelaDoMes[], valor: (p: ParcelaDoMes) => number) => arred(ps.reduce((t, p) => t + valor(p), 0));
   return {
     parcelas,
     status: statusGeral(parcelas),
     fracionado: ehFracionado(fonte),
     recebidas: parcelas.filter((p) => p.status === "recebido").length,
-    // Conta o que entrou em qualquer parcela com pagamento (inclusive parcial e isenta que já tinha pago)
-    valorRecebido: soma(parcelas.filter((p) => p.recebimento?.recebido), pagoDe),
-    valorEmAberto: soma(parcelas.filter((p) => p.status !== "recebido" && p.status !== "isento"), faltaDe),
-    valorAtrasado: soma(parcelas.filter((p) => p.status === "atrasado"), faltaDe),
+    // O que entrou em qualquer parcela com pagamento (inclusive parcial e isenta que já tinha pago), com o valor informado
+    valorRecebido: soma(parcelas.filter((p) => p.recebimento?.recebido), (p) => Math.max(0, Number(p.recebimento?.valor_recebido ?? p.devido))),
+    valorEmAberto: soma(parcelas, (p) => p.falta),
+    valorAtrasado: soma(parcelas.filter((p) => p.status === "atrasado"), (p) => p.falta),
   };
 }
 
@@ -162,18 +173,22 @@ export function infoDoStatus(status: StatusMes) {
   }
 }
 
-/** Cartões do topo: valores somados por parcela, contagens por fonte. */
+/**
+ * Cartões do topo: valores somados por parcela, contagens por fonte. O previsto não inclui o que a isenção abonou;
+ * fonte isenta conta como resolvida (junto com a recebida), não como em aberto.
+ */
 export function resumoDoMes(fontes: FonteDoMes[], hoje: string) {
   const situacoes = fontes.map((f) => situacaoDoMes(f, hoje));
-  const soma = (valor: (s: SituacaoDoMes) => number) => situacoes.reduce((t, s) => t + valor(s), 0);
+  const soma = (valor: (s: SituacaoDoMes) => number) => arred(situacoes.reduce((t, s) => t + valor(s), 0));
+  const resolvida = (s: SituacaoDoMes) => s.status === "recebido" || s.status === "isento";
   return {
-    previsto: soma((s) => s.parcelas.reduce((t, p) => t + p.valor, 0)),
+    previsto: soma((s) => s.parcelas.reduce((t, p) => t + p.devido - p.abonado, 0)),
     recebido: soma((s) => s.valorRecebido),
     emAberto: soma((s) => s.valorEmAberto),
     atrasado: soma((s) => s.valorAtrasado),
     fontes: fontes.length,
-    fontesRecebidas: situacoes.filter((s) => s.status === "recebido").length,
-    fontesEmAberto: situacoes.filter((s) => s.status !== "recebido").length,
+    fontesRecebidas: situacoes.filter(resolvida).length,
+    fontesEmAberto: situacoes.filter((s) => !resolvida(s)).length,
     fontesAtrasadas: situacoes.filter((s) => s.status === "atrasado").length,
   };
 }

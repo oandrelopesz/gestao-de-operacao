@@ -52,7 +52,7 @@ export interface Cobranca {
 export const COBRANCA_DESDE_PADRAO = "2026-09-01";
 const CENTAVO = 0.005;
 const arred = (v: number) => Math.round(v * 100) / 100;
-const MES = /^\d{4}-\d{2}$/;
+const MES = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 function proximoMes(mes: string): string {
   let [y, m] = mes.split("-").map(Number);
@@ -92,7 +92,10 @@ export function parcelasComForma(fonte: FonteCobravel) {
   });
 }
 
-/** Cada parcela de cada mês cobrado da fonte, do mês mais antigo ao atual. */
+/**
+ * Cada parcela de cada mês cobrado da fonte, do mês mais antigo ao atual. `registros` precisa ser só os da fonte
+ * (a função casa por mês e parcela, não por `fonte_id`).
+ */
 export function cobrancasDaFonte(fonte: FonteCobravel, registros: RegistroRecebimento[], hoje: string): Cobranca[] {
   const parcelas = parcelasComForma(fonte);
   const mesAtual = hoje.slice(0, 7);
@@ -124,7 +127,10 @@ export function cobrancasDaFonte(fonte: FonteCobravel, registros: RegistroRecebi
   return out;
 }
 
-/** O que está devendo (vencido e não quitado nem isento), do mais antigo ao mais novo, e o total. */
+/**
+ * O que está devendo (vencido e não quitado nem isento) e o total. Os itens saem na ordem recebida: do mais antigo ao
+ * mais novo quando são as cobranças de uma fonte só (várias fontes juntas só servem para o total).
+ */
 export function atrasadoDe(cobrancas: Cobranca[]) {
   const itens = cobrancas.filter((c) => c.vencida && c.falta > 0);
   return { itens, total: arred(itens.reduce((t, c) => t + c.falta, 0)) };
@@ -161,18 +167,29 @@ export function calendarioDaFonte(cobrancas: Cobranca[], hoje: string, n = 12) {
   });
 }
 
-/** Meses da navegação da aba: do `cobranca_desde` mais antigo das fontes até o mês atual. */
+/**
+ * Meses da navegação da aba: do `cobranca_desde` mais antigo das fontes (inválido vale como setembro de 2026, como em
+ * `mesesCobrados`; sem fontes, também) até o mês atual. Nunca fica vazia: o mês atual sempre está na lista.
+ */
 export function mesesNavegaveis(fontes: FonteCobravel[], hoje: string): string[] {
+  const padrao = COBRANCA_DESDE_PADRAO.slice(0, 7);
+  const atual = hoje.slice(0, 7);
   const inicios = fontes
-    .map((f) => String(f.cobranca_desde ?? COBRANCA_DESDE_PADRAO).slice(0, 7))
-    .filter((m) => MES.test(m))
+    .map((f) => {
+      const m = String(f.cobranca_desde ?? "").slice(0, 7);
+      return MES.test(m) ? m : padrao;
+    })
     .sort();
-  return mesesCobrados(`${inicios[0] ?? COBRANCA_DESDE_PADRAO.slice(0, 7)}-01`, hoje);
+  const primeiro = inicios[0] ?? padrao;
+  return mesesCobrados(`${primeiro < atual ? primeiro : atual}-01`, hoje);
 }
 
-/** "YYYY-MM" válido e dentro dos meses navegáveis; senão o mês atual. */
+/** "YYYY-MM" dentro dos meses navegáveis; senão o mês atual, ou o último da lista se o atual não estiver nela. */
 export function mesEscolhido(v: unknown, navegaveis: string[], hoje: string): string {
-  return typeof v === "string" && navegaveis.includes(v) ? v : hoje.slice(0, 7);
+  if (typeof v === "string" && navegaveis.includes(v)) return v;
+  const atual = hoje.slice(0, 7);
+  if (navegaveis.includes(atual)) return atual;
+  return navegaveis[navegaveis.length - 1] ?? atual;
 }
 
 /** Texto e cores de cada situação (cor nunca sozinha: sempre com o texto). */

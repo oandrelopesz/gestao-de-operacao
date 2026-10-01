@@ -106,6 +106,58 @@ test("situacaoDoMes: parcela isenta fica isenta e sai do em aberto; parcial cont
   assert.equal(parcial.status, "atrasado");
   assert.equal(parcial.valorEmAberto, 2500);
   assert.equal(parcial.valorRecebido, 1000);
+  // o sino avisa o que ainda falta (não o valor cheio)
+  assert.equal(parcial.parcelas[0].falta, 2500);
+});
+
+test("situacaoDoMes: pagamento a mais quita sem deixar o em aberto negativo nem cobrir outra parcela", () => {
+  const s = situacaoDoMes({ ...fracionada, recebimentos_mes: [receb(1, true, 1200)] }, "2026-09-12");
+  assert.deepEqual(s.parcelas.map((p) => [p.status, p.devido, p.pago, p.falta]), [
+    ["recebido", 1000, 1000, 0],
+    ["a_vencer", 1500, 0, 1500],
+  ]);
+  assert.equal(s.valorRecebido, 1200);
+  assert.equal(s.valorEmAberto, 1500);
+});
+
+test("situacaoDoMes: valor_devido congelado vence o valor atual; parcial mostra o que falta; somas em centavos", () => {
+  const congelada = situacaoDoMes({ ...unica, recebimentos_mes: [{ ...receb(1, true, 3000), valor_devido: 3000 }] }, "2026-10-31");
+  assert.equal(congelada.status, "recebido");
+  assert.equal(congelada.valorEmAberto, 0);
+  const parcial = situacaoDoMes({ ...unica, recebimentos_mes: [{ ...receb(1, true, 1000), valor_devido: 3500 }] }, "2026-10-31");
+  assert.deepEqual(parcial.parcelas.map((p) => [p.devido, p.pago, p.falta]), [[3500, 1000, 2500]]);
+  const centavos = situacaoDoMes({ valor_mensal: 0.3, dia_recebimento: 1, parcelas: [{ dia: 1, valor: 0.1 }, { dia: 2, valor: 0.2 }], recebimentos_mes: [] }, "2026-09-30");
+  assert.equal(centavos.valorEmAberto, 0.3);
+  assert.equal(centavos.valorAtrasado, 0.3);
+});
+
+test("resumoDoMes: isento sai do previsto (o que já foi pago fica) e conta como resolvido", () => {
+  const isenta = (parcela: number, valor_recebido: number | null = null, valor_devido: number | null = null): RecebimentoMes => ({
+    id: `i${parcela}`, parcela, recebido: valor_recebido != null, isento: true, data_confirmacao: null, valor_recebido, valor_devido,
+  });
+  const r = resumoDoMes([
+    { ...fracionada, recebimentos_mes: [isenta(1), isenta(2)] },       // tudo abonado: previsto 0
+    { ...unica, recebimentos_mes: [isenta(1, 1000, 3500)] },            // pagou 1000, abonou 2500
+    { valor_mensal: 500, dia_recebimento: 5, parcelas: null, recebimentos_mes: [receb(1)] }, // recebido
+    { valor_mensal: 700, dia_recebimento: 1, parcelas: null, recebimentos_mes: [] },          // atrasado
+  ], "2026-09-26");
+  assert.deepEqual(r, {
+    previsto: 2200, // 0 + 1000 + 500 + 700
+    recebido: 1500,
+    emAberto: 700,
+    atrasado: 700,
+    fontes: 4,
+    fontesRecebidas: 3, // as duas isentas contam como resolvidas
+    fontesEmAberto: 1,
+    fontesAtrasadas: 1,
+  });
+});
+
+test("resumoDoMes: usa o valor congelado (valor_devido) no previsto", () => {
+  const r = resumoDoMes([{ ...unica, recebimentos_mes: [{ ...receb(1, true, 3000), valor_devido: 3000 }] }], "2026-09-26");
+  assert.equal(r.previsto, 3000);
+  assert.equal(r.recebido, 3000);
+  assert.equal(r.emAberto, 0);
 });
 
 test("resumoDoMes: totais por parcela e contagem de fontes", () => {

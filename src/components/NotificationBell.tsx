@@ -78,7 +78,7 @@ export function NotificationBell() {
             id: p.total > 1 ? `${fonte.fonte_id}:${fonte.mes_atual}:${p.numero}` : fonte.fonte_id,
             fonte_id: fonte.fonte_id,
             nome: fonte.nome,
-            valor: p.valor,
+            valor: p.falta, // o que ainda falta (parcial não cobra o valor cheio)
             dia: p.dia,
             vencimento: p.vencimento,
             parcela: p.numero,
