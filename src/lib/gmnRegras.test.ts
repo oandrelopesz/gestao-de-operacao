@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AGENDA_PADRAO, BRIEFING_VAZIO, ESQUEMA_CHECAGEM_IMAGEM, HORARIOS, PROMPT_CHECAGEM_IMAGEM, TEMAS, alternarDia,
-  alternarImagem, checarTexto, comUtm, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras, idPastaDrive,
+  alternarImagem, base64ParaBytes, checarTexto, comUtm, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras,
+  idPastaDrive,
   mesmoHorario, montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda,
   normalizarBriefing, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64,
 } from "../../supabase/functions/gmn/regras.ts";
@@ -408,7 +409,11 @@ test("promptChecagemImagem: pessoas sempre; texto só em destaque; com logo, a s
   assert.ok(com.startsWith(sem));
   assert.match(com, /A segunda imagem é a logo da marca e serve só de referência/);
   assert.match(com, /valem para a primeira imagem/);
-  assert.match(com, /mascote, desenho ou rosto da própria logo\) não conta como texto nem como pessoa\./);
+  // A exceção vale só para o que está dentro da marca da logo aplicada; o que estiver fora continua contando.
+  assert.match(com, /dentro da própria marca da logo aplicada na arte/);
+  assert.match(com, /escrita, mascote ou rosto dela/);
+  assert.match(com, /não conta como texto nem como pessoa/);
+  assert.match(com, /Qualquer pessoa, rosto, mão ou silhueta fora da marca da logo conta como pessoa, mesmo que lembre o mascote\./);
 });
 
 test("montarMensagensPost: com contexto a regra de não inventar vale para o contexto e o briefing; sem contexto fica como era", () => {
@@ -428,17 +433,45 @@ test("decisaoChecagem: aceita limpo; repete uma vez se sobrar 45 s; senão desis
   const limpo = { tem_pessoas: false, tem_texto: false };
   const pessoas = { tem_pessoas: true, tem_texto: false };
   const texto = { tem_pessoas: false, tem_texto: true };
-  assert.equal(decisaoChecagem(1, limpo, 100_000), "aceitar");
-  assert.equal(decisaoChecagem(2, limpo, 0), "aceitar");
-  assert.equal(decisaoChecagem(2, limpo, -5), "aceitar");
-  assert.equal(decisaoChecagem(1, pessoas, 100_000), "repetir");
-  assert.equal(decisaoChecagem(1, texto, 100_000), "repetir");
-  assert.equal(decisaoChecagem(1, { tem_pessoas: true, tem_texto: true }, 45_000), "repetir");
-  assert.equal(decisaoChecagem(1, pessoas, 44_999), "desistir");
-  assert.equal(decisaoChecagem(1, texto, 0), "desistir");
-  assert.equal(decisaoChecagem(1, pessoas, -1), "desistir");
-  assert.equal(decisaoChecagem(2, pessoas, 100_000), "desistir");
-  assert.equal(decisaoChecagem(2, texto, 100_000), "desistir");
+  assert.equal(decisaoChecagem(1, limpo, 100_000, false), "aceitar");
+  assert.equal(decisaoChecagem(2, limpo, 0, false), "aceitar");
+  assert.equal(decisaoChecagem(2, limpo, -5, false), "aceitar");
+  assert.equal(decisaoChecagem(1, pessoas, 100_000, false), "repetir");
+  assert.equal(decisaoChecagem(1, texto, 100_000, false), "repetir");
+  assert.equal(decisaoChecagem(1, { tem_pessoas: true, tem_texto: true }, 45_000, false), "repetir");
+  assert.equal(decisaoChecagem(1, pessoas, 44_999, false), "desistir");
+  assert.equal(decisaoChecagem(1, texto, 0, false), "desistir");
+  assert.equal(decisaoChecagem(1, pessoas, -1, false), "desistir");
+  assert.equal(decisaoChecagem(2, pessoas, 100_000, false), "desistir");
+  assert.equal(decisaoChecagem(2, texto, 100_000, false), "desistir");
+});
+
+test("decisaoChecagem com pessoas permitidas: tem_pessoas é ignorado e só o texto em destaque reprova", () => {
+  const pessoas = { tem_pessoas: true, tem_texto: false };
+  const texto = { tem_pessoas: false, tem_texto: true };
+  const ambos = { tem_pessoas: true, tem_texto: true };
+  assert.equal(decisaoChecagem(1, pessoas, 100_000, true), "aceitar");
+  assert.equal(decisaoChecagem(2, pessoas, 0, true), "aceitar");
+  assert.equal(decisaoChecagem(1, { tem_pessoas: false, tem_texto: false }, 100_000, true), "aceitar");
+  assert.equal(decisaoChecagem(1, texto, 100_000, true), "repetir");
+  assert.equal(decisaoChecagem(1, ambos, 100_000, true), "repetir");
+  assert.equal(decisaoChecagem(1, texto, 44_999, true), "desistir");
+  assert.equal(decisaoChecagem(2, texto, 100_000, true), "desistir");
+  assert.equal(decisaoChecagem(2, ambos, 100_000, true), "desistir");
+});
+
+test("base64ParaBytes decodifica como o Buffer (padding, quebras de linha e arquivo grande)", () => {
+  assert.deepEqual([...base64ParaBytes("")], []);
+  for (const n of [1, 2, 3, 4, 100, 1001]) {
+    const orig = Uint8Array.from({ length: n }, (_, i) => (i * 37 + 11) % 256);
+    assert.deepEqual([...base64ParaBytes(Buffer.from(orig).toString("base64"))], [...orig]);
+  }
+  assert.deepEqual([...base64ParaBytes("QU\r\nJD")], [65, 66, 67]); // o atob ignora quebras de linha
+  const grande = Buffer.alloc(5 * 1024 * 1024, 200);
+  const dec = base64ParaBytes(grande.toString("base64"));
+  assert.equal(dec.length, grande.length);
+  assert.equal(Buffer.compare(Buffer.from(dec), grande), 0);
+  assert.throws(() => base64ParaBytes("***"));
 });
 
 test("tamanhoBase64 conta os bytes decodificados sem decodificar", () => {

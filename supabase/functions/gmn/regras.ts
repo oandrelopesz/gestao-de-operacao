@@ -473,8 +473,9 @@ export function promptChecagemImagem(comLogo: boolean): string {
     "placas de carro legíveis, marcas de terceiros); ignore marcas minúsculas e ilegíveis.";
   return comLogo
     ? `${base} A segunda imagem é a logo da marca e serve só de referência: as duas marcações valem para a primeira ` +
-      "imagem, e o que for da logo aplicada nela (escrita, mascote, desenho ou rosto da própria logo) não conta como " +
-      "texto nem como pessoa."
+      "imagem. Só não conta como texto nem como pessoa o que estiver dentro da própria marca da logo aplicada na arte " +
+      "(o desenho pequeno da logo, num canto, parede ou fachada: escrita, mascote ou rosto dela, como na referência). " +
+      "Qualquer pessoa, rosto, mão ou silhueta fora da marca da logo conta como pessoa, mesmo que lembre o mascote."
     : base;
 }
 
@@ -485,13 +486,14 @@ export const PROMPT_CHECAGEM_IMAGEM = promptChecagemImagem(false);
 export const MARGEM_NOVA_TENTATIVA_MS = 45_000;
 
 /**
- * O que fazer com a imagem da IA depois da checagem. Pessoas ou texto em destaque reprovam; na 1ª tentativa gera de
- * novo se ainda sobrar tempo (`restanteMs`), senão (ou na 2ª) desiste e o post sai só com texto.
+ * O que fazer com a imagem da IA depois da checagem. Pessoas ou texto em destaque reprovam (com `permitirPessoas`, só
+ * o texto: `tem_pessoas` é ignorado); na 1ª tentativa gera de novo se ainda sobrar tempo (`restanteMs`), senão (ou na
+ * 2ª) desiste e o post sai só com texto.
  */
 export function decisaoChecagem(
-  tentativa: 1 | 2, r: { tem_pessoas: boolean; tem_texto: boolean }, restanteMs: number,
+  tentativa: 1 | 2, r: { tem_pessoas: boolean; tem_texto: boolean }, restanteMs: number, permitirPessoas: boolean,
 ): "aceitar" | "repetir" | "desistir" {
-  if (!r.tem_pessoas && !r.tem_texto) return "aceitar";
+  if (!r.tem_texto && (permitirPessoas || !r.tem_pessoas)) return "aceitar";
   return tentativa === 1 && restanteMs >= MARGEM_NOVA_TENTATIVA_MS ? "repetir" : "desistir";
 }
 
@@ -514,4 +516,15 @@ export function tamanhoBase64(texto: string): number {
     if (c === 61) padding++;
   }
   return Math.floor((n * 3) / 4) - padding;
+}
+
+/**
+ * Base64 → bytes com um laço simples (`Uint8Array.from(atob(s), fn)` custa várias vezes mais CPU em arquivo de MBs).
+ * O `atob` ignora espaços e quebras de linha e dá erro em base64 inválido.
+ */
+export function base64ParaBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
 }

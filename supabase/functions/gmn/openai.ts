@@ -88,14 +88,15 @@ export async function gerarJson<T>(
   return conteudoJson<T>(d);
 }
 
-/** Logo do cliente usada como imagem de referência. */
-export interface Logo { bytes: Uint8Array; tipo: string }
+/** Logo do cliente: `bytes` vão na edição da imagem; `url` (pública no R2) vai direto à OpenAI na checagem. */
+export interface Logo { bytes: Uint8Array; tipo: string; url: string }
 
 /**
- * JPEG gerado pela OpenAI (paisagem). Sem `logo`: geração a partir do prompt. Com `logo`: edição de imagem
- * (multipart), com a logo como referência em `image[]`.
+ * JPEG gerado pela OpenAI (paisagem), em base64, como a OpenAI devolveu (quem precisar dos bytes decodifica uma vez, ao
+ * gravar; a checagem usa o mesmo texto, sem codificar de novo). Sem `logo`: geração a partir do prompt. Com `logo`:
+ * edição de imagem (multipart), com a logo como referência em `image[]`.
  */
-export async function gerarImagem(prompt: string, total?: AbortSignal, logo?: Logo): Promise<Uint8Array> {
+export async function gerarImagem(prompt: string, total?: AbortSignal, logo?: Logo): Promise<string> {
   const model = Deno.env.get("OPENAI_MODELO_IMAGEM") || "gpt-image-1";
   // quality "medium": o padrão ("auto") pode sair em "high", mais lento e caro.
   // Sem `input_fidelity`: nos modelos gpt-image-2 o parâmetro deve ser omitido (toda imagem de entrada, a logo, já é
@@ -115,28 +116,17 @@ export async function gerarImagem(prompt: string, total?: AbortSignal, logo?: Lo
     d = await chamar("/images/generations", { model, prompt, ...opcoes }, PRAZO.imagem, total, "imagem");
   }
   const b64 = d?.data?.[0]?.b64_json;
-  if (!b64) throw new Error("OpenAI não devolveu a imagem.");
-  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-}
-
-/** Bytes → base64 em pedaços (o spread de uma imagem inteira estoura a pilha). */
-function paraBase64(bytes: Uint8Array): string {
-  let s = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(s);
-}
-
-/** Imagem (ou logo) como parte `image_url` da mensagem, em data URL e com detalhe alto (gente pequena ao fundo conta). */
-function parteImagem(bytes: Uint8Array, tipoMime: string) {
-  return { type: "image_url", image_url: { url: `data:${tipoMime};base64,${paraBase64(bytes)}`, detail: "high" } };
+  if (!b64 || typeof b64 !== "string") throw new Error("OpenAI não devolveu a imagem.");
+  return b64;
 }
 
 /**
- * O modelo de visão olha a imagem: tem pessoas? tem texto legível e em destaque? Com `logo`, ela vai como segunda
- * imagem e a escrita dela não conta como texto.
+ * O modelo de visão olha a imagem gerada (`imagemB64`, o base64 que a OpenAI devolveu): tem pessoas? tem texto legível
+ * e em destaque? Com `logo`, ela vai como segunda imagem, pela URL pública (sem recodificar os MB da logo), e o que for
+ * da marca dela não conta como texto nem como pessoa. `detail: "high"`: gente pequena ao fundo conta.
  */
 export async function checarImagem(
-  bytes: Uint8Array, tipoMime: string, total?: AbortSignal, logo?: Logo,
+  imagemB64: string, tipoMime: string, total?: AbortSignal, logo?: Logo,
 ): Promise<{ tem_pessoas: boolean; tem_texto: boolean }> {
   const d = await chamar("/chat/completions", {
     model: modeloVisao(),
@@ -144,8 +134,8 @@ export async function checarImagem(
       role: "user",
       content: [
         { type: "text", text: promptChecagemImagem(!!logo) },
-        parteImagem(bytes, tipoMime),
-        ...(logo ? [parteImagem(logo.bytes, logo.tipo)] : []),
+        { type: "image_url", image_url: { url: `data:${tipoMime};base64,${imagemB64}`, detail: "high" } },
+        ...(logo ? [{ type: "image_url", image_url: { url: logo.url, detail: "high" } }] : []),
       ],
     }],
     response_format: { type: "json_schema", json_schema: { name: "checagem_imagem_gmn", strict: true, schema: ESQUEMA_CHECAGEM_IMAGEM } },

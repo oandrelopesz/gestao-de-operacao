@@ -69,11 +69,13 @@ export function AbaContexto({
           <p id="gmn-contexto-posts-dica" className="text-xs text-muted-foreground">
             Cole aqui o contexto completo do cliente gerado pelo prompt de contexto (objetivo, SEO local, tom de voz e guardrails).
           </p>
-          <p className="text-xs text-muted-foreground">{contexto.length.toLocaleString("pt-BR")} caracteres</p>
+          <p className="text-xs text-muted-foreground">
+            {contexto.length.toLocaleString("pt-BR")} / {LIMITE_CONTEXTO_POSTS.toLocaleString("pt-BR")} caracteres
+          </p>
         </div>
         {contexto.length > LIMITE_CONTEXTO_POSTS && (
           <p className={AVISO}>
-            Só os primeiros {LIMITE_CONTEXTO_POSTS.toLocaleString("pt-BR")} caracteres entram nos posts e na extração.
+            Só os primeiros {LIMITE_CONTEXTO_POSTS.toLocaleString("pt-BR")} caracteres são usados.
           </p>
         )}
       </div>

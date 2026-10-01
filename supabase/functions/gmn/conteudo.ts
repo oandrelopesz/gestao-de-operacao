@@ -1,13 +1,13 @@
 // Um post completo, sem publicar: tema → texto (com checagem e 1 nova tentativa) → imagem (Drive, IA ou nenhuma).
 // deno-lint-ignore-file no-explicit-any
 import {
-  ESQUEMA_POST, checarTexto, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras, idPastaDrive,
-  montarMensagensPost, montarPromptImagem, normalizarBriefing, proximoTema, type Tema,
+  ESQUEMA_POST, base64ParaBytes, checarTexto, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras,
+  idPastaDrive, montarMensagensPost, montarPromptImagem, normalizarBriefing, proximoTema, type Tema,
 } from "./regras.ts";
 import { checarImagem, gerarImagem, gerarJson, type Logo } from "./openai.ts";
 import { enviarR2 } from "./r2.ts";
 import { baixarDoDrive, imagensDaPasta, tokenGoogle } from "./google.ts";
-import { foiPrazo, PRAZO, sinal } from "./prazo.ts";
+import { PRAZO, sinal } from "./prazo.ts";
 
 type Sb = any;
 type Imagem = { origem: "drive" | "ia"; ref: string; url: string };
@@ -46,56 +46,67 @@ async function imagemDoDrive(sb: Sb, perfil: any, postId: string, total?: AbortS
   return { origem: "drive" as const, ref: foto.id, url };
 }
 
-/** Baixa a logo do perfil (URL pública no R2). Sem ela a imagem da IA não sai: a logo é obrigatória quando existe. */
+const LOGO_BAIXAR_MAX_BYTES = 6 * 1024 * 1024;
+const AVISO_LOGO = "Não foi possível usar a logo do perfil.";
+
+/**
+ * Baixa a logo do perfil. Só aceita URL do próprio bucket (`R2_PUBLIC_BASE`, onde a ação `logo` grava) e arquivo de
+ * até 6 MB (conferido pelo `Content-Length` e pelo tamanho lido). Qualquer falha lança: sem a logo a imagem da IA não
+ * sai, porque a logo é obrigatória quando existe.
+ */
 async function baixarLogo(url: string, total?: AbortSignal): Promise<Logo> {
-  let r: Response;
-  try {
-    r = await fetch(url, { signal: sinal(PRAZO.r2, total) });
-  } catch (e) {
-    throw new Error(foiPrazo(e) ? "A logo do perfil demorou demais para baixar." : "Não foi possível baixar a logo do perfil.");
-  }
-  if (!r.ok) throw new Error("Não foi possível baixar a logo do perfil.");
+  const base = (Deno.env.get("R2_PUBLIC_BASE") ?? "").replace(/\/+$/, "");
+  if (!base || !url.startsWith(base + "/")) throw new Error(`logo fora do bucket: ${url}`);
+  const r = await fetch(url, { signal: sinal(PRAZO.r2, total) });
+  if (!r.ok) throw new Error(`logo respondeu ${r.status}`);
+  if (Number(r.headers.get("content-length")) > LOGO_BAIXAR_MAX_BYTES) throw new Error("logo grande demais");
   const mime = (r.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   const tipo = mime === "image/png" || mime === "image/jpeg" ? mime : /\.png(\?|$)/i.test(url) ? "image/png" : "image/jpeg";
-  try {
-    return { bytes: new Uint8Array(await r.arrayBuffer()), tipo };
-  } catch (e) {
-    throw new Error(foiPrazo(e) ? "A logo do perfil demorou demais para baixar." : "Não foi possível baixar a logo do perfil.");
-  }
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  if (bytes.length > LOGO_BAIXAR_MAX_BYTES) throw new Error("logo grande demais");
+  return { bytes, tipo, url };
 }
 
 const AVISO_PESSOAS_OU_TEXTO = "A imagem da IA tinha pessoas ou texto; o post seguiu só com texto.";
 const AVISO_LINK_DRIVE = "O link da pasta do Drive não foi reconhecido.";
 
 /**
- * Imagem da IA (JPG), com a logo do perfil como referência quando houver. Sem `permitir_pessoas_ia`, a imagem passa por
- * uma checagem (pessoas ou texto em destaque; a escrita da logo não conta): reprovada, gera de novo uma vez, só se
- * sobrar tempo até `prazoFinal`; se ainda reprovar (ou não der tempo), o post fica sem imagem e com aviso.
- * Checagem que falha também deixa o post sem imagem (não dá para garantir que não há pessoas).
+ * Imagem da IA (JPG), com a logo do perfil como referência quando houver (logo que não baixa: sem imagem e com aviso).
+ * A imagem passa sempre por uma checagem (pessoas e texto em destaque; a marca da logo não conta; com
+ * `permitir_pessoas_ia` só o texto reprova): reprovada, gera de novo uma vez, só se sobrar tempo até `prazoFinal`;
+ * se ainda reprovar (ou não der tempo), o post fica sem imagem e com aviso. Checagem que falha também deixa o post sem
+ * imagem (não dá para garantir que não há pessoas).
  */
 async function imagemDaIa(
   perfil: any, postId: string, tema: Tema, prazoFinal: number, total?: AbortSignal,
 ): Promise<{ imagem: Imagem | null; aviso: string | null }> {
   const permitirPessoas = !!perfil.permitir_pessoas_ia;
-  const logo = perfil.logo_url ? await baixarLogo(perfil.logo_url, total) : undefined;
+  let logo: Logo | undefined;
+  if (perfil.logo_url) {
+    try {
+      logo = await baixarLogo(String(perfil.logo_url), total);
+    } catch (e) {
+      console.error("Logo do perfil:", msg(e));
+      return { imagem: null, aviso: AVISO_LOGO };
+    }
+  }
   let versaoAnterior: { tem_pessoas: boolean; tem_texto: boolean } | null = null;
   for (const tentativa of [1, 2] as const) {
     const prompt = montarPromptImagem({
       nome: perfil.nome, categoria: perfil.categoria, briefing: normalizarBriefing(perfil.briefing), tema,
       contextoImagens: perfil.contexto_imagens ?? null, permitirPessoas, comLogo: !!logo, versaoAnterior,
     });
-    const bytes = await gerarImagem(prompt, total, logo);
-    if (!permitirPessoas) {
-      const c = await checarImagem(bytes, "image/jpeg", total, logo);
-      const decisao = decisaoChecagem(tentativa, c, prazoFinal - Date.now());
-      if (decisao === "desistir") return { imagem: null, aviso: AVISO_PESSOAS_OU_TEXTO };
-      if (decisao === "repetir") {
-        versaoAnterior = c;
-        continue;
-      }
+    const b64 = await gerarImagem(prompt, total, logo);
+    // A checagem roda sempre: com pessoas permitidas, `tem_pessoas` é ignorado e só o texto em destaque reprova.
+    const c = await checarImagem(b64, "image/jpeg", total, logo);
+    const decisao = decisaoChecagem(tentativa, c, prazoFinal - Date.now(), permitirPessoas);
+    if (decisao === "desistir") return { imagem: null, aviso: AVISO_PESSOAS_OU_TEXTO };
+    if (decisao === "repetir") {
+      versaoAnterior = permitirPessoas ? { tem_pessoas: false, tem_texto: c.tem_texto } : c;
+      continue;
     }
     const chave = `${perfil.id}/${postId}.jpg`;
-    const url = await enviarR2(chave, bytes, "image/jpeg", total);
+    const url = await enviarR2(chave, base64ParaBytes(b64), "image/jpeg", total);
     return { imagem: { origem: "ia" as const, ref: chave, url }, aviso: null };
   }
   return { imagem: null, aviso: AVISO_PESSOAS_OU_TEXTO };

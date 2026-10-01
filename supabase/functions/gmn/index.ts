@@ -4,6 +4,7 @@
 //        extrai o briefing do contexto (contexto_posts do corpo, se veio; senão o do perfil)
 //   POST { acao: "previa", perfil_id, com_imagem? } -> { post }                   (gmn_posts, origem 'previa')
 //        com_imagem (padrão true): false gera só texto, sem buscar nem gerar imagem
+//        409 se o perfil já tem uma prévia 'gerando' criada há menos de 3 minutos
 //   POST { acao: "logo", perfil_id, tipo, base64 } -> { logo_url }                (PNG ou JPG até 5 MB, no R2; grava gmn_perfis.logo_url)
 //   POST { acao: "remover_logo", perfil_id }     -> { ok: true }                  (logo_url = null; o arquivo fica no R2)
 // POST exige x-google-id-token (e-mail em ALLOWED_GOOGLE_EMAILS) ou x-swipe-key, como o google-token.
@@ -14,7 +15,7 @@ import { gerarJson, openaiConfigurada } from "./openai.ts";
 import { PRAZO_TOTAL_MS } from "./prazo.ts";
 import { enviarR2, r2Configurado } from "./r2.ts";
 import { gerarConteudo } from "./conteudo.ts";
-import { ESQUEMA_BRIEFING, montarMensagensBriefing, normalizarBriefing, tamanhoBase64 } from "./regras.ts";
+import { ESQUEMA_BRIEFING, base64ParaBytes, montarMensagensBriefing, normalizarBriefing, tamanhoBase64 } from "./regras.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -66,6 +67,10 @@ async function acaoBriefing(sb: any, body: any, total: AbortSignal): Promise<Res
   return json({ briefing: normalizarBriefing(r) });
 }
 
+// Uma prévia em andamento (linha 'gerando') mais nova que isto bloqueia outra prévia do mesmo perfil. A função é
+// encerrada bem antes disso: depois da janela, a linha é de uma execução morta e não segura mais ninguém.
+const JANELA_PREVIA_EM_ANDAMENTO_MS = 3 * 60_000;
+
 async function acaoPrevia(sb: any, body: any, total: AbortSignal, prazoFinal: number): Promise<Response> {
   const perfil = await carregarPerfil(sb, body);
   if (!perfil.briefing_salvo_em) return json({ error: "Salve o contexto antes de gerar a prévia." }, 400);
@@ -74,6 +79,19 @@ async function acaoPrevia(sb: any, body: any, total: AbortSignal, prazoFinal: nu
   const comImagem = typeof body.com_imagem === "boolean" ? body.com_imagem : true;
   const podeTerImagem = !!String(perfil.drive_pasta_url ?? "").trim() || !!perfil.usa_ia_imagem;
   if (comImagem && podeTerImagem && !r2Configurado()) throw new ErroHttp(503, SEM_R2);
+  // Não gasta de novo (texto, imagem e checagens) enquanto a prévia anterior do perfil ainda está sendo gerada.
+  const { data: emAndamento, error: eAndamento } = await sb
+    .from("gmn_posts")
+    .select("id")
+    .eq("perfil_id", perfil.id)
+    .eq("origem", "previa")
+    .eq("status", "gerando")
+    .gt("created_at", new Date(Date.now() - JANELA_PREVIA_EM_ANDAMENTO_MS).toISOString())
+    .limit(1);
+  if (eAndamento) throw new Error(eAndamento.message);
+  if ((emAndamento ?? []).length > 0) {
+    throw new ErroHttp(409, "Já existe uma prévia sendo gerada para este perfil. Aguarde terminar.");
+  }
   const { data: post, error } = await sb
     .from("gmn_posts")
     .insert({ perfil_id: perfil.id, origem: "previa", status: "gerando" })
@@ -114,7 +132,7 @@ async function acaoLogo(sb: any, body: any, total: AbortSignal): Promise<Respons
   const b64 = texto.startsWith("data:") ? texto.slice(texto.indexOf(",") + 1) : texto;
   let bytes: Uint8Array;
   try {
-    bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    bytes = base64ParaBytes(b64);
   } catch {
     throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
   }
@@ -122,9 +140,20 @@ async function acaoLogo(sb: any, body: any, total: AbortSignal): Promise<Respons
   // O conteúdo precisa ser mesmo o do tipo informado: o arquivo fica público e a OpenAI recusa o que não for imagem.
   if (!ASSINATURA_LOGO[tipo].every((b, i) => bytes[i] === b)) throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
   if (!r2Configurado()) throw new ErroHttp(503, SEM_R2);
-  const url = await enviarR2(`logos/${perfil.id}-${Date.now()}.${tipo === "image/png" ? "png" : "jpg"}`, bytes, tipo, total);
+  // Falha do R2 ou do banco: mensagem fixa (o detalhe, em inglês, vai só para o log).
+  const SEM_GUARDAR = "Não foi possível guardar a logo. Tente de novo.";
+  let url: string;
+  try {
+    url = await enviarR2(`logos/${perfil.id}-${Date.now()}.${tipo === "image/png" ? "png" : "jpg"}`, bytes, tipo, total);
+  } catch (e) {
+    console.error("Logo: falha ao enviar para o R2:", e);
+    throw new ErroHttp(500, SEM_GUARDAR);
+  }
   const { error } = await sb.from("gmn_perfis").update({ logo_url: url, updated_at: new Date().toISOString() }).eq("id", perfil.id);
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error("Logo: falha ao gravar logo_url:", error.message);
+    throw new ErroHttp(500, SEM_GUARDAR);
+  }
   return json({ logo_url: url });
 }
 
