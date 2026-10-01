@@ -21,7 +21,8 @@ import {
   EVENTO_TEMAS_NOTAS, atualizarNota, criarNota, excluirNotas, fetchNotas, fetchTemasNotas, moverNotas, removerImagensNotas, traduzErroNotas,
   type Nota,
 } from "@/lib/notas";
-import { SEM_TEMA, TODOS, contarPorTema, filtrarNotas, previaSemTitulo, tituloOuPrimeiraLinha } from "@/lib/notasTexto";
+import { SEM_TEMA, TODOS, camposNota, contarPorTema, notasDoFiltro, previaSemTitulo, tituloOuPrimeiraLinha } from "@/lib/notasTexto";
+import { useBusca } from "@/lib/useBusca";
 import { imagensRemovidas, primeiraImagem, type NoDoc } from "@/lib/notasDoc";
 import type { EditorNota as EditorNotaTipo } from "@/components/notas/EditorNota";
 import { esperarOcioso } from "@/lib/aquecimento";
@@ -110,8 +111,10 @@ function NotasPage() {
   const lista = useMemo(() => notas ?? [], [notas]);
   const temaDe = useMemo(() => new Map(temas.map((t) => [t.id, t])), [temas]);
   const contagem = useMemo(() => contarPorTema(lista), [lista]);
-  // Busca tolerante (sem acento, com erro de digitação): o tema e "editadas por último primeiro" valem antes
-  const resultadoBusca = useMemo(() => filtrarNotas(lista, filtro, busca), [lista, filtro, busca]);
+  // Busca tolerante (sem acento, com erro de digitação): o tema e "editadas por último primeiro" valem antes. O texto das
+  // notas é indexado só quando a lista ou o tema mudam, não a cada letra digitada.
+  const baseNotas = useMemo(() => notasDoFiltro(lista, filtro), [lista, filtro]);
+  const resultadoBusca = useBusca(baseNotas, busca, camposNota);
   const visiveis = resultadoBusca.itens;
   const temaDoFiltro = filtro !== TODOS && filtro !== SEM_TEMA ? filtro : null;
 

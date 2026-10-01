@@ -86,7 +86,7 @@ function CrmTela() {
         filtro={filtro}
         onFiltro={setFiltro}
         qtd={filtrados.length}
-        resultadoBusca={resultadoBusca}
+        resultadoBusca={carregando || erro ? undefined : resultadoBusca}
         onNovoLead={() => setNovoLead(true)}
         onColunas={() => setConfigColunas(true)}
         onExportar={() => abrirExportacao({ tipo: "todos" })}

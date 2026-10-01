@@ -80,7 +80,7 @@ export function filtrarIdeias<T extends IdeiaFiltravel>(
       (f.tipo === "todos" || i.tipo === f.tipo) &&
       (f.agencia === "todas" || i.agencia === f.agencia),
   );
-  return buscar(base, f.busca, (i) => [i.titulo, i.descricao, ...i.links]);
+  return buscar(base, f.busca, (i) => [i.titulo, i.descricao, ...(i.links ?? [])]);
 }
 
 /** Coluna pré-selecionada ao enviar para demandas: o mesmo padrão do DemandaForm */

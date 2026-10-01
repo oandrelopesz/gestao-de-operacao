@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SEM_TEMA, TODOS, contarPorTema, filtrarNotas, previaSemTitulo, tituloOuPrimeiraLinha } from "./notasTexto.ts";
+import { SEM_TEMA, TODOS, camposNota, contarPorTema, filtrarNotas, notasDoFiltro, previaSemTitulo, tituloOuPrimeiraLinha } from "./notasTexto.ts";
+import { buscar } from "./search.ts";
 import { MENSAGEM_NENHUM, MENSAGEM_PARECIDOS } from "./search.ts";
 
 const n = (id: string, titulo: string, conteudo: string, tema_id: string | null, updated_at: string) => ({ id, titulo, conteudo, tema_id, updated_at });
@@ -55,6 +56,18 @@ test("filtrarNotas: o tema vale antes da busca; no empate a mais recente vem pri
     n("v3", "Planejar verba", "y", "a", "2026-09-20T10:00:00Z"), // no título, mais recente que a v2
   ];
   assert.deepEqual(filtrarNotas(com, TODOS, "verba").itens.map((x) => x.id), ["v3", "v2", "v1"]);
+});
+
+test("notasDoFiltro + camposNota: a base (tema, mais recente primeiro) e os campos que a tela indexa uma vez", () => {
+  assert.deepEqual(notasDoFiltro(notas, TODOS).map((x) => x.id), ["2", "3", "1"]);
+  assert.deepEqual(notasDoFiltro(notas, "a").map((x) => x.id), ["1"]);
+  assert.deepEqual(notasDoFiltro(notas, SEM_TEMA).map((x) => x.id), ["2"]);
+  assert.deepEqual(camposNota(notas[0]), ["Ideia de criativo", "gancho com ROAS"]);
+  // A lista original não é reordenada
+  assert.deepEqual(notas.map((x) => x.id), ["1", "2", "3"]);
+  // Mesmo resultado que filtrarNotas
+  const direto = buscar(notasDoFiltro(notas, TODOS), "blak friday", camposNota);
+  assert.deepEqual(direto, filtrarNotas(notas, TODOS, "blak friday"));
 });
 
 test("contarPorTema", () => {

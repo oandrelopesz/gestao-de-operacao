@@ -33,6 +33,7 @@ import { PastaDialog, ExcluirPastaDialog, type PastaDialogState } from "@/compon
 import { PdfViewer, PdfEditDialog, EnviarPdfsDialog, type PdfParaEnviar } from "@/components/pdfs/PdfDialogs";
 import { IconeArquivo } from "@/components/pdfs/IconeArquivo";
 import { MensagemBusca } from "@/components/MensagemBusca";
+import { palavrasDaBusca } from "@/lib/search";
 
 // Aba "Arquivos" (antes "PDFs"; /pdfs redireciona para cá). Guarda documentos em geral, sem imagem nem vídeo.
 export const Route = createFileRoute("/_authenticated/arquivos")({
@@ -151,8 +152,13 @@ function PdfsPage() {
     () => (pastaAtual ? bib.pdfs.filter((f) => f.pasta_id === pastaAtual.id) : []),
     [bib.pdfs, pastaAtual],
   );
-  // Busca tolerante (sem acento, com erro de digitação) em todas as pastas; sem texto digitado a tela mostra as pastas
-  const resultadoBusca = useMemo(() => filtrarPdfs(busca.trim() ? bib.pdfs : [], busca), [bib.pdfs, busca]);
+  // Busca tolerante (sem acento, com erro de digitação) em todas as pastas. Sem palavras na busca (vazia ou só
+  // pontuação, que a busca trata como "tudo") não há lista de resultados: a tela mostra as pastas ou, com texto
+  // digitado, "Nenhum arquivo com esse nome."
+  const resultadoBusca = useMemo(
+    () => filtrarPdfs(palavrasDaBusca(busca).length > 0 ? bib.pdfs : [], busca),
+    [bib.pdfs, busca],
+  );
   const resultadosBusca = resultadoBusca.itens;
   const recentes = useMemo(() => bib.pdfs.slice(0, 8), [bib.pdfs]);
 

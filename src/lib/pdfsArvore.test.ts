@@ -148,6 +148,19 @@ test("filtrarPdfs: acha com erro de digitação e sem acento", () => {
   assert.equal(filtrarPdfs(pdfs, "prompst").modo, "exato");
 });
 
+test("filtrarPdfs: busca só com pontuação não tem palavras: modo \"todos\" (a tela decide o que mostrar)", () => {
+  const pdfs = [
+    { nome: "Gestão de tráfego", arquivo_nome: "x.pdf" },
+    { nome: "Prompts", arquivo_nome: "claude-prompts.pdf" },
+  ];
+  for (const busca of ["...", "-", "( )", " . "]) {
+    const r = filtrarPdfs(pdfs, busca);
+    assert.equal(r.modo, "todos", busca);
+    assert.equal(r.mensagem, null, busca);
+    assert.equal(r.itens.length, 2, busca);
+  }
+});
+
 test("filtrarPdfs: parecidos e nenhum trazem a mensagem; o nome vem antes do nome do arquivo", () => {
   const pdfs = [
     { nome: "Guia", arquivo_nome: "meta-ads.pdf" },
