@@ -13,7 +13,11 @@ Ferramentas fora do app (não entram no build do Lovable). Instalar uma vez: `np
   um card até a borda direita tem de rolar o quadro, sem esticar a página nem rolar a janela (não salva nada: cancela com
   Esc). Abre a página com animações, de propósito (o defeito de 30/09/2026 vinha da animação de entrada). Depois segura
   na borda e volta para a esquerda: o arrasto não pode cair nem o React entrar em laço ("Maximum update depth").
-  `RODADAS=4` repete mais vezes (padrão 2, cada uma em 1024 e 768 px).
+  Também mede a rolagem automática com o card colado na borda: no máximo 600 px/s (uma coluna a cada meio segundo).
+  Essa medida só vale no build de produção ou no site: rodar contra `https://gestao.andrelopes.digital` ou gerar um
+  build local com `NITRO_PRESET=node-server npx vite build` e servir com `PORT=5191 node .output/server/index.mjs`
+  (o servidor de desenvolvimento é mais lento e passa sempre). `RODADAS=4` repete mais vezes (padrão 2, cada uma em
+  1024 e 768 px).
 - Fluxogramas (editor): `node testar-fluxogramas.mjs http://localhost:5190 <id de um quadro de TESTE> saida` — apaga o conteúdo
   desse quadro; imprime o resultado de cada interação e grava capturas na pasta.
 - Exportação dos Fluxogramas: `node testar-exportacao.mjs http://localhost:5190 <id de um quadro de TESTE> saida` — monta um

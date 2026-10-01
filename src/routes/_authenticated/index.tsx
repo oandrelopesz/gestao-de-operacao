@@ -528,7 +528,7 @@ function DemandasPage() {
 
   // Drag-and-drop do Kanban (mover entre colunas e reordenar) - ver src/lib/useKanbanDnd.ts.
   // Colunas por dias da semana viram várias seções (uma por dia) - ver src/lib/colunasDias.ts
-  const { collisionDetection, measuring, onDragStart, onDragOver, onDragEnd, onDragCancel } = useKanbanDnd<any>({
+  const { collisionDetection, measuring, autoScroll, onDragStart, onDragOver, onDragEnd, onDragCancel } = useKanbanDnd<any>({
     items: demandas,
     setItems: setDemandas,
     containerIds,
@@ -810,6 +810,7 @@ function DemandasPage() {
               sensors={sensors}
               collisionDetection={collisionDetection}
               measuring={measuring}
+              autoScroll={autoScroll}
               onDragStart={onDragStart}
               onDragOver={onDragOver}
               onDragEnd={onDragEnd}

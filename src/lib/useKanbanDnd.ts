@@ -46,6 +46,11 @@ interface Options<T extends KanbanItem> {
 
 const byOrdem = <T extends KanbanItem>(a: T, b: T) => (a.ordem ?? 0) - (b.ordem ?? 0);
 
+// Rolagem automática ao segurar o card perto da borda. O padrão do dnd-kit (aceleração 10) passava uma coluna a
+// cada ~300 ms no site publicado e o card ia além da coluna desejada antes de dar tempo de soltar; com 3, colado
+// na borda, são 350 a 500 px/s no build de produção (uma coluna a cada 0,6 a 0,85 s).
+const AUTO_SCROLL = { acceleration: 3 };
+
 export function useKanbanDnd<T extends KanbanItem>(opts: Options<T>) {
   const { items, setItems, containerIds, getContainer, setContainer, isItemLocked, isContainerLocked, onStart, onCancel, onDrop } = opts;
 
@@ -233,5 +238,5 @@ export function useKanbanDnd<T extends KanbanItem>(opts: Options<T>) {
 
   const measuring = useMemo(() => ({ droppable: { strategy: MeasuringStrategy.Always } }), []);
 
-  return { collisionDetection, measuring, onDragStart, onDragOver, onDragEnd, onDragCancel };
+  return { collisionDetection, measuring, autoScroll: AUTO_SCROLL, onDragStart, onDragOver, onDragEnd, onDragCancel };
 }

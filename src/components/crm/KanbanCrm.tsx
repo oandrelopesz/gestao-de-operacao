@@ -192,6 +192,7 @@ export function KanbanCrm({ leads }: { leads: LeadCrm[] }) {
         sensors={sensors}
         collisionDetection={dnd.collisionDetection}
         measuring={dnd.measuring}
+        autoScroll={dnd.autoScroll}
         onDragStart={dnd.onDragStart}
         onDragOver={dnd.onDragOver}
         onDragEnd={dnd.onDragEnd}
