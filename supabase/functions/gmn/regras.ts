@@ -304,7 +304,8 @@ export function montarMensagensPost(e: EntradaPost): Mensagens {
     "Otimize para SEO local: use a palavra-chave e a cidade ou bairro de forma natural, sem repetir à exaustão.",
     "Não inclua número de telefone, WhatsApp, e-mail, links ou nomes de site: o botão do post já leva ao contato.",
     "No máximo 3 hashtags, só se fizerem sentido. Sem emojis em excesso (no máximo 2).",
-    "Siga o tom de voz e o posicionamento do briefing. Não invente preços, prêmios, números ou fatos que não estejam no briefing.",
+    "Siga o tom de voz e o posicionamento do briefing. Não invente preços, prêmios, números ou fatos que não estejam " +
+      (contexto ? "no contexto do cliente nem no briefing." : "no briefing."),
     "Termine com uma chamada para ação coerente com o objetivo do briefing.",
     'Responda só com JSON: {"texto": "...", "palavras_chave": ["as palavras-chave que você usou"]}.',
   ];
@@ -388,6 +389,8 @@ export interface EntradaImagem {
   permitirPessoas: boolean;
   /** A logo do cliente vai junto como imagem de referência. */
   comLogo: boolean;
+  /** Nova tentativa: o que a checagem achou na versão anterior (o prompt pede para não repetir). */
+  versaoAnterior?: { tem_pessoas: boolean; tem_texto: boolean } | null;
 }
 
 export function montarPromptImagem(e: EntradaImagem): string {
@@ -401,10 +404,20 @@ export function montarPromptImagem(e: EntradaImagem): string {
     diretrizes ? `Diretrizes de imagem do cliente: ${diretrizes}` : "",
     diretrizes ? "As regras a seguir valem sempre, mesmo que as diretrizes digam o contrário." : "",
     e.permitirPessoas ? "" : "Sem pessoas: nenhum rosto, corpo, mão, silhueta ou reflexo de pessoa.",
-    "Sem texto, letras, números, preços ou slogans na arte. Sem logos ou marcas de terceiros. Sem placas de carro legíveis.",
+    e.comLogo
+      ? "Sem texto, letras, números, preços ou slogans na arte, exceto a própria logo da marca (imagem de referência), que aparece exatamente como é."
+      : "Sem texto, letras, números, preços ou slogans na arte.",
+    "Sem marcas d'água. Sem logos ou marcas de terceiros. Sem placas de carro legíveis.",
     "Aparência de fotografia real e profissional, em formato paisagem.",
     e.comLogo
       ? "Use a imagem de referência como a logo da marca: aplique-a pequena e discreta (num canto, parede ou fachada), sem distorcer, sem mudar cores, sem cobrir o assunto principal."
+      : "",
+    e.versaoAnterior && (e.versaoAnterior.tem_pessoas || e.versaoAnterior.tem_texto)
+      ? `A versão anterior tinha ${
+        e.versaoAnterior.tem_pessoas && e.versaoAnterior.tem_texto
+          ? "pessoas e texto em destaque"
+          : e.versaoAnterior.tem_pessoas ? "pessoas" : "texto em destaque"
+      }; garanta que não haja ${e.versaoAnterior.tem_pessoas && !e.versaoAnterior.tem_texto ? "nenhuma" : "nenhum"}.`
       : "",
   ]
     .filter(Boolean)
@@ -447,7 +460,56 @@ export const ESQUEMA_CHECAGEM_IMAGEM = {
   },
 };
 
-export const PROMPT_CHECAGEM_IMAGEM =
-  "Olhe a imagem e responda em JSON: tem_pessoas é true se houver qualquer pessoa, rosto, mão ou silhueta de pessoa " +
-  "(inclusive pequenos, ao fundo ou em reflexo); tem_texto é true se houver texto, letras ou números legíveis " +
-  "(placas, letreiros, preços, logos com escrita).";
+/**
+ * Pedido da checagem da imagem. Pessoas: qualquer uma, até pequena ao fundo. Texto: só escrita legível e em destaque na
+ * arte (marcas minúsculas e ilegíveis, como o emblema de um carro, não contam). Com logo, a logo vai como segunda imagem
+ * e a escrita dela não conta como texto.
+ */
+export function promptChecagemImagem(comLogo: boolean): string {
+  const base =
+    "Olhe a imagem e responda em JSON. " +
+    "tem_pessoas é true se houver qualquer pessoa, rosto, mão, corpo, silhueta ou reflexo de pessoa, mesmo pequena, parcial ou ao fundo. " +
+    "tem_texto é true só se houver escrita legível e em destaque na arte (frases, letras, números, preços, slogans, letreiros, " +
+    "placas de carro legíveis, marcas de terceiros); ignore marcas minúsculas e ilegíveis.";
+  return comLogo
+    ? `${base} A segunda imagem é a logo da marca: o que for dela, inclusive a escrita, não conta como texto.`
+    : base;
+}
+
+/** O pedido da checagem sem logo. */
+export const PROMPT_CHECAGEM_IMAGEM = promptChecagemImagem(false);
+
+/** Antes de gerar de novo, a execução precisa ter pelo menos isto sobrando do prazo total. */
+export const MARGEM_NOVA_TENTATIVA_MS = 45_000;
+
+/**
+ * O que fazer com a imagem da IA depois da checagem. Pessoas ou texto em destaque reprovam; na 1ª tentativa gera de
+ * novo se ainda sobrar tempo (`restanteMs`), senão (ou na 2ª) desiste e o post sai só com texto.
+ */
+export function decisaoChecagem(
+  tentativa: 1 | 2, r: { tem_pessoas: boolean; tem_texto: boolean }, restanteMs: number,
+): "aceitar" | "repetir" | "desistir" {
+  if (!r.tem_pessoas && !r.tem_texto) return "aceitar";
+  return tentativa === 1 && restanteMs >= MARGEM_NOVA_TENTATIVA_MS ? "repetir" : "desistir";
+}
+
+/**
+ * Bytes que um texto base64 vai ter depois de decodificado, sem decodificar nem copiar o texto: ignora o prefixo
+ * "data:...;base64," e os espaços e quebras de linha, e desconta o padding "=". Serve para recusar arquivo grande demais.
+ */
+export function tamanhoBase64(texto: string): number {
+  let i = 0;
+  if (texto.startsWith("data:")) {
+    const v = texto.indexOf(",");
+    if (v >= 0) i = v + 1;
+  }
+  let n = 0;
+  let padding = 0;
+  for (; i < texto.length; i++) {
+    const c = texto.charCodeAt(i);
+    if (c <= 32) continue;
+    n++;
+    if (c === 61) padding++;
+  }
+  return Math.floor((n * 3) / 4) - padding;
+}

@@ -2,7 +2,7 @@
 // e checagem da imagem gerada.
 // deno-lint-ignore-file no-explicit-any
 import { foiPrazo, PRAZO, sinal } from "./prazo.ts";
-import { ESQUEMA_CHECAGEM_IMAGEM, PROMPT_CHECAGEM_IMAGEM } from "./regras.ts";
+import { ESQUEMA_CHECAGEM_IMAGEM, promptChecagemImagem } from "./regras.ts";
 
 const BASE = "https://api.openai.com/v1";
 
@@ -72,6 +72,11 @@ function modeloTexto(): string {
   return Deno.env.get("OPENAI_MODELO_TEXTO") || "gpt-5-mini";
 }
 
+/** Modelo que olha a imagem na checagem: secret opcional OPENAI_MODELO_VISAO; sem ele, o mesmo modelo de texto. */
+function modeloVisao(): string {
+  return Deno.env.get("OPENAI_MODELO_VISAO") || modeloTexto();
+}
+
 export async function gerarJson<T>(
   system: string, user: string, nome: string, schema: object, total?: AbortSignal,
 ): Promise<T> {
@@ -93,6 +98,8 @@ export interface Logo { bytes: Uint8Array; tipo: string }
 export async function gerarImagem(prompt: string, total?: AbortSignal, logo?: Logo): Promise<Uint8Array> {
   const model = Deno.env.get("OPENAI_MODELO_IMAGEM") || "gpt-image-1";
   // quality "medium": o padrão ("auto") pode sair em "high", mais lento e caro.
+  // Sem `input_fidelity`: nos modelos gpt-image-2 o parâmetro deve ser omitido (toda imagem de entrada, a logo, já é
+  // processada em alta fidelidade) e enviá-lo dá 400.
   const opcoes = { size: "1536x1024", quality: "medium", n: 1, output_format: "jpeg" };
   let d: any;
   if (logo) {
@@ -119,17 +126,26 @@ function paraBase64(bytes: Uint8Array): string {
   return btoa(s);
 }
 
-/** O modelo de texto (com visão) olha a imagem: tem pessoas? tem texto legível? */
+/** Imagem (ou logo) como parte `image_url` da mensagem, em data URL e com detalhe alto (gente pequena ao fundo conta). */
+function parteImagem(bytes: Uint8Array, tipoMime: string) {
+  return { type: "image_url", image_url: { url: `data:${tipoMime};base64,${paraBase64(bytes)}`, detail: "high" } };
+}
+
+/**
+ * O modelo de visão olha a imagem: tem pessoas? tem texto legível e em destaque? Com `logo`, ela vai como segunda
+ * imagem e a escrita dela não conta como texto.
+ */
 export async function checarImagem(
-  bytes: Uint8Array, tipoMime: string, total?: AbortSignal,
+  bytes: Uint8Array, tipoMime: string, total?: AbortSignal, logo?: Logo,
 ): Promise<{ tem_pessoas: boolean; tem_texto: boolean }> {
   const d = await chamar("/chat/completions", {
-    model: modeloTexto(),
+    model: modeloVisao(),
     messages: [{
       role: "user",
       content: [
-        { type: "text", text: PROMPT_CHECAGEM_IMAGEM },
-        { type: "image_url", image_url: { url: `data:${tipoMime};base64,${paraBase64(bytes)}` } },
+        { type: "text", text: promptChecagemImagem(!!logo) },
+        parteImagem(bytes, tipoMime),
+        ...(logo ? [parteImagem(logo.bytes, logo.tipo)] : []),
       ],
     }],
     response_format: { type: "json_schema", json_schema: { name: "checagem_imagem_gmn", strict: true, schema: ESQUEMA_CHECAGEM_IMAGEM } },

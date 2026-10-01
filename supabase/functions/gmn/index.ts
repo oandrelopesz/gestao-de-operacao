@@ -14,7 +14,7 @@ import { gerarJson, openaiConfigurada } from "./openai.ts";
 import { PRAZO_TOTAL_MS } from "./prazo.ts";
 import { enviarR2, r2Configurado } from "./r2.ts";
 import { gerarConteudo } from "./conteudo.ts";
-import { ESQUEMA_BRIEFING, montarMensagensBriefing, normalizarBriefing } from "./regras.ts";
+import { ESQUEMA_BRIEFING, montarMensagensBriefing, normalizarBriefing, tamanhoBase64 } from "./regras.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -66,7 +66,7 @@ async function acaoBriefing(sb: any, body: any, total: AbortSignal): Promise<Res
   return json({ briefing: normalizarBriefing(r) });
 }
 
-async function acaoPrevia(sb: any, body: any, total: AbortSignal): Promise<Response> {
+async function acaoPrevia(sb: any, body: any, total: AbortSignal, prazoFinal: number): Promise<Response> {
   const perfil = await carregarPerfil(sb, body);
   if (!perfil.briefing_salvo_em) return json({ error: "Salve o briefing antes de gerar a prévia." }, 400);
   // Confere a configuração antes de inserir a linha e de gastar com a OpenAI.
@@ -82,7 +82,7 @@ async function acaoPrevia(sb: any, body: any, total: AbortSignal): Promise<Respo
   if (error) throw new Error(error.message);
   let campos: Record<string, unknown>;
   try {
-    campos = { ...(await gerarConteudo(sb, perfil, post.id, total, { comImagem })) };
+    campos = { ...(await gerarConteudo(sb, perfil, post.id, total, { comImagem, prazoFinal })) };
   } catch (e) {
     campos = { status: "erro", erro: msg(e) };
   }
@@ -97,6 +97,8 @@ async function acaoPrevia(sb: any, body: any, total: AbortSignal): Promise<Respo
 }
 
 const LOGO_MAX_BYTES = 5 * 1024 * 1024;
+// Corpo de uma requisição: a logo em base64 (5 MB viram uns 6,7 MB) mais o resto do JSON cabe com folga em 8 MB.
+const CORPO_MAX_BYTES = 8 * 1024 * 1024;
 const ASSINATURA_LOGO: Record<string, number[]> = { "image/png": [0x89, 0x50, 0x4e, 0x47], "image/jpeg": [0xff, 0xd8, 0xff] };
 
 /** Guarda a logo do perfil no R2 (`logos/<perfil_id>-<carimbo>.<png|jpg>`) e grava a URL em `gmn_perfis.logo_url`. */
@@ -104,10 +106,12 @@ async function acaoLogo(sb: any, body: any, total: AbortSignal): Promise<Respons
   const perfil = await carregarPerfil(sb, body);
   const tipo = typeof body.tipo === "string" ? body.tipo : "";
   if (tipo !== "image/png" && tipo !== "image/jpeg") throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
-  const b64 = typeof body.base64 === "string" ? body.base64.replace(/^data:[^,]*,/, "").replace(/\s+/g, "") : "";
-  if (!b64) throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
-  // Confere o tamanho pelo texto antes de decodificar (base64: 4 caracteres a cada 3 bytes).
-  if (Math.floor((b64.length * 3) / 4) > LOGO_MAX_BYTES + 2) throw new ErroHttp(400, "A logo pode ter até 5 MB.");
+  const texto = typeof body.base64 === "string" ? body.base64 : "";
+  if (!texto) throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
+  // Confere o tamanho pelo texto, antes de copiar ou decodificar qualquer coisa.
+  if (tamanhoBase64(texto) > LOGO_MAX_BYTES) throw new ErroHttp(400, "A logo pode ter até 5 MB.");
+  // O atob ignora espaços e quebras de linha; só o prefixo "data:...;base64," precisa sair.
+  const b64 = texto.startsWith("data:") ? texto.slice(texto.indexOf(",") + 1) : texto;
   let bytes: Uint8Array;
   try {
     bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -137,14 +141,18 @@ Deno.serve(async (req) => {
   if (req.method === "GET") return json({ openai: openaiConfigurada(), r2: r2Configurado(), acesso: acessoConfigurado() });
   if (req.method !== "POST") return json({ error: "Método não suportado" }, 405);
   // O prazo total começa antes da checagem de acesso: um tokeninfo lento também conta.
+  const prazoFinal = Date.now() + PRAZO_TOTAL_MS;
   const total = AbortSignal.timeout(PRAZO_TOTAL_MS);
   if (!(await acessoLiberado(req))) return json({ error: "Acesso não autorizado. Entre com o Google ou informe a chave." }, 403);
+
+  // Corpo grande demais (só a logo chega perto disso): recusa antes de ler e copiar o JSON inteiro.
+  if (Number(req.headers.get("content-length")) > CORPO_MAX_BYTES) return json({ error: "A logo pode ter até 5 MB." }, 400);
 
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const body = (await req.json().catch(() => null)) ?? {};
   try {
     if (body.acao === "briefing") return await acaoBriefing(sb, body, total);
-    if (body.acao === "previa") return await acaoPrevia(sb, body, total);
+    if (body.acao === "previa") return await acaoPrevia(sb, body, total, prazoFinal);
     if (body.acao === "logo") return await acaoLogo(sb, body, total);
     if (body.acao === "remover_logo") return await acaoRemoverLogo(sb, body);
     return json({ error: "Ação desconhecida" }, 400);

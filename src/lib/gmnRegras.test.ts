@@ -2,9 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AGENDA_PADRAO, BRIEFING_VAZIO, ESQUEMA_CHECAGEM_IMAGEM, HORARIOS, PROMPT_CHECAGEM_IMAGEM, TEMAS, alternarDia,
-  alternarImagem, checarTexto, comUtm, decidirImagem, escolherImagem, escolherPalavras, idPastaDrive, mesmoHorario,
-  montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda, normalizarBriefing,
-  proximoTema, resumoAgenda,
+  alternarImagem, checarTexto, comUtm, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras, idPastaDrive,
+  mesmoHorario, montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda,
+  normalizarBriefing, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64,
 } from "../../supabase/functions/gmn/regras.ts";
 
 const textoBom =
@@ -361,4 +361,92 @@ test("decidirImagem: sem imagem no dia nada; com pasta, Drive (sem cair para a I
   assert.equal(decidirImagem({ comImagem: true, temPasta: true, usaIa: false }), "drive");
   assert.equal(decidirImagem({ comImagem: true, temPasta: false, usaIa: true }), "ia");
   assert.equal(decidirImagem({ comImagem: true, temPasta: false, usaIa: false }), null);
+});
+
+test("montarPromptImagem com logo abre a exceção da própria logo no 'sem texto'; sem logo fica a frase de sempre", () => {
+  const base = { nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico" as const, contextoImagens: null, permitirPessoas: false };
+  const com = montarPromptImagem({ ...base, comLogo: true });
+  assert.match(
+    com,
+    /Sem texto, letras, números, preços ou slogans na arte, exceto a própria logo da marca \(imagem de referência\), que aparece exatamente como é\./,
+  );
+  const sem = montarPromptImagem({ ...base, comLogo: false });
+  assert.match(sem, /Sem texto, letras, números, preços ou slogans na arte\./);
+  assert.doesNotMatch(sem, /exceto a própria logo/);
+  // "sem marcas d'água" vale nos dois casos
+  assert.match(com, /sem marcas d'água/i);
+  assert.match(sem, /sem marcas d'água/i);
+});
+
+test("montarPromptImagem na nova tentativa diz o que a versão anterior tinha", () => {
+  const base = { nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico" as const, contextoImagens: null, permitirPessoas: false, comLogo: false };
+  assert.doesNotMatch(montarPromptImagem(base), /versão anterior/);
+  assert.doesNotMatch(montarPromptImagem({ ...base, versaoAnterior: null }), /versão anterior/);
+  assert.match(
+    montarPromptImagem({ ...base, versaoAnterior: { tem_pessoas: true, tem_texto: false } }),
+    /A versão anterior tinha pessoas; garanta que não haja nenhuma\./,
+  );
+  assert.match(
+    montarPromptImagem({ ...base, versaoAnterior: { tem_pessoas: false, tem_texto: true } }),
+    /A versão anterior tinha texto em destaque; garanta que não haja nenhum\./,
+  );
+  assert.match(
+    montarPromptImagem({ ...base, versaoAnterior: { tem_pessoas: true, tem_texto: true } }),
+    /A versão anterior tinha pessoas e texto em destaque; garanta que não haja nenhum\./,
+  );
+});
+
+test("promptChecagemImagem: pessoas sempre; texto só em destaque; com logo, a segunda imagem não conta como texto", () => {
+  const sem = promptChecagemImagem(false);
+  assert.equal(PROMPT_CHECAGEM_IMAGEM, sem);
+  for (const re of [/pessoa/i, /rosto/i, /m[aã]o/i, /corpo/i, /silhueta/i, /reflexo/i, /ao fundo/i]) assert.match(sem, re);
+  assert.match(sem, /leg[ií]vel e em destaque/i);
+  for (const re of [/frases/i, /pre[cç]os/i, /slogans/i, /letreiros/i, /placas de carro/i, /terceiros/i, /ilegíveis/i]) assert.match(sem, re);
+  assert.doesNotMatch(sem, /segunda imagem/i);
+  assert.doesNotMatch(sem, /logos com escrita/i);
+  const com = promptChecagemImagem(true);
+  assert.ok(com.startsWith(sem));
+  assert.match(com, /A segunda imagem é a logo da marca: o que for dela, inclusive a escrita, não conta como texto\./);
+});
+
+test("montarMensagensPost: com contexto a regra de não inventar vale para o contexto e o briefing; sem contexto fica como era", () => {
+  const entrada = {
+    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, saude: false, tema: "servico" as const, palavras: [], anteriores: [],
+    motivoReprovacao: null,
+  };
+  const com = montarMensagensPost({ ...entrada, contextoPosts: "Diferencial: revisão de 100 itens." });
+  assert.match(com.system, /fatos que não estejam no contexto do cliente nem no briefing\./);
+  assert.doesNotMatch(com.system, /fatos que não estejam no briefing\./);
+  const sem = montarMensagensPost({ ...entrada, contextoPosts: null });
+  assert.match(sem.system, /fatos que não estejam no briefing\./);
+  assert.doesNotMatch(sem.system, /nem no briefing/);
+});
+
+test("decisaoChecagem: aceita limpo; repete uma vez se sobrar 45 s; senão desiste", () => {
+  const limpo = { tem_pessoas: false, tem_texto: false };
+  const pessoas = { tem_pessoas: true, tem_texto: false };
+  const texto = { tem_pessoas: false, tem_texto: true };
+  assert.equal(decisaoChecagem(1, limpo, 100_000), "aceitar");
+  assert.equal(decisaoChecagem(2, limpo, 0), "aceitar");
+  assert.equal(decisaoChecagem(2, limpo, -5), "aceitar");
+  assert.equal(decisaoChecagem(1, pessoas, 100_000), "repetir");
+  assert.equal(decisaoChecagem(1, texto, 100_000), "repetir");
+  assert.equal(decisaoChecagem(1, { tem_pessoas: true, tem_texto: true }, 45_000), "repetir");
+  assert.equal(decisaoChecagem(1, pessoas, 44_999), "desistir");
+  assert.equal(decisaoChecagem(1, texto, 0), "desistir");
+  assert.equal(decisaoChecagem(1, pessoas, -1), "desistir");
+  assert.equal(decisaoChecagem(2, pessoas, 100_000), "desistir");
+  assert.equal(decisaoChecagem(2, texto, 100_000), "desistir");
+});
+
+test("tamanhoBase64 conta os bytes decodificados sem decodificar", () => {
+  assert.equal(tamanhoBase64(""), 0);
+  assert.equal(tamanhoBase64("QUJD"), 3);
+  assert.equal(tamanhoBase64("QUI="), 2);
+  assert.equal(tamanhoBase64("QQ=="), 1);
+  assert.equal(tamanhoBase64("QUI"), 2); // sem padding
+  assert.equal(tamanhoBase64("data:image/png;base64,QUJD"), 3);
+  assert.equal(tamanhoBase64("QU\r\nJD QUJD"), 6); // quebras e espaços não contam
+  assert.equal(tamanhoBase64(Buffer.alloc(5 * 1024 * 1024 + 1, 7).toString("base64")), 5 * 1024 * 1024 + 1);
+  for (const n of [1, 2, 3, 10, 11, 12, 1000, 1001]) assert.equal(tamanhoBase64(Buffer.alloc(n, 9).toString("base64")), n);
 });
