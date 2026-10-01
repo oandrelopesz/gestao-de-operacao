@@ -1,12 +1,13 @@
-// Um post completo, sem publicar: tema → texto (com checagem e 1 nova tentativa) → imagem.
+// Um post completo, sem publicar: tema → texto (com checagem e 1 nova tentativa) → imagem (Drive, IA ou nenhuma).
 // deno-lint-ignore-file no-explicit-any
 import {
-  ESQUEMA_POST, checarTexto, escolherImagem, escolherPalavras, idPastaDrive, montarMensagensPost, montarPromptImagem,
-  normalizarBriefing, proximoTema, type Tema,
+  ESQUEMA_POST, checarTexto, decidirImagem, escolherImagem, escolherPalavras, idPastaDrive, montarMensagensPost,
+  montarPromptImagem, normalizarBriefing, proximoTema, type Tema,
 } from "./regras.ts";
-import { gerarImagem, gerarJson } from "./openai.ts";
+import { checarImagem, gerarImagem, gerarJson, type Logo } from "./openai.ts";
 import { enviarR2 } from "./r2.ts";
 import { baixarDoDrive, imagensDaPasta, tokenGoogle } from "./google.ts";
+import { foiPrazo, PRAZO, sinal } from "./prazo.ts";
 
 type Sb = any;
 type Imagem = { origem: "drive" | "ia"; ref: string; url: string };
@@ -45,15 +46,60 @@ async function imagemDoDrive(sb: Sb, perfil: any, postId: string, total?: AbortS
   return { origem: "drive" as const, ref: foto.id, url };
 }
 
-async function imagemDaIa(perfil: any, postId: string, tema: Tema, total?: AbortSignal): Promise<Imagem> {
-  const prompt = montarPromptImagem({ nome: perfil.nome, categoria: perfil.categoria, briefing: normalizarBriefing(perfil.briefing), tema });
-  const bytes = await gerarImagem(prompt, total);
-  const chave = `${perfil.id}/${postId}.png`;
-  const url = await enviarR2(chave, bytes, "image/png", total);
-  return { origem: "ia" as const, ref: chave, url };
+/** Baixa a logo do perfil (URL pública no R2). Sem ela a imagem da IA não sai: a logo é obrigatória quando existe. */
+async function baixarLogo(url: string, total?: AbortSignal): Promise<Logo> {
+  let r: Response;
+  try {
+    r = await fetch(url, { signal: sinal(PRAZO.r2, total) });
+  } catch (e) {
+    throw new Error(foiPrazo(e) ? "A logo do perfil demorou demais para baixar." : "Não foi possível baixar a logo do perfil.");
+  }
+  if (!r.ok) throw new Error("Não foi possível baixar a logo do perfil.");
+  const mime = (r.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  const tipo = mime === "image/png" || mime === "image/jpeg" ? mime : /\.png(\?|$)/i.test(url) ? "image/png" : "image/jpeg";
+  try {
+    return { bytes: new Uint8Array(await r.arrayBuffer()), tipo };
+  } catch (e) {
+    throw new Error(foiPrazo(e) ? "A logo do perfil demorou demais para baixar." : "Não foi possível baixar a logo do perfil.");
+  }
 }
 
-export async function gerarConteudo(sb: Sb, perfil: any, postId: string, total?: AbortSignal): Promise<CamposPost> {
+const AVISO_PESSOAS_OU_TEXTO = "A imagem da IA tinha pessoas ou texto; o post seguiu só com texto.";
+
+/**
+ * Imagem da IA (JPG), com a logo do perfil como referência quando houver. Sem `permitir_pessoas_ia`, a imagem passa por
+ * uma checagem: com pessoas ou texto gera de novo uma vez; se ainda houver, o post fica sem imagem e com aviso.
+ * Checagem que falha também deixa o post sem imagem (não dá para garantir que não há pessoas).
+ */
+async function imagemDaIa(
+  perfil: any, postId: string, tema: Tema, total?: AbortSignal,
+): Promise<{ imagem: Imagem | null; aviso: string | null }> {
+  const permitirPessoas = !!perfil.permitir_pessoas_ia;
+  const logo = perfil.logo_url ? await baixarLogo(perfil.logo_url, total) : undefined;
+  const prompt = montarPromptImagem({
+    nome: perfil.nome, categoria: perfil.categoria, briefing: normalizarBriefing(perfil.briefing), tema,
+    contextoImagens: perfil.contexto_imagens ?? null, permitirPessoas, comLogo: !!logo,
+  });
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    const bytes = await gerarImagem(prompt, total, logo);
+    if (!permitirPessoas) {
+      const c = await checarImagem(bytes, "image/jpeg", total);
+      if (c.tem_pessoas || c.tem_texto) continue;
+    }
+    const chave = `${perfil.id}/${postId}.jpg`;
+    const url = await enviarR2(chave, bytes, "image/jpeg", total);
+    return { imagem: { origem: "ia" as const, ref: chave, url }, aviso: null };
+  }
+  return { imagem: null, aviso: AVISO_PESSOAS_OU_TEXTO };
+}
+
+/**
+ * `opcoes.comImagem` (padrão true): false gera só texto, sem buscar nem gerar imagem. Com pasta do Drive a imagem sai
+ * sempre dela (falhou ou vazia: sem imagem e com aviso, sem cair para a IA); sem pasta, da IA se estiver ligada.
+ */
+export async function gerarConteudo(
+  sb: Sb, perfil: any, postId: string, total?: AbortSignal, opcoes?: { comImagem?: boolean },
+): Promise<CamposPost> {
   const briefing = normalizarBriefing(perfil.briefing);
   const { data: hist } = await sb
     .from("gmn_posts")
@@ -73,7 +119,7 @@ export async function gerarConteudo(sb: Sb, perfil: any, postId: string, total?:
   for (let tentativa = 0; tentativa < 2; tentativa++) {
     const m = montarMensagensPost({
       nome: perfil.nome, categoria: perfil.categoria, briefing, saude: perfil.saude, tema, palavras, anteriores,
-      motivoReprovacao: motivo,
+      motivoReprovacao: motivo, contextoPosts: perfil.contexto_posts ?? null,
     });
     resposta = await gerarJson<{ texto: string; palavras_chave: string[] }>(m.system, m.user, "post_gmn", ESQUEMA_POST, total);
     const c = checarTexto(resposta.texto, { termosProibidos: briefing.termos_proibidos, saude: perfil.saude });
@@ -92,16 +138,24 @@ export async function gerarConteudo(sb: Sb, perfil: any, postId: string, total?:
   // Imagem que falha não derruba o texto (já gerado e pago): vira aviso em `erro` e o post segue sem imagem.
   let imagem: Imagem | null = null;
   const avisos: string[] = [];
-  try {
-    const doDrive = await imagemDoDrive(sb, perfil, postId, total);
-    if (doDrive === "vazia") avisos.push("A pasta do Drive não tem fotos JPG ou PNG de até 5 MB.");
-    else imagem = doDrive;
-  } catch (e) {
-    avisos.push(`Pasta do Drive: ${msg(e)}`);
-  }
-  if (!imagem && perfil.usa_ia_imagem) {
+  const origem = decidirImagem({
+    comImagem: opcoes?.comImagem ?? true,
+    temPasta: !!idPastaDrive(String(perfil.drive_pasta_url ?? "")),
+    usaIa: !!perfil.usa_ia_imagem,
+  });
+  if (origem === "drive") {
     try {
-      imagem = await imagemDaIa(perfil, postId, tema, total);
+      const doDrive = await imagemDoDrive(sb, perfil, postId, total);
+      if (doDrive === "vazia") avisos.push("A pasta do Drive não tem fotos JPG ou PNG de até 5 MB.");
+      else imagem = doDrive;
+    } catch (e) {
+      avisos.push(`Pasta do Drive: ${msg(e)}`);
+    }
+  } else if (origem === "ia") {
+    try {
+      const r = await imagemDaIa(perfil, postId, tema, total);
+      imagem = r.imagem;
+      if (r.aviso) avisos.push(r.aviso);
     } catch (e) {
       avisos.push(`Imagem da IA: ${msg(e)}`);
     }

@@ -1,14 +1,18 @@
 // Posts no Google Meu Negócio — Fase 1 (sem publicar no Google).
 //   GET                                          -> { openai, r2, acesso }
-//   POST { acao: "briefing", perfil_id, texto_dados_internos? } -> { briefing }   (não salva)
-//   POST { acao: "previa", perfil_id }           -> { post }                      (gmn_posts, origem 'previa')
+//   POST { acao: "briefing", perfil_id, texto_dados_internos?, contexto_posts? } -> { briefing }   (não salva)
+//        extrai o briefing do contexto (contexto_posts do corpo, se veio; senão o do perfil)
+//   POST { acao: "previa", perfil_id, com_imagem? } -> { post }                   (gmn_posts, origem 'previa')
+//        com_imagem (padrão true): false gera só texto, sem buscar nem gerar imagem
+//   POST { acao: "logo", perfil_id, tipo, base64 } -> { logo_url }                (PNG ou JPG até 5 MB, no R2; grava gmn_perfis.logo_url)
+//   POST { acao: "remover_logo", perfil_id }     -> { ok: true }                  (logo_url = null; o arquivo fica no R2)
 // POST exige x-google-id-token (e-mail em ALLOWED_GOOGLE_EMAILS) ou x-swipe-key, como o google-token.
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
 import { acessoConfigurado, acessoLiberado } from "./acesso.ts";
 import { gerarJson, openaiConfigurada } from "./openai.ts";
 import { PRAZO_TOTAL_MS } from "./prazo.ts";
-import { r2Configurado } from "./r2.ts";
+import { enviarR2, r2Configurado } from "./r2.ts";
 import { gerarConteudo } from "./conteudo.ts";
 import { ESQUEMA_BRIEFING, montarMensagensBriefing, normalizarBriefing } from "./regras.ts";
 
@@ -55,6 +59,8 @@ async function acaoBriefing(sb: any, body: any, total: AbortSignal): Promise<Res
     nome: perfil.nome, categoria: perfil.categoria, site: perfil.site, endereco: perfil.endereco, nicho,
     briefingAtual: normalizarBriefing(perfil.briefing),
     textoDadosInternos: typeof body.texto_dados_internos === "string" ? body.texto_dados_internos : null,
+    // O texto da tela (ainda não salvo) vale mais que o do perfil.
+    contextoPosts: typeof body.contexto_posts === "string" ? body.contexto_posts : perfil.contexto_posts ?? null,
   });
   const r = await gerarJson<unknown>(m.system, m.user, "briefing_gmn", ESQUEMA_BRIEFING, total);
   return json({ briefing: normalizarBriefing(r) });
@@ -65,8 +71,9 @@ async function acaoPrevia(sb: any, body: any, total: AbortSignal): Promise<Respo
   if (!perfil.briefing_salvo_em) return json({ error: "Salve o briefing antes de gerar a prévia." }, 400);
   // Confere a configuração antes de inserir a linha e de gastar com a OpenAI.
   if (!openaiConfigurada()) throw new ErroHttp(503, SEM_OPENAI);
+  const comImagem = typeof body.com_imagem === "boolean" ? body.com_imagem : true;
   const podeTerImagem = !!String(perfil.drive_pasta_url ?? "").trim() || !!perfil.usa_ia_imagem;
-  if (podeTerImagem && !r2Configurado()) throw new ErroHttp(503, SEM_R2);
+  if (comImagem && podeTerImagem && !r2Configurado()) throw new ErroHttp(503, SEM_R2);
   const { data: post, error } = await sb
     .from("gmn_posts")
     .insert({ perfil_id: perfil.id, origem: "previa", status: "gerando" })
@@ -75,7 +82,7 @@ async function acaoPrevia(sb: any, body: any, total: AbortSignal): Promise<Respo
   if (error) throw new Error(error.message);
   let campos: Record<string, unknown>;
   try {
-    campos = { ...(await gerarConteudo(sb, perfil, post.id, total)) };
+    campos = { ...(await gerarConteudo(sb, perfil, post.id, total, { comImagem })) };
   } catch (e) {
     campos = { status: "erro", erro: msg(e) };
   }
@@ -87,6 +94,42 @@ async function acaoPrevia(sb: any, body: any, total: AbortSignal): Promise<Respo
     .single();
   if (e2) throw new Error(e2.message);
   return json({ post: final });
+}
+
+const LOGO_MAX_BYTES = 5 * 1024 * 1024;
+const ASSINATURA_LOGO: Record<string, number[]> = { "image/png": [0x89, 0x50, 0x4e, 0x47], "image/jpeg": [0xff, 0xd8, 0xff] };
+
+/** Guarda a logo do perfil no R2 (`logos/<perfil_id>-<carimbo>.<png|jpg>`) e grava a URL em `gmn_perfis.logo_url`. */
+async function acaoLogo(sb: any, body: any, total: AbortSignal): Promise<Response> {
+  const perfil = await carregarPerfil(sb, body);
+  const tipo = typeof body.tipo === "string" ? body.tipo : "";
+  if (tipo !== "image/png" && tipo !== "image/jpeg") throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
+  const b64 = typeof body.base64 === "string" ? body.base64.replace(/^data:[^,]*,/, "").replace(/\s+/g, "") : "";
+  if (!b64) throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
+  // Confere o tamanho pelo texto antes de decodificar (base64: 4 caracteres a cada 3 bytes).
+  if (Math.floor((b64.length * 3) / 4) > LOGO_MAX_BYTES + 2) throw new ErroHttp(400, "A logo pode ter até 5 MB.");
+  let bytes: Uint8Array;
+  try {
+    bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  } catch {
+    throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
+  }
+  if (bytes.length > LOGO_MAX_BYTES) throw new ErroHttp(400, "A logo pode ter até 5 MB.");
+  // O conteúdo precisa ser mesmo o do tipo informado: o arquivo fica público e a OpenAI recusa o que não for imagem.
+  if (!ASSINATURA_LOGO[tipo].every((b, i) => bytes[i] === b)) throw new ErroHttp(400, "Envie a logo em PNG ou JPG.");
+  if (!r2Configurado()) throw new ErroHttp(503, SEM_R2);
+  const url = await enviarR2(`logos/${perfil.id}-${Date.now()}.${tipo === "image/png" ? "png" : "jpg"}`, bytes, tipo, total);
+  const { error } = await sb.from("gmn_perfis").update({ logo_url: url, updated_at: new Date().toISOString() }).eq("id", perfil.id);
+  if (error) throw new Error(error.message);
+  return json({ logo_url: url });
+}
+
+/** Tira a logo do perfil (o arquivo antigo pode ficar no R2). */
+async function acaoRemoverLogo(sb: any, body: any): Promise<Response> {
+  const perfil = await carregarPerfil(sb, body);
+  const { error } = await sb.from("gmn_perfis").update({ logo_url: null, updated_at: new Date().toISOString() }).eq("id", perfil.id);
+  if (error) throw new Error(error.message);
+  return json({ ok: true });
 }
 
 Deno.serve(async (req) => {
@@ -102,6 +145,8 @@ Deno.serve(async (req) => {
   try {
     if (body.acao === "briefing") return await acaoBriefing(sb, body, total);
     if (body.acao === "previa") return await acaoPrevia(sb, body, total);
+    if (body.acao === "logo") return await acaoLogo(sb, body, total);
+    if (body.acao === "remover_logo") return await acaoRemoverLogo(sb, body);
     return json({ error: "Ação desconhecida" }, 400);
   } catch (e) {
     if (e instanceof ErroHttp) return json({ error: e.message }, e.status);
