@@ -214,8 +214,10 @@ export function ordenarParcelas(parcelas: Parcela[]): Parcela[] {
 }
 
 /** Valor em reais no formato da máscara de moeda ("3.500,00"); a máscara lê dígitos como centavos. */
+let fmtValor: Intl.NumberFormat | null = null; // criado uma vez
 export function textoDoValor(valor: number): string {
-  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(valor) || 0);
+  fmtValor ??= new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return fmtValor.format(Number(valor) || 0);
 }
 
 /** "2026-09-01" → "setembro de 2026" (sem `new Date`, que em Brasília voltaria um mês). */

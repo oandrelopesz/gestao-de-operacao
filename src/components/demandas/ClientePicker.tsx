@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Check, User } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -34,9 +34,14 @@ export function ClientePicker({
 }: ClientePickerProps) {
   const [open, setOpen] = useState(false);
 
+  // A lista só aparece com o popover aberto: ordena a partir da primeira abertura (e mantém durante a
+  // animação de fechar). Cada card do Kanban tem um seletor; ordenar os clientes em todos pesava na aba de Demandas.
+  const jaAbriu = useRef(false);
+  if (open) jaAbriu.current = true;
   const clientesOrdenados = useMemo(
-    () => [...clientes].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
-    [clientes]
+    () => (jaAbriu.current ? [...clientes].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [clientes, open]
   );
 
   const escolher = (valor: { cliente_id: string | null; pessoal: boolean }) => {

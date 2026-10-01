@@ -20,10 +20,18 @@ export function simboloMoeda(moeda: Moeda | string | null | undefined): string {
   return MOEDAS.find((m) => m.id === moeda)?.simbolo || "R$";
 }
 
+// Um formatador por moeda, criado uma vez (criar um Intl.NumberFormat por valor pesava nas listas)
+const fmtMoeda = new Map<string, Intl.NumberFormat>();
+
 export function formatMoeda(valor: number | string | null | undefined, moeda: Moeda | string | null | undefined = "BRL"): string {
   const n = typeof valor === "string" ? Number(valor) : valor ?? 0;
   const currency = isMoeda(moeda) ? moeda : "BRL";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(n || 0);
+  let fmt = fmtMoeda.get(currency);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency });
+    fmtMoeda.set(currency, fmt);
+  }
+  return fmt.format(n || 0);
 }
 
 /** Quantos BRL vale 1 unidade de cada moeda; `data` é o dia da cotação usada */

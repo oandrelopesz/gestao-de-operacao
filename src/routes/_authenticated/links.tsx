@@ -17,6 +17,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS } from "@/lib/data";
 import {
   EVENTO_TEMAS_LINKS, atualizarLink, criarLink, excluirLinks, fetchLinks, fetchTemas, moverLinks, traduzErroLinks,
   type Link, type TemaLink,
@@ -31,9 +33,10 @@ const SEM = "__sem__"; // valor do Select para "Sem tema"
 type Edicao = { id?: string; nome: string; url: string; tema_id: string | null };
 
 function LinksPage() {
-  const [links, setLinks] = useState<Link[]>([]);
-  const [temas, setTemas] = useState<TemaLink[]>([]);
-  const [carregando, setCarregando] = useState(true);
+  // Cache em memória: voltar para a aba mostra os links na hora e atualiza por trás
+  const [links, setLinks] = useCachedState<Link[]>(CACHE_KEYS.links, []);
+  const [temas, setTemas] = useCachedState<TemaLink[]>(CACHE_KEYS.linksTemas, []);
+  const [carregando, setCarregando] = useState(!hasCached(CACHE_KEYS.links));
   const [erro, setErro] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<string>(TODOS);
   const [busca, setBusca] = useState("");
@@ -56,7 +59,7 @@ function LinksPage() {
     } finally {
       setCarregando(false);
     }
-  }, []);
+  }, [setLinks, setTemas]);
 
   useEffect(() => {
     carregar();

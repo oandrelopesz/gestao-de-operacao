@@ -7,12 +7,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadOnboardingAndamento } from "@/lib/data";
 import { formatarDataCurta } from "@/lib/entrega";
 import {
   criarProcesso,
-  fetchClientesEmOnboarding,
-  fetchProcessos,
-  fetchRoadmapsLigados,
   fetchTemplates,
   type ClienteResumo,
   type Processo,
@@ -86,10 +85,11 @@ function OnboardingPage() {
 
 function EmAndamento({ clienteFoco }: { clienteFoco?: string }) {
   const navigate = useNavigate();
-  const [clientes, setClientes] = useState<ClienteResumo[]>([]);
-  const [processos, setProcessos] = useState<Processo[]>([]);
-  const [roadmaps, setRoadmaps] = useState<RoadmapLigado[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Cache em memória: voltar para a aba mostra os cards na hora e atualiza por trás
+  const [clientes, setClientes] = useCachedState<ClienteResumo[]>(CACHE_KEYS.onboardingClientes, []);
+  const [processos, setProcessos] = useCachedState<Processo[]>(CACHE_KEYS.onboardingProcessos, []);
+  const [roadmaps, setRoadmaps] = useCachedState<RoadmapLigado[]>(CACHE_KEYS.onboardingRoadmaps, []);
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.onboardingProcessos));
   const [erro, setErro] = useState<string | null>(null);
   const [destacado, setDestacado] = useState<string | null>(null);
 
@@ -98,8 +98,7 @@ function EmAndamento({ clienteFoco }: { clienteFoco?: string }) {
   const carregar = useCallback(async () => {
     const minha = ++requisicao.current;
     try {
-      const [c, p] = await Promise.all([fetchClientesEmOnboarding(), fetchProcessos("onboarding", "ativos")]);
-      const r = await fetchRoadmapsLigados(p.flatMap((x) => x.passos.map((s) => s.id)));
+      const { clientes: c, processos: p, roadmaps: r } = await loadOnboardingAndamento();
       if (minha !== requisicao.current) return;
       setClientes(c);
       setProcessos(p);
@@ -111,7 +110,7 @@ function EmAndamento({ clienteFoco }: { clienteFoco?: string }) {
     } finally {
       if (minha === requisicao.current) setLoading(false);
     }
-  }, []);
+  }, [setClientes, setProcessos, setRoadmaps]);
 
   useEffect(() => { carregar(); }, [carregar]);
 

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Plus, Search, Building2, Filter, AlertTriangle, TrendingUp, Users, Target, AlertCircle, MoreVertical, Edit2, Trash2, ClipboardCheck, History, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -12,8 +12,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { NPS_AVALIACOES_QUERY, NPS_CLIENTES_QUERY } from "@/lib/data";
 import { NPSForm } from "@/components/NPSForm";
-import { NPSHistoryDrawer } from "@/components/NPSHistoryDrawer";
+import type { NPSHistoryDrawer as NPSHistoryDrawerTipo } from "@/components/NPSHistoryDrawer";
+import { esperarOcioso } from "@/lib/aquecimento";
 import { Dialog } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -49,8 +51,24 @@ interface NPSRow {
 
 const CATEGORIA_ORDEM: Record<string, number> = { critico: 0, em_risco: 1, saudavel: 2, ancora: 3, sem_avaliacao: 4 };
 
+// O histórico (gráficos do recharts, a maior parte do código desta aba) fica num pacote à parte: a lista
+// abre sem ele e ele é baixado logo depois, com o navegador ocioso — ao abrir o histórico já está pronto.
+let historicoCarregado: typeof NPSHistoryDrawerTipo | null = null;
+const carregarHistorico = () => import("@/components/NPSHistoryDrawer").then((m) => (historicoCarregado = m.NPSHistoryDrawer));
+function useHistoricoNps() {
+  const [Historico, setHistorico] = useState(() => historicoCarregado);
+  useEffect(() => {
+    if (Historico) return;
+    let vivo = true;
+    esperarOcioso().then(carregarHistorico).then((H) => { if (vivo) setHistorico(() => H); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [Historico]);
+  return Historico;
+}
+
 function NPSPage() {
   const queryClient = useQueryClient();
+  const NPSHistoryDrawer = useHistoricoNps();
   const { agencias, label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
   const [filterAgencia, setFilterAgencia] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -62,32 +80,12 @@ function NPSPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingName, setDeletingName] = useState<string>("");
 
-  // Todos os clientes ativos entram na lista, mesmo sem avaliação
-  const { data: clientes, isLoading: loadingClientes, error: clientesError } = useQuery({
-    queryKey: ["clientes-ativos-nps"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("id, nome, agencia, status_operacional, em_onboarding, nicho")
-        .eq("arquivado", false)
-        .order("nome");
-      if (error) throw error;
-      return (data || []) as ClienteRow[];
-    },
-  });
+  // Todos os clientes ativos entram na lista, mesmo sem avaliação.
+  // Consultas compartilhadas com o pré-aquecimento do app (src/lib/data.ts): a aba abre com os dados na hora.
+  const { data: clientesQuery, isLoading: loadingClientes, error: clientesError } = useQuery(NPS_CLIENTES_QUERY);
+  const clientes = clientesQuery as ClienteRow[] | undefined;
 
-  const { data: avaliacoes, isLoading: loadingAvaliacoes, error: queryError } = useQuery({
-    queryKey: ["nps-avaliacoes"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("nps_avaliacoes_view")
-        .select("*")
-        .order("data_avaliacao", { ascending: false })
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  const { data: avaliacoes, isLoading: loadingAvaliacoes, error: queryError } = useQuery(NPS_AVALIACOES_QUERY);
 
   const isLoading = loadingClientes || loadingAvaliacoes;
   const loadError = clientesError || queryError;
@@ -435,7 +433,7 @@ function NPSPage() {
         )}
       </Dialog>
 
-      {selectedCliente && (
+      {selectedCliente && NPSHistoryDrawer && (
         <NPSHistoryDrawer
           cliente={selectedCliente}
           onClose={() => setSelectedCliente(null)}

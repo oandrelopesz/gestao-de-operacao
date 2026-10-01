@@ -77,11 +77,14 @@ export function agregar(
 }
 
 /** Data local em Brasília (YYYY-MM-DD) a partir de um timestamp ISO. */
+// Criado uma vez: é chamado para cada conclusão do período (centenas/milhares por abertura do Dashboard)
+let fmtDataBrasilia: Intl.DateTimeFormat | null = null;
 export function dataLocalBrasilia(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
+  fmtDataBrasilia ??= new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date(iso));
+  });
+  return fmtDataBrasilia.format(new Date(iso));
 }

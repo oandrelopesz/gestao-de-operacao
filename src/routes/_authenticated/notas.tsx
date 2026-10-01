@@ -23,11 +23,27 @@ import {
 } from "@/lib/notas";
 import { SEM_TEMA, TODOS, contarPorTema, filtrarNotas, previaSemTitulo, tituloOuPrimeiraLinha } from "@/lib/notasTexto";
 import { imagensRemovidas, primeiraImagem, type NoDoc } from "@/lib/notasDoc";
-import { EditorNota } from "@/components/notas/EditorNota";
+import type { EditorNota as EditorNotaTipo } from "@/components/notas/EditorNota";
+import { esperarOcioso } from "@/lib/aquecimento";
 import type { Tema } from "@/components/temas/TemasLista";
 import { TemasNotasDialog } from "@/components/notas/TemasNotas";
 
 export const Route = createFileRoute("/_authenticated/notas")({ component: NotasPage });
+
+// O editor (TipTap/ProseMirror, a maior parte do código desta aba) fica num pacote à parte: a lista de notas
+// abre sem ele e ele é baixado logo depois, com o navegador ocioso — ao abrir uma nota já está pronto.
+let editorCarregado: typeof EditorNotaTipo | null = null;
+const carregarEditor = () => import("@/components/notas/EditorNota").then((m) => (editorCarregado = m.EditorNota));
+function useEditorNota() {
+  const [Editor, setEditor] = useState(() => editorCarregado);
+  useEffect(() => {
+    if (Editor) return;
+    let vivo = true;
+    esperarOcioso().then(carregarEditor).then((E) => { if (vivo) setEditor(() => E); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [Editor]);
+  return Editor;
+}
 
 const SEM = "__sem__"; // valor do Select para "Sem tema"
 
@@ -45,6 +61,7 @@ function quando(iso: string): string {
 }
 
 function NotasPage() {
+  const EditorNota = useEditorNota();
   const [notas, setNotas] = useCachedState<Nota[] | null>("notas.lista", null);
   const [temas, setTemas] = useCachedState<Tema[]>("notas.temas", []);
   const [erro, setErro] = useState<string | null>(null);
@@ -412,13 +429,15 @@ function NotasPage() {
               <Input autoFocus={!edicao.id} placeholder="Título" value={edicao.titulo} autoComplete="off" className="text-base font-semibold"
                 onChange={(e) => setEdicao({ ...edicao, titulo: e.target.value })} />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border">
-                <EditorNota
-                  key={edicao.id ?? "nova"}
-                  doc={edicao.doc}
-                  textoAntigo={edicao.conteudo}
-                  autoFocus={!!edicao.id}
-                  onChange={(doc, texto) => setEdicao((atual) => (atual ? { ...atual, doc, conteudo: texto } : atual))}
-                />
+                {EditorNota && (
+                  <EditorNota
+                    key={edicao.id ?? "nova"}
+                    doc={edicao.doc}
+                    textoAntigo={edicao.conteudo}
+                    autoFocus={!!edicao.id}
+                    onChange={(doc, texto) => setEdicao((atual) => (atual ? { ...atual, doc, conteudo: texto } : atual))}
+                  />
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Select value={edicao.tema_id ?? SEM} onValueChange={(v) => setEdicao({ ...edicao, tema_id: v === SEM ? null : v })}>

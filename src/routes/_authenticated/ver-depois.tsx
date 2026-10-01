@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useCachedState, hasCached, getCached, setCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadVerDepois } from "@/lib/data";
 import { toast } from "sonner";
 import { fetchTiposVerDepois, iconeDoTipo, TIPOS_VER_DEPOIS_PADRAO, TIPO_OUTRO, type TipoVerDepois } from "@/lib/verDepoisTipos";
 
@@ -80,25 +82,26 @@ function dominio(link: string): string {
 }
 
 function VerDepoisPage() {
-  const [itens, setItens] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Cache em memória: voltar para a aba mostra a lista na hora e atualiza por trás
+  const [itens, setItens] = useCachedState<Item[]>(CACHE_KEYS.verDepois, []);
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.verDepois));
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<string>("todos");
   const [mostrarVistos, setMostrarVistos] = useState(false);
   const [dialog, setDialog] = useState<{ item?: Item } | null>(null);
   const [toDelete, setToDelete] = useState<Item | null>(null);
-  const [tipos, setTipos] = useState<TipoVerDepois[]>(TIPOS_VER_DEPOIS_PADRAO);
+  const [tipos, setTipos] = useState<TipoVerDepois[]>(() => getCached<TipoVerDepois[]>(CACHE_KEYS.verDepoisTipos) ?? TIPOS_VER_DEPOIS_PADRAO);
 
   const load = async () => {
-    const { data, error } = await supabase.from("ver_depois").select("*").order("visto").order("created_at", { ascending: false });
-    if (error) {
-      setErro(/schema cache|does not exist|not find/i.test(error.message)
-        ? "A tabela ver_depois ainda não existe. Rode supabase/migrations/20260918110000_cursos_acesso_ver_depois.sql no SQL Editor."
-        : error.message);
-    } else {
-      setItens((data || []) as Item[]);
+    try {
+      setItens((await loadVerDepois()) as Item[]);
       setErro(null);
+    } catch (error: any) {
+      const msg = String(error?.message ?? error);
+      setErro(/schema cache|does not exist|not find/i.test(msg)
+        ? "A tabela ver_depois ainda não existe. Rode supabase/migrations/20260918110000_cursos_acesso_ver_depois.sql no SQL Editor."
+        : msg);
     }
     setLoading(false);
   };
@@ -108,7 +111,7 @@ function VerDepoisPage() {
   // Tipos configuráveis; se a tabela falhar, ficam os 6 padrões
   useEffect(() => {
     fetchTiposVerDepois()
-      .then((lista) => { if (lista.length) setTipos(lista); })
+      .then((lista) => { if (lista.length) { setCached(CACHE_KEYS.verDepoisTipos, lista); setTipos(lista); } })
       .catch(() => {});
   }, []);
 

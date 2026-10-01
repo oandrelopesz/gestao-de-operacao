@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCached, setCached } from "@/lib/pageCache";
 import { slugifyColumnId } from "@/lib/demandaColunas";
 import { CATEGORIA_CLIENTE, TIPOS_IDEIA } from "@/lib/ideiasTexto";
 
@@ -109,16 +110,35 @@ export async function moverCategoriaIdeia(lista: CategoriaIdeia[], id: string, d
   if (falha?.error) throw falha.error;
 }
 
+/** Chave do cache em memória (a aba abre já com as categorias da última vez). */
+export const CACHE_CATEGORIAS_IDEIAS = "ideias.categorias";
+
+// A aba e o formulário pedem as categorias juntos ao abrir: uma consulta só, dividida entre os dois.
+// Depois de uma alteração (evento), cada um busca de novo, como antes.
+let buscaEmAndamento: Promise<CategoriaIdeia[]> | null = null;
+function buscarCategorias(forcar: boolean): Promise<CategoriaIdeia[]> {
+  if (forcar || !buscaEmAndamento) {
+    const busca = fetchCategoriasIdeias();
+    buscaEmAndamento = busca;
+    busca.finally(() => { if (buscaEmAndamento === busca) buscaEmAndamento = null; });
+  }
+  return buscaEmAndamento;
+}
+
 /** Categorias da tabela; recarrega quando outra tela avisa pelo evento "ideias-categorias". */
 export function useCategoriasIdeias() {
-  const [categorias, setCategorias] = useState<CategoriaIdeia[]>(CATEGORIAS_IDEIAS_PADRAO);
+  const [categorias, setCategorias] = useState<CategoriaIdeia[]>(
+    () => getCached<CategoriaIdeia[]>(CACHE_CATEGORIAS_IDEIAS) ?? CATEGORIAS_IDEIAS_PADRAO,
+  );
 
-  const recarregar = useCallback(async () => {
-    setCategorias(await fetchCategoriasIdeias());
+  const recarregar = useCallback(async (forcar = true) => {
+    const lista = await buscarCategorias(forcar);
+    setCached(CACHE_CATEGORIAS_IDEIAS, lista);
+    setCategorias(lista);
   }, []);
 
   useEffect(() => {
-    recarregar();
+    recarregar(false);
     const ouvir = () => { recarregar(); };
     window.addEventListener(EVENTO_CATEGORIAS_IDEIAS, ouvir);
     return () => window.removeEventListener(EVENTO_CATEGORIAS_IDEIAS, ouvir);

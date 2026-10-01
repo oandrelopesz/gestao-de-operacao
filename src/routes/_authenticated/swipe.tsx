@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS } from "@/lib/data";
 import { toast } from "sonner";
 import {
   CATEGORIAS, REDES, STATUS_META, categoriaMeta, redeLabel, fetchNichos, fetchItens, fetchSwipeConfig, excluirItem, erroAmigavel, temChave,
@@ -51,12 +53,13 @@ interface Selecao {
 }
 
 function SwipePage() {
-  const [config, setConfig] = useState<SwipeConfig | null>(null);
-  const [nichos, setNichos] = useState<SwipeNicho[]>([]);
-  const [itens, setItens] = useState<SwipeItem[]>([]);
-  const [fila, setFila] = useState<SwipeJob[]>([]);
+  // Cache em memória: voltar para a aba mostra os itens na hora e atualiza por trás
+  const [config, setConfig] = useCachedState<SwipeConfig | null>(CACHE_KEYS.swipeConfig, null);
+  const [nichos, setNichos] = useCachedState<SwipeNicho[]>(CACHE_KEYS.swipeNichos, []);
+  const [itens, setItens] = useCachedState<SwipeItem[]>(CACHE_KEYS.swipeItens, []);
+  const [fila, setFila] = useCachedState<SwipeJob[]>(CACHE_KEYS.swipeFila, []);
   const [itemOcupado, setItemOcupado] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.swipeItens));
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [filtroRede, setFiltroRede] = useState("todas");

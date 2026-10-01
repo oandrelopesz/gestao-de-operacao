@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { ChevronRight, ChevronLeft, PanelLeft, Sun, Moon, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { AtualizarAoVoltar } from "@/components/AtualizarAoVoltar";
 import { PlataformasProvider } from "@/lib/plataformas";
 import { useTheme } from "@/lib/theme";
 import { warmAllCaches } from "@/lib/data";
+import { depoisDoLoad, emLotes, esperarOcioso, pausa } from "@/lib/aquecimento";
 import { getConfig } from "@/lib/appConfig";
 import { aplicarMenu, type MenuConfig } from "@/lib/menuConfig";
 import { NAV_GROUPS } from "@/lib/nav";
@@ -32,6 +34,9 @@ function AuthenticatedLayout() {
   const session = context?.session;
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Tela que está de fato montada (rota já carregada). O endereço muda no clique, antes de a rota nova
+  // entrar; usar ele na chave remontava a tela antiga por um instante (refazendo as consultas dela).
+  const telaMontada = useRouterState({ select: (s) => s.matches[s.matches.length - 1]?.pathname ?? s.location.pathname });
   const [userName, setUserName] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   // Sobe quando o celular volta de um tempo em segundo plano: remonta a tela para buscar dados frescos
@@ -43,6 +48,7 @@ function AuthenticatedLayout() {
   });
   const { theme, toggle: toggleTheme } = useTheme();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   // Config do menu lateral (Admin): quais abas aparecem e a ordem de cada grupo.
   // Guardada num estado local (e não só no useConfig) para recarregar assim que o
@@ -74,19 +80,29 @@ function AuthenticatedLayout() {
     else setIsSidebarOpen(true);
   }, []);
 
-  // Logo após abrir o app: pré-carrega o código de todas as rotas e aquece o
-  // cache de dados de cada aba, para a troca de aba ser instantânea.
+  // Aquecimento para a troca de aba ser instantânea: o cache de dados de cada aba e o código de todas as
+  // rotas. A tela aberta tem prioridade total — só começa depois que ela carregou (load + 1,5 s + navegador
+  // ocioso) e segue em passos pequenos, sempre no ocioso: dados em lotes de 3 consultas, código uma rota por
+  // vez, na ordem do menu. Antes disso, passar o mouse/tocar num link já baixa aquela aba (preload "intent").
   useEffect(() => {
-    const t = setTimeout(() => {
-      ALL_LINKS.forEach((l) => {
-        router.preloadRoute({ to: l.to as any }).catch(() => {});
-      });
-      warmAllCaches();
-      // A grade da Agenda (FullCalendar) é carregada à parte: baixa já, para a aba abrir na hora
-      import("@/components/agenda/AgendaGrade").catch(() => {});
-    }, 300);
-    return () => clearTimeout(t);
-  }, [router]);
+    let cancelado = false;
+    const parou = () => cancelado;
+    const ocioso = () => esperarOcioso();
+    (async () => {
+      await depoisDoLoad();
+      await pausa(1500);
+      if (cancelado) return;
+      await Promise.all([
+        warmAllCaches(queryClient, { lote: 3, antes: ocioso, cancelado: parou }),
+        (async () => {
+          await emLotes(ALL_LINKS.map((l) => () => router.preloadRoute({ to: l.to as any })), 1, ocioso, parou);
+          // A grade da Agenda (FullCalendar) é carregada à parte: baixa também, para a aba abrir na hora
+          await emLotes([() => import("@/components/agenda/AgendaGrade")], 1, ocioso, parou);
+        })(),
+      ]);
+    })();
+    return () => { cancelado = true; };
+  }, [router, queryClient]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -274,7 +290,7 @@ function AuthenticatedLayout() {
               <NotificationBell />
             </div>
           </header>
-          <div key={`${pathname}#${recarga}`} className="p-4 lg:p-8 max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))] page-enter">
+          <div key={`${telaMontada}#${recarga}`} className="p-4 lg:p-8 max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))] page-enter">
             <Outlet />
           </div>
           <MobileNav onMais={() => setIsSidebarOpen(true)} maisAberto={isSidebarOpen} novos={avisosNaoVistos.length} />

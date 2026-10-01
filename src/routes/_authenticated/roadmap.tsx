@@ -14,9 +14,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useCachedState, hasCached } from "@/lib/pageCache";
+import { CACHE_KEYS, loadRoadmapAndamento } from "@/lib/data";
 import { diasDeAtraso, formatarDataCurta, hojeBrasilia } from "@/lib/entrega";
 import { progresso } from "@/lib/processos";
-import { atualizarProcesso, fetchProcessos, type Passo, type Processo } from "@/lib/processosService";
+import { atualizarProcesso, type Passo, type Processo } from "@/lib/processosService";
 import { ProcessoCard } from "@/components/processos/ProcessoCard";
 import { TemplatesView } from "@/components/processos/TemplatesView";
 import { HistoricoView } from "@/components/processos/HistoricoView";
@@ -92,9 +94,10 @@ const GRUPO_PESSOAL = "__pessoal__";
 
 function EmAndamento({ roadmapFoco, onIrHistorico }: { roadmapFoco?: string; onIrHistorico: () => void }) {
   const navigate = useNavigate();
-  const [roadmaps, setRoadmaps] = useState<Processo[]>([]);
-  const [passosOnboarding, setPassosOnboarding] = useState<Map<string, Passo>>(new Map());
-  const [loading, setLoading] = useState(true);
+  // Cache em memória: voltar para a aba mostra os cards na hora e atualiza por trás
+  const [roadmaps, setRoadmaps] = useCachedState<Processo[]>(CACHE_KEYS.roadmaps, []);
+  const [passosOnboarding, setPassosOnboarding] = useCachedState<Map<string, Passo>>(CACHE_KEYS.roadmapPassosOnboarding, new Map());
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.roadmaps));
   const [erro, setErro] = useState<string | null>(null);
   const [destacado, setDestacado] = useState<string | null>(null);
   const [novoAberto, setNovoAberto] = useState(false);
@@ -108,10 +111,8 @@ function EmAndamento({ roadmapFoco, onIrHistorico }: { roadmapFoco?: string; onI
   const carregar = useCallback(async () => {
     const minha = ++requisicao.current;
     try {
-      const [r, o] = await Promise.all([fetchProcessos("roadmap", "ativos"), fetchProcessos("onboarding", "ativos")]);
+      const { roadmaps: r, passosOnboarding: passos } = await loadRoadmapAndamento();
       if (minha !== requisicao.current) return;
-      const passos = new Map<string, Passo>();
-      o.forEach((p) => p.passos.forEach((s) => passos.set(s.id, s)));
 
       const idsNovos = new Set(r.map((x) => x.id));
       const sumidos = [...anteriores.current.keys()].filter((id) => !idsNovos.has(id));

@@ -20,7 +20,8 @@ import { CATEGORIA_CLIENTE, tipoIdeiaMeta, filtrarIdeias, dominioDoLink, type Si
 import { useCategoriasIdeias, EVENTO_CATEGORIAS_IDEIAS } from "@/lib/ideiasCategorias";
 import { CategoriasIdeiasDialog } from "@/components/ideias/CategoriasIdeiasDialog";
 import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
-import { loadClientesLite } from "@/lib/data";
+import { CACHE_KEYS, loadClientesLite } from "@/lib/data";
+import { useCachedState, hasCached } from "@/lib/pageCache";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/ideias")({
@@ -30,9 +31,10 @@ export const Route = createFileRoute("/_authenticated/ideias")({
 function IdeiasPage() {
   const navigate = useNavigate();
   const { agencias, meta: agenciaMeta } = useAgencias();
-  const [ideias, setIdeias] = useState<Ideia[]>([]);
-  const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Cache em memória: voltar para a aba mostra a lista na hora e atualiza por trás
+  const [ideias, setIdeias] = useCachedState<Ideia[]>(CACHE_KEYS.ideias, []);
+  const [clientes, setClientes] = useCachedState<{ id: string; nome: string; agencia: string }[]>(CACHE_KEYS.clientesLite, []);
+  const [loading, setLoading] = useState(!hasCached(CACHE_KEYS.ideias));
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("todos");

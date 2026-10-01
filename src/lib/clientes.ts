@@ -1,8 +1,13 @@
 // As agências agora vêm do banco (tabela agencias) — ver src/lib/agencias.tsx
 
+// Formatadores criados uma vez (criar um Intl.NumberFormat por valor pesava nas listas)
+let fmtBRL: Intl.NumberFormat | null = null;
+let fmtDecimal: Intl.NumberFormat | null = null;
+
 export function formatBRL(value: number | string | null | undefined): string {
   const n = typeof value === "string" ? Number(value) : value ?? 0;
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n || 0);
+  fmtBRL ??= new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+  return fmtBRL.format(n || 0);
 }
 
 export function parseBRLInput(input: string): number {
@@ -13,7 +18,8 @@ export function parseBRLInput(input: string): number {
 
 export function maskBRLInput(input: string): string {
   const value = parseBRLInput(input);
-  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  fmtDecimal ??= new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return fmtDecimal.format(value);
 }
 
 export function tempoDeCasa(dataInicio: string | null | undefined): string {

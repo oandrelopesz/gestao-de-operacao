@@ -1,6 +1,9 @@
 /** Data de hoje em Brasília (YYYY-MM-DD), a mesma usada pelo banco (hoje_brt). */
+// Criado uma vez: montar um Intl.DateTimeFormat a cada chamada pesava na lista de demandas (uma por card)
+let fmtDiaBrasilia: Intl.DateTimeFormat | null = null;
 export function hojeBrasilia(agora: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(agora);
+  fmtDiaBrasilia ??= new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" });
+  return fmtDiaBrasilia.format(agora);
 }
 
 const DIA_MS = 24 * 60 * 60 * 1000;
