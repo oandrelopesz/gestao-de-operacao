@@ -198,10 +198,12 @@ function ClientesPage() {
 
   // "Ver detalhes" do aviso de fim de contrato escreve "Nome A|Nome B": a busca por texto não faz "ou",
   // então cada nome entre "|" é um cliente exato e o resultado é só esses, na ordem da tela.
-  const nomesDoAviso = useMemo(
-    () => (search.includes("|") ? new Set(search.split("|").map(normalizarBusca).filter(Boolean)) : null),
-    [search],
-  );
+  const nomesDoAviso = useMemo(() => {
+    if (!search.includes("|")) return null;
+    const nomes = new Set(search.split("|").map(normalizarBusca).filter(Boolean));
+    // Só "|" digitado (sem nome): vale como busca vazia
+    return nomes.size ? nomes : null;
+  }, [search]);
   // Busca tolerante no nome (e na agência): os outros filtros e a ordem da tela vêm antes
   const resultadoTexto = useBusca(baseFiltrada, nomesDoAviso ? "" : search, (c) => [c.nome, agenciaLabelOf(c.agencia)], { deps: [agenciaLabelOf] });
   const resultadoBusca = useMemo<ResultadoBusca<ClienteView>>(() => {
