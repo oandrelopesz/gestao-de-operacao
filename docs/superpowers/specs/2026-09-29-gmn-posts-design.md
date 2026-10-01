@@ -104,6 +104,7 @@ para a aba mostrar o status ao vivo.
 
 Tabela `gmn_imagens_uso` (`perfil_id`, `origem`, `ref`, `usado_em`), com PK (`perfil_id`, `origem`, `ref`). Guarda quando
 cada foto do Drive ou do Google foi usada pela última vez. Não há cópia da lista de fotos: a lista é lida da fonte a cada post.
+O uso é registrado quando a foto é escolhida, inclusive na prévia: prévias seguidas mostram fotos diferentes.
 
 ### 3.5 Conexão da andfalopes@
 
@@ -173,20 +174,24 @@ As chamadas usam `net.http_post`, no padrão de `20260429023356_…sql`.
    `pulado` com o motivo e entra um aviso no sino.
 5. **Imagem:**
    1. Pasta do Drive do perfil (link → id da pasta): lista as imagens (JPG ou PNG, até 5 MB; WebP é ignorado) com o token GMN e, se
-      falhar, com o token geral. Escolhe a usada há mais tempo (ou nunca usada) em `gmn_imagens_uso`, baixa e envia ao R2.
+      falhar, com o token geral. Escolhe a usada há mais tempo (ou nunca usada) em `gmn_imagens_uso`, baixa, envia ao R2 e registra o uso (seção 3.4).
+      Pasta sem nenhuma foto aceita vira aviso no post.
    2. Fotos do perfil no Google (`GET v4/{account}/{location}/media`): a usada há mais tempo; usa a `googleUrl`.
    3. Se `usa_ia_imagem`: gera a imagem com a OpenAI (foto realista do tipo de negócio e do tema, sem texto na arte) e
       envia ao R2.
-   4. Sem nenhuma imagem: publica só o texto.
+   4. Sem nenhuma imagem, ou se a imagem falhar (Drive, IA ou R2): publica só o texto, com o motivo da falha como aviso
+      em `erro`.
 6. **Publicar** (exceto `origem='previa'`, que termina em `gerado`): `POST
    https://mybusiness.googleapis.com/v4/{account}/{location}/localPosts` com `languageCode: "pt-BR"`, `summary`,
    `topicType: "STANDARD"`, `callToAction` e `media: [{ mediaFormat: "PHOTO", sourceUrl }]`. Grava `google_post_name`,
-   `google_url`, `google_estado`, `status='publicado'` e `conferir_em = now() + 1h`, e registra o uso da imagem.
+   `google_url`, `google_estado`, `status='publicado'` e `conferir_em = now() + 1h`.
 7. **Conferência:** em toda chamada, até 5 posts `publicado` com `conferir_em <= now()` e `google_estado <> 'LIVE'`
    passam por `GET` no post. `REJECTED` → `status='erro'` + aviso. `LIVE` → apenas grava. `PROCESSING` → `conferir_em`
    mais 1 h, até 24 h depois da publicação.
 
-Um post por chamada mantém cada execução bem abaixo do limite de tempo das edge functions. A prévia e o "Publicar agora"
+Um post por chamada mantém cada execução bem abaixo do limite de tempo das edge functions. Cada chamada externa tem
+prazo próprio (OpenAI: texto 60 s, imagem 90 s; Google 20 s; R2 30 s, com até 2 novas tentativas) e a execução inteira
+tem até 130 s: estourando, o post vai para `erro` em vez de ficar em `gerando`. A prévia e o "Publicar agora"
 chamam a mesma função com `post_id` explícito.
 
 ### 6.3 Checagem do texto (função pura, testada)
