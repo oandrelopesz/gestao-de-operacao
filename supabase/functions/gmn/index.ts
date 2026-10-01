@@ -18,7 +18,9 @@ import { PRAZO_TOTAL_MS } from "./prazo.ts";
 import { enviarR2, r2Configurado } from "./r2.ts";
 import { gerarConteudo } from "./conteudo.ts";
 import { lerPng } from "./png.ts";
-import { ESQUEMA_BRIEFING, base64ParaBytes, montarMensagensBriefing, normalizarBriefing, tamanhoBase64 } from "./regras.ts";
+import {
+  ESQUEMA_BRIEFING, LOGO_LADO_MAX, base64ParaBytes, montarMensagensBriefing, normalizarBriefing, tamanhoBase64,
+} from "./regras.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -121,8 +123,6 @@ const LOGO_MAX_BYTES = 5 * 1024 * 1024;
 // Corpo de uma requisição: a logo em base64 (5 MB viram uns 6,7 MB) mais o resto do JSON cabe com folga em 8 MB.
 const CORPO_MAX_BYTES = 8 * 1024 * 1024;
 const ASSINATURA_PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-// Lado máximo da logo: um arquivo pequeno pode declarar dimensões enormes, e a leitura aloca largura x altura x 4 bytes.
-const LOGO_LADO_MAX = 2048;
 const LOGO_ILEGIVEL = "Não foi possível ler a logo enviada.";
 const ORIGEM_URL_MAX = 2000;
 
@@ -161,12 +161,14 @@ async function acaoLogo(sb: any, body: any, total: AbortSignal): Promise<Respons
   if (bytes.length > LOGO_MAX_BYTES) throw new ErroHttp(400, "A logo pode ter até 5 MB.");
   // O conteúdo precisa ser mesmo PNG: o arquivo fica público e a composição só lê PNG.
   if (!ASSINATURA_PNG.every((b, i) => bytes[i] === b)) throw new ErroHttp(400, LOGO_ILEGIVEL);
-  // Dimensões do IHDR antes de ler o PNG: recusa o arquivo que declara um tamanho que esgotaria a memória.
+  // Dimensões do IHDR antes de ler o PNG: um arquivo pequeno pode declarar um tamanho que esgotaria a memória (a leitura
+  // aloca largura x altura x 4 bytes). Conferência barata; o lerPng repete o teto abaixo, como garantia.
   const dim = dimensoesDoPng(bytes);
   if (!dim || dim.largura > LOGO_LADO_MAX || dim.altura > LOGO_LADO_MAX) throw new ErroHttp(400, LOGO_ILEGIVEL);
-  // Garante que a composição vai conseguir ler a logo (8 bits, RGB/RGBA, sem entrelaçamento, deflate válido).
+  // Garante que a composição vai conseguir ler a logo (8 bits, RGB/RGBA, sem entrelaçamento, deflate válido). O lerPng
+  // também recusa IHDR repetido e lado acima do teto, e não descomprime além do tamanho declarado.
   try {
-    await lerPng(bytes);
+    await lerPng(bytes, LOGO_LADO_MAX);
   } catch (e) {
     console.error("Logo: PNG ilegível:", msg(e));
     throw new ErroHttp(400, LOGO_ILEGIVEL);

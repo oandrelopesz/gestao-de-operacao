@@ -234,6 +234,9 @@ export type TamanhoLogo = (typeof TAMANHOS_LOGO)[number];
 export const FUNDOS_LOGO = ["nenhum", "claro", "escuro"] as const;
 export type FundoLogo = (typeof FUNDOS_LOGO)[number];
 
+/** Maior lado (largura ou altura, em pixels) de uma logo em PNG: a ação `logo` recusa acima disso e a composição não lê mais que isso. */
+export const LOGO_LADO_MAX = 2048;
+
 export const ROTULO_POSICAO_LOGO: Record<PosicaoLogo, string> = {
   superior_esquerdo: "Canto superior esquerdo", superior_direito: "Canto superior direito",
   inferior_esquerdo: "Canto inferior esquerdo", inferior_direito: "Canto inferior direito",
@@ -435,7 +438,7 @@ export function montarPromptImagem(e: EntradaImagem): string {
     "Sem marcas d'água. Sem logos ou marcas de terceiros. Sem placas de carro legíveis.",
     "Aparência de fotografia real e profissional, em formato paisagem.",
     e.cantoLivre
-      ? `Deixe o canto ${ROTULO_POSICAO_LOGO[e.cantoLivre].replace(/^Canto /, "").toLowerCase()} da imagem limpo, com fundo simples e sem nenhum objeto importante: a logo da marca será aplicada ali depois.`
+      ? `Deixe o canto ${ROTULO_POSICAO_LOGO[e.cantoLivre].replace(/^Canto /, "").toLowerCase()} da imagem limpo, com fundo simples e sem nenhum objeto importante: esse espaço ficará reservado.`
       : "",
     e.versaoAnterior && (e.versaoAnterior.tem_pessoas || e.versaoAnterior.tem_texto)
       ? `A versão anterior tinha ${

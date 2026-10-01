@@ -10,11 +10,10 @@ export function openaiConfigurada(): boolean {
   return !!Deno.env.get("OPENAI_API_KEY");
 }
 
-/** `json: false` no envio multipart: o fetch define o Content-Type (com o boundary) sozinho. */
-function cabecalhos(json = true): HeadersInit {
+function cabecalhos(): HeadersInit {
   const chave = Deno.env.get("OPENAI_API_KEY");
   if (!chave) throw new Error("Falta o secret OPENAI_API_KEY.");
-  return json ? { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" } : { Authorization: `Bearer ${chave}` };
+  return { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" };
 }
 
 /** Mensagem fixa em português pelo status; o detalhe da OpenAI (em inglês) vai só para o log. */
@@ -29,19 +28,17 @@ function erroOpenai(status: number, detalhe: { error?: { message?: string } }): 
 }
 
 /**
- * POST na OpenAI com o prazo da chamada (`ms`) e o prazo total; devolve o JSON da resposta.
- * `corpo` que é FormData vai como multipart; qualquer outro valor vai como JSON.
+ * POST na OpenAI com o prazo da chamada (`ms`) e o prazo total; o `corpo` vai como JSON e a resposta volta como JSON.
  */
 async function chamar(
   caminho: string, corpo: unknown, ms: number, total: AbortSignal | undefined, o: "texto" | "imagem",
 ): Promise<any> {
-  const multipart = corpo instanceof FormData;
-  const headers = cabecalhos(!multipart);
+  const headers = cabecalhos();
   let r: Response;
   let d: any;
   try {
     r = await fetch(`${BASE}${caminho}`, {
-      method: "POST", headers, body: multipart ? corpo : JSON.stringify(corpo), signal: sinal(ms, total),
+      method: "POST", headers, body: JSON.stringify(corpo), signal: sinal(ms, total),
     });
     // O sinal vale também para a leitura do corpo; corpo que não é JSON cai nas checagens de resposta vazia abaixo.
     d = await r.json().catch((e) => {

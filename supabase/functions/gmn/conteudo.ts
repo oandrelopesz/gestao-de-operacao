@@ -2,7 +2,7 @@
 // deno-lint-ignore-file no-explicit-any
 import {
   ESQUEMA_POST, base64ParaBytes, checarTexto, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras,
-  idPastaDrive, montarMensagensPost, montarPromptImagem, normalizarBriefing, opcoesDaLogo, proximoTema, type Tema,
+  idPastaDrive, montarMensagensPost, montarPromptImagem, normalizarBriefing, opcoesDaLogo, proximoTema, LOGO_LADO_MAX, type Tema,
 } from "./regras.ts";
 import { checarImagem, gerarImagem, gerarJson } from "./openai.ts";
 import { lerPng, gravarPng } from "./png.ts";
@@ -51,12 +51,20 @@ async function imagemDoDrive(sb: Sb, perfil: any, postId: string, total?: AbortS
 const LOGO_BAIXAR_MAX_BYTES = 6 * 1024 * 1024;
 const AVISO_LOGO = "Não foi possível usar a logo do perfil.";
 const AVISO_APLICAR_LOGO = "Não foi possível aplicar a logo na imagem.";
+const AVISO_LOGO_ANTIGA = "Envie a logo do perfil de novo: o formato antigo não é mais aceito.";
+const AVISO_FORMATO_IA = "A OpenAI devolveu a imagem num formato inesperado.";
 const ASSINATURA_PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+const ehPng = (b: Uint8Array) => ASSINATURA_PNG.every((v, i) => b[i] === v);
+
+/** Erro cuja mensagem já é o aviso final, em português fixo (nada em inglês de biblioteca ou da OpenAI chega à tela). */
+class ErroDeAviso extends Error {}
 
 /**
  * Baixa a logo do perfil (PNG). Só aceita URL do próprio bucket (`R2_PUBLIC_BASE`, onde a ação `logo` grava) e arquivo de
- * até 6 MB (conferido pelo `Content-Length` e pelo tamanho lido) que comece com a assinatura PNG. Qualquer falha lança:
- * sem a logo a imagem da IA não sai, porque a logo é obrigatória quando existe.
+ * até 6 MB (conferido pelo `Content-Length` e pelo tamanho lido) que comece com a assinatura PNG (logo antiga em JPG lança
+ * um `ErroDeAviso` pedindo o reenvio). Qualquer falha lança: sem a logo a imagem da IA não sai, porque a logo é obrigatória
+ * quando existe.
  */
 async function baixarLogo(url: string, total?: AbortSignal): Promise<Uint8Array> {
   const base = (Deno.env.get("R2_PUBLIC_BASE") ?? "").replace(/\/+$/, "");
@@ -66,7 +74,20 @@ async function baixarLogo(url: string, total?: AbortSignal): Promise<Uint8Array>
   if (Number(r.headers.get("content-length")) > LOGO_BAIXAR_MAX_BYTES) throw new Error("logo grande demais");
   const bytes = new Uint8Array(await r.arrayBuffer());
   if (bytes.length > LOGO_BAIXAR_MAX_BYTES) throw new Error("logo grande demais");
-  if (!ASSINATURA_PNG.every((b, i) => bytes[i] === b)) throw new Error("logo não é PNG");
+  if (!ehPng(bytes)) throw new ErroDeAviso(AVISO_LOGO_ANTIGA);
+  return bytes;
+}
+
+/** Bytes da imagem que a OpenAI devolveu; base64 inválido ou conteúdo que não é PNG vira um aviso fixo (detalhe só no log). */
+function bytesDaImagemDaIa(b64: string): Uint8Array {
+  let bytes: Uint8Array;
+  try {
+    bytes = base64ParaBytes(b64);
+  } catch (e) {
+    console.error("Imagem da IA com base64 inválido:", msg(e));
+    throw new ErroDeAviso(AVISO_FORMATO_IA);
+  }
+  if (!ehPng(bytes)) throw new ErroDeAviso(AVISO_FORMATO_IA);
   return bytes;
 }
 
@@ -78,7 +99,8 @@ const AVISO_LINK_DRIVE = "O link da pasta do Drive não foi reconhecido.";
  * (logo que não baixa: sem imagem e com aviso). A imagem da IA passa sempre por uma checagem, ainda sem a logo (pessoas e
  * texto em destaque; com `permitir_pessoas_ia` só o texto reprova): reprovada, gera de novo uma vez, só se sobrar tempo
  * até `prazoFinal`; se ainda reprovar (ou não der tempo), o post fica sem imagem e com aviso. Checagem que falha também
- * deixa o post sem imagem (não dá para garantir que não há pessoas). Logo que não dá para aplicar: sem imagem e com aviso.
+ * deixa o post sem imagem (não dá para garantir que não há pessoas). Logo que não dá para aplicar, ou imagem da OpenAI que
+ * não é PNG: sem imagem e com aviso.
  */
 async function imagemDaIa(
   perfil: any, postId: string, tema: Tema, prazoFinal: number, total?: AbortSignal,
@@ -91,7 +113,7 @@ async function imagemDaIa(
       logoPng = await baixarLogo(String(perfil.logo_url), total);
     } catch (e) {
       console.error("Logo do perfil:", msg(e));
-      return { imagem: null, aviso: AVISO_LOGO };
+      return { imagem: null, aviso: e instanceof ErroDeAviso ? e.message : AVISO_LOGO };
     }
   }
   let versaoAnterior: { tem_pessoas: boolean; tem_texto: boolean } | null = null;
@@ -110,15 +132,18 @@ async function imagemDaIa(
       versaoAnterior = permitirPessoas ? { tem_pessoas: false, tem_texto: c.tem_texto } : c;
       continue;
     }
-    let bytes = base64ParaBytes(b64);
-    if (logoPng) {
-      try {
-        const final = aplicarLogo(await lerPng(bytes), await lerPng(logoPng), opcoes);
-        bytes = await gravarPng(final);
-      } catch (e) {
-        console.error("Aplicar a logo:", msg(e));
-        return { imagem: null, aviso: AVISO_APLICAR_LOGO };
+    let bytes: Uint8Array;
+    try {
+      bytes = bytesDaImagemDaIa(b64);
+      if (logoPng) {
+        const inicio = Date.now();
+        bytes = await gravarPng(aplicarLogo(await lerPng(bytes), await lerPng(logoPng, LOGO_LADO_MAX), opcoes));
+        // Medida em produção: mostra quanto da CPU do isolate a composição usa (o Deno pode ser mais lento que o Node).
+        console.log("Logo aplicada em", Date.now() - inicio, "ms");
       }
+    } catch (e) {
+      console.error("Imagem da IA ou aplicação da logo:", msg(e));
+      return { imagem: null, aviso: e instanceof ErroDeAviso ? e.message : AVISO_APLICAR_LOGO };
     }
     const chave = `${perfil.id}/${postId}.png`;
     const url = await enviarR2(chave, bytes, "image/png", total);

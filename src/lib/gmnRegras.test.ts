@@ -349,8 +349,11 @@ test("montarPromptImagem: com canto livre pede o canto limpo e nunca fala em des
   const base = { nome: "Loja", categoria: "Loja de carros", briefing: BRIEFING_VAZIO, tema: "servico" as const, contextoImagens: null, permitirPessoas: false };
   const com = montarPromptImagem({ ...base, cantoLivre: "inferior_direito" });
   assert.match(com, /Deixe o canto inferior direito da imagem limpo/);
-  assert.match(com, /Sem texto, letras, números, preços ou slogans na arte./);
+  assert.match(com, /Sem texto, letras, números, preços ou slogans na arte\./);
   assert.doesNotMatch(com, /referência|aplique-a|exceto a própria logo/i);
+  // A IA não fica sabendo da logo: o pedido do canto não a menciona (só "Sem logos ou marcas de terceiros" fala de logo).
+  assert.doesNotMatch(com.replace("Sem logos ou marcas de terceiros.", ""), /logo/i);
+  assert.doesNotMatch(com.match(/Deixe o canto[^.]*\./)?.[0] ?? "", /logo/i);
   const sem = montarPromptImagem({ ...base, cantoLivre: null });
   assert.doesNotMatch(sem, /Deixe o canto/);
   assert.match(sem, /Sem pessoas/);
@@ -359,7 +362,7 @@ test("montarPromptImagem: com canto livre pede o canto limpo e nunca fala em des
 test("montarPromptImagem: o canto livre segue a posição escolhida e as regras fixas valem com e sem logo", () => {
   const base = { nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico" as const, contextoImagens: null, permitirPessoas: false };
   const canto = (c: PosicaoLogo) => montarPromptImagem({ ...base, cantoLivre: c });
-  assert.match(canto("superior_esquerdo"), /Deixe o canto superior esquerdo da imagem limpo, com fundo simples e sem nenhum objeto importante: a logo da marca será aplicada ali depois./);
+  assert.match(canto("superior_esquerdo"), /Deixe o canto superior esquerdo da imagem limpo, com fundo simples e sem nenhum objeto importante: esse espaço ficará reservado\./);
   assert.match(canto("superior_direito"), /Deixe o canto superior direito da imagem limpo/);
   assert.match(canto("inferior_esquerdo"), /Deixe o canto inferior esquerdo da imagem limpo/);
   for (const c of ["superior_esquerdo", "inferior_direito"] as const) {

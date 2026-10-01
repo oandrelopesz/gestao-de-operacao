@@ -37,8 +37,38 @@ function paeth(a: number, b: number, c: number): number {
   return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
 }
 
-/** Lê um PNG de 8 bits, RGB (tipo 2) ou RGBA (tipo 6), sem entrelaçamento. Outro formato lança erro. */
-export async function lerPng(bytes: Uint8Array): Promise<ImagemRgba> {
+/** Lado máximo (largura ou altura) que `lerPng` aceita quando o chamador não informa outro. */
+export const LADO_MAX_PADRAO = 4096;
+
+/**
+ * Descomprime só até `esperado` bytes e cancela o resto do fluxo: um arquivo pequeno que descomprime para centenas de MB
+ * (bomba de deflate) não chega a ocupar memória além do tamanho que o IHDR declara. Fluxo mais curto que isso lança erro.
+ */
+async function inflarAte(bytes: Uint8Array, esperado: number): Promise<Uint8Array> {
+  const leitor = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate")).getReader();
+  const out = new Uint8Array(esperado);
+  let n = 0;
+  try {
+    while (n < esperado) {
+      const { done, value } = await leitor.read();
+      if (done) break;
+      const parte = value.subarray(0, esperado - n);
+      out.set(parte, n);
+      n += parte.length;
+    }
+  } finally {
+    await leitor.cancel().catch(() => {});
+  }
+  if (n < esperado) throw new Error("PNG corrompido");
+  return out;
+}
+
+/**
+ * Lê um PNG de 8 bits, RGB (tipo 2) ou RGBA (tipo 6), sem entrelaçamento. Outro formato lança erro. O IHDR só vale como
+ * primeiro bloco e uma vez; lado maior que `ladoMax` é recusado antes de descomprimir; a descompressão para no tamanho
+ * declarado (ver `inflarAte`). Deflate corrompido pode lançar erro do próprio stream: quem chama precisa de try/catch.
+ */
+export async function lerPng(bytes: Uint8Array, ladoMax = LADO_MAX_PADRAO): Promise<ImagemRgba> {
   if (!ASSINATURA.every((v, i) => bytes[i] === v)) throw new Error("não é PNG");
   let largura = 0, altura = 0, tipo = -1;
   const idat: Uint8Array[] = [];
@@ -47,12 +77,14 @@ export async function lerPng(bytes: Uint8Array): Promise<ImagemRgba> {
     const nome = String.fromCharCode(bytes[i + 4], bytes[i + 5], bytes[i + 6], bytes[i + 7]);
     const ini = i + 8;
     if (nome === "IHDR") {
+      if (i !== 8 || tam !== 13 || largura) throw new Error("PNG inválido");
       largura = u32(bytes, ini);
       altura = u32(bytes, ini + 4);
       const prof = bytes[ini + 8];
       tipo = bytes[ini + 9];
       const entrelacado = bytes[ini + 12];
       if (prof !== 8 || (tipo !== 2 && tipo !== 6) || entrelacado !== 0) throw new Error("PNG em formato não suportado");
+      if (largura > ladoMax || altura > ladoMax) throw new Error("PNG grande demais");
     } else if (nome === "IDAT") {
       idat.push(bytes.subarray(ini, ini + tam));
     } else if (nome === "IEND") break;
@@ -62,10 +94,9 @@ export async function lerPng(bytes: Uint8Array): Promise<ImagemRgba> {
   const comprimido = new Uint8Array(idat.reduce((s, p) => s + p.length, 0));
   let o = 0;
   for (const p of idat) { comprimido.set(p, o); o += p.length; }
-  const cru = await transformar(comprimido, new DecompressionStream("deflate"));
   const bpp = tipo === 6 ? 4 : 3;
   const linha = largura * bpp;
-  if (cru.length < altura * (linha + 1)) throw new Error("PNG corrompido");
+  const cru = await inflarAte(comprimido, altura * (linha + 1));
   const px = new Uint8Array(altura * linha);
   for (let y = 0; y < altura; y++) {
     const filtro = cru[y * (linha + 1)];
