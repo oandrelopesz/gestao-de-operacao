@@ -13,15 +13,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  enviarLogo, excluirPerfil, gerarBriefingIa, gerarPrevia, removerLogo, salvarBriefing, salvarPerfil, traduzErroGmn,
-  type ClienteOpcao, type CtaTipo, type PerfilGmn,
+  adicionarImagemSite, buscarFotosNoSite, buscarLogosNoSite, enviarLogo, excluirPerfil, gerarBriefingIa, gerarPrevia,
+  removerImagemSite, removerLogo, salvarBriefing, salvarPerfil, traduzErroGmn, usarLogoDoSite,
+  type CandidatoSite, type ClienteOpcao, type CtaTipo, type PerfilGmn,
 } from "@/lib/gmn";
 import {
   DIAS_CURTOS, HORARIOS, alternarDia, alternarImagem, comUtm, idPastaDrive, mesmoHorario, mudarHora, normalizarAgenda,
-  normalizarBriefing, type Briefing, type ItemAgenda,
+  normalizarBriefing, type Briefing, type ImagemSite, type ItemAgenda,
 } from "../../../supabase/functions/gmn/regras.ts";
 import { AbaContexto } from "./AbaContexto";
-import { AbaImagens, type LogoOcupada } from "./AbaImagens";
+import { AbaImagens, type AcoesSite, type EstadoSite, type LogoOcupada } from "./AbaImagens";
 import { GerarBriefingDialog } from "./GerarBriefingDialog";
 import { PostsLista, type PreviaGerando } from "./PostsLista";
 
@@ -48,10 +49,13 @@ function ajustesContexto(d: PerfilGmn, b: Briefing) {
   return { contexto_posts: vazioNulo(d.contexto_posts), briefing: normalizarBriefing(b), saude: d.saude, cliente_id: d.cliente_id };
 }
 
-/** O que "Salvar imagens" grava (o arquivo da logo é gravado no envio, fora daqui; posição, tamanho e fundo entram). */
+/**
+ * O que "Salvar imagens" grava. O arquivo da logo (`logo_url`, `logo_origem_url`) e a lista de fotos do site marcadas
+ * (`imagens_site`) são gravados na hora, fora daqui; posição, tamanho e fundo da logo e a chave das fotos do site entram.
+ */
 function ajustesImagens(d: PerfilGmn) {
   return {
-    drive_pasta_url: vazioNulo(d.drive_pasta_url), usa_ia_imagem: d.usa_ia_imagem,
+    drive_pasta_url: vazioNulo(d.drive_pasta_url), usa_ia_imagem: d.usa_ia_imagem, usa_fotos_site: d.usa_fotos_site,
     contexto_imagens: vazioNulo(d.contexto_imagens), permitir_pessoas_ia: d.permitir_pessoas_ia,
     logo_posicao: d.logo_posicao, logo_tamanho: d.logo_tamanho, logo_fundo: d.logo_fundo,
   };
@@ -73,6 +77,12 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
   const [salvando, setSalvando] = useState<"contexto" | "imagens" | "config" | null>(null);
   const [extraindo, setExtraindo] = useState(false);
   const [logoOcupada, setLogoOcupada] = useState<LogoOcupada>(null);
+  // Busca no site (aba Imagens): os resultados são só da tela (somem ao fechar a gaveta); nada disso é rascunho nem é gravado.
+  const [logosDoSite, setLogosDoSite] = useState<CandidatoSite[] | null>(null);
+  const [fotosDoSite, setFotosDoSite] = useState<CandidatoSite[] | null>(null);
+  const [buscandoSite, setBuscandoSite] = useState<EstadoSite["buscando"]>(null);
+  const [logoEmGravacao, setLogoEmGravacao] = useState<string | null>(null);
+  const [fotoEmGravacao, setFotoEmGravacao] = useState<EstadoSite["fotoEmGravacao"]>(null);
   const [previaGerando, setPreviaGerando] = useState<PreviaGerando>(null);
   const [postsVersao, setPostsVersao] = useState(0);
   const [substituir, setSubstituir] = useState(false);
@@ -90,6 +100,9 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
   // for a mesma em que o pedido começou: o resultado velho não entra no rascunho novo, nem o fim de um pedido antigo
   // destrava a espera de um pedido novo.
   const sessaoRef = useRef(0);
+  // Gravação de foto do site em curso (de qualquer sessão): a função acrescenta à lista lendo e regravando, então duas
+  // gravações ao mesmo tempo poderiam perder uma. A espera da tela volta ao início com a sessão; este guarda, não.
+  const fotoEmCursoRef = useRef(false);
   if (chave !== chaveAtual) {
     sessaoRef.current += 1;
     setChave(chaveAtual);
@@ -97,6 +110,11 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
     setSalvando(null);
     setExtraindo(false);
     setLogoOcupada(null);
+    setLogosDoSite(null);
+    setFotosDoSite(null);
+    setBuscandoSite(null);
+    setLogoEmGravacao(null);
+    setFotoEmGravacao(null);
     setPreviaGerando(null);
     setSubstituir(false);
     if (perfil && chaveAtual) {
@@ -245,6 +263,79 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
     }
   }
 
+  // Busca no site: só lê e classifica (não grava nada). O resultado e a espera valem só na sessão em que o pedido começou.
+  async function buscarNoSite(tipo: "logos" | "fotos") {
+    const id = perfil!.id;
+    const mesma = iniciarPedido();
+    setBuscandoSite(tipo);
+    try {
+      const lista = tipo === "logos" ? await buscarLogosNoSite(id) : await buscarFotosNoSite(id);
+      if (!mesma()) return; // a gaveta foi fechada ou trocou de perfil: o resultado é do site de outra sessão
+      if (tipo === "logos") setLogosDoSite(lista);
+      else setFotosDoSite(lista);
+    } catch (e) {
+      if (mesma()) toast.error(traduzErroGmn(e));
+    } finally {
+      if (mesma()) setBuscandoSite(null);
+    }
+  }
+
+  // Usar uma logo achada no site grava como o envio do computador (na hora), só que guardando de onde ela veio. Como lá, o
+  // rascunho é atualizado se a gaveta ainda estiver no mesmo perfil; só a espera fica presa à sessão do pedido.
+  async function usarLogoDoSitePerfil(c: CandidatoSite) {
+    const id = perfil!.id;
+    const mesma = iniciarPedido();
+    setLogoOcupada("usando");
+    setLogoEmGravacao(c.url);
+    try {
+      const url = await usarLogoDoSite(id, c.url);
+      setDados((d) => (d && d.id === id ? { ...d, logo_url: url, logo_origem_url: c.url } : d));
+      toast.success("Logo do site em uso.");
+      onMudou();
+    } catch (e) {
+      toast.error(traduzErroGmn(e));
+    } finally {
+      if (mesma()) {
+        setLogoOcupada(null);
+        setLogoEmGravacao(null);
+      }
+    }
+  }
+
+  // Marcar e desmarcar fotos do site gravam na hora (fora do "Salvar imagens") e uma por vez: a lista nova vem do servidor
+  // (marcar) ou é a lista atual sem a foto (desmarcar), e entra no rascunho se a gaveta ainda estiver no mesmo perfil.
+  async function gravarFotoDoSite(origem: string, acao: "marcando" | "removendo", gravar: () => Promise<ImagemSite[]>, aviso: string) {
+    if (fotoEmCursoRef.current) return toast.info("Aguarde: outra foto do site ainda está sendo gravada.");
+    fotoEmCursoRef.current = true;
+    const id = perfil!.id;
+    const mesma = iniciarPedido();
+    setFotoEmGravacao({ origem, acao });
+    try {
+      const lista = await gravar();
+      setDados((d) => (d && d.id === id ? { ...d, imagens_site: lista } : d));
+      toast.success(aviso);
+      onMudou();
+    } catch (e) {
+      toast.error(traduzErroGmn(e));
+    } finally {
+      fotoEmCursoRef.current = false;
+      if (mesma()) setFotoEmGravacao(null);
+    }
+  }
+
+  function marcarFotoDoSite(c: CandidatoSite) {
+    const id = perfil!.id;
+    return gravarFotoDoSite(c.url, "marcando", () => adicionarImagemSite(id, c), "Foto marcada para os posts.");
+  }
+
+  function desmarcarFotoDoSite(imagemId: string) {
+    const id = perfil!.id;
+    const lista = dados!.imagens_site;
+    const foto = lista.find((i) => i.id === imagemId);
+    if (!foto) return;
+    return gravarFotoDoSite(foto.origem_url, "removendo", () => removerImagemSite(id, lista, imagemId), "Foto desmarcada.");
+  }
+
   async function gerarPreviaDoPerfil(comImagem: boolean) {
     const id = perfil!.id;
     const mesma = iniciarPedido();
@@ -283,6 +374,13 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
 
   const set = (patch: Partial<PerfilGmn>) => setDados((d) => (d ? { ...d, ...patch } : d));
   const gravando = salvando !== null; // enquanto uma gravação roda, nenhum botão de salvar fica livre
+  const estadoSite: EstadoSite = {
+    logos: logosDoSite, fotos: fotosDoSite, buscando: buscandoSite, logoEmGravacao, fotoEmGravacao,
+  };
+  const acoesSite: AcoesSite = {
+    onBuscarLogos: () => buscarNoSite("logos"), onBuscarFotos: () => buscarNoSite("fotos"),
+    onUsarLogo: usarLogoDoSitePerfil, onMarcarFoto: marcarFotoDoSite, onDesmarcarFoto: desmarcarFotoDoSite,
+  };
 
   return (
     <Sheet open={aberto} onOpenChange={(v) => !v && tentarFechar()}>
@@ -324,6 +422,8 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
           <TabsContent value="imagens">
             <AbaImagens
               dados={dados}
+              siteSalvo={vazioNulo(perfil.site)}
+              site={estadoSite}
               alterado={imagensAlteradas}
               salvando={salvando === "imagens"}
               ocupado={gravando}
@@ -331,6 +431,7 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
               onDados={set}
               onEnviarLogo={enviarLogoDoPerfil}
               onRemoverLogo={removerLogoDoPerfil}
+              acoesSite={acoesSite}
               onSalvar={gravarImagens}
             />
           </TabsContent>

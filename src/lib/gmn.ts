@@ -2,11 +2,14 @@
 // O types.ts gerado ainda não conhece as tabelas novas: por isso `as any` nos `.from(...)`.
 import { supabase } from "@/integrations/supabase/client";
 import { cabecalhosDeAcesso } from "@/lib/googleDrive";
-import { blobParaBase64, normalizarLogo } from "@/lib/gmnImagem";
+import { blobParaBase64, normalizarFoto, normalizarLogo } from "@/lib/gmnImagem";
 import {
   normalizarAgenda, normalizarBriefing, normalizarImagensSite, opcoesDaLogo,
   type Briefing, type FundoLogo, type ImagemSite, type ItemAgenda, type PosicaoLogo, type TamanhoLogo,
 } from "../../supabase/functions/gmn/regras.ts";
+import type { CandidatoSite } from "../../supabase/functions/gmn/site.ts";
+
+export type { CandidatoSite };
 
 /** Fase 1: nada é publicado no Google; o liga/desliga fica desabilitado até a API ser aprovada. */
 export const PUBLICACAO_LIBERADA = false;
@@ -35,6 +38,8 @@ export interface PerfilGmn {
   cta_url: string | null;
   drive_pasta_url: string | null;
   usa_ia_imagem: boolean;
+  /** Fotos do site nos posts: desligado (padrão), as marcadas em `imagens_site` ficam guardadas mas nunca entram num post. */
+  usa_fotos_site: boolean;
   /** Contexto completo do cliente, colado pelo André; vai inteiro para o prompt de cada post. */
   contexto_posts: string | null;
   /** Diretrizes de imagem do cliente; entram no prompt de toda imagem gerada pela IA. */
@@ -80,7 +85,7 @@ const FUNCAO = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmn`;
 const CAMPOS_PERFIL =
   "id, location_name, nome, endereco, categoria, site, telefone, cliente_id, ativo, sem_acesso, agenda, " +
   "cta_tipo, cta_url, drive_pasta_url, usa_ia_imagem, contexto_posts, contexto_imagens, logo_url, permitir_pessoas_ia, " +
-  "logo_posicao, logo_tamanho, logo_fundo, logo_origem_url, imagens_site, " +
+  "logo_posicao, logo_tamanho, logo_fundo, logo_origem_url, imagens_site, usa_fotos_site, " +
   "saude, briefing, briefing_salvo_em, created_at";
 const CAMPOS_POST = "id, perfil_id, origem, status, tema, palavras_chave, texto, imagem_origem, imagem_url, google_url, erro, created_at";
 
@@ -92,6 +97,8 @@ function comBriefing(p: any): PerfilGmn {
     // Linha sem a chave (mock, consulta antiga) vale como "logo enviada do computador".
     logo_origem_url: typeof p.logo_origem_url === "string" ? p.logo_origem_url : null,
     imagens_site: normalizarImagensSite(p.imagens_site),
+    // Só `true` liga as fotos do site (linha sem a chave ou antiga vale como desligado).
+    usa_fotos_site: p.usa_fotos_site === true,
   } as PerfilGmn;
 }
 
@@ -106,6 +113,10 @@ export function traduzErroGmn(e: unknown): string {
   // As opções da logo e as imagens do site vieram na migration das imagens.
   if (faltaNoBanco && /logo_posicao|logo_tamanho|logo_fundo|logo_origem_url|imagens_site/i.test(msg)) {
     return "As colunas novas das imagens do Google Meu Negócio (opções da logo e imagens do site) ainda não existem no banco (migration 20261001170000_gmn_imagens.sql).";
+  }
+  // A chave das fotos do site veio numa migration própria.
+  if (faltaNoBanco && /usa_fotos_site/i.test(msg)) {
+    return "A coluna das fotos do site do Google Meu Negócio ainda não existe no banco (migration 20261001190000_gmn_fotos_site.sql).";
   }
   if (/gmn_/i.test(msg) && faltaNoBanco) {
     return "As tabelas do Google Meu Negócio ainda não existem no banco (migration 20260929120000_gmn.sql).";
@@ -205,4 +216,49 @@ export async function enviarLogo(perfilId: string, arquivo: Blob, origemUrl: str
 /** Tira a logo do perfil (o arquivo antigo pode ficar no armazenamento). */
 export async function removerLogo(perfilId: string): Promise<void> {
   await chamar<{ ok: boolean }>({ acao: "remover_logo", perfil_id: perfilId });
+}
+
+/** Logos que a função acha no site salvo do perfil (a IA confere cada uma). Não grava nada. */
+export async function buscarLogosNoSite(perfilId: string): Promise<CandidatoSite[]> {
+  const d = await chamar<{ logos?: CandidatoSite[] }>({ acao: "site", perfil_id: perfilId, tipo: "logos" });
+  return Array.isArray(d.logos) ? d.logos : [];
+}
+
+/** Fotos que a função acha no site salvo do perfil (a IA confere e descreve cada uma). Não grava nada. */
+export async function buscarFotosNoSite(perfilId: string): Promise<CandidatoSite[]> {
+  const d = await chamar<{ fotos?: CandidatoSite[] }>({ acao: "site", perfil_id: perfilId, tipo: "fotos" });
+  return Array.isArray(d.fotos) ? d.fotos : [];
+}
+
+/** A imagem de outro site, baixada pela função (o navegador não pode baixar direto por causa do CORS). */
+export async function baixarImagemExterna(url: string): Promise<Blob> {
+  const headers = await cabecalhosDeAcesso();
+  const r = await fetch(FUNCAO, { method: "POST", headers, body: JSON.stringify({ acao: "baixar_imagem", url }) });
+  if (!r.ok) {
+    // Erro volta como JSON { error }; a imagem em si volta como bytes.
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `A função gmn respondeu ${r.status}`);
+  }
+  return await r.blob();
+}
+
+/** Usa uma logo encontrada no site: baixa, converte para PNG e grava (guardando de onde veio). */
+export async function usarLogoDoSite(perfilId: string, url: string): Promise<string> {
+  return await enviarLogo(perfilId, await baixarImagemExterna(url), url);
+}
+
+/** Marca uma foto do site para os posts: baixa, converte para JPG e manda guardar (a função descreve se a descrição vier curta). */
+export async function adicionarImagemSite(perfilId: string, c: CandidatoSite): Promise<ImagemSite[]> {
+  const jpg = await normalizarFoto(await baixarImagemExterna(c.url));
+  const d = await chamar<{ imagens_site: unknown }>({
+    acao: "imagem_site", perfil_id: perfilId, origem_url: c.url, descricao: c.descricao, base64: await blobParaBase64(jpg),
+  });
+  return normalizarImagensSite(d.imagens_site);
+}
+
+/** Desmarca uma foto do site (o arquivo fica no R2). Devolve a lista nova, já gravada. */
+export async function removerImagemSite(perfilId: string, lista: ImagemSite[], id: string): Promise<ImagemSite[]> {
+  const nova = lista.filter((i) => i.id !== id);
+  await salvarPerfil(perfilId, { imagens_site: nova });
+  return nova;
 }
