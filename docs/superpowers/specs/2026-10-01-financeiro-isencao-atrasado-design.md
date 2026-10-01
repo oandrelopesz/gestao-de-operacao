@@ -30,15 +30,18 @@ Um registro por fonte + mês + parcela (chave única que já existe). **Sem regi
 
 - **Meses cobrados:** de `cobranca_desde` até o mês de hoje (Brasília). Antes disso, nada é cobrado ("fora da cobrança").
 - **Parcelas de cada mês:** as da configuração atual da fonte (pagamento único = 1 parcela). Valor da parcela no mês =
-  `valor_devido` do registro, se houver; senão, o valor atual. Registro de parcela que não existe mais na configuração é
-  ignorado (como hoje).
+  `valor_devido` do registro, se houver; num registro antigo recebido, não isento e sem `valor_devido`, o
+  `valor_recebido` (a tela antiga gravava ali o valor da parcela); senão, o valor atual. Registro de parcela que não
+  existe mais na configuração é ignorado (como hoje).
 - **Situação de cada parcela no mês:**
-  - `isento`: o registro diz `isento`. O que já tinha sido pago continua contando como recebido; o resto é abonado.
-  - `recebido`: pago ≥ valor (pago = `valor_recebido`, ou o valor cheio se o registro está recebido sem valor).
+  - `recebido`: pago ≥ valor (pago = `valor_recebido`, ou o valor cheio se o registro está recebido sem valor). Vale
+    mesmo com o registro `isento` (o pagamento cobre tudo: nada é abonado).
+  - `isento`: o registro diz `isento` e o pago não cobre o valor. O que já tinha sido pago continua contando como
+    recebido; o resto é abonado.
   - `parcial`: 0 < pago < valor. Falta = valor − pago.
-  - sem pagamento: mês que já passou = `atrasado`; mês atual = `a_vencer` / `pendente` / `atrasado` pela regra de hoje
-    (5 dias de tolerância depois do vencimento).
-- **Vencida:** mês anterior ao atual, ou mês atual depois da tolerância. **Atrasado** de uma fonte = soma do que falta
+  - sem pagamento: `a_vencer` / `pendente` / `atrasado` pela regra de hoje (5 dias de tolerância depois do vencimento),
+    em qualquer mês: a parcela que venceu no fim do mês anterior ainda é `pendente` nos primeiros dias do mês seguinte.
+- **Vencida:** depois do vencimento + 5 dias de tolerância, em qualquer mês. **Atrasado** de uma fonte = soma do que falta
   nas parcelas vencidas de todos os meses cobrados (inclui o resto do parcial).
 - **Totais de um mês** (o mês escolhido na aba): previsto = soma dos valores menos o abonado; recebido = soma do pago;
   isento = soma do abonado; em aberto = soma do que falta; atrasado (cartão do topo) = atrasado de todas as fontes até
@@ -46,6 +49,7 @@ Um registro por fonte + mês + parcela (chave única que já existe). **Sem regi
 - **Mês no calendário:** pior situação das parcelas: devido (atrasado) > parcial > pendente > a vencer; todas isentas =
   isento; recebidas (com ou sem isentas) = recebido; antes de `cobranca_desde` = fora.
 - `situacaoDoMes` (usada pelo sino de avisos) passa a tratar parcela isenta como resolvida e parcial como ainda em aberto.
+  O sino não avisa fonte com `cobranca_desde` depois do mês atual (fora da cobrança) nem parcela sem nada a receber.
 
 ## 3. Ações (gravam em `financeiro_recebimentos`, upsert na chave fonte + mês + parcela)
 
@@ -81,6 +85,11 @@ Um registro por fonte + mês + parcela (chave única que já existe). **Sem regi
 
 - Mês ainda não acertado usa o valor atual da fonte: mudar o valor muda os meses em aberto; os acertados ficam como
   estavam (`valor_devido`).
+- Mudar as parcelas (quantidade, dias ou valores, ou trocar entre pagamento único e parcelado) refaz a cobrança dos meses
+  que já passaram com as parcelas novas (pode aparecer atraso que não existia). Ao editar a fonte com "Cobrar a partir de"
+  antes do mês atual, o formulário avisa e oferece "Cobrar a partir de <mês atual>"; salvar sem isso continua permitido.
+- "Cobrar a partir de" no mês atual com o (primeiro) vencimento já passado da tolerância faz o mês começar atrasado; o
+  formulário avisa embaixo do campo.
 - Fonte desativada não aparece na aba (como hoje), nem o atrasado dela.
 - O sino de avisos continua olhando só o mês atual.
 

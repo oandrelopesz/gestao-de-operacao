@@ -5,6 +5,14 @@ import type { Cobranca, RegistroRecebimento } from "@/lib/financeiroCobranca";
 const USUARIO_PADRAO = "b34bdae5-7a67-4b63-a46f-8aad43a06c63";
 const tabela = () => supabase.from("financeiro_recebimentos" as any) as any;
 
+/** Erro da nossa validação: a mensagem é para o usuário (a tela mostra no aviso no lugar do erro genérico). */
+export class ErroValidacao extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = "ErroValidacao";
+  }
+}
+
 async function usuario(): Promise<string> {
   const { data } = await supabase.auth.getUser();
   return data.user?.id ?? USUARIO_PADRAO;
@@ -39,8 +47,8 @@ function diaExiste(iso: string): boolean {
  * `dataIso` = "YYYY-MM-DD".
  */
 export async function confirmarValorRecebido(fonteId: string, c: Cobranca, valorTotal: number, dataIso: string) {
-  if (!(valorTotal > 0)) throw new Error("Informe um valor maior que zero.");
-  if (!diaExiste(dataIso)) throw new Error("Informe a data do recebimento.");
+  if (!(valorTotal > 0)) throw new ErroValidacao("Informe o valor recebido (maior que zero).");
+  if (!diaExiste(dataIso)) throw new ErroValidacao("Informe a data do recebimento.");
   await gravar(fonteId, c, {
     recebido: true, isento: false, valor_recebido: Math.round(valorTotal * 100) / 100, valor_devido: c.valor, observacoes: null,
     data_confirmacao: new Date(`${dataIso}T12:00:00-03:00`).toISOString(),

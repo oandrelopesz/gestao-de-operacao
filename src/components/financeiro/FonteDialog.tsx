@@ -23,6 +23,10 @@ import {
   ehFracionado,
   parcelasDaFonte,
   textoDoValor,
+  mudouAsParcelas,
+  nomeDoMes,
+  statusDaParcela,
+  vencimentoNoMes,
   MIN_PARCELAS,
   type TipoFonte,
   type Parcela,
@@ -145,6 +149,29 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
       setCobrancaDesdeForm(String(fonte ? (fonte.cobranca_desde ?? COBRANCA_DESDE_PADRAO) : hojeBrasilia()).slice(0, 7));
     }
   }
+
+  // Hoje e o mês atual em Brasília ("YYYY-MM-DD" e "YYYY-MM")
+  const hoje = hojeBrasilia();
+  const mesAtual = hoje.slice(0, 7);
+  // As parcelas como estão no formulário (pagamento único = uma parcela com o valor e o dia)
+  const parcelasDoFormulario: Parcela[] = fracionado
+    ? parcelasForm
+    : [{ dia: parseInt(diaTexto), valor: parseBRLInput(valorMensalTexto) }];
+  // Editar a quantidade, os dias ou os valores refaz a cobrança dos meses que já passaram (cada mês usa as parcelas
+  // atuais): com "cobrar a partir de" antes deste mês, avisa e oferece cobrar só daqui para frente
+  const avisoMesesAnteriores =
+    !!editingFonte &&
+    /^\d{4}-\d{2}$/.test(cobrancaDesdeForm) &&
+    cobrancaDesdeForm < mesAtual &&
+    mudouAsParcelas(parcelasDaFonte(editingFonte), parcelasDoFormulario);
+  // Cobrança começando neste mês com o (primeiro) vencimento já passado da tolerância: o mês nasce atrasado
+  const primeiroDia = ordenarParcelas(parcelasDoFormulario)[0]?.dia;
+  const diaDoAviso =
+    typeof primeiroDia === "number" && Number.isInteger(primeiroDia) && primeiroDia >= 1 && primeiroDia <= 31 ? primeiroDia : null;
+  const comecaAtrasado =
+    cobrancaDesdeForm === mesAtual &&
+    diaDoAviso !== null &&
+    statusDaParcela(vencimentoNoMes(diaDoAviso, hoje), false, hoje) === "atrasado";
 
   const alternarFracionado = (ativo: boolean) => {
     setFracionado(ativo);
@@ -345,12 +372,30 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
                     placeholder="AAAA-MM"
                     value={cobrancaDesdeForm}
                     onChange={(e) => setCobrancaDesdeForm(e.target.value)}
-                    aria-describedby="cobranca_desde_ajuda"
+                    aria-describedby={comecaAtrasado ? "cobranca_desde_ajuda cobranca_desde_atraso" : "cobranca_desde_ajuda"}
                     required
                   />
                   <p id="cobranca_desde_ajuda" className="text-xs text-muted-foreground">Meses antes disso não entram no atrasado.</p>
+                  {comecaAtrasado && (
+                    <p id="cobranca_desde_atraso" className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                      {`Com o vencimento no dia ${diaDoAviso}, este mês já começa como atrasado.`}
+                    </p>
+                  )}
                 </div>
               </div>
+              {avisoMesesAnteriores && (
+                <div
+                  role="note"
+                  className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                >
+                  <p>
+                    {"Os meses anteriores passam a ser cobrados com as parcelas novas (pode aparecer atraso que não existia). Para não mexer no que já passou, cobre a partir deste mês."}
+                  </p>
+                  <Button type="button" variant="outline" size="sm" className="whitespace-normal text-left" onClick={() => setCobrancaDesdeForm(mesAtual)}>
+                    {`Cobrar a partir de ${nomeDoMes(hoje)}`}
+                  </Button>
+                </div>
+              )}
               <div className="flex items-center space-x-2 py-2">
                 <Switch id="ativo" name="ativo" defaultChecked={editingFonte ? editingFonte.ativo : true} />
                 <Label htmlFor="ativo">Fonte ativa para faturamento</Label>

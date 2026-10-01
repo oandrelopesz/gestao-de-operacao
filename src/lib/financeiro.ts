@@ -43,6 +43,8 @@ export interface FonteDoMes {
   dia_recebimento: number;
   parcelas?: Parcela[] | null;
   recebimentos_mes?: RecebimentoMes[] | null;
+  /** Primeiro mês cobrado ("YYYY-MM-DD"); antes dele a fonte está fora da cobrança. */
+  cobranca_desde?: string | null;
 }
 
 export interface ParcelaDoMes extends Parcela {
@@ -132,6 +134,19 @@ const CENTAVO = 0.005;
 /** Arredonda em centavos (soma de valores quebrados não pode sair 0,30000000000000004). */
 const arred = (v: number) => Math.round(v * 100) / 100;
 
+/**
+ * Valor da parcela congelado no registro: `valor_devido`; num registro antigo recebido e não isento sem ele (a tela
+ * antiga gravava o valor da parcela em `valor_recebido`), o que foi recebido. Sem nada congelado: null (vale o atual).
+ */
+export function valorDevidoDoRegistro(
+  registro: { recebido?: boolean | null; isento?: boolean | null; valor_recebido?: number | null; valor_devido?: number | null } | null | undefined,
+): number | null {
+  if (!registro) return null;
+  if (registro.valor_devido != null) return Number(registro.valor_devido);
+  if (registro.recebido && !registro.isento && registro.valor_recebido != null) return Number(registro.valor_recebido);
+  return null;
+}
+
 export function situacaoDoMes(fonte: FonteDoMes, hoje: string): SituacaoDoMes {
   const lista = parcelasDaFonte(fonte);
   const recebimentos = fonte.recebimentos_mes || [];
@@ -139,11 +154,12 @@ export function situacaoDoMes(fonte: FonteDoMes, hoje: string): SituacaoDoMes {
     const recebimento = recebimentos.find((r) => r.parcela === i + 1) || null;
     const vencimento = vencimentoNoMes(p.dia, hoje);
     // O valor congelado no acerto vence o atual; o pago conta no máximo o devido (o excesso não abate outra parcela)
-    const devido = arred(Number(recebimento?.valor_devido ?? p.valor));
+    const devido = arred(valorDevidoDoRegistro(recebimento) ?? p.valor);
     const pago = recebimento?.recebido ? arred(Math.max(0, Math.min(Number(recebimento.valor_recebido ?? devido), devido))) : 0;
-    const isenta = !!recebimento?.isento;
     // Recebido de verdade só quando o pago cobre o devido; valor menor é parcial e a parcela segue em aberto pela data
     const quitada = !!recebimento?.recebido && pago >= devido - CENTAVO;
+    // Quitada vale mais que a isenção: isenta com o pagamento cobrindo o devido é recebida (nada abonado)
+    const isenta = !!recebimento?.isento && !quitada;
     const status: StatusMes = isenta ? "isento" : statusDaParcela(vencimento, quitada, hoje);
     const falta = isenta || quitada ? 0 : arred(devido - pago);
     const abonado = isenta ? arred(devido - pago) : 0;
@@ -163,23 +179,12 @@ export function situacaoDoMes(fonte: FonteDoMes, hoje: string): SituacaoDoMes {
 }
 
 /**
- * Cartões do topo: valores somados por parcela, contagens por fonte. O previsto não inclui o que a isenção abonou;
- * fonte isenta conta como resolvida (junto com a recebida), não como em aberto.
+ * Parcelas do mês de `hoje` que o sino avisa: pendentes ou atrasadas com algo ainda a receber, só de fonte já cobrada
+ * neste mês ("cobrar a partir de" depois do mês atual = fora da cobrança, como na aba).
  */
-export function resumoDoMes(fontes: FonteDoMes[], hoje: string) {
-  const situacoes = fontes.map((f) => situacaoDoMes(f, hoje));
-  const soma = (valor: (s: SituacaoDoMes) => number) => arred(situacoes.reduce((t, s) => t + valor(s), 0));
-  const resolvida = (s: SituacaoDoMes) => s.status === "recebido" || s.status === "isento";
-  return {
-    previsto: soma((s) => s.parcelas.reduce((t, p) => t + p.devido - p.abonado, 0)),
-    recebido: soma((s) => s.valorRecebido),
-    emAberto: soma((s) => s.valorEmAberto),
-    atrasado: soma((s) => s.valorAtrasado),
-    fontes: fontes.length,
-    fontesRecebidas: situacoes.filter(resolvida).length,
-    fontesEmAberto: situacoes.filter((s) => !resolvida(s)).length,
-    fontesAtrasadas: situacoes.filter((s) => s.status === "atrasado").length,
-  };
+export function parcelasParaAvisar(fonte: FonteDoMes, hoje: string): ParcelaDoMes[] {
+  if (fonte.cobranca_desde && String(fonte.cobranca_desde).slice(0, 7) > hoje.slice(0, 7)) return [];
+  return situacaoDoMes(fonte, hoje).parcelas.filter((p) => (p.status === "pendente" || p.status === "atrasado") && p.falta > 0);
 }
 
 // ---- Formulário
@@ -236,6 +241,18 @@ export function validarParcelas(parcelas: Parcela[]): string | null {
 
 export function ordenarParcelas(parcelas: Parcela[]): Parcela[] {
   return [...parcelas].sort(porDia);
+}
+
+/**
+ * A configuração do pagamento mudou? Quantidade, dias ou valores (em centavos); trocar entre pagamento único e parcelado
+ * muda a quantidade. A forma de pagamento não conta.
+ */
+export function mudouAsParcelas(antes: Parcela[], depois: Parcela[]): boolean {
+  const a = ordenarParcelas(antes);
+  const b = ordenarParcelas(depois);
+  if (a.length !== b.length) return true;
+  const centavos = (v: number) => Math.round((Number(v) || 0) * 100);
+  return a.some((p, i) => Number(p.dia) !== Number(b[i].dia) || centavos(p.valor) !== centavos(b[i].valor));
 }
 
 /** Valor em reais no formato da máscara de moeda ("3.500,00"); a máscara lê dígitos como centavos. */

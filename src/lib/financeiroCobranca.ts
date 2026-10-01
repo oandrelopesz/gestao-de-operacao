@@ -1,7 +1,7 @@
 // Cobrança mês a mês de cada fonte do Financeiro: de "cobrar a partir de" até o mês atual, cada parcela de cada mês com
 // o que foi pago, o que falta, o que foi abonado (isento) e se já venceu. Puro (sem Supabase/React): roda no navegador e no
 // node --test. Datas "YYYY-MM-DD" e meses "YYYY-MM" de Brasília.
-import { nomeDoMes, parcelasDaFonte, statusDaParcela, vencimentoNoMes, type FonteDoMes } from "./financeiro.ts";
+import { nomeDoMes, parcelasDaFonte, statusDaParcela, valorDevidoDoRegistro, vencimentoNoMes, type FonteDoMes } from "./financeiro.ts";
 
 export type FormaPagamento = "pix" | "cartao" | "boleto";
 export const FORMAS_DE_PAGAMENTO: Record<FormaPagamento, string> = { pix: "PIX", cartao: "Cartão", boleto: "Boleto" };
@@ -107,28 +107,31 @@ export function parcelasComForma(fonte: FonteCobravel) {
  */
 export function cobrancasDaFonte(fonte: FonteCobravel, registros: RegistroRecebimento[], hoje: string): Cobranca[] {
   const parcelas = parcelasComForma(fonte);
-  const mesAtual = hoje.slice(0, 7);
   const out: Cobranca[] = [];
   for (const mes of mesesCobrados(fonte.cobranca_desde, hoje)) {
     parcelas.forEach((p, i) => {
       const numero = i + 1;
       const registro = registros.find((r) => r.mes_referencia.slice(0, 7) === mes && (r.parcela ?? 1) === numero) ?? null;
-      const valor = arred(registro?.valor_devido != null ? Number(registro.valor_devido) : p.valor);
+      const valor = arred(valorDevidoDoRegistro(registro) ?? p.valor);
       const pagoInformado = registro?.recebido ? Number(registro.valor_recebido ?? valor) : 0;
       const pago = arred(Math.max(0, Math.min(pagoInformado, valor)));
       const vencimento = vencimentoNoMes(p.dia, `${mes}-01`);
-      const vencida = mes < mesAtual || statusDaParcela(vencimento, false, hoje) === "atrasado";
+      // A mesma tolerância em qualquer mês: vencida só depois do vencimento + 5 dias (vencida no dia 30, ainda é
+      // pendente nos primeiros dias do mês seguinte)
+      const semPagamento = statusDaParcela(vencimento, false, hoje) as SituacaoCobranca;
+      const vencida = semPagamento === "atrasado";
       let situacao: SituacaoCobranca;
       let falta = 0;
       let abonado = 0;
-      if (registro?.isento) {
+      if (pago >= valor - CENTAVO) {
+        // Quitada vale mais que a isenção: isenta com o pagamento cobrindo o valor é recebida (nada abonado)
+        situacao = "recebido";
+      } else if (registro?.isento) {
         situacao = "isento";
         abonado = arred(valor - pago);
-      } else if (pago >= valor - CENTAVO) {
-        situacao = "recebido";
       } else {
         falta = arred(valor - pago);
-        situacao = pago > 0 ? "parcial" : mes < mesAtual ? "atrasado" : (statusDaParcela(vencimento, false, hoje) as SituacaoCobranca);
+        situacao = pago > 0 ? "parcial" : semPagamento;
       }
       out.push({ mes, parcela: numero, total: parcelas.length, dia: p.dia, vencimento, valor, pago, falta, abonado, forma: p.forma, situacao, vencida, registro });
     });

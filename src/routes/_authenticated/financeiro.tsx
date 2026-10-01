@@ -78,6 +78,7 @@ import {
   confirmarValorCheio,
   confirmarValorRecebido,
   desfazerCobranca,
+  ErroValidacao,
   isentarCobranca,
   isentarMes,
 } from "@/lib/financeiroAcoes";
@@ -381,7 +382,8 @@ function FinanceiroPage() {
       toast.success(sucesso);
     } catch (error) {
       console.error("Erro ao salvar a cobrança:", error);
-      toast.error("Não foi possível salvar. Tente de novo.");
+      // Erro da nossa validação mostra o próprio texto; os demais (rede, banco), o genérico
+      toast.error(error instanceof ErroValidacao ? error.message : "Não foi possível salvar. Tente de novo.");
     }
     try {
       await Promise.all([fetchFinanceiro(), historicoRef.current === fonteId ? carregarHistorico(fonteId) : null]);

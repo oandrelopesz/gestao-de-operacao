@@ -75,6 +75,37 @@ test("cobrancasDaFonte: valor_devido congelado vence o valor atual; recebido sem
   assert.deepEqual([c[0].valor, c[0].pago, c[0].situacao], [800, 800, "recebido"]);
 });
 
+test("cobrancasDaFonte: a tolerância de 5 dias vale também na virada do mês", () => {
+  // vence em 30/09 e não foi paga: pendente até 05/10, atrasada a partir de 06/10
+  const dia30 = { ...unica, dia_recebimento: 30 };
+  const em1 = cobrancasDaFonte(dia30, [], "2026-10-01");
+  assert.deepEqual([em1[0].mes, em1[0].situacao, em1[0].vencida], ["2026-09", "pendente", false]);
+  assert.equal(atrasadoDe(em1).total, 0);
+  assert.equal(cobrancasDaFonte(dia30, [], "2026-10-05")[0].situacao, "pendente");
+  const em6 = cobrancasDaFonte(dia30, [], "2026-10-06");
+  assert.deepEqual([em6[0].situacao, em6[0].vencida], ["atrasado", true]);
+  assert.equal(atrasadoDe(em6).total, 1000);
+  // parcial no mês que acabou também espera a tolerância para entrar no atrasado
+  const parcial = cobrancasDaFonte(dia30, [reg({ mes: "2026-09", recebido: true, valor_recebido: 400, valor_devido: 1000 })], "2026-10-03");
+  assert.deepEqual([parcial[0].situacao, parcial[0].vencida, atrasadoDe(parcial).total], ["parcial", false, 0]);
+});
+
+test("cobrancasDaFonte: recebido antigo sem valor_devido vale o que foi recebido (a fonte subiu depois)", () => {
+  const c = cobrancasDaFonte({ ...unica, valor_mensal: 3500 }, [reg({ mes: "2026-09", recebido: true, isento: false, valor_recebido: 3400 })], "2026-10-02");
+  assert.deepEqual([c[0].valor, c[0].pago, c[0].falta, c[0].situacao], [3400, 3400, 0, "recebido"]);
+  // sem pagamento ainda vale o valor atual
+  assert.equal(c[1].valor, 3500);
+});
+
+test("cobrancasDaFonte: isenta com o pagamento cobrindo o valor é recebida, sem abono (e o Desfazer apaga o acerto)", () => {
+  const c = cobrancasDaFonte(unica, [reg({ mes: "2026-09", isento: true, recebido: true, valor_recebido: 1000, valor_devido: 1000 })], "2026-10-02");
+  assert.deepEqual([c[0].situacao, c[0].pago, c[0].falta, c[0].abonado], ["recebido", 1000, 0, 0]);
+  // recebida com registro: a linha oferece só o "Desfazer", que apaga o registro (não é "isento com pagamento")
+  assert.ok(c[0].registro);
+  assert.ok(!(c[0].situacao === "isento" && c[0].pago > 0));
+  assert.deepEqual(totaisDe([c[0]]), { previsto: 1000, recebido: 1000, isento: 0, emAberto: 0 });
+});
+
 test("cobrancasDaFonte: parcelado em ordem de dia; registro de parcela que não existe mais é ignorado", () => {
   const c = cobrancasDaFonte(parcelada, [reg({ mes: "2026-09", parcela: 3, recebido: true })], "2026-09-01");
   assert.deepEqual(c.map((x) => [x.parcela, x.dia, x.valor, x.forma, x.situacao]), [
