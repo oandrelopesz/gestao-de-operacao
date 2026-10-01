@@ -20,8 +20,8 @@ const TAMANHO_LONGA = 5;
 
 /** Sem acento, minúsculas, tudo que não é letra ou número vira um espaço só, sem espaço nas pontas. null/undefined -> "". */
 export function normalizarBusca(texto: string | null | undefined): string {
-  if (!texto) return "";
-  return texto
+  if (texto === null || texto === undefined || texto === "") return "";
+  return String(texto)
     .normalize("NFD")
     .replace(/\p{M}+/gu, "")
     .toLowerCase()
@@ -128,6 +128,8 @@ export interface OpcoesBusca {
 /** Itens preparados por `indexarBusca`. Só o que o chamador pode usar fica à mostra; o resto é interno. */
 export interface IndiceBusca<T> {
   readonly itens: readonly T[];
+  /** Marca: só um índice feito por `indexarBusca` serve (um ResultadoBusca também tem `itens`). */
+  readonly tipo: "indice-busca";
 }
 
 interface CampoIndexado {
@@ -178,7 +180,7 @@ export function indexarBusca<T>(itens: readonly T[], campos: CamposBusca<T>): In
     });
     return lista;
   });
-  const indice: IndiceInterno<T> = { itens: copia, campos: indexados };
+  const indice: IndiceInterno<T> = { tipo: "indice-busca", itens: copia, campos: indexados };
   return indice;
 }
 

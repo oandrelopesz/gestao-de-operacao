@@ -1,7 +1,8 @@
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import {
   buscarNoIndice,
   indexarBusca,
+  palavrasDaBusca,
   type CamposBusca,
   type OpcoesBusca,
   type ResultadoBusca,
@@ -13,7 +14,7 @@ import {
  *
  * - `itens`: precisa manter a mesma referência enquanto a lista não mudar (venha do useQuery/useState, ou de um useMemo).
  * - `campos`: o 1º é o campo principal (título/nome); os demais, secundários. Pode ser uma arrow nova a cada render:
- *   o índice usa sempre a mais recente, mas só é refeito quando `itens` ou `deps` mudam.
+ *   o índice só é refeito quando `itens`, `deps` ou a presença de busca mudam (sem busca, nada é indexado).
  * - `opcoes.deps`: para quando os campos dependem de outro estado (por exemplo, um mapa de nomes de cliente que chega
  *   depois). Mesmo tamanho a cada render.
  * - `opcoes.manterOrdem`: só filtra, sem reordenar (Kanban).
@@ -26,16 +27,17 @@ export function useBusca<T>(
   campos: CamposBusca<T>,
   opcoes?: OpcoesBusca & { deps?: readonly unknown[] },
 ): ResultadoBusca<T> {
-  const camposRef = useRef(campos);
-  camposRef.current = campos;
   const manterOrdem = opcoes?.manterOrdem;
+  // Sem palavras na busca não há o que indexar: a lista vale inteira (e mudar a lista, como no arrasto do Kanban, sai barato).
+  const temBusca = palavrasDaBusca(consulta).length > 0;
   const indice = useMemo(
-    () => indexarBusca(itens, (item) => camposRef.current(item)),
+    () => (temBusca ? indexarBusca(itens, campos) : null),
+    // `campos` fica de fora de propósito: costuma ser uma arrow nova a cada render; o que ele lê de outro estado vai em `deps`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [itens, ...(opcoes?.deps ?? [])],
+    [temBusca, itens, ...(opcoes?.deps ?? [])],
   );
-  return useMemo(
-    () => buscarNoIndice(indice, consulta, { manterOrdem }),
-    [indice, consulta, manterOrdem],
+  return useMemo<ResultadoBusca<T>>(
+    () => (indice ? buscarNoIndice(indice, consulta, { manterOrdem }) : { itens: itens.slice(), modo: "todos", mensagem: null }),
+    [indice, consulta, manterOrdem, itens],
   );
 }

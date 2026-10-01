@@ -445,3 +445,29 @@ test("campo longo (texto de nota) acha palavra no meio e com erro de digitação
   assert.deepEqual(titulos(achar("convercao", itens).itens), ["Ata 12"]);
   assert.deepEqual(titulos(achar("estrategia googel", itens).itens), ["Ata 12"]);
 });
+
+test("trecho curto (menos de 5 letras) acha pela metade", () => {
+  assert.deepEqual(titulos(achar("goog").itens), ["Google Ads"]);
+  assert.deepEqual(titulos(achar("pag").itens), ["Página de vendas"]);
+});
+
+test("pela metade com erro: começo do mesmo tamanho", () => {
+  assert.deepEqual(titulos(achar("otimisa").itens), ["Otimização de campanha"]);
+});
+
+test("começo de palavra só para 5 letras ou mais", () => {
+  assert.equal(achar("otmi").modo, "nenhum");
+});
+
+test("texto sem espaços só para 5 letras ou mais", () => {
+  assert.equal(achar("lead", [{ titulo: "Google Ads" }]).modo, "nenhum");
+});
+
+test("troca por letra que não existe na palavra", () => {
+  assert.deepEqual(titulos(achar("goxgle").itens), ["Google Ads"]);
+  assert.deepEqual(titulos(achar("otimyzacxo").itens), ["Otimização de campanha"]);
+});
+
+test("valor que não é texto não quebra a normalização", () => {
+  assert.equal(normalizarBusca(2026 as unknown as string), "2026");
+});
