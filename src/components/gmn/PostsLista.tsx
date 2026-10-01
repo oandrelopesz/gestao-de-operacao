@@ -1,6 +1,6 @@
-// Posts do perfil (prévias nesta fase) e o botão "Gerar prévia".
+// Posts do perfil (prévias nesta fase) e os botões "Gerar prévia com imagem" e "Gerar prévia só texto".
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, Loader2, Wand2 } from "lucide-react";
+import { ExternalLink, FileText, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,17 @@ const STATUS: Record<PostGmn["status"], string> = {
 };
 const ORIGEM_IMAGEM: Record<string, string> = { drive: "Foto do Drive", google: "Foto do Google", ia: "Imagem de IA" };
 
+/** Imagem do post; se o arquivo não carregar, não deixa uma miniatura quebrada: avisa em texto. */
+function ImagemPost({ url }: { url: string }) {
+  const [quebrou, setQuebrou] = useState(false);
+  if (quebrou) return <p className="text-xs text-muted-foreground">Imagem indisponível.</p>;
+  return <img src={url} alt="Imagem do post" className="max-h-72 w-full rounded-md object-cover" onError={() => setQuebrou(true)} />;
+}
+
 export function PostsLista({ perfil }: { perfil: PerfilGmn }) {
   const [posts, setPosts] = useState<PostGmn[] | null>(null);
-  const [gerando, setGerando] = useState(false);
+  // Qual prévia está sendo gerada: as duas ficam travadas enquanto uma roda.
+  const [gerando, setGerando] = useState<"com" | "sem" | null>(null);
   const [falhou, setFalhou] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -31,10 +39,10 @@ export function PostsLista({ perfil }: { perfil: PerfilGmn }) {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  async function previa() {
-    setGerando(true);
+  async function previa(comImagem: boolean) {
+    setGerando(comImagem ? "com" : "sem");
     try {
-      const p = await gerarPrevia(perfil.id);
+      const p = await gerarPrevia(perfil.id, comImagem);
       if (p.status === "gerado") {
         if (p.erro) toast.warning(`Prévia gerada com aviso: ${p.erro}`);
         else toast.success("Prévia pronta.");
@@ -44,18 +52,22 @@ export function PostsLista({ perfil }: { perfil: PerfilGmn }) {
     } catch (e) {
       toast.error(traduzErroGmn(e));
     } finally {
-      setGerando(false);
+      setGerando(null);
     }
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={previa} disabled={gerando || !perfil.briefing_salvo_em}>
-          {gerando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-          {gerando ? "Gerando (até 2 min)…" : "Gerar prévia"}
+        <Button onClick={() => previa(true)} disabled={gerando !== null || !perfil.briefing_salvo_em}>
+          {gerando === "com" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+          {gerando === "com" ? "Gerando (até 2 min)…" : "Gerar prévia com imagem"}
         </Button>
-        {!perfil.briefing_salvo_em && <span className="text-sm text-muted-foreground">Salve o briefing primeiro.</span>}
+        <Button variant="outline" onClick={() => previa(false)} disabled={gerando !== null || !perfil.briefing_salvo_em}>
+          {gerando === "sem" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+          {gerando === "sem" ? "Gerando (até 2 min)…" : "Gerar prévia só texto"}
+        </Button>
+        {!perfil.briefing_salvo_em && <span className="text-sm text-muted-foreground">Salve o contexto primeiro.</span>}
         <span className="text-xs text-muted-foreground">A prévia não é publicada no Google.</span>
       </div>
       {posts === null && <p className="text-sm text-muted-foreground">Carregando…</p>}
@@ -68,6 +80,7 @@ export function PostsLista({ perfil }: { perfil: PerfilGmn }) {
               <Badge variant={p.status === "erro" || p.status === "pulado" ? "destructive" : "secondary"}>{STATUS[p.status]}</Badge>
               {p.tema && <span>{ROTULO_TEMA[p.tema as Tema] ?? p.tema}</span>}
               {p.imagem_origem && <span className="text-muted-foreground">· {ORIGEM_IMAGEM[p.imagem_origem]}</span>}
+              {!p.imagem_url && p.status === "gerado" && <span className="text-muted-foreground">· Só texto</span>}
               <span className="text-muted-foreground">· {new Date(p.created_at).toLocaleString("pt-BR")}</span>
               {p.google_url && (
                 <a href={p.google_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">
@@ -75,7 +88,7 @@ export function PostsLista({ perfil }: { perfil: PerfilGmn }) {
                 </a>
               )}
             </div>
-            {p.imagem_url && <img src={p.imagem_url} alt="Imagem do post" className="max-h-72 w-full rounded-md object-cover" />}
+            {p.imagem_url && <ImagemPost key={p.imagem_url} url={p.imagem_url} />}
             {p.texto && <p className="whitespace-pre-wrap text-sm">{p.texto}</p>}
             {p.palavras_chave.length > 0 && (
               <p className="text-xs text-muted-foreground">Palavras-chave: {p.palavras_chave.join(", ")}</p>
