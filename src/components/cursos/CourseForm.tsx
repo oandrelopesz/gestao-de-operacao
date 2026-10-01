@@ -298,6 +298,25 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 name="categoria_id"
                 render={({ field }) => {
                   const selecionada = categorias.find((cat) => cat.id === field.value);
+                  // "Criar" só aparece com texto digitado e sem categoria de mesmo nome
+                  const podeCriar = !!searchQuery.trim() && !categorias.some((c) => c.nome.toLowerCase() === searchQuery.trim().toLowerCase());
+                  const grupoCriar = podeCriar ? (
+                    <CommandGroup heading="Nova categoria">
+                      <CommandItem
+                        value={`criar-${searchQuery}`}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          void handleAddCategory(searchQuery);
+                        }}
+                        onSelect={() => {
+                          void handleAddCategory(searchQuery);
+                        }}
+                        className="gap-2 text-primary cursor-pointer"
+                      >
+                        <Plus size={14} /> Criar "{searchQuery.trim()}"
+                      </CommandItem>
+                    </CommandGroup>
+                  ) : null;
                   const itemDaEntrada = (entrada: EntradaCategoria) =>
                     entrada.tipo === "remover" ? (
                       <CommandItem key="__sem_categoria" value="__sem_categoria" onSelect={() => selecionarCategoria(null)} className="text-muted-foreground">
@@ -355,6 +374,8 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                             {resultadoCategorias.modo === "nenhum" && categorias.length > 0 && (
                               <p className="px-2 py-3 text-center text-xs text-muted-foreground">{MENSAGEM_NENHUM}</p>
                             )}
+                            {/* Só parecidos: "Criar" vem primeiro, para o Enter criar o que foi digitado (os parecidos ficam logo abaixo) */}
+                            {resultadoCategorias.modo === "parecidos" && grupoCriar}
                             {resultadoCategorias.modo === "parecidos" ? (
                               <CommandGroup heading={MENSAGEM_PARECIDOS}>
                                 {resultadoCategorias.itens.map(itemDaEntrada)}
@@ -366,23 +387,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                 </CommandGroup>
                               )
                             )}
-                            {searchQuery.trim() && !categorias.some((c) => c.nome.toLowerCase() === searchQuery.trim().toLowerCase()) && (
-                              <CommandGroup heading="Nova categoria">
-                                <CommandItem
-                                  value={`criar-${searchQuery}`}
-                                  onMouseDown={(event) => {
-                                    event.preventDefault();
-                                    void handleAddCategory(searchQuery);
-                                  }}
-                                  onSelect={() => {
-                                    void handleAddCategory(searchQuery);
-                                  }}
-                                  className="gap-2 text-primary cursor-pointer"
-                                >
-                                  <Plus size={14} /> Criar "{searchQuery.trim()}"
-                                </CommandItem>
-                              </CommandGroup>
-                            )}
+                            {resultadoCategorias.modo !== "parecidos" && grupoCriar}
                             {resultadoCategorias.modo !== "parecidos" && removerDoResultado.length > 0 && (
                               <CommandGroup>{removerDoResultado.map(itemDaEntrada)}</CommandGroup>
                             )}

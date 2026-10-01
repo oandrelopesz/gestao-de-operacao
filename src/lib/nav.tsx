@@ -42,7 +42,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     title: "Operação",
     links: [
       { label: "Demandas", icon: <LayoutDashboard size={17} />, to: "/", palavras: ["tarefas", "pendências", "afazeres", "kanban"] },
-      { label: "Agenda", icon: <CalendarDays size={17} />, to: "/agenda", palavras: ["calendário", "reuniões", "eventos", "compromissos"] },
+      { label: "Agenda", icon: <CalendarDays size={17} />, to: "/agenda", palavras: ["calendário", "reuniões", "reunião", "eventos", "compromissos"] },
       { label: "Onboarding", icon: <Rocket size={17} />, to: "/onboarding", palavras: ["implantação", "novos clientes", "início"] },
       { label: "Roadmap", icon: <MapIcon size={17} />, to: "/roadmap", palavras: ["planejamento", "etapas", "trilha"] },
       { label: "Ideias", icon: <Lightbulb size={17} />, to: "/ideias", palavras: ["brainstorm", "sugestões"] },
@@ -74,7 +74,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     title: "Ferramentas",
     links: [
       { label: "Transcritor", icon: <AudioLines size={17} />, to: "/transcritor", palavras: ["transcrição", "áudio", "vídeo", "legenda"] },
-      { label: "Fireflies", icon: <NotebookPen size={17} />, to: "/fireflies", palavras: ["reuniões gravadas", "gravações", "atas", "resumos"] },
+      { label: "Fireflies", icon: <NotebookPen size={17} />, to: "/fireflies", palavras: ["reuniões gravadas", "reunião gravada", "gravações", "atas", "resumos"] },
       { label: "Swipe file", icon: <Images size={17} />, to: "/swipe", palavras: ["referências", "criativos", "anúncios salvos", "inspiração"] },
       { label: "Links", icon: <Link2 size={17} />, to: "/links", palavras: ["favoritos", "urls", "sites"] },
       { label: "Notas", icon: <StickyNote size={17} />, to: "/notas", palavras: ["anotações", "bloco de notas"] },

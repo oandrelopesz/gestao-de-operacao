@@ -202,41 +202,46 @@ function ListaClientes({ clientes, extras, opcaoVazia, atual, valorInicial, text
   // Sem texto, a lista sai como recebida (vazio, extras, clientes); com texto, na ordem da busca.
   const resultado = useBusca(entradas, texto, camposDaEntrada);
 
+  const renderEntrada = (entrada: Entrada) => {
+    if (entrada.tipo === "vazio") {
+      return (
+        <CommandItem key={VALOR_VAZIO} value={VALOR_VAZIO} onSelect={() => escolher(null)}>
+          <span className="flex-1 truncate">{entrada.rotulo}</span>
+          {atual === null && <Check aria-hidden="true" />}
+        </CommandItem>
+      );
+    }
+    if (entrada.tipo === "extra") {
+      const e = entrada.extra;
+      return (
+        <CommandItem key={chaveDaEntrada(entrada)} value={valorExtra(e.value)} onSelect={() => escolher(e.value)}>
+          <span className="flex-1 truncate">{e.label}</span>
+          {atual === e.value && <Check aria-hidden="true" />}
+        </CommandItem>
+      );
+    }
+    const c = entrada.cliente;
+    return (
+      <CommandItem key={chaveDaEntrada(entrada)} value={valorCliente(c.id)} onSelect={() => escolher(c.id)}>
+        <span className="min-w-0 flex-1 break-words">{c.nome}</span>
+        {c.agencia ? <span className="shrink-0 text-xs text-muted-foreground">{c.agencia}</span> : null}
+        {atual === c.id && <Check aria-hidden="true" />}
+      </CommandItem>
+    );
+  };
+
   return (
     // A busca é nossa (tolerante a erro de digitação): o cmdk só mostra os itens, na ordem que passamos
     <Command shouldFilter={false} defaultValue={valorInicial} label={textoBusca.replace(/…$/, "")} loop>
       <CommandInput placeholder={textoBusca} value={texto} onValueChange={setTexto} />
       <CommandList label="Opções">
         <CommandEmpty>{resultado.modo === "nenhum" ? MENSAGEM_NENHUM : textoNenhum}</CommandEmpty>
-        <CommandGroup heading={resultado.modo === "parecidos" ? MENSAGEM_PARECIDOS : undefined}>
-          {resultado.itens.map((entrada) => {
-            if (entrada.tipo === "vazio") {
-              return (
-                <CommandItem key={VALOR_VAZIO} value={VALOR_VAZIO} onSelect={() => escolher(null)}>
-                  <span className="flex-1 truncate">{entrada.rotulo}</span>
-                  {atual === null && <Check aria-hidden="true" />}
-                </CommandItem>
-              );
-            }
-            if (entrada.tipo === "extra") {
-              const e = entrada.extra;
-              return (
-                <CommandItem key={chaveDaEntrada(entrada)} value={valorExtra(e.value)} onSelect={() => escolher(e.value)}>
-                  <span className="flex-1 truncate">{e.label}</span>
-                  {atual === e.value && <Check aria-hidden="true" />}
-                </CommandItem>
-              );
-            }
-            const c = entrada.cliente;
-            return (
-              <CommandItem key={chaveDaEntrada(entrada)} value={valorCliente(c.id)} onSelect={() => escolher(c.id)}>
-                <span className="min-w-0 flex-1 break-words">{c.nome}</span>
-                {c.agencia ? <span className="shrink-0 text-xs text-muted-foreground">{c.agencia}</span> : null}
-                {atual === c.id && <Check aria-hidden="true" />}
-              </CommandItem>
-            );
-          })}
-        </CommandGroup>
+        {/* Sem itens (nenhum resultado ou lista vazia) o grupo nem entra: o cmdk não o esconde sozinho e sobraria um espaço em branco */}
+        {resultado.itens.length > 0 && (
+          <CommandGroup heading={resultado.modo === "parecidos" ? MENSAGEM_PARECIDOS : undefined}>
+            {resultado.itens.map(renderEntrada)}
+          </CommandGroup>
+        )}
       </CommandList>
     </Command>
   );
