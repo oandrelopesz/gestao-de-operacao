@@ -1,5 +1,6 @@
-// Janela de criar/editar fonte de receita da aba Financeiro (extraída de routes/_authenticated/financeiro.tsx,
-// sem mudar textos, campos, validações nem gravação). Também usada pelo CRM para cadastrar o lead ganho.
+// Janela de criar/editar fonte de receita da aba Financeiro (extraída de routes/_authenticated/financeiro.tsx).
+// Também usada pelo CRM para cadastrar o lead ganho. Além do pagamento: forma de pagamento (do cliente e de cada
+// parcela) e "cobrar a partir de" (primeiro mês que entra na conta do atrasado).
 import { useState } from "react";
 import { Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ import {
   type Parcela,
   type RecebimentoMes,
 } from "@/lib/financeiro";
+import { COBRANCA_DESDE_PADRAO, FORMAS_DE_PAGAMENTO, formaDePagamento, type FormaPagamento } from "@/lib/financeiroCobranca";
+import { hojeBrasilia } from "@/lib/entrega";
 import { ParcelasEditor } from "@/components/financeiro/ParcelasEditor";
 import { useAgencias } from "@/lib/agencias";
 import { toast } from "sonner";
@@ -43,6 +46,18 @@ import {
 
 /** Valor do item "Sem agência" no seletor (o Select do Radix não aceita valor vazio). */
 const SEM_AGENCIA = "__sem_agencia__";
+/** Idem para "Não informada" na forma de pagamento (grava null). */
+const SEM_FORMA = "__sem_forma__";
+
+const FORMAS = Object.keys(FORMAS_DE_PAGAMENTO) as FormaPagamento[];
+
+/** As parcelas da fonte em ordem de dia, mantendo a forma de cada uma (parcelasDaFonte só devolve dia e valor). */
+function parcelasParaEditar(fonte: FinanceiroView): Parcela[] {
+  return parcelasDaFonte(fonte).map((p) => {
+    const forma = formaDePagamento(fonte.parcelas?.find((o) => Number(o.dia) === p.dia)?.forma);
+    return forma ? { ...p, forma } : p;
+  });
+}
 
 export type FinanceiroView = {
   fonte_id: string;
@@ -65,6 +80,10 @@ export type FinanceiroView = {
   parcelas: Parcela[] | null;
   /** Recebimentos do mês atual, um por parcela já marcada */
   recebimentos_mes: RecebimentoMes[] | null;
+  /** pix | cartao | boleto; null = não informada */
+  forma_pagamento?: string | null;
+  /** Primeiro mês cobrado ("YYYY-MM-DD", sempre dia 1) */
+  cobranca_desde?: string | null;
 };
 
 /** Pré-preenchimento de uma fonte nova (ex.: lead ganho no CRM) */
@@ -92,6 +111,9 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
   const [parcelasForm, setParcelasForm] = useState<Parcela[]>([]);
   const [tipoForm, setTipoForm] = useState<TipoFonte>("agencia");
   const [agenciaForm, setAgenciaForm] = useState<string | null>(null);
+  // Forma de pagamento do cliente (SEM_FORMA = não informada) e primeiro mês cobrado ("YYYY-MM")
+  const [formaForm, setFormaForm] = useState<string>(SEM_FORMA);
+  const [cobrancaDesdeForm, setCobrancaDesdeForm] = useState("");
   const { todasAgencias } = useAgencias();
 
   // Ao abrir, prepara o formulário (ajuste de estado durante o render: o conteúdo já monta com os valores certos,
@@ -104,7 +126,7 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
       setAbertura(abertura + 1);
       setEditingFonte(fonte);
       setInicialAberto(fonte ? undefined : inicial);
-      const emParcelas = fonte && ehFracionado(fonte) ? parcelasDaFonte(fonte) : null;
+      const emParcelas = fonte && ehFracionado(fonte) ? parcelasParaEditar(fonte) : null;
       setFracionado(!!emParcelas);
       setParcelasForm(emParcelas || []);
       // O valor vai para a máscara em reais (a máscara lê dígitos como centavos: 3500 viraria "35,00")
@@ -118,6 +140,9 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
       setDiaTexto(String(fonte?.dia_recebimento || 1));
       setTipoForm(fonte?.tipo || "agencia");
       setAgenciaForm(fonte?.agencia_id ?? null);
+      setFormaForm(formaDePagamento(fonte?.forma_pagamento) ?? SEM_FORMA);
+      // Fonte nova começa a ser cobrada neste mês; fonte antiga sem o campo (cache de antes da migration) em setembro de 2026
+      setCobrancaDesdeForm(String(fonte ? (fonte.cobranca_desde ?? COBRANCA_DESDE_PADRAO) : hojeBrasilia()).slice(0, 7));
     }
   }
 
@@ -132,14 +157,22 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
   const handleSaveFonte = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // parcelas como tipo literal (não a interface Parcela) para caber no Json do Supabase
-    let pagamento: { valor_mensal: number; dia_recebimento: number; parcelas: { dia: number; valor: number }[] | null };
+    let pagamento: { valor_mensal: number; dia_recebimento: number; parcelas: { dia: number; valor: number; forma?: string }[] | null };
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(cobrancaDesdeForm)) {
+      toast.error('Informe o mês em "Cobrar a partir de"');
+      return;
+    }
     if (fracionado) {
       const erro = validarParcelas(parcelasForm);
       if (erro) {
         toast.error(erro);
         return;
       }
-      const parcelas = ordenarParcelas(parcelasForm).map((p) => ({ dia: p.dia, valor: p.valor }));
+      // A forma da parcela só é gravada quando escolhida (sem ela vale a forma do cliente)
+      const parcelas = ordenarParcelas(parcelasForm).map((p) => {
+        const forma = formaDePagamento(p.forma);
+        return forma ? { dia: p.dia, valor: p.valor, forma } : { dia: p.dia, valor: p.valor };
+      });
       const total = parcelas.reduce((t, p) => t + p.valor, 0);
       pagamento = { valor_mensal: Math.round(total * 100) / 100, dia_recebimento: parcelas[0].dia, parcelas };
     } else {
@@ -152,6 +185,8 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
       tipo: tipoForm,
       agencia_id: tipoForm === "freelancer" ? agenciaForm : null,
       ...pagamento,
+      forma_pagamento: formaDePagamento(formaForm),
+      cobranca_desde: `${cobrancaDesdeForm}-01`,
       ativo: formData.get("ativo") === "on",
       observacoes: formData.get("observacoes") as string,
     };
@@ -162,9 +197,10 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
       // if (!user) throw new Error("Usuário não autenticado");
 
       if (editingFonte) {
+        // forma_pagamento e cobranca_desde ainda não estão nos tipos gerados do Supabase (types.ts)
         const { error } = await supabase
           .from("financeiro_fontes")
-          .update(values)
+          .update(values as any)
           .eq("id", editingFonte.fonte_id);
         if (error) throw error;
         toast.success("Fonte atualizada com sucesso");
@@ -282,6 +318,35 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
                   </div>
                 </div>
               )}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid content-start gap-2">
+                  <Label htmlFor="forma_pagamento">Forma de pagamento</Label>
+                  <Select value={formaForm} onValueChange={setFormaForm}>
+                    <SelectTrigger id="forma_pagamento" aria-label="Forma de pagamento">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FORMAS.map((f) => (
+                        <SelectItem key={f} value={f}>{FORMAS_DE_PAGAMENTO[f]}</SelectItem>
+                      ))}
+                      <SelectItem value={SEM_FORMA}>Não informada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid content-start gap-2">
+                  <Label htmlFor="cobranca_desde">Cobrar a partir de</Label>
+                  <Input
+                    id="cobranca_desde"
+                    type="month"
+                    placeholder="AAAA-MM"
+                    value={cobrancaDesdeForm}
+                    onChange={(e) => setCobrancaDesdeForm(e.target.value)}
+                    aria-describedby="cobranca_desde_ajuda"
+                    required
+                  />
+                  <p id="cobranca_desde_ajuda" className="text-xs text-muted-foreground">Meses antes disso não entram no atrasado.</p>
+                </div>
+              </div>
               <div className="flex items-center space-x-2 py-2">
                 <Switch id="ativo" name="ativo" defaultChecked={editingFonte ? editingFonte.ativo : true} />
                 <Label htmlFor="ativo">Fonte ativa para faturamento</Label>

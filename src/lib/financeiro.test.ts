@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   parcelasDaFonte, ehFracionado, vencimentoNoMes, statusDaParcela, situacaoDoMes, resumoDoMes,
-  dividirEmParcelas, ajustarQuantidade, validarParcelas, textoDoValor, nomeDoMes, agruparHistorico, descreverDias, tipoDaFonte,
+  dividirEmParcelas, ajustarQuantidade, ordenarParcelas, validarParcelas, textoDoValor, nomeDoMes, agruparHistorico, descreverDias, tipoDaFonte,
 } from "./financeiro.ts";
 import type { RecebimentoMes } from "./financeiro.ts";
 
@@ -201,4 +201,13 @@ test("tipoDaFonte: rótulo de cada tipo; tipo desconhecido cai em Pessoal", () =
   assert.equal(tipoDaFonte("freelancer").label, "Freelancer");
   assert.equal(tipoDaFonte("outro").label, "Pessoal");
   assert.notEqual(tipoDaFonte("freelancer").classe, tipoDaFonte("agencia").classe);
+});
+
+test("ordenarParcelas e ajustarQuantidade mantêm a forma de cada parcela; validarParcelas ignora a forma", () => {
+  const base = [{ dia: 20, valor: 1500, forma: "boleto" }, { dia: 5, valor: 1000 }];
+  assert.deepEqual(ordenarParcelas(base), [{ dia: 5, valor: 1000 }, { dia: 20, valor: 1500, forma: "boleto" }]);
+  const mais = ajustarQuantidade(base, 3);
+  assert.deepEqual(mais.slice(0, 2), base);
+  assert.deepEqual(ajustarQuantidade(mais, 2), base);
+  assert.equal(validarParcelas(base), null);
 });

@@ -4,8 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatBRL, parseBRLInput } from "@/lib/clientes";
 import { MIN_PARCELAS, MAX_PARCELAS, ajustarQuantidade, textoDoValor, type Parcela } from "@/lib/financeiro";
+import { FORMAS_DE_PAGAMENTO, formaDePagamento, type FormaPagamento } from "@/lib/financeiroCobranca";
 
 const QUANTIDADES = Array.from({ length: MAX_PARCELAS - MIN_PARCELAS + 1 }, (_, i) => MIN_PARCELAS + i);
+const FORMAS = Object.keys(FORMAS_DE_PAGAMENTO) as FormaPagamento[];
+/** Valor do item "Igual ao cliente" (o Select do Radix não aceita valor vazio). */
+const IGUAL_AO_CLIENTE = "__igual_ao_cliente__";
 
 interface Props {
   ativo: boolean;
@@ -14,7 +18,7 @@ interface Props {
   onChange: (parcelas: Parcela[]) => void;
 }
 
-/** Alavanca "Pagamento fracionado" do cadastro da fonte: quantas vezes, e o dia e o valor de cada parcela. */
+/** Alavanca "Pagamento fracionado" do cadastro da fonte: quantas vezes, e o dia, o valor e a forma de cada parcela. */
 export function ParcelasEditor({ ativo, onAtivoChange, parcelas, onChange }: Props) {
   const total = parcelas.reduce((t, p) => t + (p.valor || 0), 0);
   const alterar = (i: number, campo: Partial<Parcela>) => onChange(parcelas.map((p, j) => (j === i ? { ...p, ...campo } : p)));
@@ -69,6 +73,23 @@ export function ParcelasEditor({ ativo, onAtivoChange, parcelas, onChange }: Pro
                     value={p.valor ? textoDoValor(p.valor) : ""}
                     onChange={(e) => alterar(i, { valor: parseBRLInput(e.target.value) })}
                   />
+                </div>
+                <div className="col-span-2 col-start-2 grid gap-1">
+                  <Label htmlFor={`parcela-forma-${i}`} className="text-[11px] text-muted-foreground">Forma</Label>
+                  <Select
+                    value={formaDePagamento(p.forma) ?? IGUAL_AO_CLIENTE}
+                    onValueChange={(v) => alterar(i, { forma: v === IGUAL_AO_CLIENTE ? null : v })}
+                  >
+                    <SelectTrigger id={`parcela-forma-${i}`} aria-label={`Forma da parcela ${i + 1}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={IGUAL_AO_CLIENTE}>Igual ao cliente</SelectItem>
+                      {FORMAS.map((f) => (
+                        <SelectItem key={f} value={f}>{FORMAS_DE_PAGAMENTO[f]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             ))}

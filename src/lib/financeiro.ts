@@ -21,6 +21,8 @@ export function tipoDaFonte(tipo: string) {
 export interface Parcela {
   dia: number;
   valor: number;
+  /** pix | cartao | boleto; ausente = a forma de pagamento da fonte */
+  forma?: string | null;
 }
 
 /** Linha de `financeiro_recebimentos` do mês atual, como a `financeiro_view` entrega em `recebimentos_mes`. */
