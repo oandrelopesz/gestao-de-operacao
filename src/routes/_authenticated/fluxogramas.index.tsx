@@ -107,6 +107,8 @@ function FluxogramasPage() {
   // Busca tolerante (sem acento, com erro de digitação) no título e nos textos dentro do quadro
   const resultadoBusca = useBusca(doTema, busca, (f) => [f.titulo, f.textos]);
   const visiveis = resultadoBusca.itens;
+  // "Nenhum resultado" só vale quando há quadros para buscar; sem nenhum, fica o texto de "nenhum quadro aqui ainda"
+  const semResultadoDaBusca = resultadoBusca.modo === "nenhum" && doTema.length > 0;
   const temaDoFiltro = filtro !== TODOS && filtro !== SEM_TEMA ? filtro : null;
 
   const criar = async () => {
@@ -233,10 +235,10 @@ function FluxogramasPage() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 px-6 py-14 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Workflow size={26} /></span>
-            {resultadoBusca.modo === "nenhum"
+            {semResultadoDaBusca
               ? <MensagemBusca resultado={resultadoBusca} className="text-base font-semibold text-foreground" />
               : <p className="text-base font-semibold">Nenhum quadro aqui ainda</p>}
-            {resultadoBusca.modo !== "nenhum" && <Button className="mt-1 gap-2" onClick={abrirNovo}><Plus size={16} /> Novo quadro</Button>}
+            {!semResultadoDaBusca && <Button className="mt-1 gap-2" onClick={abrirNovo}><Plus size={16} /> Novo quadro</Button>}
           </CardContent>
         </Card>
       ) : (

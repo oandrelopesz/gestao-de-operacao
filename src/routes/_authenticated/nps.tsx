@@ -327,7 +327,7 @@ function NPSPage() {
             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
               <Target size={24} className="opacity-20" />
             </div>
-            {resultadoBusca.modo === "nenhum" ? (
+            {resultadoBusca.modo === "nenhum" && baseRows.length > 0 ? (
               <MensagemBusca resultado={resultadoBusca} className="text-lg font-semibold text-foreground" />
             ) : (
               <h3 className="text-lg font-semibold">Nenhum resultado para os filtros</h3>

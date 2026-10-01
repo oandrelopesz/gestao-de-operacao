@@ -310,7 +310,7 @@ function AcessosPage() {
         </Card>
       ) : filteredAcessos.length === 0 ? (
         <Card className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-2 border-dashed">
-          {resultadoBusca.modo === "nenhum" ? (
+          {resultadoBusca.modo === "nenhum" && acessosDaAgencia.length > 0 ? (
             <MensagemBusca resultado={resultadoBusca} />
           ) : (
             <>

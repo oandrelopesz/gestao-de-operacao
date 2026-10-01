@@ -819,7 +819,7 @@ function DemandasPage() {
       </div>
 
       {/* Na lista, "nenhum resultado" aparece no lugar da lista (estado vazio abaixo) */}
-      {(view === "kanban" || resultadoBusca.modo === "parecidos") && (
+      {(resultadoBusca.modo === "parecidos" || (view === "kanban" && resultadoBusca.modo === "nenhum" && demandas.length > 0)) && (
         <MensagemBusca resultado={resultadoBusca} className="shrink-0" />
       )}
 
@@ -953,7 +953,7 @@ function DemandasPage() {
               {filteredDemandas.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full py-20 text-muted-foreground">
                       <List size={40} className="mb-4 opacity-20" />
-                      {resultadoBusca.modo === "nenhum" ? <MensagemBusca resultado={resultadoBusca} /> : <p>Nenhuma demanda encontrada.</p>}
+                      {resultadoBusca.modo === "nenhum" && demandas.length > 0 ? <MensagemBusca resultado={resultadoBusca} /> : <p>Nenhuma demanda encontrada.</p>}
                   </div>
               ) : (
                 <div className="divide-y">

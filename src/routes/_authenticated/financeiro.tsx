@@ -698,7 +698,7 @@ function FinanceiroPage() {
       ) : filteredData.length === 0 ? (
         <div className="text-center py-20 border-2 border-dashed rounded-xl bg-muted/30">
           <DollarSign size={48} className="mx-auto mb-4 opacity-20" />
-          {resultadoBusca.modo === "nenhum" ? (
+          {resultadoBusca.modo === "nenhum" && baseData.length > 0 ? (
             <MensagemBusca resultado={resultadoBusca} className="font-medium" />
           ) : (
             <p className="text-muted-foreground font-medium">Nenhuma fonte financeira encontrada.</p>

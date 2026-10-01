@@ -340,7 +340,7 @@ function LivrosPage() {
         {filteredLivros.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Book className="size-12 text-muted-foreground/20 mb-4" />
-            {resultadoBusca.modo === "nenhum" ? (
+            {resultadoBusca.modo === "nenhum" && livrosDaAba.length > 0 ? (
               <MensagemBusca resultado={resultadoBusca} className="font-medium" />
             ) : (
               <>

@@ -347,7 +347,7 @@ function SwipePage() {
           {filtrados.length === 0 && !loading ? (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
               <div className="bg-muted rounded-full p-4"><FolderOpen size={36} className="text-muted-foreground" /></div>
-              {resultadoBusca.modo === "nenhum" ? (
+              {resultadoBusca.modo === "nenhum" && doFiltro.length > 0 ? (
                 <MensagemBusca resultado={resultadoBusca} className="text-lg font-medium text-foreground" />
               ) : (
                 <>

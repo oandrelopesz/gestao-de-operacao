@@ -243,6 +243,8 @@ function CursosPage() {
   // Busca tolerante no nome do curso e no nome da categoria
   const resultadoBusca = useBusca(cursosDaTela, searchQuery, (c) => [c.nome, c.curso_categorias?.nome]);
   const filteredCursos = resultadoBusca.itens;
+  // "Nenhum resultado" só vale quando há cursos para buscar; sem nenhum, ficam os textos de "nenhum curso"
+  const semResultadoDaBusca = resultadoBusca.modo === "nenhum" && cursosDaTela.length > 0;
 
   const stats = useMemo(() => contarConclusao(filteredCursos), [filteredCursos]);
 
@@ -469,7 +471,7 @@ function CursosPage() {
             {situacao === "todos" ? (
               <>
                 <div className="space-y-2">
-                  {resultadoBusca.modo === "nenhum" ? (
+                  {semResultadoDaBusca ? (
                     <MensagemBusca resultado={resultadoBusca} className="text-lg font-medium text-foreground" />
                   ) : (
                     <>
@@ -482,12 +484,12 @@ function CursosPage() {
                     </>
                   )}
                 </div>
-                {resultadoBusca.modo !== "nenhum" && <Button onClick={handleAddCourse}>Criar primeiro curso</Button>}
+                {!semResultadoDaBusca && <Button onClick={handleAddCourse}>Criar primeiro curso</Button>}
               </>
             ) : (
               <>
                 <div className="space-y-2">
-                  {resultadoBusca.modo === "nenhum" ? (
+                  {semResultadoDaBusca ? (
                     <MensagemBusca resultado={resultadoBusca} className="text-lg font-medium text-foreground" />
                   ) : (
                     <h3 className="text-lg font-medium">

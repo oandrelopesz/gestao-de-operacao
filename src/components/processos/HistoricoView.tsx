@@ -104,7 +104,7 @@ export function HistoricoView({ tipo }: HistoricoViewProps) {
       ) : filtrados.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
           <div className="bg-muted rounded-full p-4"><History size={32} className="text-muted-foreground" /></div>
-          {resultadoBusca.modo === "nenhum" ? (
+          {resultadoBusca.modo === "nenhum" && doPeriodo.length > 0 ? (
             <MensagemBusca resultado={resultadoBusca} className="text-base font-medium text-foreground" />
           ) : (
             <>

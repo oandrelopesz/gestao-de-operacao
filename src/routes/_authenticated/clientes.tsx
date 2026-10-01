@@ -56,6 +56,7 @@ import { saveCliente, loadClienteFormValues, setTrafegoAtivo, type ClienteFormIn
 import { formatMoeda } from "@/lib/moedas";
 import { cn } from "@/lib/utils";
 import { useBusca } from "@/lib/useBusca";
+import { MENSAGEM_NENHUM, normalizarBusca, type ResultadoBusca } from "@/lib/search";
 import { MensagemBusca } from "@/components/MensagemBusca";
 
 type SearchParams = { agencia?: string; view?: "cards" | "tabela"; subAgencia?: string };
@@ -195,8 +196,19 @@ function ClientesPage() {
       .filter((c) => c.arquivado || showPausados || c.status_operacional === "ativo");
   }, [clientes, arquivados, showArquivados, agencia, subAgencia, statusFilter, showPausados]);
 
+  // "Ver detalhes" do aviso de fim de contrato escreve "Nome A|Nome B": a busca por texto não faz "ou",
+  // então cada nome entre "|" é um cliente exato e o resultado é só esses, na ordem da tela.
+  const nomesDoAviso = useMemo(
+    () => (search.includes("|") ? new Set(search.split("|").map(normalizarBusca).filter(Boolean)) : null),
+    [search],
+  );
   // Busca tolerante no nome (e na agência): os outros filtros e a ordem da tela vêm antes
-  const resultadoBusca = useBusca(baseFiltrada, search, (c) => [c.nome, agenciaLabelOf(c.agencia)], { deps: [agenciaLabelOf] });
+  const resultadoTexto = useBusca(baseFiltrada, nomesDoAviso ? "" : search, (c) => [c.nome, agenciaLabelOf(c.agencia)], { deps: [agenciaLabelOf] });
+  const resultadoBusca = useMemo<ResultadoBusca<ClienteView>>(() => {
+    if (!nomesDoAviso) return resultadoTexto;
+    const itens = baseFiltrada.filter((c) => nomesDoAviso.has(normalizarBusca(c.nome)));
+    return itens.length ? { itens, modo: "exato", mensagem: null } : { itens, modo: "nenhum", mensagem: MENSAGEM_NENHUM };
+  }, [nomesDoAviso, baseFiltrada, resultadoTexto]);
   const filtered = resultadoBusca.itens;
 
   const metrics = useMemo(() => {
@@ -583,7 +595,7 @@ function ClientesPage() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/20">
           <UsersIcon size={36} className="text-muted-foreground mb-3 opacity-50" />
-          {resultadoBusca.modo === "nenhum" ? (
+          {resultadoBusca.modo === "nenhum" && baseFiltrada.length > 0 ? (
             <MensagemBusca resultado={resultadoBusca} className="mb-4 text-lg font-semibold text-foreground" />
           ) : (
             <>

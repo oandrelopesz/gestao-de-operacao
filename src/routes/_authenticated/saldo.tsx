@@ -727,7 +727,7 @@ function SaldoPage() {
         ) : filteredData.length === 0 ? (
           <div className="col-span-full h-64 flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/30 text-muted-foreground">
             <Wallet size={48} className="mb-4 opacity-20" />
-            {resultadoBusca.modo === "nenhum" ? (
+            {resultadoBusca.modo === "nenhum" && baseData.length > 0 ? (
               <MensagemBusca resultado={resultadoBusca} />
             ) : (
               <p>{data.length === 0 ? "Nenhum cliente monitorado ainda. Cadastre um cliente com Pix/Boleto em Clientes Ativos." : "Nenhum registro encontrado."}</p>

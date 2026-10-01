@@ -180,7 +180,7 @@ export function NavegadorPasta(p: NavegadorPastaProps) {
         <GaleriaFotos key={p.pastaId} itens={itens} onBaixarZip={p.onBaixarZip} onAbrirPasta={(item) => abrir(item)} />
       ) : visiveis.length === 0 ? (
         <Card className="px-6 py-12 text-center text-sm text-muted-foreground">
-          {resultadoBusca.modo === "nenhum" ? <MensagemBusca resultado={resultadoBusca} /> : "Nenhuma resposta ainda."}
+          {resultadoBusca.modo === "nenhum" && daPasta.length > 0 ? <MensagemBusca resultado={resultadoBusca} /> : "Nenhuma resposta ainda."}
         </Card>
       ) : (
         <Card className="divide-y overflow-hidden">

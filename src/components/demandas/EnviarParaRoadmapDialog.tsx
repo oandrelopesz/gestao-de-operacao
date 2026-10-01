@@ -268,7 +268,7 @@ export function EnviarParaRoadmapDialog({ demanda, clientes, onClose, onDefinirR
               </div>
             ) : filtrados.length === 0 ? (
               <div className="rounded-lg border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
-                {resultadoBusca.modo === "nenhum"
+                {resultadoBusca.modo === "nenhum" && doDono.length > 0
                   ? <MensagemBusca resultado={resultadoBusca} className="text-xs" />
                   : !mostrarTodos && temDonoDemanda
                     ? "Nenhum roadmap ativo deste cliente — use \"Mostrar todos\" ou crie um novo."
