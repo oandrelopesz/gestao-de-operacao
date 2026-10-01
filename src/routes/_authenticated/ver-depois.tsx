@@ -21,6 +21,8 @@ import { useCachedState, hasCached, getCached, setCached } from "@/lib/pageCache
 import { CACHE_KEYS, loadVerDepois } from "@/lib/data";
 import { toast } from "sonner";
 import { fetchTiposVerDepois, iconeDoTipo, TIPOS_VER_DEPOIS_PADRAO, TIPO_OUTRO, type TipoVerDepois } from "@/lib/verDepoisTipos";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 export const Route = createFileRoute("/_authenticated/ver-depois")({
   component: VerDepoisPage,
@@ -115,14 +117,13 @@ function VerDepoisPage() {
       .catch(() => {});
   }, []);
 
-  const filtrados = useMemo(() => {
-    const q = busca.trim().toLowerCase();
-    return itens.filter((i) =>
-      (mostrarVistos || !i.visto) &&
-      (filtroTipo === "todos" || i.tipo === filtroTipo) &&
-      (!q || i.titulo.toLowerCase().includes(q) || i.link.toLowerCase().includes(q) || (i.observacao || "").toLowerCase().includes(q)),
-    );
-  }, [itens, busca, filtroTipo, mostrarVistos]);
+  const itensDaTela = useMemo(
+    () => itens.filter((i) => (mostrarVistos || !i.visto) && (filtroTipo === "todos" || i.tipo === filtroTipo)),
+    [itens, filtroTipo, mostrarVistos],
+  );
+  // Busca tolerante (sem acento, com erro de digitação) no título, na nota e no link
+  const resultadoBusca = useBusca(itensDaTela, busca, (i) => [i.titulo, i.observacao, i.link]);
+  const filtrados = resultadoBusca.itens;
 
   const contagem = useMemo(() => {
     const c: Record<string, number> = { todos: 0 };
@@ -215,12 +216,19 @@ function VerDepoisPage() {
         </div>
       </div>
 
+      {!loading && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} className="-mb-3" />}
       {filtrados.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
           <div className="bg-muted rounded-full p-4"><Link2 size={36} className="text-muted-foreground" /></div>
-          <h3 className="text-lg font-medium">{itens.length === 0 ? "Nada salvo ainda" : "Nenhum item nesse filtro"}</h3>
-          <p className="text-muted-foreground max-w-xs text-sm">Cole um link, dê um título e ele fica aqui até você ver.</p>
-          <Button onClick={() => setDialog({})}>Adicionar o primeiro link</Button>
+          {resultadoBusca.modo === "nenhum" ? (
+            <MensagemBusca resultado={resultadoBusca} className="text-lg font-medium text-foreground" />
+          ) : (
+            <>
+              <h3 className="text-lg font-medium">{itens.length === 0 ? "Nada salvo ainda" : "Nenhum item nesse filtro"}</h3>
+              <p className="text-muted-foreground max-w-xs text-sm">Cole um link, dê um título e ele fica aqui até você ver.</p>
+              <Button onClick={() => setDialog({})}>Adicionar o primeiro link</Button>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

@@ -61,6 +61,8 @@ import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 export const Route = createFileRoute("/_authenticated/saldo")({
   component: SaldoPage,
@@ -460,17 +462,16 @@ function SaldoPage() {
   // Mesmo critério da linha da tabela (qtd_operacoes > 1): o diálogo de remover diz de qual operação a plataforma sai
   const removendoDeVariasOperacoes = !!removendo && (groupedData.find((g) => g.cliente_id === removendo.cliente_id)?.qtd_operacoes ?? 0) > 1;
 
-  const filteredData = useMemo(() => {
-    const q = searchQuery.toLowerCase();
+  // Filtros e ordenação da tela, sem o texto da busca (a busca tolerante vem depois, em `resultadoBusca`)
+  const baseData = useMemo(() => {
     const result = groupedData.filter((group) => {
       const matchesAgencia = filterAgencia === "all" || group.cliente_agencia === filterAgencia;
-      const matchesSearch = !q || group.cliente_nome?.toLowerCase().includes(q);
       const isPausado = group.status_operacional === "pausado";
       const matchesPausados = showPausados || !isPausado;
       const hasPlataforma = filterPlataforma === "all" || group.plataformas.some((p) => p.plataformas?.includes(filterPlataforma));
       const hasStatus = filterStatus === "all" || group.plataformas.some((p) => statusEfetivo(p) === filterStatus || p.status_alerta === filterStatus);
       const hasCartao = showCartao || group.plataformas.some((p) => p.metodo_pagamento !== "cartao");
-      return matchesAgencia && matchesSearch && matchesPausados && hasPlataforma && hasStatus && hasCartao;
+      return matchesAgencia && matchesPausados && hasPlataforma && hasStatus && hasCartao;
     });
 
     result.sort((a, b) => {
@@ -485,7 +486,14 @@ function SaldoPage() {
     });
 
     return result;
-  }, [groupedData, filterAgencia, filterPlataforma, filterStatus, searchQuery, sortBy, showPausados, showCartao]);
+  }, [groupedData, filterAgencia, filterPlataforma, filterStatus, sortBy, showPausados, showCartao]);
+
+  // Busca tolerante no nome do cliente e nas plataformas dele
+  const resultadoBusca = useBusca(baseData, searchQuery, (group) => [
+    group.cliente_nome,
+    group.plataformas.map((p) => (p.plataformas || []).join(" ")).join(" "),
+  ]);
+  const filteredData = resultadoBusca.itens;
 
   const metrics = useMemo(() => {
     const monitored = data.filter((i) => i.metodo_pagamento !== "cartao");
@@ -713,12 +721,17 @@ function SaldoPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+        {!loading && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} className="col-span-full" />}
         {loading ? (
           Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-[300px] rounded-xl border bg-card animate-pulse" />)
         ) : filteredData.length === 0 ? (
           <div className="col-span-full h-64 flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/30 text-muted-foreground">
             <Wallet size={48} className="mb-4 opacity-20" />
-            <p>{data.length === 0 ? "Nenhum cliente monitorado ainda. Cadastre um cliente com Pix/Boleto em Clientes Ativos." : "Nenhum registro encontrado."}</p>
+            {resultadoBusca.modo === "nenhum" ? (
+              <MensagemBusca resultado={resultadoBusca} />
+            ) : (
+              <p>{data.length === 0 ? "Nenhum cliente monitorado ainda. Cadastre um cliente com Pix/Boleto em Clientes Ativos." : "Nenhum registro encontrado."}</p>
+            )}
             {data.length > 0 && (
               <Button variant="link" onClick={() => { setFilterAgencia("all"); setFilterPlataforma("all"); setFilterStatus("all"); setSearchQuery(""); }}>
                 Limpar filtros

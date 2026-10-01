@@ -75,6 +75,8 @@ import { ehEsquemaDesatualizado, recarregarUmaVez } from "@/lib/recuperacaoErro"
 import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
 import { SelecaoBarra } from "@/components/demandas/SelecaoBarra";
 import { montarCopiaDemanda, colunaDaCopia, proximaOrdem } from "@/lib/demandaCopia";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 type ColumnDialogState =
   | { mode: "create"; title: string; hex: string; regra: RegraData; dias: number[] }
@@ -487,13 +489,14 @@ function DemandasPage() {
     }
   };
 
-  const filteredDemandas = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return demandas.filter(d => {
-      return d.titulo.toLowerCase().includes(q) ||
-             (d.clientes?.nome && d.clientes.nome.toLowerCase().includes(q));
-    });
-  }, [demandas, searchQuery]);
+  // Busca tolerante (sem acento, com erro de digitação): só filtra, os cards seguem a ordem das colunas
+  const resultadoBusca = useBusca(
+    demandas,
+    searchQuery,
+    (d) => [d.titulo, d.clientes?.nome, d.pessoal ? "Pessoal" : null],
+    { manterOrdem: true },
+  );
+  const filteredDemandas = resultadoBusca.itens;
 
   // Drag and Drop Logic
   const byOrdem = (a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0);
@@ -815,6 +818,11 @@ function DemandasPage() {
         )}
       </div>
 
+      {/* Na lista, "nenhum resultado" aparece no lugar da lista (estado vazio abaixo) */}
+      {(view === "kanban" || resultadoBusca.modo === "parecidos") && (
+        <MensagemBusca resultado={resultadoBusca} className="shrink-0" />
+      )}
+
       <div className="flex-1 min-h-0 overflow-hidden">
         {view === "kanban" ? (
           <div className={cn("h-full overflow-x-auto pb-4", selecaoAtiva && "pb-20")}>
@@ -945,7 +953,7 @@ function DemandasPage() {
               {filteredDemandas.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full py-20 text-muted-foreground">
                       <List size={40} className="mb-4 opacity-20" />
-                      <p>Nenhuma demanda encontrada.</p>
+                      {resultadoBusca.modo === "nenhum" ? <MensagemBusca resultado={resultadoBusca} /> : <p>Nenhuma demanda encontrada.</p>}
                   </div>
               ) : (
                 <div className="divide-y">

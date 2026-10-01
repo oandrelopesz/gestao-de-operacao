@@ -28,6 +28,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 export const Route = createFileRoute("/_authenticated/nps")({
   component: NPSPage,
@@ -135,13 +137,12 @@ function NPSPage() {
     });
   }, [clientes, avaliacoes]);
 
-  const filteredRows = useMemo(() => {
-    const q = searchQuery.toLowerCase();
+  // Filtros e ordenação da tela, sem o texto da busca (a busca tolerante vem depois, em `resultadoBusca`)
+  const baseRows = useMemo(() => {
     const filtered = rows.filter((r) => {
       const matchesAgencia = filterAgencia === "all" || r.cliente.agencia === filterAgencia;
       const matchesCategory = filterCategory === "all" || r.categoria === filterCategory;
-      const matchesSearch = !q || r.cliente.nome.toLowerCase().includes(q);
-      return matchesAgencia && matchesCategory && matchesSearch;
+      return matchesAgencia && matchesCategory;
     });
     // Crítico → em risco → saudável → âncora → sem avaliação; depois por score crescente
     return [...filtered].sort((a, b) => {
@@ -151,7 +152,10 @@ function NPSPage() {
       if (a.ultima && b.ultima) return (a.ultima.score_total || 0) - (b.ultima.score_total || 0);
       return a.cliente.nome.localeCompare(b.cliente.nome);
     });
-  }, [rows, filterAgencia, filterCategory, searchQuery]);
+  }, [rows, filterAgencia, filterCategory]);
+
+  const resultadoBusca = useBusca(baseRows, searchQuery, (r) => [r.cliente.nome]);
+  const filteredRows = resultadoBusca.itens;
 
   const stats = useMemo(() => {
     const avaliados = filteredRows.filter((r) => r.ultima);
@@ -307,6 +311,7 @@ function NPSPage() {
       </div>
 
       <div className="space-y-4">
+        {!isLoading && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} />}
         {isLoading ? (
           <div className="flex justify-center py-20 text-muted-foreground">Carregando...</div>
         ) : rows.length === 0 ? (
@@ -322,7 +327,11 @@ function NPSPage() {
             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
               <Target size={24} className="opacity-20" />
             </div>
-            <h3 className="text-lg font-semibold">Nenhum resultado para os filtros</h3>
+            {resultadoBusca.modo === "nenhum" ? (
+              <MensagemBusca resultado={resultadoBusca} className="text-lg font-semibold text-foreground" />
+            ) : (
+              <h3 className="text-lg font-semibold">Nenhum resultado para os filtros</h3>
+            )}
             <p className="text-muted-foreground">Tente ajustar seus critérios de busca, agência ou categoria.</p>
           </div>
         ) : (

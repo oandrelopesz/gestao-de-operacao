@@ -46,6 +46,8 @@ import {
   patchConclusao, rotuloConclusao, type FiltroConclusao,
 } from "@/lib/cursoConclusao";
 import { hojeBrasilia } from "@/lib/entrega";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 type Tema = string; // enum legado; a classificação agora é por categoria_id
 
@@ -224,20 +226,23 @@ function CursosPage() {
     }
   };
 
-  const filteredCursos = useMemo(() => {
-    const porCategoriaEBusca = cursos.filter(c => {
-      const matchesTema = currentTema === "todos" || c.categoria_id === currentTema || (currentTema === SEM_CATEGORIA.id && !c.categoria_id);
-      const matchesSearch = c.nome.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesTema && matchesSearch;
+  // Categoria, situação e ordem da tela, sem o texto da busca (a busca tolerante vem depois, em `resultadoBusca`)
+  const cursosDaTela = useMemo(() => {
+    const porCategoria = cursos.filter(c => {
+      return currentTema === "todos" || c.categoria_id === currentTema || (currentTema === SEM_CATEGORIA.id && !c.categoria_id);
     });
-    return filtrarPorConclusao(porCategoriaEBusca, situacao)
+    return filtrarPorConclusao(porCategoria, situacao)
       .sort((a, b) => {
         if (a.em_andamento !== b.em_andamento) {
           return a.em_andamento ? -1 : 1;
         }
         return a.nome.localeCompare(b.nome);
       });
-  }, [cursos, currentTema, searchQuery, situacao]);
+  }, [cursos, currentTema, situacao]);
+
+  // Busca tolerante no nome do curso e no nome da categoria
+  const resultadoBusca = useBusca(cursosDaTela, searchQuery, (c) => [c.nome, c.curso_categorias?.nome]);
+  const filteredCursos = resultadoBusca.itens;
 
   const stats = useMemo(() => contarConclusao(filteredCursos), [filteredCursos]);
 
@@ -386,6 +391,7 @@ function CursosPage() {
       </div>
 
       <div className="space-y-8">
+        {resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} className="-mb-4" />}
         {inProgress.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -463,21 +469,31 @@ function CursosPage() {
             {situacao === "todos" ? (
               <>
                 <div className="space-y-2">
-                  <h3 className="text-lg font-medium">Nenhum curso cadastrado ainda</h3>
-                  <p className="text-muted-foreground max-w-xs">
-                    {currentTema === "todos"
-                      ? "Comece adicionando seu primeiro curso."
-                      : `Nenhum curso no tema "${allTabs.find(t => t.id === currentTema)?.label}" cadastrado.`}
-                  </p>
+                  {resultadoBusca.modo === "nenhum" ? (
+                    <MensagemBusca resultado={resultadoBusca} className="text-lg font-medium text-foreground" />
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-medium">Nenhum curso cadastrado ainda</h3>
+                      <p className="text-muted-foreground max-w-xs">
+                        {currentTema === "todos"
+                          ? "Comece adicionando seu primeiro curso."
+                          : `Nenhum curso no tema "${allTabs.find(t => t.id === currentTema)?.label}" cadastrado.`}
+                      </p>
+                    </>
+                  )}
                 </div>
-                <Button onClick={handleAddCourse}>Criar primeiro curso</Button>
+                {resultadoBusca.modo !== "nenhum" && <Button onClick={handleAddCourse}>Criar primeiro curso</Button>}
               </>
             ) : (
               <>
                 <div className="space-y-2">
-                  <h3 className="text-lg font-medium">
-                    {situacao === "concluidos" ? "Nenhum curso concluído ainda." : "Nenhum curso pendente."}
-                  </h3>
+                  {resultadoBusca.modo === "nenhum" ? (
+                    <MensagemBusca resultado={resultadoBusca} className="text-lg font-medium text-foreground" />
+                  ) : (
+                    <h3 className="text-lg font-medium">
+                      {situacao === "concluidos" ? "Nenhum curso concluído ainda." : "Nenhum curso pendente."}
+                    </h3>
+                  )}
                   <p className="text-muted-foreground max-w-xs">
                     {escopoVazio
                       ? `Filtros ativos: ${escopoVazio}.`

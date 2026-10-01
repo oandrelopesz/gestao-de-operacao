@@ -55,6 +55,8 @@ import { useAgencias, agenciaBadgeStyle, agenciaBorderStyle } from "@/lib/agenci
 import { saveCliente, loadClienteFormValues, setTrafegoAtivo, type ClienteFormInitial } from "@/lib/clientesService";
 import { formatMoeda } from "@/lib/moedas";
 import { cn } from "@/lib/utils";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 type SearchParams = { agencia?: string; view?: "cards" | "tabela"; subAgencia?: string };
 
@@ -180,7 +182,7 @@ function ClientesPage() {
     return c;
   }, [clientes]);
 
-  const filtered = useMemo(() => {
+  const baseFiltrada = useMemo(() => {
     // Ativos primeiro, arquivados no fim; os cartões de resumo continuam usando só "clientes"
     // Quem já está nos ativos sai dos arquivados: na recarga em paralelo (restaurar/arquivar) as duas listas
     // podem se cruzar por um instante e o mesmo cliente apareceria duas vezes
@@ -190,9 +192,12 @@ function ClientesPage() {
       .filter((c) => agencia === "todos" ? true : c.agencia === agencia)
       .filter((c) => !subAgencia || c.agencia === subAgencia)
       .filter((c) => statusFilter === "all" || c.nps_status === statusFilter)
-      .filter((c) => c.arquivado || showPausados || c.status_operacional === "ativo")
-      .filter((c) => !search || c.nome.toLowerCase().includes(search.toLowerCase()));
-  }, [clientes, arquivados, showArquivados, agencia, subAgencia, statusFilter, search, showPausados]);
+      .filter((c) => c.arquivado || showPausados || c.status_operacional === "ativo");
+  }, [clientes, arquivados, showArquivados, agencia, subAgencia, statusFilter, showPausados]);
+
+  // Busca tolerante no nome (e na agência): os outros filtros e a ordem da tela vêm antes
+  const resultadoBusca = useBusca(baseFiltrada, search, (c) => [c.nome, agenciaLabelOf(c.agencia)], { deps: [agenciaLabelOf] });
+  const filtered = resultadoBusca.itens;
 
   const metrics = useMemo(() => {
     const list = clientes.filter((c) => agencia === "todos" ? true : c.agencia === agencia);
@@ -553,6 +558,9 @@ function ClientesPage() {
       </div>
 
       {/* Conteúdo */}
+      {!loading && !fetchError && resultadoBusca.modo === "parecidos" && (
+        <MensagemBusca resultado={resultadoBusca} className="-mb-3" />
+      )}
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[1, 2, 3, 4].map((i) => <div key={i} className="h-56 rounded-lg bg-muted/40 animate-pulse" />)}
@@ -575,12 +583,18 @@ function ClientesPage() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-lg bg-muted/20">
           <UsersIcon size={36} className="text-muted-foreground mb-3 opacity-50" />
-          <h3 className="text-lg font-semibold">
-            {clientes.length === 0 ? "Nenhum cliente cadastrado ainda" : `Nenhum cliente em ${agencia === "todos" ? "Todos os Clientes" : agenciaMeta.label}`}
-          </h3>
-          <p className="text-muted-foreground mb-4 text-sm">
-            {clientes.length === 0 ? "Cadastre o primeiro cliente — ele aparece automaticamente em Saldo, NPS e Demandas." : "Cadastre o primeiro cliente desta agência ou ajuste os filtros."}
-          </p>
+          {resultadoBusca.modo === "nenhum" ? (
+            <MensagemBusca resultado={resultadoBusca} className="mb-4 text-lg font-semibold text-foreground" />
+          ) : (
+            <>
+              <h3 className="text-lg font-semibold">
+                {clientes.length === 0 ? "Nenhum cliente cadastrado ainda" : `Nenhum cliente em ${agencia === "todos" ? "Todos os Clientes" : agenciaMeta.label}`}
+              </h3>
+              <p className="text-muted-foreground mb-4 text-sm">
+                {clientes.length === 0 ? "Cadastre o primeiro cliente — ele aparece automaticamente em Saldo, NPS e Demandas." : "Cadastre o primeiro cliente desta agência ou ajuste os filtros."}
+              </p>
+            </>
+          )}
           <Button className="gap-2" onClick={() => { setEditing(null); setEditingValues(null); setModalOpen(true); }}>
             <Plus size={16} /> Novo cliente
           </Button>

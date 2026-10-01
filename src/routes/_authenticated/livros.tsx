@@ -58,6 +58,8 @@ import { hojeBrasilia } from "@/lib/entrega";
 import { anoDaData, contarLidosNoAno } from "@/lib/livrosDatas";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -125,27 +127,26 @@ function LivrosPage() {
     return { total, emAndamento, esteAno };
   }, [livros]);
 
-  const filteredLivros = useMemo(() => {
-    const search = searchQuery.toLowerCase();
-    const filtered = livros.filter(l => 
-      l.nome.toLowerCase().includes(search) || 
-      l.autor.toLowerCase().includes(search)
-    );
-
+  // Livros da aba (estante ou lidos), na ordem da tela, sem o texto da busca (a busca tolerante vem depois)
+  const livrosDaAba = useMemo(() => {
     if (aba === "estante") {
-      return filtered.filter(l => !l.lido).sort((a, b) => {
+      return livros.filter(l => !l.lido).sort((a, b) => {
         if (a.em_andamento && !b.em_andamento) return -1;
         if (!a.em_andamento && b.em_andamento) return 1;
         return a.nome.localeCompare(b.nome);
       });
     } else {
-      return filtered.filter(l => l.lido).sort((a, b) => {
+      return livros.filter(l => l.lido).sort((a, b) => {
         const dateA = a.data_conclusao ? new Date(a.data_conclusao).getTime() : 0;
         const dateB = b.data_conclusao ? new Date(b.data_conclusao).getTime() : 0;
         return dateB - dateA;
       });
     }
-  }, [livros, aba, searchQuery]);
+  }, [livros, aba]);
+
+  // Busca tolerante (sem acento, com erro de digitação) no nome e no autor
+  const resultadoBusca = useBusca(livrosDaAba, searchQuery, (l) => [l.nome, l.autor]);
+  const filteredLivros = resultadoBusca.itens;
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -339,17 +340,24 @@ function LivrosPage() {
         {filteredLivros.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Book className="size-12 text-muted-foreground/20 mb-4" />
-            <p className="text-muted-foreground font-medium">
-              {aba === "estante" 
-                ? "Sua estante está vazia. Adicione livros pra começar a controlar suas leituras." 
-                : "Você ainda não concluiu nenhum livro. Que tal começar agora?"}
-            </p>
-            <Button variant="link" onClick={() => aba === "estante" ? setIsModalOpen(true) : setAba("estante")} className="mt-2">
-              {aba === "estante" ? "Adicionar meu primeiro livro" : "Ver minha estante"}
-            </Button>
+            {resultadoBusca.modo === "nenhum" ? (
+              <MensagemBusca resultado={resultadoBusca} className="font-medium" />
+            ) : (
+              <>
+                <p className="text-muted-foreground font-medium">
+                  {aba === "estante"
+                    ? "Sua estante está vazia. Adicione livros pra começar a controlar suas leituras."
+                    : "Você ainda não concluiu nenhum livro. Que tal começar agora?"}
+                </p>
+                <Button variant="link" onClick={() => aba === "estante" ? setIsModalOpen(true) : setAba("estante")} className="mt-2">
+                  {aba === "estante" ? "Adicionar meu primeiro livro" : "Ver minha estante"}
+                </Button>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-8">
+            <MensagemBusca resultado={resultadoBusca} className="-mb-4" />
             {aba === "estante" && (
               <>
                 {filteredLivros.some(l => l.em_andamento) && (
