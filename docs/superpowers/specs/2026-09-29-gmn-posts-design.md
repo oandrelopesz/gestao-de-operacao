@@ -1,10 +1,10 @@
 # Posts automáticos no Google Meu Negócio — desenho
 
-Data: 29/09/2026. Status: aprovado no brainstorming, aguardando revisão da spec.
+Data: 29/09/2026. Status: aprovada; Fase 1 implementada em 30/09/2026 (branch `gmn-fase1`), com emendas ao longo da implementação.
 
 ## 1. Objetivo
 
-Publicar de 1 a 3 posts por semana, sem intervenção, nos perfis do Google Meu Negócio (GMN) dos clientes. Cada post segue
+Publicar posts toda semana (de 1 a 7 por perfil, nos dias e horários escolhidos na tela), sem intervenção, nos perfis do Google Meu Negócio (GMN) dos clientes. Cada post segue
 o briefing de marca do perfil e é escrito para SEO local. Uma aba nova do sistema concentra tudo: liga/desliga por perfil,
 briefing, pasta de fotos, fila e histórico. Perfis novos que aparecem na conta gerente entram sozinhos na aba, desligados.
 
@@ -24,8 +24,8 @@ aceitar pelo sistema os convites de gerente; aviso por WhatsApp; aprovação hum
 | Dados | Tabelas no Supabase (Lovable Cloud) do sistema. Sem Cloudflare D1 |
 | Ligação com `clientes` | Opcional (`cliente_id` nulo permitido); um cliente pode ter vários perfis |
 | Motor | `pg_cron` + edge functions, um post por chamada. Sem n8n e sem worker da VPS |
-| Frequência | 1, 2 ou 3 posts/semana por perfil (padrão 2). Dias padrão: ter/qui (2) e seg/qua/sex (3); 1 post = qua; editáveis |
-| Horário | Sorteado entre 9h e 11h (America/Sao_Paulo) |
+| Frequência | Escolhida por perfil na aba Agenda, só com cliques: de 1 a 7 dias por semana, um post por dia ligado. Padrão: terça e quinta (decisão de 30/09/2026, substituiu 1–3 posts com dias fixos) |
+| Horário | Um horário por dia ligado, escolhido de 30 em 30 min entre 06:00 e 22:00 (America/Sao_Paulo); padrão 09:00. Horário exato (o processamento roda a cada 10 min, então o post sai até 10 min depois) |
 | Tipo de post | `STANDARD` ("Novidade") com botão: Saiba mais (`LEARN_MORE` + URL com UTM), Ligar (`CALL`) ou Agendar (`BOOK` + URL) |
 | Temas | Rodízio: serviço em destaque, dúvida frequente, bairro/região, diferencial, bastidores |
 
@@ -45,8 +45,7 @@ atual do sistema.
 | `cliente_id` | uuid NULL → `clientes(id)` ON DELETE SET NULL | |
 | `ativo` | bool default false | o liga/desliga |
 | `sem_acesso` | bool default false | perfil sumiu da conta gerente |
-| `posts_semana` | smallint 1–3 default 2 | CHECK |
-| `dias` | smallint[] | 0=dom … 6=sáb; preenchido pelo padrão da frequência |
+| `agenda` | jsonb default `[{"dia":2,"hora":"09:00"},{"dia":4,"hora":"09:00"}]` | um item `{dia, hora}` por dia (0=dom … 6=sáb; hora `HH:MM`, BRT), de 1 a 7 itens, sem dia repetido; CHECK `jsonb_typeof(agenda) = 'array'`; posts por semana = número de itens |
 | `cta_tipo` | text: `LEARN_MORE` \| `CALL` \| `BOOK` | default `LEARN_MORE` |
 | `cta_url` | text NULL | obrigatório para LEARN_MORE e BOOK; a UTM é aplicada na publicação (`utm_source=google&utm_medium=organic&utm_campaign=gmn-post`) |
 | `drive_pasta_url` | text NULL | link da pasta de fotos |
@@ -105,19 +104,23 @@ para a aba mostrar o status ao vivo.
 
 Tabela `gmn_imagens_uso` (`perfil_id`, `origem`, `ref`, `usado_em`), com PK (`perfil_id`, `origem`, `ref`). Guarda quando
 cada foto do Drive ou do Google foi usada pela última vez. Não há cópia da lista de fotos: a lista é lida da fonte a cada post.
+O uso é registrado quando a foto é escolhida, inclusive na prévia: prévias seguidas mostram fotos diferentes.
 
 ### 3.5 Conexão da andfalopes@
 
 A conexão da andfalopes@ ganha uma linha própria em `google_oauth_tokens`, identificada por uma coluna nova
 `finalidade text default 'geral'` (`'gmn'` para esta conta). A linha atual da contato@ continua como `geral`. Os escopos
 pedidos na conexão GMN são `business.manage` e `drive.readonly`. As funções `google-oauth-exchange` e `google-token`
-passam a aceitar `finalidade` (no `state` e como parâmetro); sem ela, o comportamento atual não muda.
+passam a aceitar `finalidade` (no `state` e como parâmetro); sem ela, o comportamento atual não muda. (Fase 2 — na Fase 1 a função usa a linha mais recente, que é a da contato@.) Atenção: o `tokenGoogle` de
+`supabase/functions/gmn/google.ts` também pega a linha mais recente e precisa filtrar por `finalidade` junto com o
+`google-token`; sem isso, a linha nova da andfalopes@ passaria a ser usada por Swipe, Drive e Agenda.
 
 ## 4. Imagens no Cloudflare R2
 
 - Bucket `gmn-midia` (criado em 29/09/2026 na conta Cloudflare da contato@, id `b4e84eaa8099c0e841a2eb35824027ca`,
   região ENAM), acesso público em `https://pub-ae3cb23015f64d9183be1720f7c52e2e.r2.dev`. A chave de API é criada na
-  implementação e vai direto para os secrets, sem passar pelo repositório. Chave de API do R2 só com escrita nesse bucket. Secrets:
+  implementação e vai direto para os secrets, sem passar pelo repositório. A chave de API do R2 é a mesma dos Arquivos (token `sistema gestao - arquivos e gmn`, criado em 30/09/2026, com
+  leitura e escrita nos dois buckets). Secrets:
   `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE`.
 - Chave do objeto: `{perfil_id}/{post_id}.{jpg|png}`. Só entram imagens de fato usadas em post: foto do Drive
   copiada ou imagem da IA. Fotos do perfil no Google usam a `googleUrl` do próprio Google, sem cópia.
@@ -137,7 +140,11 @@ posts, seo local.
 - **Fila da semana:** posts dos próximos 7 dias de todos os perfis, com status ao vivo (realtime).
 - **Gaveta do perfil** (padrão da gaveta de Demandas), em abas:
   - **Briefing:** os campos de 3.2, a marcação "saúde", o cliente ligado (opcional) e o botão **Gerar com IA** (seção 6.5).
-  - **Agenda:** posts por semana, dias, tipo de botão e URL, pasta do Drive e imagem de IA ligada ou desligada.
+  - **Agenda:** dias e horários, tipo de botão e URL, pasta do Drive e imagem de IA ligada ou desligada. Dias e horários só com
+    cliques: 7 botões de dia (clique liga ou desliga); cada dia ligado ganha uma lista de horários de 30 em 30 min (06:00 a
+    22:00); dia novo entra com o horário do primeiro dia já ligado (ou 09:00); "Usar HH:MM em todos" aparece quando os
+    horários diferem; texto "N posts por semana"; salvar exige pelo menos 1 dia. Na lista de perfis, a agenda aparece
+    resumida ("Ter 09:00 · Qui 14:30").
   - **Posts:** próximos e histórico, com texto, miniatura, origem da imagem, estado no Google, link e erro. Ações:
     **Gerar prévia**, **Publicar agora** e **Tentar de novo** (em `erro` ou `pulado`).
 
@@ -148,7 +155,7 @@ posts, seo local.
 | Job | Quando (UTC) | O que faz |
 |---|---|---|
 | `gmn-sincronizar` | diário 08:30 (05:30 BRT) | chama a função `gmn-sincronizar` |
-| `gmn-planejar-dia` | diário 09:00 (06:00 BRT) | função SQL `gmn_planejar_dia()`: para cada perfil `ativo AND NOT sem_acesso` cujo `dias` contém o dia da semana de hoje (BRT), insere um `gmn_posts` `origem='agenda'` com horário sorteado entre 9h e 11h BRT (`ON CONFLICT DO NOTHING`) |
+| `gmn-planejar-dia` | diário 03:05 (00:05 BRT) | função SQL `gmn_planejar_dia()`: para cada perfil `ativo AND NOT sem_acesso` cuja `agenda` tem o dia da semana de hoje (BRT), insere um `gmn_posts` `origem='agenda'` com `agendado_para` = hoje no horário do item (BRT) (`ON CONFLICT DO NOTHING`). Ao salvar a agenda de um perfil, os posts `agendado` de origem `agenda` que não batem mais com ela são apagados |
 | `gmn-processar` | a cada 10 min | chama a função `gmn-processar` |
 
 As chamadas usam `net.http_post`, no padrão de `20260429023356_…sql`.
@@ -162,42 +169,45 @@ As chamadas usam `net.http_post`, no padrão de `20260429023356_…sql`.
    palavras-chave do briefing, as usadas há mais tempo (pelo histórico de `gmn_posts.palavras_chave`).
 3. **Texto:** chamada à OpenAI com saída em JSON (`{ "texto": "…", "palavras_chave": ["…"] }`). O prompt leva o briefing,
    o tema, as palavras-chave, os textos dos últimos 10 posts do perfil e as regras:
-   - português do Brasil, de 150 a 300 palavras, no máximo 1.500 caracteres;
+   - português do Brasil, de 120 a 220 palavras, no máximo 1.400 caracteres (a checagem aceita até 1.500), texto simples sem markdown;
    - palavra-chave e bairro ou cidade aparecem de forma natural, sem repetição forçada;
    - sem telefone, sem URL e sem hashtags em excesso;
    - se `saude`, as regras de 6.3.
 4. **Checagem** (seção 6.3). Se reprovar, gera de novo uma vez com o motivo no prompt. Se reprovar outra vez, o post vira
    `pulado` com o motivo e entra um aviso no sino.
 5. **Imagem:**
-   1. Pasta do Drive do perfil (link → id da pasta): lista as imagens (jpg/png/webp, até 5 MB) com o token GMN e, se
-      falhar, com o token geral. Escolhe a usada há mais tempo (ou nunca usada) em `gmn_imagens_uso`, baixa, converte
-      webp para jpg se necessário e envia ao R2.
+   1. Pasta do Drive do perfil (link → id da pasta): lista as imagens (JPG ou PNG, até 5 MB; WebP é ignorado) com o token GMN e, se
+      falhar, com o token geral. Escolhe a usada há mais tempo (ou nunca usada) em `gmn_imagens_uso`, baixa, envia ao R2 e registra o uso (seção 3.4).
+      Pasta sem nenhuma foto aceita vira aviso no post.
    2. Fotos do perfil no Google (`GET v4/{account}/{location}/media`): a usada há mais tempo; usa a `googleUrl`.
    3. Se `usa_ia_imagem`: gera a imagem com a OpenAI (foto realista do tipo de negócio e do tema, sem texto na arte) e
       envia ao R2.
-   4. Sem nenhuma imagem: publica só o texto.
+   4. Sem nenhuma imagem, ou se a imagem falhar (Drive, IA ou R2): publica só o texto, com o motivo da falha como aviso
+      em `erro`.
 6. **Publicar** (exceto `origem='previa'`, que termina em `gerado`): `POST
    https://mybusiness.googleapis.com/v4/{account}/{location}/localPosts` com `languageCode: "pt-BR"`, `summary`,
    `topicType: "STANDARD"`, `callToAction` e `media: [{ mediaFormat: "PHOTO", sourceUrl }]`. Grava `google_post_name`,
-   `google_url`, `google_estado`, `status='publicado'` e `conferir_em = now() + 1h`, e registra o uso da imagem.
+   `google_url`, `google_estado`, `status='publicado'` e `conferir_em = now() + 1h`.
 7. **Conferência:** em toda chamada, até 5 posts `publicado` com `conferir_em <= now()` e `google_estado <> 'LIVE'`
    passam por `GET` no post. `REJECTED` → `status='erro'` + aviso. `LIVE` → apenas grava. `PROCESSING` → `conferir_em`
    mais 1 h, até 24 h depois da publicação.
 
-Um post por chamada mantém cada execução bem abaixo do limite de tempo das edge functions. A prévia e o "Publicar agora"
+Um post por chamada mantém cada execução bem abaixo do limite de tempo das edge functions. Cada chamada externa tem
+prazo próprio (OpenAI: texto 60 s, imagem 90 s; Google 20 s; R2 30 s, com até 2 novas tentativas) e a execução inteira
+tem até 130 s: estourando, o post vai para `erro` em vez de ficar em `gerando`. A prévia e o "Publicar agora"
 chamam a mesma função com `post_id` explícito.
 
 ### 6.3 Checagem do texto (função pura, testada)
 
 Reprova quando:
 - o texto contém algum item de `termos_proibidos` (comparação sem acentos e sem diferenciar maiúsculas);
-- o texto contém telefone (regex de números BR) ou URL/domínio;
+- o texto contém telefone (regex de números BR e 0800; pares de anos como "2019-2020" não contam) ou URL/domínio, `wa.me` ou e-mail;
 - o texto tem menos de 100 ou mais de 1.500 caracteres;
 - o perfil é `saude` e o texto casa com a lista fixa: promessa de resultado ("garantid", "100%", "resultado
-  definitivo", "cura"), "antes e depois", preço/valor/desconto de procedimento (`R$`, "promoção"), superlativos
+  definitivo", "cura"), "antes e depois", preço/valor/desconto de procedimento (`R$`, "promoção", "desconto", "brinde", "grátis"), superlativos
   ("o melhor", "o único", "número 1", "mais barato").
 
-A lista fixa de saúde fica num módulo compartilhado (`src/lib/gmnChecagem.ts`), importado pela edge function e testado com Vitest.
+A lista fixa de saúde fica em `supabase/functions/gmn/regras.ts` e é testada com `node --test` (`src/lib/gmnRegras.test.ts`).
 
 ### 6.4 Erros e novas tentativas
 
@@ -217,8 +227,9 @@ A lista fixa de saúde fica num módulo compartilhado (`src/lib/gmnChecagem.ts`)
     para ativar");
   - perfis que não vieram na lista ficam `sem_acesso=true, ativo=false`;
   - perfis que voltaram ficam `sem_acesso=false` e continuam desligados.
-- **`gmn-briefing-ia`:** recebe `perfil_id` e, opcionalmente, o id de um envio de briefing de Dados internos
-  (`formularios_envios`; o `.txt` é lido no Drive como o visualizador de Dados internos já faz). Junta os dados do Google
+- **Briefing com IA** (ação `briefing` da função `gmn`, implementada assim na Fase 1): recebe `perfil_id` e,
+  opcionalmente, o texto de um envio de briefing de Dados internos (o front lê o `.txt` no Drive como o visualizador de
+  Dados internos já faz e manda o texto). Junta os dados do Google
   (descrição, categorias, site e endereço), o nicho do cliente ligado e o briefing escolhido, e devolve o JSON de 3.2 para
   o front preencher. Não salva nada: o usuário revisa e salva.
 
@@ -228,9 +239,11 @@ A lista fixa de saúde fica num módulo compartilhado (`src/lib/gmnChecagem.ts`)
 
 - Migration (seção 3), R2 (seção 4) e secrets da OpenAI.
 - Aba `/gmn` completa, com perfis criados **à mão** (nome + cliente opcional, `location_name` nulo) para testar.
-- `gmn-briefing-ia` (sem dados do Google), **Gerar prévia** (texto + imagem do Drive ou da IA + R2) e checagem.
+- Briefing com IA (ação `briefing` da função `gmn`, sem dados do Google), **Gerar prévia** (texto + imagem do Drive ou da IA + R2) e checagem.
 - **Nada vai ao ar na Fase 1** (decisão do usuário, 29/09/2026). A aba não é publicada no Lovable, os crons não são
-  criados e nenhum perfil é ativado. Os testes rodam no dev server local; as tabelas novas existem no banco, mas ficam
+  criados e nenhum perfil é ativado. Como a função `gmn` precisa ir para a `main` para o Lovable publicá-la, a tela só
+  funciona no servidor local (`ABA_LIBERADA = import.meta.env.DEV` em `src/lib/gmn.ts`); no site publicado, `/gmn`
+  mostra "Em preparação". Tirar essa trava na Fase 2. Os testes rodam no dev server local; as tabelas novas existem no banco, mas ficam
   sem uso.
 - **Perfil de teste: Brazilian Car** (Brasília, compra e venda de seminovos). Objetivo do cliente: fortalecer a
   percepção de "a melhor loja de Brasília para comprar e vender seminovos". Não é perfil de saúde, então o
@@ -251,8 +264,8 @@ o briefing e o histórico ficam no manual e a linha sincronizada duplicada é re
 
 ## 8. Testes
 
-- **Vitest:** checagem do texto (6.3), rodízio de tema e palavras-chave, escolha da imagem usada há mais tempo, dias
-  padrão por frequência, montagem da URL com UTM e extração do id da pasta a partir do link do Drive.
+- **`node --test`:** checagem do texto (6.3), rodízio de tema e palavras-chave, escolha da imagem usada há mais tempo, agenda
+  (normalização, ligar e desligar dia, mesmo horário em todos, resumo), montagem da URL com UTM e extração do id da pasta a partir do link do Drive.
 - **Fase 1, manual:** prévia em um perfil manual com pasta do Drive, em outro sem pasta (imagem da IA) e em um perfil
   `saude` com termo proibido no briefing (tem de pular ou regenerar).
 - **Fase 2, manual:** sincronização, um post publicado de verdade, conferência do estado `LIVE`, erro de conexão simulado
