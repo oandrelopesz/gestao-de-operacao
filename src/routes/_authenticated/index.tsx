@@ -357,7 +357,11 @@ function DemandasPage() {
       // A cópia entra no fim da coluna de destino e não repete o passo de onboarding (UNIQUE).
       const destino = colunaDaCopia(demanda.status);
       if (!columns.some((c) => c.id === destino)) {
-        toast.error("A coluna Standby não existe mais. Recrie a coluna para duplicar uma demanda concluída.");
+        toast.error(
+          demanda.status === "feito"
+            ? "A coluna Standby não existe mais. Recrie a coluna para duplicar uma demanda concluída."
+            : "A coluna de destino não existe mais. Recarregue a página.",
+        );
         return;
       }
       const copia = montarCopiaDemanda(demanda, proximaOrdem(demandas, destino));
@@ -368,7 +372,8 @@ function DemandasPage() {
       }]);
 
       if (error) throw error;
-      toast.success("Demanda duplicada!");
+      // A cópia de uma demanda concluída vai para outra coluna (Standby): o aviso diz onde ela foi parar
+      toast.success(destino !== demanda.status ? "Cópia criada no Standby." : "Demanda duplicada!");
       fetchDemandas();
     } catch (error: any) {
       toast.error("Erro ao duplicar demanda");

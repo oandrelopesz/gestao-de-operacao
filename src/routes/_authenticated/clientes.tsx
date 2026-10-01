@@ -178,7 +178,10 @@ function ClientesPage() {
 
   const filtered = useMemo(() => {
     // Ativos primeiro, arquivados no fim; os cartões de resumo continuam usando só "clientes"
-    const base = showArquivados ? [...clientes, ...arquivados] : clientes;
+    // Quem já está nos ativos sai dos arquivados: na recarga em paralelo (restaurar/arquivar) as duas listas
+    // podem se cruzar por um instante e o mesmo cliente apareceria duas vezes
+    const idsAtivos = new Set(clientes.map((c) => c.id));
+    const base = showArquivados ? [...clientes, ...arquivados.filter((c) => !idsAtivos.has(c.id))] : clientes;
     return base
       .filter((c) => agencia === "todos" ? true : c.agencia === agencia)
       .filter((c) => !subAgencia || c.agencia === subAgencia)
@@ -246,7 +249,7 @@ function ClientesPage() {
     const { error } = await supabase.from("clientes")
       .update({ arquivado: true } as any).eq("id", id);
     if (error) { toast.error("Erro ao arquivar"); return; }
-    toast.success("Cliente arquivado", { action: { label: "Desfazer", onClick: () => handleRestore(id) } });
+    toast.success("Cliente arquivado", { duration: 8000, action: { label: "Desfazer", onClick: () => handleRestore(id) } });
     recarregarListas();
   };
 

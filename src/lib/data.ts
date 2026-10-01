@@ -305,10 +305,25 @@ export async function warmAllCaches(
         return itens;
       },
     ],
-    [CACHE_KEYS.links, async () => (await import("@/lib/links")).fetchLinks()],
-    [CACHE_KEYS.linksTemas, async () => (await import("@/lib/links")).fetchTemas()],
-    [CACHE_KEYS.notas, async () => (await import("@/lib/notas")).fetchNotas()],
-    [CACHE_KEYS.notasTemas, async () => (await import("@/lib/notas")).fetchTemasNotas()],
+    [
+      CACHE_KEYS.links,
+      async () => {
+        // Lista e temas juntos, como a aba os carrega
+        const { fetchLinks, fetchTemas } = await import("@/lib/links");
+        const [links, temas] = await Promise.all([fetchLinks(), fetchTemas()]);
+        setCached(CACHE_KEYS.linksTemas, temas);
+        return links;
+      },
+    ],
+    [
+      CACHE_KEYS.notas,
+      async () => {
+        const { fetchNotas, fetchTemasNotas } = await import("@/lib/notas");
+        const [notas, temas] = await Promise.all([fetchNotas(), fetchTemasNotas()]);
+        setCached(CACHE_KEYS.notasTemas, temas);
+        return notas;
+      },
+    ],
     [CACHE_KEYS.pdfs, fetchPdfBiblioteca],
   ];
 

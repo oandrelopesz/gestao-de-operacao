@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Check, CheckSquare, Copy, FolderInput, Plus, Search, StickyNote, Tags, Trash2, X } from "lucide-react";
+import { Check, CheckSquare, Copy, FolderInput, Loader2, Plus, Search, StickyNote, Tags, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,13 +36,19 @@ let editorCarregado: typeof EditorNotaTipo | null = null;
 const carregarEditor = () => import("@/components/notas/EditorNota").then((m) => (editorCarregado = m.EditorNota));
 function useEditorNota() {
   const [Editor, setEditor] = useState(() => editorCarregado);
+  // Chamada no clique: começa o download na hora (ou usa o que já chegou). Se falhar, a promessa rejeita e o
+  // próximo clique tenta de novo — nada fica guardado como "falhou".
+  const garantir = useCallback(
+    () => (editorCarregado ? Promise.resolve(editorCarregado) : carregarEditor()).then((E) => { setEditor(() => E); }),
+    [],
+  );
   useEffect(() => {
     if (Editor) return;
     let vivo = true;
     esperarOcioso().then(carregarEditor).then((E) => { if (vivo) setEditor(() => E); }).catch(() => {});
     return () => { vivo = false; };
   }, [Editor]);
-  return Editor;
+  return { Editor, garantir };
 }
 
 const SEM = "__sem__"; // valor do Select para "Sem tema"
@@ -61,7 +67,7 @@ function quando(iso: string): string {
 }
 
 function NotasPage() {
-  const EditorNota = useEditorNota();
+  const { Editor: EditorNota, garantir: garantirEditor } = useEditorNota();
   const [notas, setNotas] = useCachedState<Nota[] | null>("notas.lista", null);
   const [temas, setTemas] = useCachedState<Tema[]>("notas.temas", []);
   const [erro, setErro] = useState<string | null>(null);
@@ -124,7 +130,15 @@ function NotasPage() {
     return () => window.removeEventListener("keydown", aoTeclar);
   }, [selecaoAtiva, limparSelecao]);
 
-  const abrir = (e: Edicao) => { original.current = e; setEdicao(e); };
+  const abrir = (e: Edicao) => {
+    original.current = e;
+    setEdicao(e);
+    // O clique já começa a baixar o editor (se ainda não chegou). Se falhar, fecha e o próximo clique tenta de novo.
+    garantirEditor().catch(() => {
+      toast.error("Não foi possível abrir o editor. Tente abrir a nota de novo.");
+      setEdicao((atual) => (atual === e ? null : atual));
+    });
+  };
   const novo = () => abrir({ titulo: "", conteudo: "", tema_id: temaDoFiltro, doc: null });
   const abrirNota = (n: Nota) => abrir({ id: n.id, titulo: n.titulo, conteudo: n.conteudo, tema_id: n.tema_id, doc: n.doc });
 
@@ -429,7 +443,7 @@ function NotasPage() {
               <Input autoFocus={!edicao.id} placeholder="Título" value={edicao.titulo} autoComplete="off" className="text-base font-semibold"
                 onChange={(e) => setEdicao({ ...edicao, titulo: e.target.value })} />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border">
-                {EditorNota && (
+                {EditorNota ? (
                   <EditorNota
                     key={edicao.id ?? "nova"}
                     doc={edicao.doc}
@@ -437,6 +451,9 @@ function NotasPage() {
                     autoFocus={!!edicao.id}
                     onChange={(doc, texto) => setEdicao((atual) => (atual ? { ...atual, doc, conteudo: texto } : atual))}
                   />
+                ) : (
+                  // Mesmo marcador do EditorNota (que ainda não chegou): sem ele a área ficaria em branco
+                  <div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground"><Loader2 size={16} className="mr-2 animate-spin" /> Abrindo o editor…</div>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2">

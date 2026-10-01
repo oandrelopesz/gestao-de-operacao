@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
-import { Plus, Search, Building2, Filter, AlertTriangle, TrendingUp, Users, Target, AlertCircle, MoreVertical, Edit2, Trash2, ClipboardCheck, History, Info } from "lucide-react";
+import { useCallback, useEffect, useState, useMemo } from "react";
+import { Plus, Search, Loader2, Building2, Filter, AlertTriangle, TrendingUp, Users, Target, AlertCircle, MoreVertical, Edit2, Trash2, ClipboardCheck, History, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getScoreCategory, NPS_SCORE_CATEGORIES } from "@/lib/nps";
@@ -57,18 +57,24 @@ let historicoCarregado: typeof NPSHistoryDrawerTipo | null = null;
 const carregarHistorico = () => import("@/components/NPSHistoryDrawer").then((m) => (historicoCarregado = m.NPSHistoryDrawer));
 function useHistoricoNps() {
   const [Historico, setHistorico] = useState(() => historicoCarregado);
+  // Chamada no clique: começa o download na hora (ou usa o que já chegou). Se falhar, a promessa rejeita e o
+  // próximo clique tenta de novo — nada fica guardado como "falhou".
+  const garantir = useCallback(
+    () => (historicoCarregado ? Promise.resolve(historicoCarregado) : carregarHistorico()).then((H) => { setHistorico(() => H); }),
+    [],
+  );
   useEffect(() => {
     if (Historico) return;
     let vivo = true;
     esperarOcioso().then(carregarHistorico).then((H) => { if (vivo) setHistorico(() => H); }).catch(() => {});
     return () => { vivo = false; };
   }, [Historico]);
-  return Historico;
+  return { Historico, garantir };
 }
 
 function NPSPage() {
   const queryClient = useQueryClient();
-  const NPSHistoryDrawer = useHistoricoNps();
+  const { Historico: NPSHistoryDrawer, garantir: garantirHistorico } = useHistoricoNps();
   const { agencias, label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
   const [filterAgencia, setFilterAgencia] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -80,12 +86,22 @@ function NPSPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingName, setDeletingName] = useState<string>("");
 
+  // Histórico: o clique já começa a baixar o código (se ainda não chegou) e a gaveta abre assim que ele vem
+  const abrirHistorico = (cliente: ClienteRow) => {
+    const alvo = { id: cliente.id, nome: cliente.nome, agencia: cliente.agencia };
+    setSelectedCliente(alvo);
+    garantirHistorico().catch(() => {
+      toast.error("Não foi possível abrir o histórico. Tente de novo.");
+      setSelectedCliente((atual: any) => (atual === alvo ? null : atual));
+    });
+  };
+
   // Todos os clientes ativos entram na lista, mesmo sem avaliação.
   // Consultas compartilhadas com o pré-aquecimento do app (src/lib/data.ts): a aba abre com os dados na hora.
-  const { data: clientesQuery, isLoading: loadingClientes, error: clientesError } = useQuery(NPS_CLIENTES_QUERY);
+  const { data: clientesQuery, isLoading: loadingClientes, error: clientesError } = useQuery({ ...NPS_CLIENTES_QUERY, refetchOnMount: "always" });
   const clientes = clientesQuery as ClienteRow[] | undefined;
 
-  const { data: avaliacoes, isLoading: loadingAvaliacoes, error: queryError } = useQuery(NPS_AVALIACOES_QUERY);
+  const { data: avaliacoes, isLoading: loadingAvaliacoes, error: queryError } = useQuery({ ...NPS_AVALIACOES_QUERY, refetchOnMount: "always" });
 
   const isLoading = loadingClientes || loadingAvaliacoes;
   const loadError = clientesError || queryError;
@@ -321,7 +337,7 @@ function NPSPage() {
                     "flex items-center gap-4 p-3 hover:bg-muted/40 transition-colors cursor-pointer",
                     isPausado && "opacity-70"
                   )}
-                  onClick={() => setSelectedCliente({ id: cliente.id, nome: cliente.nome, agencia: cliente.agencia })}
+                  onClick={() => abrirHistorico(cliente)}
                 >
                   {cat ? (
                     <div className={cn(
@@ -390,7 +406,7 @@ function NPSPage() {
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openNewForClient(cliente.id); }}>
                         <Plus size={14} className="mr-2" /> Nova avaliação
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedCliente({ id: cliente.id, nome: cliente.nome, agencia: cliente.agencia }); }}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); abrirHistorico(cliente); }}>
                         <History size={14} className="mr-2" /> Histórico
                       </DropdownMenuItem>
                       {ultima && (
@@ -438,6 +454,11 @@ function NPSPage() {
           cliente={selectedCliente}
           onClose={() => setSelectedCliente(null)}
         />
+      )}
+      {selectedCliente && !NPSHistoryDrawer && (
+        <div role="status" className="fixed bottom-6 left-1/2 z-50 inline-flex -translate-x-1/2 items-center rounded-full border bg-background px-4 py-2 text-sm text-muted-foreground shadow-lg">
+          <Loader2 size={16} className="mr-2 animate-spin" /> Abrindo o histórico…
+        </div>
       )}
 
       <AlertDialog open={!!deletingId} onOpenChange={(o) => { if (!o) setDeletingId(null); }}>

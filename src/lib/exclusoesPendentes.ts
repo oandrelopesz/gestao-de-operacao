@@ -18,16 +18,19 @@ export function criarExclusoesPendentes() {
       });
     },
 
-    /** Espera a exclusão pendente do caminho, no máximo `limiteMs`. Resolve na hora se não há nenhuma. */
-    async esperar(caminho: string, limiteMs: number): Promise<void> {
+    /**
+     * Espera a exclusão pendente do caminho, no máximo `limiteMs`. Resolve na hora se não há nenhuma.
+     * Devolve `true` quando não havia pendência ou ela terminou (com sucesso ou não); `false` quando o limite estourou.
+     */
+    async esperar(caminho: string, limiteMs: number): Promise<boolean> {
       const pendente = pendentes.get(caminho);
-      if (!pendente) return;
+      if (!pendente) return true;
       let cronometro: ReturnType<typeof setTimeout> | undefined;
-      const limite = new Promise<void>((resolve) => {
-        cronometro = setTimeout(resolve, limiteMs);
+      const limite = new Promise<boolean>((resolve) => {
+        cronometro = setTimeout(() => resolve(false), limiteMs);
       });
       try {
-        await Promise.race([pendente, limite]);
+        return await Promise.race([pendente.then(() => true), limite]);
       } finally {
         clearTimeout(cronometro);
       }

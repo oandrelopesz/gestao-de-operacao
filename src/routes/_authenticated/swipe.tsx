@@ -70,6 +70,7 @@ function SwipePage() {
   const [toDelete, setToDelete] = useState<SwipeItem | null>(null);
   const [nichoToDelete, setNichoToDelete] = useState<SwipeNicho | null>(null);
   const [driveReady, setDriveReady] = useState<boolean>(temChave());
+  const [driveChecado, setDriveChecado] = useState(false);
   const [googleInfo, setGoogleInfo] = useState<{ login: boolean; clientId: string | null }>({ login: false, clientId: null });
 
   const load = async () => {
@@ -90,8 +91,8 @@ function SwipePage() {
   // Descobre como liberar o Drive neste navegador: chave já configurada, ou login Google (que
   // funciona em qualquer dispositivo). Tenta o login silencioso (One Tap) antes de pedir clique.
   const checarDrive = async () => {
-    if (temChave()) { setDriveReady(true); return; }
     try {
+      if (temChave()) { setDriveReady(true); return; }
       const st = await statusDoDrive();
       setGoogleInfo({ login: !!st.google_login, clientId: st.client_id });
       if (st.google_login && st.client_id) {
@@ -100,6 +101,10 @@ function SwipePage() {
       }
     } catch {
       // sem status: mantém não-pronto; o aviso orienta o usuário
+    } finally {
+      // O aviso "Falta liberar o Drive" só vale depois da primeira checagem (com ou sem erro): antes disso
+      // ele piscaria para quem já tem acesso liberado e abriu a aba com os itens em cache
+      setDriveChecado(true);
     }
   };
 
@@ -207,7 +212,7 @@ function SwipePage() {
 
       {erro && <Card className="border-destructive/40"><CardContent className="p-4 text-sm text-destructive">{erro}</CardContent></Card>}
 
-      {!loading && !pronto && !erro && (
+      {!loading && driveChecado && !pronto && !erro && (
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardContent className="p-4 text-sm flex items-start gap-3">
             <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />

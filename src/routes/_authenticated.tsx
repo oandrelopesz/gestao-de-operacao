@@ -96,8 +96,18 @@ function AuthenticatedLayout() {
         warmAllCaches(queryClient, { lote: 3, antes: ocioso, cancelado: parou }),
         (async () => {
           await emLotes(ALL_LINKS.map((l) => () => router.preloadRoute({ to: l.to as any })), 1, ocioso, parou);
-          // A grade da Agenda (FullCalendar) é carregada à parte: baixa também, para a aba abrir na hora
-          await emLotes([() => import("@/components/agenda/AgendaGrade")], 1, ocioso, parou);
+          // Pedaços carregados à parte (grade da Agenda, editor das Notas, histórico do NPS): baixam também,
+          // um por vez, para a aba abrir e o clique responder na hora
+          await emLotes(
+            [
+              () => import("@/components/agenda/AgendaGrade"),
+              () => import("@/components/notas/EditorNota"),
+              () => import("@/components/NPSHistoryDrawer"),
+            ],
+            1,
+            ocioso,
+            parou,
+          );
         })(),
       ]);
     })();

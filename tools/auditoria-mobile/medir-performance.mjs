@@ -16,8 +16,11 @@ import { gzipSync } from "node:zlib";
 import { ROTAS as TODAS, CHROME } from "./rotas.mjs";
 
 const [BASE = "http://localhost:4199", SAIDA = "resultados/performance.json"] = process.argv.slice(2);
-// O Fireflies também está no menu (fica fora da lista da auditoria visual)
-const MENU = [...TODAS.slice(0, 15), "/transcritor", "/fireflies", ...TODAS.slice(16)];
+// O Fireflies também está no menu (fica fora da lista da auditoria visual): entra logo depois do Transcritor,
+// achado pela posição na lista — assim a lista não depende de índices fixos nem repete rota
+const MENU = [...TODAS];
+const depoisDoTranscritor = MENU.indexOf("/transcritor") + 1;
+if (depoisDoTranscritor > 0 && !MENU.includes("/fireflies")) MENU.splice(depoisDoTranscritor, 0, "/fireflies");
 const BASES = [BASE, ...(process.env.COMPARAR ? [process.env.COMPARAR] : [])];
 const REPETICOES = Math.max(1, Number(process.env.REPETICOES || 1));
 const ROTAS = process.env.ROTAS ? MENU.filter((r) => process.env.ROTAS.split(",").includes(r)) : MENU;

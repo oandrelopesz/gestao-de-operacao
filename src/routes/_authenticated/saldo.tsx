@@ -356,12 +356,14 @@ function SaldoPage() {
     const alvo = removendo;
     const nome = (alvo.plataformas || []).join(", ") || "Plataforma";
     setRemovendoAndamento(true);
+    // A gravação leva alguns segundos: o aviso de progresso vira o de sucesso ou de erro (mesmo id)
+    const aviso = toast.loading("Removendo a plataforma…");
     try {
       await removerPlataformaDaOperacao(alvo.cliente_id, alvo.operacao_id, alvo.plataformas || []);
-      toast.success(`${nome} removida de ${alvo.cliente_nome}. As recargas ficam guardadas.`);
+      toast.success(`${nome} removida de ${alvo.cliente_nome}. As recargas ficam guardadas.`, { id: aviso });
       fetchSaldo(true);
     } catch (e: any) {
-      toast.error(e?.message || "Erro ao remover a plataforma");
+      toast.error(e?.message || "Erro ao remover a plataforma", { id: aviso });
     } finally {
       setRemovendoAndamento(false);
     }
@@ -454,6 +456,9 @@ function SaldoPage() {
 
     return Object.values(groups);
   }, [data]);
+
+  // Mesmo critério da linha da tabela (qtd_operacoes > 1): o diálogo de remover diz de qual operação a plataforma sai
+  const removendoDeVariasOperacoes = !!removendo && (groupedData.find((g) => g.cliente_id === removendo.cliente_id)?.qtd_operacoes ?? 0) > 1;
 
   const filteredData = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -1095,7 +1100,10 @@ function SaldoPage() {
               Remover {(removendo?.plataformas || []).join(", ") || "a plataforma"} de {removendo?.cliente_nome}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              A plataforma sai do cadastro do cliente e a verba é recalculada. As recargas ficam guardadas e voltam se a plataforma for adicionada de novo.
+              {removendoDeVariasOperacoes && removendo?.operacao_nome
+                ? `A plataforma sai da operação "${removendo.operacao_nome}" do cliente (as outras operações não mudam) e a verba é recalculada. `
+                : "A plataforma sai do cadastro do cliente e a verba é recalculada. "}
+              As recargas ficam guardadas e voltam se a plataforma for adicionada de novo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

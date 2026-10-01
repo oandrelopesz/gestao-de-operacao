@@ -168,7 +168,8 @@ export async function subirImagem(fluxoId: string, fileId: string, dataURL: stri
   const blob = await (await fetch(dataURL)).blob();
   const caminho = `${fluxoId}/${fileId}.${extensaoDoMime(mimeType)}`;
   // Apagar e desfazer em seguida reenvia na mesma chave: se a exclusão ainda estiver a caminho, espera, senão ela apaga o arquivo novo
-  await exclusoesPendentes.esperar(caminho, 10_000);
+  const terminou = await exclusoesPendentes.esperar(caminho, 10_000);
+  if (!terminou) console.warn("[fluxos] exclusão pendente demorou mais de 10 s; enviando mesmo assim:", caminho);
   await enviarR2("fluxogramas", caminho, blob, mimeType);
   return { caminho, mimeType };
 }
