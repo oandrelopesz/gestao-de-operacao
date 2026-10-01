@@ -147,12 +147,17 @@ export function escolherImagem(candidatos: string[], usos: Record<string, string
 
 // ------------------------------------------------------------------ agenda (dias e horários dos posts)
 
-/** Um dia da semana com o horário do post. `dia`: 0 = domingo … 6 = sábado; `hora`: "HH:MM" (horário de Brasília). */
-export interface ItemAgenda { dia: number; hora: string }
+/**
+ * Um dia da semana com o horário do post. `dia`: 0 = domingo … 6 = sábado; `hora`: "HH:MM" (horário de Brasília);
+ * `imagem`: o post desse dia leva imagem (true) ou é só texto (false).
+ */
+export interface ItemAgenda { dia: number; hora: string; imagem: boolean }
 
 export const DIAS_CURTOS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 export const HORA_PADRAO = "09:00";
-export const AGENDA_PADRAO: ItemAgenda[] = [{ dia: 2, hora: HORA_PADRAO }, { dia: 4, hora: HORA_PADRAO }];
+export const AGENDA_PADRAO: ItemAgenda[] = [
+  { dia: 2, hora: HORA_PADRAO, imagem: true }, { dia: 4, hora: HORA_PADRAO, imagem: true },
+];
 
 /** Horários oferecidos na tela: de 30 em 30 minutos, das 06:00 às 22:00. */
 export const HORARIOS: string[] = Array.from({ length: 33 }, (_, i) => {
@@ -162,41 +167,62 @@ export const HORARIOS: string[] = Array.from({ length: 33 }, (_, i) => {
 
 const RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-/** Qualquer valor (jsonb do banco, estado da tela) → agenda válida: um item por dia (o primeiro vence), em ordem de dia. */
+/**
+ * Qualquer valor (jsonb do banco, estado da tela) → agenda válida: um item por dia (o primeiro vence), em ordem de dia.
+ * `imagem` fora de booleano (ou ausente, como nas agendas antigas) vale true.
+ */
 export function normalizarAgenda(v: unknown): ItemAgenda[] {
-  const porDia = new Map<number, string>();
+  const porDia = new Map<number, { hora: string; imagem: boolean }>();
   for (const x of Array.isArray(v) ? v : []) {
     const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
     const dia = typeof o.dia === "number" ? o.dia : Number.NaN;
     const hora = typeof o.hora === "string" ? o.hora.trim() : "";
-    if (Number.isInteger(dia) && dia >= 0 && dia <= 6 && RE_HORA.test(hora) && !porDia.has(dia)) porDia.set(dia, hora);
+    const imagem = typeof o.imagem === "boolean" ? o.imagem : true;
+    if (Number.isInteger(dia) && dia >= 0 && dia <= 6 && RE_HORA.test(hora) && !porDia.has(dia)) porDia.set(dia, { hora, imagem });
   }
-  return [...porDia.entries()].sort((a, b) => a[0] - b[0]).map(([dia, hora]) => ({ dia, hora }));
+  return [...porDia.entries()].sort((a, b) => a[0] - b[0]).map(([dia, x]) => ({ dia, hora: x.hora, imagem: x.imagem }));
 }
 
-/** Liga ou desliga um dia. Dia novo entra com o horário do primeiro dia já ligado (ou 09:00). */
+/** Liga ou desliga um dia. Dia novo entra com o horário do primeiro dia já ligado (ou 09:00) e com imagem. */
 export function alternarDia(agenda: ItemAgenda[], dia: number): ItemAgenda[] {
   const a = normalizarAgenda(agenda);
   if (a.some((x) => x.dia === dia)) return a.filter((x) => x.dia !== dia);
-  return normalizarAgenda([...a, { dia, hora: a[0]?.hora ?? HORA_PADRAO }]);
+  return normalizarAgenda([...a, { dia, hora: a[0]?.hora ?? HORA_PADRAO, imagem: true }]);
 }
 
 /** Troca o horário de um dia já ligado. */
 export function mudarHora(agenda: ItemAgenda[], dia: number, hora: string): ItemAgenda[] {
-  if (!RE_HORA.test(hora)) return normalizarAgenda(agenda); // hora inválida não apaga o dia
-  return normalizarAgenda(agenda.map((x) => (x.dia === dia ? { dia, hora } : x)));
+  const a = normalizarAgenda(agenda);
+  if (!RE_HORA.test(hora)) return a; // hora inválida não apaga o dia
+  return normalizarAgenda(a.map((x) => (x.dia === dia ? { ...x, hora } : x)));
 }
 
 /** O mesmo horário em todos os dias ligados. */
 export function mesmoHorario(agenda: ItemAgenda[], hora: string): ItemAgenda[] {
-  if (!RE_HORA.test(hora)) return normalizarAgenda(agenda);
-  return normalizarAgenda(agenda.map((x) => ({ dia: x.dia, hora })));
+  const a = normalizarAgenda(agenda);
+  if (!RE_HORA.test(hora)) return a;
+  return normalizarAgenda(a.map((x) => ({ ...x, hora })));
 }
 
-/** "Ter 09:00 · Qui 14:30" (sem nenhum dia: "Sem dias"). */
+/** Inverte "com imagem" / "só texto" de um dia ligado. Dia que não está na agenda: devolve igual. */
+export function alternarImagem(agenda: ItemAgenda[], dia: number): ItemAgenda[] {
+  return normalizarAgenda(normalizarAgenda(agenda).map((x) => (x.dia === dia ? { ...x, imagem: !x.imagem } : x)));
+}
+
+/** "Ter 09:00 · Qui 14:30 (só texto)" (sem nenhum dia: "Sem dias"). */
 export function resumoAgenda(agenda: ItemAgenda[]): string {
   const a = normalizarAgenda(agenda);
-  return a.length ? a.map((x) => `${DIAS_CURTOS[x.dia]} ${x.hora}`).join(" · ") : "Sem dias";
+  return a.length ? a.map((x) => `${DIAS_CURTOS[x.dia]} ${x.hora}${x.imagem ? "" : " (só texto)"}`).join(" · ") : "Sem dias";
+}
+
+/**
+ * De onde sai a imagem de um post: sem imagem no dia, nada; com pasta do Drive, sempre o Drive (se falhar, o post vai
+ * sem imagem: não cai para a IA); sem pasta, a IA, se estiver ligada.
+ */
+export function decidirImagem(o: { comImagem: boolean; temPasta: boolean; usaIa: boolean }): "drive" | "ia" | null {
+  if (!o.comImagem) return null;
+  if (o.temPasta) return "drive";
+  return o.usaIa ? "ia" : null;
 }
 
 export const UTM = { utm_source: "google", utm_medium: "organic", utm_campaign: "gmn-post" };
@@ -227,6 +253,15 @@ export function idPastaDrive(link: string): string | null {
 
 export interface Mensagens { system: string; user: string }
 
+export const LIMITE_CONTEXTO_POSTS = 30000;
+export const LIMITE_CONTEXTO_IMAGENS = 8000;
+
+/** Texto longo do cliente aparado e cortado no limite; vazio ou só espaços: `null` (como se não houvesse). */
+function contextoAte(texto: string | null | undefined, limite: number): string | null {
+  const t = typeof texto === "string" ? texto.trim() : "";
+  return t ? t.slice(0, limite) : null;
+}
+
 export interface EntradaPost {
   nome: string;
   categoria: string | null;
@@ -236,6 +271,8 @@ export interface EntradaPost {
   palavras: string[];
   anteriores: string[];
   motivoReprovacao: string | null;
+  /** Contexto completo do cliente (fonte principal dos guardrails, tom de voz e SEO local), se o perfil tiver. */
+  contextoPosts: string | null;
 }
 
 function blocoBriefing(b: Briefing): string {
@@ -259,6 +296,7 @@ function blocoBriefing(b: Briefing): string {
 }
 
 export function montarMensagensPost(e: EntradaPost): Mensagens {
+  const contexto = contextoAte(e.contextoPosts, LIMITE_CONTEXTO_POSTS);
   const regras = [
     "Você escreve posts para o Perfil da Empresa no Google (Google Meu Negócio) de negócios locais brasileiros.",
     "Escreva em português do Brasil, entre 120 e 220 palavras, no máximo 1.400 caracteres.",
@@ -266,10 +304,14 @@ export function montarMensagensPost(e: EntradaPost): Mensagens {
     "Otimize para SEO local: use a palavra-chave e a cidade ou bairro de forma natural, sem repetir à exaustão.",
     "Não inclua número de telefone, WhatsApp, e-mail, links ou nomes de site: o botão do post já leva ao contato.",
     "No máximo 3 hashtags, só se fizerem sentido. Sem emojis em excesso (no máximo 2).",
-    "Siga o tom de voz e o posicionamento do briefing. Não invente preços, prêmios, números ou fatos que não estejam no briefing.",
+    "Siga o tom de voz e o posicionamento do briefing. Não invente preços, prêmios, números ou fatos que não estejam " +
+      (contexto ? "no contexto do cliente nem no briefing." : "no briefing."),
     "Termine com uma chamada para ação coerente com o objetivo do briefing.",
     'Responda só com JSON: {"texto": "...", "palavras_chave": ["as palavras-chave que você usou"]}.',
   ];
+  if (contexto) {
+    regras.push("Siga à risca os guardrails, o tom de voz e o objetivo de SEO local do contexto do cliente; nunca contradiga o contexto.");
+  }
   if (e.saude) {
     regras.push(
       "Este é um perfil da área da saúde: siga as regras de publicidade do CFM e do CFO. Não prometa resultado nem cura, " +
@@ -278,6 +320,7 @@ export function montarMensagensPost(e: EntradaPost): Mensagens {
   }
   const partes = [
     `Empresa: ${e.nome}${e.categoria ? ` (${e.categoria})` : ""}`,
+    contexto ? `Contexto completo do cliente (fonte principal; siga os guardrails dele):\n${contexto}` : "",
     `Briefing:\n${blocoBriefing(e.briefing)}`,
     `Tema deste post: ${ROTULO_TEMA[e.tema]}`,
     e.palavras.length ? `Palavras-chave para este post: ${e.palavras.join("; ")}` : "Palavras-chave: use as do briefing.",
@@ -297,38 +340,88 @@ export interface EntradaBriefing {
   nicho: string | null;
   briefingAtual: Briefing;
   textoDadosInternos: string | null;
+  /** Contexto completo do cliente: com ele o briefing é extraído desse texto, em vez de sugerido. */
+  contextoPosts: string | null;
 }
 
 export function montarMensagensBriefing(e: EntradaBriefing): Mensagens {
-  const system = [
-    "Você é estrategista de marketing local e monta o briefing de marca de um negócio para posts no Google Meu Negócio.",
-    "Use apenas as informações recebidas; quando faltar algo, faça uma sugestão prudente e genérica, sem inventar fatos.",
-    "Palavras-chave: de 5 a 10 buscas locais reais que o cliente faria (serviço + cidade/bairro), em minúsculas.",
-    "Listas: itens curtos. Termos proibidos: só o que o material pedir para evitar (lista vazia se nada for dito).",
-    "Mantenha o que já estiver preenchido no briefing atual, a menos que o material traga algo melhor.",
-    "Responda só com o JSON do briefing.",
-  ].join("\n");
+  const contexto = contextoAte(e.contextoPosts, LIMITE_CONTEXTO_POSTS);
+  const system = (contexto
+    ? [
+        "Você é estrategista de marketing local e EXTRAI, do contexto completo do cliente, os campos do briefing de marca para posts no Google Meu Negócio.",
+        "O texto do contexto é a fonte da verdade: extraia os campos dele e não invente nada que ele não diga.",
+        'Se o contexto tiver um bloco "DADOS PARA O SISTEMA", use esse bloco como base dos campos.',
+        "Palavras-chave: as que o contexto trouxer, como estão no texto (não crie nem reescreva).",
+        "Termos proibidos: exatamente os listados no contexto (lista vazia se ele não listar nenhum).",
+        "Listas: itens curtos. Campo que o contexto não cobre: mantenha o do briefing atual ou deixe vazio.",
+        "Responda só com o JSON do briefing.",
+      ]
+    : [
+        "Você é estrategista de marketing local e monta o briefing de marca de um negócio para posts no Google Meu Negócio.",
+        "Use apenas as informações recebidas; quando faltar algo, faça uma sugestão prudente e genérica, sem inventar fatos.",
+        "Palavras-chave: de 5 a 10 buscas locais reais que o cliente faria (serviço + cidade/bairro), em minúsculas.",
+        "Listas: itens curtos. Termos proibidos: só o que o material pedir para evitar (lista vazia se nada for dito).",
+        "Mantenha o que já estiver preenchido no briefing atual, a menos que o material traga algo melhor.",
+        "Responda só com o JSON do briefing.",
+      ]
+  ).join("\n");
   const user = [
     `Empresa: ${e.nome}`,
     e.categoria ? `Categoria no Google: ${e.categoria}` : "",
     e.site ? `Site: ${e.site}` : "",
     e.endereco ? `Endereço: ${e.endereco}` : "",
     e.nicho ? `Nicho: ${e.nicho}` : "",
+    contexto ? `Contexto completo do cliente (extraia o briefing deste texto):\n${contexto}` : "",
     `Briefing atual:\n${blocoBriefing(e.briefingAtual)}`,
     e.textoDadosInternos ? `Respostas do formulário de briefing do cliente:\n${e.textoDadosInternos.slice(0, 20000)}` : "",
   ];
   return { system, user: user.filter(Boolean).join("\n\n") };
 }
 
-export function montarPromptImagem(e: { nome: string; categoria: string | null; briefing: Briefing; tema: Tema }): string {
+export interface EntradaImagem {
+  nome: string;
+  categoria: string | null;
+  briefing: Briefing;
+  tema: Tema;
+  /** Diretrizes de imagem escritas para o cliente (até 8.000 caracteres entram no prompt). */
+  contextoImagens: string | null;
+  /** Só o André liga: sem isso a IA nunca gera pessoas. */
+  permitirPessoas: boolean;
+  /** A logo do cliente vai junto como imagem de referência. */
+  comLogo: boolean;
+  /** Nova tentativa: o que a checagem achou na versão anterior (o prompt pede para não repetir). */
+  versaoAnterior?: { tem_pessoas: boolean; tem_texto: boolean } | null;
+}
+
+export function montarPromptImagem(e: EntradaImagem): string {
   const negocio = e.categoria || e.briefing.servicos[0] || e.nome;
   const local = [e.briefing.cidade, ...e.briefing.bairros.slice(0, 1)].filter(Boolean).join(", ");
+  const diretrizes = contextoAte(e.contextoImagens, LIMITE_CONTEXTO_IMAGENS);
   return [
     `Fotografia realista e profissional para o post de um negócio local: ${negocio}${local ? ` em ${local}` : ""}.`,
     `Assunto: ${ROTULO_TEMA[e.tema]}${e.briefing.servicos.length ? ` — ${e.briefing.servicos.slice(0, 3).join(", ")}` : ""}.`,
     "Luz natural, cores agradáveis, composição limpa, aparência de foto real tirada no local.",
-    "Sem texto, sem letras, sem logotipos, sem marcas d'água e sem rostos em destaque.",
-  ].join(" ");
+    diretrizes ? `Diretrizes de imagem do cliente: ${diretrizes}` : "",
+    diretrizes ? "As regras a seguir valem sempre, mesmo que as diretrizes digam o contrário." : "",
+    e.permitirPessoas ? "" : "Sem pessoas: nenhum rosto, corpo, mão, silhueta ou reflexo de pessoa.",
+    e.comLogo
+      ? "Sem texto, letras, números, preços ou slogans na arte, exceto a própria logo da marca (imagem de referência), que aparece exatamente como é."
+      : "Sem texto, letras, números, preços ou slogans na arte.",
+    "Sem marcas d'água. Sem logos ou marcas de terceiros. Sem placas de carro legíveis.",
+    "Aparência de fotografia real e profissional, em formato paisagem.",
+    e.comLogo
+      ? "Use a imagem de referência como a logo da marca: aplique-a pequena e discreta (num canto, parede ou fachada), sem distorcer, sem mudar cores, sem cobrir o assunto principal."
+      : "",
+    e.versaoAnterior && (e.versaoAnterior.tem_pessoas || e.versaoAnterior.tem_texto)
+      ? `A versão anterior tinha ${
+        e.versaoAnterior.tem_pessoas && e.versaoAnterior.tem_texto
+          ? "pessoas e texto em destaque"
+          : e.versaoAnterior.tem_pessoas ? "pessoas" : "texto em destaque"
+      }; garanta que não haja ${e.versaoAnterior.tem_pessoas && !e.versaoAnterior.tem_texto ? "nenhuma" : "nenhum"}.`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 // ------------------------------------------------------------------ esquemas da OpenAI (strict)
@@ -355,3 +448,83 @@ export const ESQUEMA_BRIEFING = {
     servicos: LISTA, bairros: LISTA, palavras_chave: LISTA, diferenciais: LISTA, termos_proibidos: LISTA,
   },
 };
+
+/** Checagem da imagem gerada pela IA: a imagem não pode ter gente nem texto (a regra sobre pessoas vale sempre). */
+export const ESQUEMA_CHECAGEM_IMAGEM = {
+  type: "object",
+  additionalProperties: false,
+  required: ["tem_pessoas", "tem_texto"],
+  properties: {
+    tem_pessoas: { type: "boolean" },
+    tem_texto: { type: "boolean" },
+  },
+};
+
+/**
+ * Pedido da checagem da imagem. Pessoas: qualquer uma, até pequena ao fundo. Texto: só escrita legível e em destaque na
+ * arte (marcas minúsculas e ilegíveis, como o emblema de um carro, não contam). Com logo, a logo vai como segunda imagem
+ * e a escrita dela não conta como texto.
+ */
+export function promptChecagemImagem(comLogo: boolean): string {
+  const base =
+    "Olhe a imagem e responda em JSON. " +
+    "tem_pessoas é true se houver qualquer pessoa, rosto, mão, corpo, silhueta ou reflexo de pessoa, mesmo pequena, parcial ou ao fundo. " +
+    "tem_texto é true só se houver escrita legível e em destaque na arte (frases, letras, números, preços, slogans, letreiros, " +
+    "placas de carro legíveis, marcas de terceiros); ignore marcas minúsculas e ilegíveis.";
+  return comLogo
+    ? `${base} A segunda imagem é a logo da marca e serve só de referência: as duas marcações valem para a primeira ` +
+      "imagem. Só não conta como texto nem como pessoa o que estiver dentro da própria marca da logo aplicada na arte " +
+      "(o desenho pequeno da logo, num canto, parede ou fachada: escrita, mascote ou rosto dela, como na referência). " +
+      "Qualquer pessoa, rosto, mão ou silhueta fora da marca da logo conta como pessoa, mesmo que lembre o mascote."
+    : base;
+}
+
+/** O pedido da checagem sem logo. */
+export const PROMPT_CHECAGEM_IMAGEM = promptChecagemImagem(false);
+
+/** Antes de gerar de novo, a execução precisa ter pelo menos isto sobrando do prazo total. */
+export const MARGEM_NOVA_TENTATIVA_MS = 45_000;
+
+/**
+ * O que fazer com a imagem da IA depois da checagem. Pessoas ou texto em destaque reprovam (com `permitirPessoas`, só
+ * o texto: `tem_pessoas` é ignorado); na 1ª tentativa gera de novo se ainda sobrar tempo (`restanteMs`), senão (ou na
+ * 2ª) desiste e o post sai só com texto.
+ */
+export function decisaoChecagem(
+  tentativa: 1 | 2, r: { tem_pessoas: boolean; tem_texto: boolean }, restanteMs: number, permitirPessoas: boolean,
+): "aceitar" | "repetir" | "desistir" {
+  if (!r.tem_texto && (permitirPessoas || !r.tem_pessoas)) return "aceitar";
+  return tentativa === 1 && restanteMs >= MARGEM_NOVA_TENTATIVA_MS ? "repetir" : "desistir";
+}
+
+/**
+ * Bytes que um texto base64 vai ter depois de decodificado, sem decodificar nem copiar o texto: ignora o prefixo
+ * "data:...;base64," e os espaços e quebras de linha, e desconta o padding "=". Serve para recusar arquivo grande demais.
+ */
+export function tamanhoBase64(texto: string): number {
+  let i = 0;
+  if (texto.startsWith("data:")) {
+    const v = texto.indexOf(",");
+    if (v >= 0) i = v + 1;
+  }
+  let n = 0;
+  let padding = 0;
+  for (; i < texto.length; i++) {
+    const c = texto.charCodeAt(i);
+    if (c <= 32) continue;
+    n++;
+    if (c === 61) padding++;
+  }
+  return Math.floor((n * 3) / 4) - padding;
+}
+
+/**
+ * Base64 → bytes com um laço simples (`Uint8Array.from(atob(s), fn)` custa várias vezes mais CPU em arquivo de MBs).
+ * O `atob` ignora espaços e quebras de linha e dá erro em base64 inválido.
+ */
+export function base64ParaBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}

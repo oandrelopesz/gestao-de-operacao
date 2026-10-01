@@ -1,4 +1,4 @@
-// Aba Google Meu Negócio (Fase 1: perfis à mão, briefing e prévias; nada é publicado).
+// Aba Google Meu Negócio (Fase 1: perfis à mão, contexto e prévias; nada é publicado).
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, MapPin, Plus } from "lucide-react";
@@ -26,7 +26,7 @@ type Filtro = "todos" | "ativos" | "desligados" | "erro" | "saude" | "sem_acesso
 const FILTROS: { v: Filtro; rotulo: string }[] = [
   { v: "todos", rotulo: "Todos" }, { v: "ativos", rotulo: "Ativos" }, { v: "desligados", rotulo: "Desligados" },
   { v: "erro", rotulo: "Com erro" }, { v: "saude", rotulo: "Saúde" }, { v: "sem_acesso", rotulo: "Sem acesso" },
-  { v: "sem_briefing", rotulo: "Sem briefing" },
+  { v: "sem_briefing", rotulo: "Sem contexto" },
 ];
 const SEM_CLIENTE = "__sem__";
 
@@ -96,7 +96,7 @@ function GmnConteudo() {
 
   async function alternar(p: PerfilGmn, ativo: boolean) {
     if (ativo && !p.briefing_salvo_em) {
-      toast.error("Salve o briefing antes de ligar o perfil.");
+      toast.error("Salve o contexto antes de ligar o perfil.");
       setAbertoId(p.id);
       return;
     }
@@ -165,7 +165,7 @@ function GmnConteudo() {
                   <p className="truncate font-medium">{p.nome}</p>
                   <p className="truncate text-xs text-muted-foreground">
                     {nomeCliente(p.cliente_id) ?? "Sem cliente"} · {resumoAgenda(p.agenda)}
-                    {p.briefing_salvo_em ? "" : " · sem briefing"}
+                    {p.briefing_salvo_em ? "" : " · sem contexto"}
                   </p>
                   {u && (
                     <p className="flex items-center gap-1.5 text-xs text-muted-foreground" title={u.erro ?? undefined}>

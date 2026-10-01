@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  AGENDA_PADRAO, BRIEFING_VAZIO, HORARIOS, TEMAS, alternarDia, checarTexto, comUtm, escolherImagem, escolherPalavras,
-  idPastaDrive, mesmoHorario, montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda,
-  normalizarBriefing, proximoTema, resumoAgenda,
+  AGENDA_PADRAO, BRIEFING_VAZIO, ESQUEMA_CHECAGEM_IMAGEM, HORARIOS, PROMPT_CHECAGEM_IMAGEM, TEMAS, alternarDia,
+  alternarImagem, base64ParaBytes, checarTexto, comUtm, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras,
+  idPastaDrive,
+  mesmoHorario, montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda,
+  normalizarBriefing, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64,
 } from "../../supabase/functions/gmn/regras.ts";
 
 const textoBom =
@@ -94,25 +96,60 @@ test("normalizarAgenda: um item por dia, ordenado, descarta lixo", () => {
       { dia: 4, hora: "14:30" }, { dia: 2, hora: "09:00" }, { dia: 4, hora: "10:00" }, { dia: 7, hora: "09:00" },
       { dia: 1, hora: "25:00" }, "x", null,
     ]),
-    [{ dia: 2, hora: "09:00" }, { dia: 4, hora: "14:30" }],
+    [{ dia: 2, hora: "09:00", imagem: true }, { dia: 4, hora: "14:30", imagem: true }],
   );
-  assert.deepEqual(normalizarAgenda(AGENDA_PADRAO), [{ dia: 2, hora: "09:00" }, { dia: 4, hora: "09:00" }]);
+  assert.deepEqual(
+    normalizarAgenda(AGENDA_PADRAO),
+    [{ dia: 2, hora: "09:00", imagem: true }, { dia: 4, hora: "09:00", imagem: true }],
+  );
 });
 
-test("alternarDia liga com o horário do primeiro dia ligado e desliga", () => {
-  const a = [{ dia: 2, hora: "14:30" }];
-  assert.deepEqual(alternarDia(a, 5), [{ dia: 2, hora: "14:30" }, { dia: 5, hora: "14:30" }]);
+test("normalizarAgenda: imagem booleana é mantida; faltando ou de outro tipo vira true", () => {
+  assert.deepEqual(
+    normalizarAgenda([
+      { dia: 1, hora: "09:00", imagem: false }, { dia: 2, hora: "09:00", imagem: true }, { dia: 3, hora: "09:00" },
+      { dia: 4, hora: "09:00", imagem: "não" }, { dia: 5, hora: "09:00", imagem: 0 }, { dia: 6, hora: "09:00", imagem: null },
+    ]),
+    [
+      { dia: 1, hora: "09:00", imagem: false }, { dia: 2, hora: "09:00", imagem: true }, { dia: 3, hora: "09:00", imagem: true },
+      { dia: 4, hora: "09:00", imagem: true }, { dia: 5, hora: "09:00", imagem: true }, { dia: 6, hora: "09:00", imagem: true },
+    ],
+  );
+  assert.equal(AGENDA_PADRAO.every((x) => x.imagem === true), true);
+});
+
+test("alternarDia liga com o horário do primeiro dia ligado e desliga; dia novo entra com imagem", () => {
+  const a = [{ dia: 2, hora: "14:30", imagem: true }];
+  assert.deepEqual(alternarDia(a, 5), [{ dia: 2, hora: "14:30", imagem: true }, { dia: 5, hora: "14:30", imagem: true }]);
   assert.deepEqual(alternarDia(a, 2), []);
-  assert.deepEqual(alternarDia([], 0), [{ dia: 0, hora: "09:00" }]);
-  assert.deepEqual(alternarDia(alternarDia([], 3), 1), [{ dia: 1, hora: "09:00" }, { dia: 3, hora: "09:00" }]);
+  assert.deepEqual(alternarDia([], 0), [{ dia: 0, hora: "09:00", imagem: true }]);
+  assert.deepEqual(
+    alternarDia(alternarDia([], 3), 1),
+    [{ dia: 1, hora: "09:00", imagem: true }, { dia: 3, hora: "09:00", imagem: true }],
+  );
+  // ligar um dia novo não mexe no "só texto" dos outros
+  assert.deepEqual(
+    alternarDia([{ dia: 2, hora: "09:00", imagem: false }], 4),
+    [{ dia: 2, hora: "09:00", imagem: false }, { dia: 4, hora: "09:00", imagem: true }],
+  );
+});
+
+test("alternarImagem inverte só o dia ligado; dia desligado fica igual", () => {
+  const a = [{ dia: 2, hora: "09:00", imagem: true }, { dia: 4, hora: "14:30", imagem: true }];
+  const b = alternarImagem(a, 4);
+  assert.deepEqual(b, [{ dia: 2, hora: "09:00", imagem: true }, { dia: 4, hora: "14:30", imagem: false }]);
+  assert.deepEqual(alternarImagem(b, 4), a);
+  assert.deepEqual(alternarImagem(a, 5), a);
+  assert.deepEqual(alternarImagem([], 1), []);
 });
 
 test("mudarHora, mesmoHorario, resumoAgenda e HORARIOS", () => {
-  const a = [{ dia: 2, hora: "09:00" }, { dia: 4, hora: "09:00" }];
+  const a = [{ dia: 2, hora: "09:00", imagem: true }, { dia: 4, hora: "09:00", imagem: false }];
   const b = mudarHora(a, 4, "14:30");
-  assert.deepEqual(b, [{ dia: 2, hora: "09:00" }, { dia: 4, hora: "14:30" }]);
-  assert.deepEqual(mesmoHorario(b, "10:00"), [{ dia: 2, hora: "10:00" }, { dia: 4, hora: "10:00" }]);
-  assert.equal(resumoAgenda(b), "Ter 09:00 · Qui 14:30");
+  assert.deepEqual(b, [{ dia: 2, hora: "09:00", imagem: true }, { dia: 4, hora: "14:30", imagem: false }]);
+  assert.deepEqual(mesmoHorario(b, "10:00"), [{ dia: 2, hora: "10:00", imagem: true }, { dia: 4, hora: "10:00", imagem: false }]);
+  assert.equal(resumoAgenda(b), "Ter 09:00 · Qui 14:30 (só texto)");
+  assert.equal(resumoAgenda(alternarImagem(b, 4)), "Ter 09:00 · Qui 14:30");
   assert.equal(resumoAgenda([]), "Sem dias");
   assert.equal(HORARIOS.length, 33);
   assert.equal(HORARIOS[0], "06:00");
@@ -142,11 +179,12 @@ test("idPastaDrive lê os formatos de link do Drive", () => {
   assert.equal(idPastaDrive("https://exemplo.com"), null);
 });
 
+
 test("montarMensagensPost leva briefing, tema, palavras, anteriores e regras de saúde", () => {
   const briefing = { ...BRIEFING_VAZIO, posicionamento: "a melhor loja de Brasília", cidade: "Brasília" };
   const m = montarMensagensPost({
     nome: "Brazilian Car", categoria: "Concessionária", briefing, saude: false, tema: "regiao",
-    palavras: ["seminovos brasília"], anteriores: ["Post antigo"], motivoReprovacao: null,
+    palavras: ["seminovos brasília"], anteriores: ["Post antigo"], motivoReprovacao: null, contextoPosts: null,
   });
   assert.match(m.user, /Brazilian Car/);
   assert.match(m.user, /a melhor loja de Brasília/);
@@ -159,21 +197,291 @@ test("montarMensagensPost leva briefing, tema, palavras, anteriores e regras de 
   assert.doesNotMatch(m.system, /CFM/);
   const s = montarMensagensPost({
     nome: "Clínica", categoria: null, briefing, saude: true, tema: "servico", palavras: [], anteriores: [],
-    motivoReprovacao: "contém telefone",
+    motivoReprovacao: "contém telefone", contextoPosts: null,
   });
   assert.match(s.system, /CFM/);
   assert.match(s.system, /descontos/);
   assert.match(s.user, /contém telefone/);
 });
 
-test("montarMensagensBriefing e montarPromptImagem", () => {
+test("montarMensagensPost sem contexto fica como era: sem bloco do contexto nem a regra dos guardrails", () => {
+  const m = montarMensagensPost({
+    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, saude: false, tema: "servico", palavras: [], anteriores: [],
+    motivoReprovacao: null, contextoPosts: null,
+  });
+  assert.doesNotMatch(m.user, /Contexto completo do cliente/);
+  assert.doesNotMatch(m.system, /guardrails/);
+  const vazio = montarMensagensPost({
+    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, saude: false, tema: "servico", palavras: [], anteriores: [],
+    motivoReprovacao: null, contextoPosts: "   \n ",
+  });
+  assert.deepEqual(vazio, m);
+});
+
+test("montarMensagensPost com contexto: o contexto vem antes do briefing e o system manda seguir os guardrails", () => {
+  const briefing = { ...BRIEFING_VAZIO, posicionamento: "loja de carros", cidade: "Brasília" };
+  const m = montarMensagensPost({
+    nome: "Brazilian Car", categoria: null, briefing, saude: false, tema: "servico", palavras: [], anteriores: [],
+    motivoReprovacao: null, contextoPosts: "GUARDRAILS: nunca falar de leilão. Tom: direto e acolhedor.",
+  });
+  assert.match(m.user, /Contexto completo do cliente \(fonte principal; siga os guardrails dele\):\nGUARDRAILS: nunca falar de leilão/);
+  assert.ok(m.user.indexOf("Contexto completo do cliente") < m.user.indexOf("Briefing:"));
+  assert.ok(m.user.indexOf("Empresa: Brazilian Car") < m.user.indexOf("Contexto completo do cliente"));
+  assert.match(
+    m.system,
+    /Siga à risca os guardrails, o tom de voz e o objetivo de SEO local do contexto do cliente; nunca contradiga o contexto\./,
+  );
+  const longo = montarMensagensPost({
+    nome: "X", categoria: null, briefing, saude: false, tema: "servico", palavras: [], anteriores: [],
+    motivoReprovacao: null, contextoPosts: "a".repeat(40000),
+  });
+  assert.ok(longo.user.includes("a".repeat(30000)));
+  assert.ok(!longo.user.includes("a".repeat(30001)));
+});
+
+test("montarMensagensBriefing sem contexto e montarPromptImagem", () => {
   const b = montarMensagensBriefing({
     nome: "Brazilian Car", categoria: null, site: "https://brazilian.com.br", endereco: "SIA", nicho: "automotivo",
-    briefingAtual: BRIEFING_VAZIO, textoDadosInternos: "Pergunta 1 - Resposta",
+    briefingAtual: BRIEFING_VAZIO, textoDadosInternos: "Pergunta 1 - Resposta", contextoPosts: null,
   });
   assert.match(b.user, /Pergunta 1 - Resposta/);
   assert.match(b.user, /automotivo/);
-  const p = montarPromptImagem({ nome: "Brazilian Car", categoria: "Loja de carros usados", briefing: BRIEFING_VAZIO, tema: "bastidores" });
+  assert.doesNotMatch(b.user, /Contexto completo do cliente/);
+  assert.doesNotMatch(b.system, /extra[ií]/i);
+  const p = montarPromptImagem({
+    nome: "Brazilian Car", categoria: "Loja de carros usados", briefing: BRIEFING_VAZIO, tema: "bastidores",
+    contextoImagens: null, permitirPessoas: false, comLogo: false,
+  });
   assert.match(p, /sem texto/i);
   assert.match(p, /Loja de carros usados/);
+});
+
+test("montarMensagensBriefing com contexto: extrai do texto, que vai no user (até 30.000 caracteres)", () => {
+  const b = montarMensagensBriefing({
+    nome: "Brazilian Car", categoria: null, site: null, endereco: null, nicho: null,
+    briefingAtual: BRIEFING_VAZIO, textoDadosInternos: null,
+    contextoPosts: "Identificação: loja de seminovos.\nDADOS PARA O SISTEMA\nPalavras-chave: seminovos brasília",
+  });
+  assert.match(b.user, /Identificação: loja de seminovos\./);
+  assert.match(b.user, /DADOS PARA O SISTEMA/);
+  assert.match(b.system, /extra/i);
+  assert.match(b.system, /DADOS PARA O SISTEMA/);
+  assert.match(b.system, /fonte da verdade/i);
+  assert.match(b.system, /não invente/i);
+  assert.match(b.system, /termos proibidos/i);
+  const longo = montarMensagensBriefing({
+    nome: "X", categoria: null, site: null, endereco: null, nicho: null, briefingAtual: BRIEFING_VAZIO,
+    textoDadosInternos: null, contextoPosts: "b".repeat(35000),
+  });
+  assert.ok(longo.user.includes("b".repeat(30000)));
+  assert.ok(!longo.user.includes("b".repeat(30001)));
+});
+
+test("montarPromptImagem sem pessoas (padrão): proíbe pessoas e traz as regras fixas", () => {
+  const p = montarPromptImagem({
+    nome: "Brazilian Car", categoria: "Loja de carros usados", briefing: BRIEFING_VAZIO, tema: "servico",
+    contextoImagens: null, permitirPessoas: false, comLogo: false,
+  });
+  assert.match(p, /Sem pessoas: nenhum rosto, corpo, mão, silhueta ou reflexo de pessoa\./);
+  assert.match(p, /sem texto, letras, números, preços ou slogans na arte/i);
+  assert.match(p, /sem logos ou marcas de terceiros/i);
+  assert.match(p, /sem placas de carro legíveis/i);
+  assert.match(p, /aparência de fotografia real e profissional/i);
+  assert.match(p, /formato paisagem/i);
+  assert.doesNotMatch(p, /imagem de referência/);
+  assert.doesNotMatch(p, /Diretrizes de imagem do cliente/);
+});
+
+test("montarPromptImagem com permitirPessoas não proíbe pessoas, mas mantém o resto", () => {
+  const p = montarPromptImagem({
+    nome: "Clínica", categoria: null, briefing: BRIEFING_VAZIO, tema: "bastidores",
+    contextoImagens: null, permitirPessoas: true, comLogo: false,
+  });
+  assert.doesNotMatch(p, /Sem pessoas/);
+  assert.match(p, /sem texto, letras, números, preços ou slogans na arte/i);
+  assert.match(p, /sem placas de carro legíveis/i);
+  assert.match(p, /formato paisagem/i);
+});
+
+test("montarPromptImagem com logo manda aplicá-la pequena e discreta", () => {
+  const com = montarPromptImagem({
+    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico",
+    contextoImagens: null, permitirPessoas: false, comLogo: true,
+  });
+  assert.match(
+    com,
+    /Use a imagem de referência como a logo da marca: aplique-a pequena e discreta \(num canto, parede ou fachada\), sem distorcer, sem mudar cores, sem cobrir o assunto principal\./,
+  );
+  const sem = montarPromptImagem({
+    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico",
+    contextoImagens: null, permitirPessoas: false, comLogo: false,
+  });
+  assert.doesNotMatch(sem, /logo da marca/);
+  // "sem logos ou marcas de terceiros" vale nos dois casos
+  assert.match(sem, /sem logos ou marcas de terceiros/i);
+  assert.match(com, /sem logos ou marcas de terceiros/i);
+});
+
+test("montarPromptImagem com contexto das imagens: entra como diretrizes (até 8.000 caracteres), antes das regras fixas", () => {
+  const p = montarPromptImagem({
+    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico",
+    contextoImagens: "Fundo claro, carros prata, vitrine do SIA.", permitirPessoas: false, comLogo: false,
+  });
+  assert.match(p, /Diretrizes de imagem do cliente: Fundo claro, carros prata, vitrine do SIA\./);
+  assert.ok(p.indexOf("Diretrizes de imagem do cliente") < p.indexOf("Sem pessoas"));
+  const longo = montarPromptImagem({
+    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico",
+    contextoImagens: "c".repeat(9000), permitirPessoas: false, comLogo: false,
+  });
+  assert.ok(longo.includes("c".repeat(8000)));
+  assert.ok(!longo.includes("c".repeat(8001)));
+  const vazio = montarPromptImagem({
+    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico",
+    contextoImagens: "  ", permitirPessoas: false, comLogo: false,
+  });
+  assert.doesNotMatch(vazio, /Diretrizes de imagem do cliente/);
+});
+
+test("ESQUEMA_CHECAGEM_IMAGEM é estrito, com tem_pessoas e tem_texto obrigatórios", () => {
+  assert.equal(ESQUEMA_CHECAGEM_IMAGEM.type, "object");
+  assert.equal(ESQUEMA_CHECAGEM_IMAGEM.additionalProperties, false);
+  assert.deepEqual([...ESQUEMA_CHECAGEM_IMAGEM.required].sort(), ["tem_pessoas", "tem_texto"]);
+  assert.deepEqual(ESQUEMA_CHECAGEM_IMAGEM.properties, { tem_pessoas: { type: "boolean" }, tem_texto: { type: "boolean" } });
+  assert.match(PROMPT_CHECAGEM_IMAGEM, /pessoa/i);
+  assert.match(PROMPT_CHECAGEM_IMAGEM, /rosto/i);
+  assert.match(PROMPT_CHECAGEM_IMAGEM, /m[aã]o/i);
+  assert.match(PROMPT_CHECAGEM_IMAGEM, /silhueta/i);
+  assert.match(PROMPT_CHECAGEM_IMAGEM, /texto/i);
+  assert.match(PROMPT_CHECAGEM_IMAGEM, /n[uú]meros/i);
+});
+
+test("decidirImagem: sem imagem no dia nada; com pasta, Drive (sem cair para a IA); sem pasta, IA só se ligada", () => {
+  assert.equal(decidirImagem({ comImagem: false, temPasta: true, usaIa: true }), null);
+  assert.equal(decidirImagem({ comImagem: false, temPasta: false, usaIa: true }), null);
+  assert.equal(decidirImagem({ comImagem: true, temPasta: true, usaIa: true }), "drive");
+  assert.equal(decidirImagem({ comImagem: true, temPasta: true, usaIa: false }), "drive");
+  assert.equal(decidirImagem({ comImagem: true, temPasta: false, usaIa: true }), "ia");
+  assert.equal(decidirImagem({ comImagem: true, temPasta: false, usaIa: false }), null);
+});
+
+test("montarPromptImagem com logo abre a exceção da própria logo no 'sem texto'; sem logo fica a frase de sempre", () => {
+  const base = { nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico" as const, contextoImagens: null, permitirPessoas: false };
+  const com = montarPromptImagem({ ...base, comLogo: true });
+  assert.match(
+    com,
+    /Sem texto, letras, números, preços ou slogans na arte, exceto a própria logo da marca \(imagem de referência\), que aparece exatamente como é\./,
+  );
+  const sem = montarPromptImagem({ ...base, comLogo: false });
+  assert.match(sem, /Sem texto, letras, números, preços ou slogans na arte\./);
+  assert.doesNotMatch(sem, /exceto a própria logo/);
+  // "sem marcas d'água" vale nos dois casos
+  assert.match(com, /sem marcas d'água/i);
+  assert.match(sem, /sem marcas d'água/i);
+});
+
+test("montarPromptImagem na nova tentativa diz o que a versão anterior tinha", () => {
+  const base = { nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, tema: "servico" as const, contextoImagens: null, permitirPessoas: false, comLogo: false };
+  assert.doesNotMatch(montarPromptImagem(base), /versão anterior/);
+  assert.doesNotMatch(montarPromptImagem({ ...base, versaoAnterior: null }), /versão anterior/);
+  assert.match(
+    montarPromptImagem({ ...base, versaoAnterior: { tem_pessoas: true, tem_texto: false } }),
+    /A versão anterior tinha pessoas; garanta que não haja nenhuma\./,
+  );
+  assert.match(
+    montarPromptImagem({ ...base, versaoAnterior: { tem_pessoas: false, tem_texto: true } }),
+    /A versão anterior tinha texto em destaque; garanta que não haja nenhum\./,
+  );
+  assert.match(
+    montarPromptImagem({ ...base, versaoAnterior: { tem_pessoas: true, tem_texto: true } }),
+    /A versão anterior tinha pessoas e texto em destaque; garanta que não haja nenhum\./,
+  );
+});
+
+test("promptChecagemImagem: pessoas sempre; texto só em destaque; com logo, a segunda imagem não conta como texto", () => {
+  const sem = promptChecagemImagem(false);
+  assert.equal(PROMPT_CHECAGEM_IMAGEM, sem);
+  for (const re of [/pessoa/i, /rosto/i, /m[aã]o/i, /corpo/i, /silhueta/i, /reflexo/i, /ao fundo/i]) assert.match(sem, re);
+  assert.match(sem, /leg[ií]vel e em destaque/i);
+  for (const re of [/frases/i, /pre[cç]os/i, /slogans/i, /letreiros/i, /placas de carro/i, /terceiros/i, /ilegíveis/i]) assert.match(sem, re);
+  assert.doesNotMatch(sem, /segunda imagem/i);
+  assert.doesNotMatch(sem, /logos com escrita/i);
+  const com = promptChecagemImagem(true);
+  assert.ok(com.startsWith(sem));
+  assert.match(com, /A segunda imagem é a logo da marca e serve só de referência/);
+  assert.match(com, /valem para a primeira imagem/);
+  // A exceção vale só para o que está dentro da marca da logo aplicada; o que estiver fora continua contando.
+  assert.match(com, /dentro da própria marca da logo aplicada na arte/);
+  assert.match(com, /escrita, mascote ou rosto dela/);
+  assert.match(com, /não conta como texto nem como pessoa/);
+  assert.match(com, /Qualquer pessoa, rosto, mão ou silhueta fora da marca da logo conta como pessoa, mesmo que lembre o mascote\./);
+});
+
+test("montarMensagensPost: com contexto a regra de não inventar vale para o contexto e o briefing; sem contexto fica como era", () => {
+  const entrada = {
+    nome: "Loja", categoria: null, briefing: BRIEFING_VAZIO, saude: false, tema: "servico" as const, palavras: [], anteriores: [],
+    motivoReprovacao: null,
+  };
+  const com = montarMensagensPost({ ...entrada, contextoPosts: "Diferencial: revisão de 100 itens." });
+  assert.match(com.system, /fatos que não estejam no contexto do cliente nem no briefing\./);
+  assert.doesNotMatch(com.system, /fatos que não estejam no briefing\./);
+  const sem = montarMensagensPost({ ...entrada, contextoPosts: null });
+  assert.match(sem.system, /fatos que não estejam no briefing\./);
+  assert.doesNotMatch(sem.system, /nem no briefing/);
+});
+
+test("decisaoChecagem: aceita limpo; repete uma vez se sobrar 45 s; senão desiste", () => {
+  const limpo = { tem_pessoas: false, tem_texto: false };
+  const pessoas = { tem_pessoas: true, tem_texto: false };
+  const texto = { tem_pessoas: false, tem_texto: true };
+  assert.equal(decisaoChecagem(1, limpo, 100_000, false), "aceitar");
+  assert.equal(decisaoChecagem(2, limpo, 0, false), "aceitar");
+  assert.equal(decisaoChecagem(2, limpo, -5, false), "aceitar");
+  assert.equal(decisaoChecagem(1, pessoas, 100_000, false), "repetir");
+  assert.equal(decisaoChecagem(1, texto, 100_000, false), "repetir");
+  assert.equal(decisaoChecagem(1, { tem_pessoas: true, tem_texto: true }, 45_000, false), "repetir");
+  assert.equal(decisaoChecagem(1, pessoas, 44_999, false), "desistir");
+  assert.equal(decisaoChecagem(1, texto, 0, false), "desistir");
+  assert.equal(decisaoChecagem(1, pessoas, -1, false), "desistir");
+  assert.equal(decisaoChecagem(2, pessoas, 100_000, false), "desistir");
+  assert.equal(decisaoChecagem(2, texto, 100_000, false), "desistir");
+});
+
+test("decisaoChecagem com pessoas permitidas: tem_pessoas é ignorado e só o texto em destaque reprova", () => {
+  const pessoas = { tem_pessoas: true, tem_texto: false };
+  const texto = { tem_pessoas: false, tem_texto: true };
+  const ambos = { tem_pessoas: true, tem_texto: true };
+  assert.equal(decisaoChecagem(1, pessoas, 100_000, true), "aceitar");
+  assert.equal(decisaoChecagem(2, pessoas, 0, true), "aceitar");
+  assert.equal(decisaoChecagem(1, { tem_pessoas: false, tem_texto: false }, 100_000, true), "aceitar");
+  assert.equal(decisaoChecagem(1, texto, 100_000, true), "repetir");
+  assert.equal(decisaoChecagem(1, ambos, 100_000, true), "repetir");
+  assert.equal(decisaoChecagem(1, texto, 44_999, true), "desistir");
+  assert.equal(decisaoChecagem(2, texto, 100_000, true), "desistir");
+  assert.equal(decisaoChecagem(2, ambos, 100_000, true), "desistir");
+});
+
+test("base64ParaBytes decodifica como o Buffer (padding, quebras de linha e arquivo grande)", () => {
+  assert.deepEqual([...base64ParaBytes("")], []);
+  for (const n of [1, 2, 3, 4, 100, 1001]) {
+    const orig = Uint8Array.from({ length: n }, (_, i) => (i * 37 + 11) % 256);
+    assert.deepEqual([...base64ParaBytes(Buffer.from(orig).toString("base64"))], [...orig]);
+  }
+  assert.deepEqual([...base64ParaBytes("QU\r\nJD")], [65, 66, 67]); // o atob ignora quebras de linha
+  const grande = Buffer.alloc(5 * 1024 * 1024, 200);
+  const dec = base64ParaBytes(grande.toString("base64"));
+  assert.equal(dec.length, grande.length);
+  assert.equal(Buffer.compare(Buffer.from(dec), grande), 0);
+  assert.throws(() => base64ParaBytes("***"));
+});
+
+test("tamanhoBase64 conta os bytes decodificados sem decodificar", () => {
+  assert.equal(tamanhoBase64(""), 0);
+  assert.equal(tamanhoBase64("QUJD"), 3);
+  assert.equal(tamanhoBase64("QUI="), 2);
+  assert.equal(tamanhoBase64("QQ=="), 1);
+  assert.equal(tamanhoBase64("QUI"), 2); // sem padding
+  assert.equal(tamanhoBase64("data:image/png;base64,QUJD"), 3);
+  assert.equal(tamanhoBase64("QU\r\nJD QUJD"), 6); // quebras e espaços não contam
+  assert.equal(tamanhoBase64(Buffer.alloc(5 * 1024 * 1024 + 1, 7).toString("base64")), 5 * 1024 * 1024 + 1);
+  for (const n of [1, 2, 3, 10, 11, 12, 1000, 1001]) assert.equal(tamanhoBase64(Buffer.alloc(n, 9).toString("base64")), n);
 });

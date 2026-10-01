@@ -28,6 +28,14 @@ export interface PerfilGmn {
   cta_url: string | null;
   drive_pasta_url: string | null;
   usa_ia_imagem: boolean;
+  /** Contexto completo do cliente, colado pelo André; vai inteiro para o prompt de cada post. */
+  contexto_posts: string | null;
+  /** Diretrizes de imagem do cliente; entram no prompt de toda imagem gerada pela IA. */
+  contexto_imagens: string | null;
+  /** URL pública da logo do cliente (R2). */
+  logo_url: string | null;
+  /** Só o André liga: com isso desligado a IA nunca gera pessoas nas imagens. */
+  permitir_pessoas_ia: boolean;
   saude: boolean;
   briefing: Briefing;
   briefing_salvo_em: string | null;
@@ -57,19 +65,26 @@ const FUNCAO = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmn`;
 
 const CAMPOS_PERFIL =
   "id, location_name, nome, endereco, categoria, site, telefone, cliente_id, ativo, sem_acesso, agenda, " +
-  "cta_tipo, cta_url, drive_pasta_url, usa_ia_imagem, saude, briefing, briefing_salvo_em, created_at";
+  "cta_tipo, cta_url, drive_pasta_url, usa_ia_imagem, contexto_posts, contexto_imagens, logo_url, permitir_pessoas_ia, " +
+  "saude, briefing, briefing_salvo_em, created_at";
 const CAMPOS_POST = "id, perfil_id, origem, status, tema, palavras_chave, texto, imagem_origem, imagem_url, google_url, erro, created_at";
 
 function comBriefing(p: any): PerfilGmn {
   return { ...p, briefing: normalizarBriefing(p.briefing), agenda: normalizarAgenda(p.agenda) } as PerfilGmn;
 }
 
-/** Tabela ainda não criada no banco (migration pendente) vira uma mensagem clara. */
+/** Tabela ou coluna ainda não criada no banco (migration pendente) e falha de rede viram uma mensagem clara. */
 export function traduzErroGmn(e: unknown): string {
   const msg = e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e ?? "");
-  if (/gmn_/i.test(msg) && /schema cache|does not exist|not find/i.test(msg)) {
+  const faltaNoBanco = /schema cache|does not exist|not find/i.test(msg);
+  // As colunas do contexto, da logo e das pessoas nas imagens vieram numa migration própria.
+  if (faltaNoBanco && /contexto_posts|contexto_imagens|logo_url|permitir_pessoas_ia/i.test(msg)) {
+    return "As colunas novas do Google Meu Negócio (contexto, logo e pessoas nas imagens) ainda não existem no banco (migration 20261001120000_gmn_contexto.sql).";
+  }
+  if (/gmn_/i.test(msg) && faltaNoBanco) {
     return "As tabelas do Google Meu Negócio ainda não existem no banco (migration 20260929120000_gmn.sql).";
   }
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) return "Não foi possível falar com o servidor. Confira a conexão e tente de novo.";
   return msg || "Erro inesperado";
 }
 
@@ -136,12 +151,49 @@ async function chamar<T>(body: Record<string, unknown>): Promise<T> {
   return d as T;
 }
 
-export async function gerarBriefingIa(perfilId: string, textoDadosInternos: string | null): Promise<Briefing> {
-  const d = await chamar<{ briefing: unknown }>({ acao: "briefing", perfil_id: perfilId, texto_dados_internos: textoDadosInternos });
+/**
+ * Pede à função um briefing. Com `contextoPosts`, ela extrai os campos desse texto (o da tela, ainda não salvo);
+ * sem ele, usa o contexto salvo do perfil, se houver.
+ */
+export async function gerarBriefingIa(perfilId: string, textoDadosInternos: string | null, contextoPosts?: string | null): Promise<Briefing> {
+  const corpo: Record<string, unknown> = { acao: "briefing", perfil_id: perfilId, texto_dados_internos: textoDadosInternos };
+  if (typeof contextoPosts === "string") corpo.contexto_posts = contextoPosts;
+  const d = await chamar<{ briefing: unknown }>(corpo);
   return normalizarBriefing(d.briefing);
 }
 
-export async function gerarPrevia(perfilId: string): Promise<PostGmn> {
-  const d = await chamar<{ post: PostGmn }>({ acao: "previa", perfil_id: perfilId });
+/** `comImagem` falso gera só texto: a função não busca nem gera imagem. */
+export async function gerarPrevia(perfilId: string, comImagem = true): Promise<PostGmn> {
+  const d = await chamar<{ post: PostGmn }>({ acao: "previa", perfil_id: perfilId, com_imagem: comImagem });
   return d.post;
+}
+
+export const LOGO_TIPOS = ["image/png", "image/jpeg"];
+export const LOGO_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Conteúdo do arquivo em base64, sem o prefixo `data:...;base64,`. */
+function lerBase64(arquivo: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      const r = String(leitor.result ?? "");
+      resolve(r.slice(r.indexOf(",") + 1));
+    };
+    leitor.onerror = () => reject(new Error("Não foi possível ler o arquivo da logo."));
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
+/** Envia a logo do cliente (PNG ou JPG até 5 MB) e devolve a URL pública gravada no perfil. */
+export async function enviarLogo(perfilId: string, arquivo: File): Promise<string> {
+  if (!LOGO_TIPOS.includes(arquivo.type)) throw new Error("Envie a logo em PNG ou JPG.");
+  if (arquivo.size > LOGO_MAX_BYTES) throw new Error("A logo pode ter até 5 MB.");
+  const base64 = await lerBase64(arquivo);
+  const d = await chamar<{ logo_url: string }>({ acao: "logo", perfil_id: perfilId, tipo: arquivo.type, base64 });
+  return d.logo_url;
+}
+
+/** Tira a logo do perfil (o arquivo antigo pode ficar no armazenamento). */
+export async function removerLogo(perfilId: string): Promise<void> {
+  await chamar<{ ok: boolean }>({ acao: "remover_logo", perfil_id: perfilId });
 }
