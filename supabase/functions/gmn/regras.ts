@@ -286,13 +286,19 @@ export function resumoAgenda(agenda: ItemAgenda[]): string {
 }
 
 /**
- * De onde sai a imagem de um post: sem imagem no dia, nada; com pasta do Drive, sempre o Drive (se falhar, o post vai
- * sem imagem: não cai para a IA); sem pasta, a IA, se estiver ligada.
+ * As fontes da imagem de um post, na ordem em que são tentadas: sem imagem no dia, nenhuma; com pasta do Drive, só o Drive
+ * (se falhar, o post vai sem imagem: não cai para outra fonte); sem pasta, as fotos do site (se a chave estiver ligada e
+ * houver foto com descrição) e depois a IA (se estiver ligada). A foto do site só vale se combinar com o texto do post.
  */
-export function decidirImagem(o: { comImagem: boolean; temPasta: boolean; usaIa: boolean }): "drive" | "ia" | null {
-  if (!o.comImagem) return null;
-  if (o.temPasta) return "drive";
-  return o.usaIa ? "ia" : null;
+export function fontesDaImagem(
+  o: { comImagem: boolean; temPasta: boolean; temFotosSite: boolean; usaIa: boolean },
+): ("drive" | "site" | "ia")[] {
+  if (!o.comImagem) return [];
+  if (o.temPasta) return ["drive"];
+  const fontes: ("site" | "ia")[] = [];
+  if (o.temFotosSite) fontes.push("site");
+  if (o.usaIa) fontes.push("ia");
+  return fontes;
 }
 
 // ------------------------------------------------------------------ logo aplicada sobre a imagem da IA
@@ -373,6 +379,8 @@ export interface EntradaPost {
   motivoReprovacao: string | null;
   /** Contexto completo do cliente (fonte principal dos guardrails, tom de voz e SEO local), se o perfil tiver. */
   contextoPosts: string | null;
+  /** O que a foto do post mostra (a foto do Drive é escolhida antes do texto); null: sem foto ou ainda não escolhida. */
+  descricaoImagem: string | null;
 }
 
 function blocoBriefing(b: Briefing): string {
@@ -418,11 +426,14 @@ export function montarMensagensPost(e: EntradaPost): Mensagens {
         "não use 'antes e depois', não cite preços, valores, descontos, brindes ou promoções, não use superlativos ('o melhor', 'o único', 'número 1', 'mais barato').",
     );
   }
+  // Sem o ponto final da descrição (a da IA costuma terminar com ele): a frase fixa traz o seu.
+  const imagem = (e.descricaoImagem ?? "").trim().replace(/[.\s]+$/, "");
   const partes = [
     `Empresa: ${e.nome}${e.categoria ? ` (${e.categoria})` : ""}`,
     contexto ? `Contexto completo do cliente (fonte principal; siga os guardrails dele):\n${contexto}` : "",
     `Briefing:\n${blocoBriefing(e.briefing)}`,
     `Tema deste post: ${ROTULO_TEMA[e.tema]}`,
+    imagem ? `A imagem do post mostra: ${imagem}. Escreva de forma coerente com ela, sem descrever a foto.` : "",
     e.palavras.length ? `Palavras-chave para este post: ${e.palavras.join("; ")}` : "Palavras-chave: use as do briefing.",
     e.anteriores.length
       ? `Posts anteriores (não repita assunto, abertura nem frases):\n${e.anteriores.map((t, i) => `${i + 1}. ${t}`).join("\n")}`
@@ -636,4 +647,49 @@ export function normalizarImagensSite(v: unknown): ImagemSite[] {
     out.push({ id, url, origem_url: origem, descricao: typeof o.descricao === "string" ? o.descricao.slice(0, 300) : "" });
   }
   return out;
+}
+
+/**
+ * As fotos do site que podem entrar nos posts: nenhuma com a chave `usa_fotos_site` desligada (só `true` liga); ligada, só as
+ * que têm descrição (sem saber o que a foto mostra, não dá para conferir se combina com o post).
+ */
+export function fotosDoSiteComDescricao(perfil: { usa_fotos_site?: unknown; imagens_site?: unknown }): ImagemSite[] {
+  if (perfil.usa_fotos_site !== true) return [];
+  return normalizarImagensSite(perfil.imagens_site).filter((i) => i.descricao.trim() !== "");
+}
+
+// ------------------------------------------------------------------ fotos do site: classificar e combinar com o post
+
+export const ESQUEMA_FOTOS_QUE_COMBINAM = {
+  type: "object", additionalProperties: false, required: ["ids"],
+  properties: { ids: { type: "array", items: { type: "string" } } },
+} as const;
+
+/** Pede à IA as fotos do site cuja descrição combina com o post (na dúvida, nenhuma). Até 40 fotos. */
+export function montarMensagensFotosQueCombinam(texto: string, fotos: { id: string; descricao: string }[]): Mensagens {
+  const system = [
+    "Você escolhe fotos para um post do Perfil da Empresa no Google (Google Meu Negócio).",
+    "Responda só com os ids das fotos cuja descrição combina claramente com o assunto do post.",
+    "Na dúvida, não inclua. Pode não haver nenhuma: aí responda com a lista vazia.",
+  ].join("\n");
+  const lista = fotos.slice(0, 40).map((f) => `- ${f.id}: ${f.descricao}`).join("\n");
+  return { system, user: `Post:\n${texto}\n\nFotos:\n${lista}` };
+}
+
+export const ESQUEMA_CLASSIFICACAO_IMAGEM = {
+  type: "object", additionalProperties: false, required: ["tipo", "descricao"],
+  properties: { tipo: { type: "string", enum: ["logo", "foto", "outro"] }, descricao: { type: "string" } },
+} as const;
+
+export const PROMPT_CLASSIFICAR_IMAGEM =
+  "Esta imagem saiu do site de um negócio local. Classifique: logo (logotipo, marca ou ícone da empresa), " +
+  "foto (fotografia ou imagem que poderia ilustrar um post: produto, ambiente, fachada, serviço, equipe) ou outro " +
+  "(banner com muito texto, ícone genérico, gráfico, captura de tela, imagem decorativa). Para foto, descreva em " +
+  "uma frase curta, em português do Brasil, o que ela mostra; para logo e outro, descricao vazia.";
+
+/** O modelo de visão lê PNG, JPG, WEBP e GIF; SVG, ICO, BMP, TIFF, AVIF e HEIC ficam só pela pista do HTML. */
+export function visaoLeFormato(url: string): boolean {
+  const ext = /\.([a-z0-9]+)(?:[?#]|$)/i.exec(new URL(url).pathname)?.[1]?.toLowerCase() ?? "";
+  if (!ext) return true; // sem extensão: tenta
+  return ["png", "jpg", "jpeg", "jfif", "webp", "gif"].includes(ext);
 }

@@ -9,18 +9,29 @@
 //        PNG convertido pela tela, até 5 MB, no R2; origem_url opcional (http/https, até 2.000 caracteres);
 //        grava gmn_perfis.logo_url e logo_origem_url
 //   POST { acao: "remover_logo", perfil_id }     -> { ok: true }                  (logo_url e logo_origem_url = null; o arquivo fica no R2)
+//   POST { acao: "site", perfil_id, tipo: "logos" | "fotos", url? } -> { logos: CandidatoSite[] } | { fotos: CandidatoSite[] }
+//        lê o site do perfil (ou a url enviada) e a IA separa logo de foto; não grava nada
+//   POST { acao: "baixar_imagem", url }          -> bytes da imagem (Content-Type da imagem; não é JSON)
+//        baixa uma imagem de outro site para a tela converter (o navegador não pode, por CORS)
+//   POST { acao: "imagem_site", perfil_id, base64 (JPG), origem_url, descricao } -> { imagens_site: ImagemSite[] }
+//        guarda a foto do site (JPG já convertido pela tela) no R2 e a acrescenta a gmn_perfis.imagens_site
 // POST exige x-google-id-token (e-mail em ALLOWED_GOOGLE_EMAILS) ou x-swipe-key, como o google-token.
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
 import { acessoConfigurado, acessoLiberado } from "./acesso.ts";
-import { gerarJson, openaiConfigurada } from "./openai.ts";
-import { PRAZO_TOTAL_MS } from "./prazo.ts";
+import { classificarImagem, descreverImagem, gerarJson, openaiConfigurada } from "./openai.ts";
+import { PRAZO_TOTAL_MS, sinal } from "./prazo.ts";
 import { enviarR2, r2Configurado } from "./r2.ts";
 import { gerarConteudo } from "./conteudo.ts";
 import { lerPng } from "./png.ts";
 import {
-  ESQUEMA_BRIEFING, LOGO_LADO_MAX, base64ParaBytes, montarMensagensBriefing, normalizarBriefing, tamanhoBase64,
+  ESQUEMA_BRIEFING, LOGO_LADO_MAX, base64ParaBytes, fotosDoSiteComDescricao, montarMensagensBriefing, normalizarBriefing,
+  normalizarImagensSite, tamanhoBase64, visaoLeFormato,
 } from "./regras.ts";
+import {
+  candidatosDeFoto, candidatosDeLogo, deduplicar, imagensDoBundle, imagensDoHtml, scriptsDoSite, urlPublicaHttp,
+  type CandidatoSite,
+} from "./site.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -82,7 +93,7 @@ async function acaoPrevia(sb: any, body: any, total: AbortSignal, prazoFinal: nu
   // Confere a configuração antes de inserir a linha e de gastar com a OpenAI.
   if (!openaiConfigurada()) throw new ErroHttp(503, SEM_OPENAI);
   const comImagem = typeof body.com_imagem === "boolean" ? body.com_imagem : true;
-  const podeTerImagem = !!String(perfil.drive_pasta_url ?? "").trim() || !!perfil.usa_ia_imagem;
+  const podeTerImagem = !!String(perfil.drive_pasta_url ?? "").trim() || !!perfil.usa_ia_imagem || fotosDoSiteComDescricao(perfil).length > 0;
   if (comImagem && podeTerImagem && !r2Configurado()) throw new ErroHttp(503, SEM_R2);
   // Não gasta de novo (texto, imagem e checagens) enquanto a prévia anterior do perfil ainda está sendo gerada.
   const { data: emAndamento, error: eAndamento } = await sb
@@ -202,6 +213,248 @@ async function acaoRemoverLogo(sb: any, body: any): Promise<Response> {
   return json({ ok: true });
 }
 
+// ------------------------------------------------------------------ imagens e logo do site do cliente
+
+const UA = "Mozilla/5.0 (compatible; GestaoDeOperacao/1.0; +https://gestao.andrelopes.digital)";
+const REDIRECIONAMENTOS_MAX = 5;
+const SITE_HTML_MAX_BYTES = 3 * 1024 * 1024;
+const SITE_SCRIPT_MAX_BYTES = 5 * 1024 * 1024;
+const IMAGEM_EXTERNA_MAX = 20 * 1024 * 1024;
+const IMAGEM_SITE_MAX_BYTES = 5 * 1024 * 1024;
+const CLASSIFICAR_EM_PARALELO = 6;
+const CLASSIFICAR_PRAZO_MS = 20_000;
+const DESCRICAO_FOTO_MIN = 10;
+const SEM_LER_IMAGEM = "Não foi possível ler a imagem enviada.";
+
+/** Lê até `max` bytes de uma resposta (corta o resto). */
+async function lerAte(r: Response, max: number): Promise<Uint8Array> {
+  const leitor = r.body?.getReader();
+  if (!leitor) return new Uint8Array(0);
+  const partes: Uint8Array[] = [];
+  let n = 0;
+  while (n < max) {
+    const { done, value } = await leitor.read();
+    if (done || !value) break;
+    partes.push(value);
+    n += value.length;
+  }
+  await leitor.cancel().catch(() => {});
+  const out = new Uint8Array(Math.min(n, max));
+  let o = 0;
+  for (const p of partes) {
+    const pedaco = p.subarray(0, out.length - o);
+    out.set(pedaco, o);
+    o += pedaco.length;
+    if (o >= out.length) break;
+  }
+  return out;
+}
+
+/**
+ * GET em endereço público com o prazo `ms` (e o prazo total, que vale também para a leitura do corpo). Os redirecionamentos
+ * são seguidos à mão (até 5) e cada destino passa por `urlPublicaHttp`: um site público não pode mandar a função para a rede
+ * interna. Devolve a resposta e o endereço final (base dos caminhos relativos da página).
+ */
+async function buscarPublico(
+  alvo: URL, headers: Record<string, string>, ms: number, total: AbortSignal,
+): Promise<{ r: Response; url: string }> {
+  const signal = sinal(ms, total);
+  let url = alvo;
+  for (let i = 0; i <= REDIRECIONAMENTOS_MAX; i++) {
+    const r = await fetch(url.href, { headers, redirect: "manual", signal });
+    const destino = [301, 302, 303, 307, 308].includes(r.status) ? r.headers.get("location") : null;
+    if (!destino) return { r, url: url.href };
+    await r.body?.cancel().catch(() => {});
+    let proximo: URL | null = null;
+    try {
+      proximo = urlPublicaHttp(new URL(destino, url).href);
+    } catch { /* Location ilegível */ }
+    if (!proximo) throw new Error("redirecionamento para um endereço que não é público");
+    url = proximo;
+  }
+  throw new Error("redirecionamentos demais");
+}
+
+/** Endereço digitado como `loja.com.br` vale como `https://loja.com.br`; só http(s) de host público passa. */
+function enderecoPublico(v: unknown): URL | null {
+  const t = typeof v === "string" ? v.trim() : "";
+  return t ? urlPublicaHttp(/^https?:\/\//i.test(t) ? t : `https://${t}`) : null;
+}
+
+/** Roda `f` em todos os itens, até `limite` ao mesmo tempo, e devolve os resultados na ordem dos itens (`f` não deve lançar). */
+async function emParalelo<T, R>(itens: T[], limite: number, f: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(itens.length);
+  let proximo = 0;
+  const trabalhador = async () => {
+    while (proximo < itens.length) {
+      const i = proximo++;
+      out[i] = await f(itens[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, trabalhador));
+  return out;
+}
+
+/**
+ * O que a IA diz de uma imagem do site: logo, foto ou outro (com a descrição, se foto). Sem OpenAI, em formato que o modelo
+ * não lê (SVG, ICO…) ou com erro na chamada, vale a pista do HTML: `pista` ("logo" na busca de logos, "foto" na de fotos,
+ * com o alt como descrição).
+ */
+async function classificarCandidato(
+  c: CandidatoSite, pista: "logo" | "foto", total: AbortSignal,
+): Promise<{ tipo: "logo" | "foto" | "outro"; descricao: string }> {
+  try {
+    if (openaiConfigurada() && visaoLeFormato(c.url)) return await classificarImagem(c.url, sinal(CLASSIFICAR_PRAZO_MS, total));
+  } catch (e) {
+    console.error("Classificar imagem:", msg(e));
+  }
+  return { tipo: pista, descricao: c.descricao };
+}
+
+/**
+ * Busca no site do perfil (ou na `url` enviada) as logos (`tipo: "logos"`) ou as fotos (`tipo: "fotos"`). Lê o HTML e os .js
+ * do próprio site, separa os candidatos pela pista do HTML e a IA confere cada um (logo, foto ou outro). Não grava nada.
+ * Fotos: só as classificadas como foto, com descrição (da IA ou, sem ela, o alt) de pelo menos 10 caracteres.
+ */
+async function acaoSite(sb: any, body: any, total: AbortSignal): Promise<Response> {
+  if (body.tipo !== "logos" && body.tipo !== "fotos") throw new ErroHttp(400, "Escolha buscar a logo ou as fotos.");
+  const perfil = await carregarPerfil(sb, body);
+  const alvo = enderecoPublico(typeof body.url === "string" && body.url.trim() ? body.url : perfil.site);
+  if (!alvo) throw new ErroHttp(400, "Informe o site do perfil (http ou https) na aba Agenda.");
+  let html: string;
+  let base: string;
+  try {
+    const { r, url } = await buscarPublico(alvo, { "user-agent": UA, accept: "text/html" }, 15_000, total);
+    if (!r.ok) {
+      await r.body?.cancel().catch(() => {});
+      throw new ErroHttp(502, `O site respondeu ${r.status}.`);
+    }
+    html = new TextDecoder().decode(await lerAte(r, SITE_HTML_MAX_BYTES));
+    base = url;
+  } catch (e) {
+    if (e instanceof ErroHttp) throw e;
+    console.error("Site:", msg(e));
+    throw new ErroHttp(502, "Não foi possível abrir o site.");
+  }
+  let lista = imagensDoHtml(html, base);
+  for (const s of scriptsDoSite(html, base)) {
+    const alvoJs = urlPublicaHttp(s);
+    if (!alvoJs) continue;
+    try {
+      const { r } = await buscarPublico(alvoJs, { "user-agent": UA }, 10_000, total);
+      if (r.ok) lista = deduplicar([...lista, ...imagensDoBundle(new TextDecoder().decode(await lerAte(r, SITE_SCRIPT_MAX_BYTES)), s)]);
+      else await r.body?.cancel().catch(() => {});
+    } catch (e) {
+      console.error("Site, script:", msg(e));
+    }
+  }
+  // Endereço de imagem que não é público não serve (a tela não consegue baixar nem a IA ver).
+  lista = lista.filter((c) => urlPublicaHttp(c.url));
+
+  if (body.tipo === "logos") {
+    const candidatos = candidatosDeLogo(lista);
+    const veredito = await emParalelo(candidatos, CLASSIFICAR_EM_PARALELO, (c) => classificarCandidato(c, "logo", total));
+    return json({ logos: candidatos.filter((_, i) => veredito[i].tipo === "logo").map((c) => ({ ...c, logo: true })) });
+  }
+  const candidatos = candidatosDeFoto(lista);
+  const veredito = await emParalelo(candidatos, CLASSIFICAR_EM_PARALELO, (c) => classificarCandidato(c, "foto", total));
+  const fotos: CandidatoSite[] = [];
+  candidatos.forEach((c, i) => {
+    const descricao = (veredito[i].descricao || c.descricao).trim().slice(0, 300);
+    if (veredito[i].tipo === "foto" && descricao.length >= DESCRICAO_FOTO_MIN) fotos.push({ ...c, descricao, logo: false });
+  });
+  return json({ fotos });
+}
+
+/** Baixa uma imagem de outro site para o navegador converter (o navegador não pode, por CORS). Devolve os bytes dela. */
+async function acaoBaixarImagem(body: any, total: AbortSignal): Promise<Response> {
+  const alvo = urlPublicaHttp(typeof body.url === "string" ? body.url.trim() : "");
+  if (!alvo) throw new ErroHttp(400, "Endereço de imagem inválido.");
+  const SEM_BAIXAR = "Não foi possível baixar a imagem.";
+  const GRANDE = "A imagem passa de 20 MB.";
+  let r: Response;
+  try {
+    r = (await buscarPublico(alvo, { "user-agent": UA, accept: "image/*" }, 20_000, total)).r;
+  } catch (e) {
+    console.error("Baixar imagem:", msg(e));
+    throw new ErroHttp(502, SEM_BAIXAR);
+  }
+  const tipo = (r.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  const recusa = !r.ok ? new ErroHttp(502, SEM_BAIXAR)
+    : Number(r.headers.get("content-length")) > IMAGEM_EXTERNA_MAX ? new ErroHttp(400, GRANDE)
+    : tipo && !tipo.startsWith("image/") && tipo !== "application/octet-stream" ? new ErroHttp(400, "O endereço não é de uma imagem.")
+    : null;
+  if (recusa) {
+    await r.body?.cancel().catch(() => {});
+    throw recusa;
+  }
+  let bytes: Uint8Array;
+  try {
+    bytes = await lerAte(r, IMAGEM_EXTERNA_MAX + 1);
+  } catch (e) {
+    console.error("Baixar imagem:", msg(e));
+    throw new ErroHttp(502, SEM_BAIXAR);
+  }
+  if (bytes.length > IMAGEM_EXTERNA_MAX) throw new ErroHttp(400, GRANDE);
+  return new Response(bytes as BlobPart, {
+    status: 200, headers: { ...cors, "Content-Type": tipo.startsWith("image/") ? tipo : "application/octet-stream" },
+  });
+}
+
+/**
+ * Guarda no R2 (`site/<perfil_id>/<id>.jpg`) uma imagem do site já convertida em JPG pela tela e a acrescenta a
+ * `gmn_perfis.imagens_site` (a mesma `origem_url` de antes é substituída). Descrição curta (menos de 15 caracteres): a IA
+ * descreve a foto.
+ */
+async function acaoImagemSite(sb: any, body: any, total: AbortSignal): Promise<Response> {
+  const perfil = await carregarPerfil(sb, body);
+  const origem = urlPublicaHttp(typeof body.origem_url === "string" ? body.origem_url.trim() : "");
+  if (!origem || origem.href.length > ORIGEM_URL_MAX) throw new ErroHttp(400, "Endereço de imagem inválido.");
+  const texto = typeof body.base64 === "string" ? body.base64 : "";
+  if (!texto) throw new ErroHttp(400, SEM_LER_IMAGEM);
+  if (tamanhoBase64(texto) > IMAGEM_SITE_MAX_BYTES) throw new ErroHttp(400, "A imagem convertida passa de 5 MB.");
+  let bytes: Uint8Array;
+  try {
+    bytes = base64ParaBytes(texto.startsWith("data:") ? texto.slice(texto.indexOf(",") + 1) : texto);
+  } catch {
+    throw new ErroHttp(400, SEM_LER_IMAGEM);
+  }
+  // A tela converte tudo para JPG: o arquivo fica público e é servido como image/jpeg.
+  if (!(bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)) throw new ErroHttp(400, SEM_LER_IMAGEM);
+  if (!r2Configurado()) throw new ErroHttp(503, SEM_R2);
+  const SEM_GUARDAR = "Não foi possível guardar a imagem. Tente de novo.";
+  const id = crypto.randomUUID();
+  let url: string;
+  try {
+    url = await enviarR2(`site/${perfil.id}/${id}.jpg`, bytes, "image/jpeg", total);
+  } catch (e) {
+    console.error("Imagem do site: R2:", msg(e));
+    throw new ErroHttp(500, SEM_GUARDAR);
+  }
+  let descricao = typeof body.descricao === "string" ? body.descricao.trim().slice(0, 300) : "";
+  if (descricao.length < 15 && openaiConfigurada()) {
+    try {
+      descricao = (await descreverImagem(url, total)) || descricao;
+    } catch (e) {
+      console.error("Descrever imagem:", msg(e));
+    }
+  }
+  // Relê a lista agora (o envio e a descrição levam segundos): uma imagem guardada nesse meio-tempo não se perde.
+  const { data: atual, error: eLer } = await sb.from("gmn_perfis").select("imagens_site").eq("id", perfil.id).maybeSingle();
+  if (eLer) {
+    console.error("Imagem do site: banco:", eLer.message);
+    throw new ErroHttp(500, SEM_GUARDAR);
+  }
+  const lista = normalizarImagensSite(atual ? atual.imagens_site : perfil.imagens_site).filter((i) => i.origem_url !== origem.href);
+  lista.push({ id, url, origem_url: origem.href, descricao });
+  const { error } = await sb.from("gmn_perfis").update({ imagens_site: lista, updated_at: new Date().toISOString() }).eq("id", perfil.id);
+  if (error) {
+    console.error("Imagem do site: banco:", error.message);
+    throw new ErroHttp(500, SEM_GUARDAR);
+  }
+  return json({ imagens_site: lista });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method === "GET") return json({ openai: openaiConfigurada(), r2: r2Configurado(), acesso: acessoConfigurado() });
@@ -221,6 +474,9 @@ Deno.serve(async (req) => {
     if (body.acao === "previa") return await acaoPrevia(sb, body, total, prazoFinal);
     if (body.acao === "logo") return await acaoLogo(sb, body, total);
     if (body.acao === "remover_logo") return await acaoRemoverLogo(sb, body);
+    if (body.acao === "site") return await acaoSite(sb, body, total);
+    if (body.acao === "baixar_imagem") return await acaoBaixarImagem(body, total);
+    if (body.acao === "imagem_site") return await acaoImagemSite(sb, body, total);
     return json({ error: "Ação desconhecida" }, 400);
   } catch (e) {
     if (e instanceof ErroHttp) return json({ error: e.message }, e.status);

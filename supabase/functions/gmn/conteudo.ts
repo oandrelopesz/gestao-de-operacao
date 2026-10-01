@@ -1,11 +1,11 @@
-// Um post completo, sem publicar: tema → texto (com checagem e 1 nova tentativa) → imagem (Drive, IA ou nenhuma).
+// Um post completo, sem publicar: tema → texto (com checagem e 1 nova tentativa) → imagem (Drive, site, IA ou nenhuma).
 // deno-lint-ignore-file no-explicit-any
 import {
-  ESQUEMA_POST, base64ParaBytes, checarTexto, decidirImagem, decisaoChecagem, descricaoDaFoto, escolherPalavras,
-  fotoDiretaDoDrive, idPastaDrive, montarMensagensPost, montarPromptImagem, normalizarBriefing, opcoesDaLogo, ordemDeTentativa,
-  proximoTema, tipoPelaAssinatura, LOGO_LADO_MAX, type Tema,
+  ESQUEMA_POST, base64ParaBytes, checarTexto, decisaoChecagem, descricaoDaFoto, escolherPalavras, fontesDaImagem,
+  fotoDiretaDoDrive, fotosDoSiteComDescricao, idPastaDrive, montarMensagensPost, montarPromptImagem, normalizarBriefing,
+  opcoesDaLogo, ordemDeTentativa, proximoTema, tipoPelaAssinatura, LOGO_LADO_MAX, type Tema,
 } from "./regras.ts";
-import { checarImagem, gerarImagem, gerarJson } from "./openai.ts";
+import { checarImagem, fotosQueCombinam, gerarImagem, gerarJson } from "./openai.ts";
 import { lerPng, gravarPng, type ImagemRgba } from "./png.ts";
 import { aplicarLogo } from "./compor.ts";
 import { enviarR2 } from "./r2.ts";
@@ -84,6 +84,32 @@ async function imagemDoDrive(sb: Sb, perfil: any, postId: string, total?: AbortS
   return "vazia";
 }
 
+/** Fotos do site que a IA pode olhar de uma vez para ver se combinam com o post. */
+const FOTOS_DO_SITE_CONFERIDAS = 40;
+
+/**
+ * Foto do site (já no R2, em JPG) que combina com o texto do post, ou null. Só entram as fotos com descrição, se a chave
+ * `usa_fotos_site` estiver ligada. A IA vê as descrições (as menos usadas primeiro, até 40) e diz quais combinam; entre elas
+ * vale o rodízio: a menos usada (nunca usada, ou usada há mais tempo), e o uso é registrado. Nenhuma combina: null.
+ */
+async function imagemDoSite(sb: Sb, perfil: any, texto: string, total?: AbortSignal): Promise<Imagem | null> {
+  const lista = fotosDoSiteComDescricao(perfil);
+  if (!lista.length) return null;
+  const { data: usos } = await sb.from("gmn_imagens_uso").select("ref, usado_em").eq("perfil_id", perfil.id).eq("origem", "site");
+  const mapa: Record<string, string> = Object.fromEntries((usos ?? []).map((u: any) => [u.ref, u.usado_em]));
+  const ordem = ordemDeTentativa(lista.map((f) => f.id), mapa, FOTOS_DO_SITE_CONFERIDAS);
+  const combinam = new Set(await fotosQueCombinam(texto, ordem.map((id) => lista.find((f) => f.id === id)!), total));
+  // `ordem` já vai da menos usada para a mais usada: a primeira que combina é a do rodízio.
+  const ref = ordem.find((id) => combinam.has(id));
+  if (!ref) return null;
+  const item = lista.find((f) => f.id === ref)!;
+  await sb.from("gmn_imagens_uso").upsert(
+    { perfil_id: perfil.id, origem: "site", ref: item.id, usado_em: new Date().toISOString() },
+    { onConflict: "perfil_id,origem,ref" },
+  );
+  return { origem: "site" as const, ref: item.id, url: item.url, descricao: item.descricao };
+}
+
 const LOGO_BAIXAR_MAX_BYTES = 6 * 1024 * 1024;
 const AVISO_LOGO = "Não foi possível usar a logo do perfil.";
 const AVISO_APLICAR_LOGO = "Não foi possível aplicar a logo na imagem.";
@@ -130,6 +156,7 @@ function bytesDaImagemDaIa(b64: string): Uint8Array {
 const AVISO_PESSOAS_OU_TEXTO = "A imagem da IA tinha pessoas ou texto; o post seguiu só com texto.";
 const AVISO_LINK_DRIVE = "O link da pasta do Drive não foi reconhecido.";
 const AVISO_PASTA_SEM_FOTO = "A pasta do Drive não tem nenhuma foto que deu para usar.";
+const AVISO_SITE_SEM_FOTO = "Nenhuma foto do site combinou com este post.";
 
 /**
  * Imagem da IA (PNG), gerada sem a logo e com a logo do perfil aplicada por cima, sem a IA (compor.ts), quando houver
@@ -198,10 +225,14 @@ async function imagemDaIa(
 }
 
 /**
- * `opcoes.comImagem` (padrão true): false gera só texto, sem buscar nem gerar imagem. Com pasta do Drive preenchida a
- * imagem sai sempre dela (falhou, vazia ou link não reconhecido: sem imagem e com aviso, sem cair para a IA); sem pasta,
- * da IA se estiver ligada. `opcoes.prazoFinal` (ms desde 1970, obrigatório): fim do prazo total da execução, o mesmo
- * de `total` (a nova tentativa da imagem da IA só acontece se sobrarem 45 s).
+ * `opcoes.comImagem` (padrão true): false gera só texto, sem buscar nem gerar imagem. Fontes da imagem (`fontesDaImagem`):
+ *  - com pasta do Drive preenchida, só o Drive (falhou, vazia ou link não reconhecido: sem imagem e com aviso, sem cair para
+ *    outra fonte); a foto é escolhida ANTES do texto e a descrição dela vai para o prompt do post;
+ *  - sem pasta, a foto do site (só com a chave `usa_fotos_site` ligada e foto com descrição) e depois a IA, se ligada. A foto
+ *    do site é escolhida DEPOIS do texto e só entra se a IA conferir que combina com ele; nenhuma combina: segue para a IA
+ *    (ou, sem IA, o post sai só com texto e com aviso).
+ * `opcoes.prazoFinal` (ms desde 1970, obrigatório): fim do prazo total da execução, o mesmo de `total` (a nova tentativa da
+ * imagem da IA só acontece se sobrarem 45 s).
  */
 export async function gerarConteudo(
   sb: Sb, perfil: any, postId: string, total: AbortSignal | undefined, opcoes: { comImagem?: boolean; prazoFinal: number },
@@ -220,13 +251,34 @@ export async function gerarConteudo(
   const tema = proximoTema(historico.map((h) => h.tema));
   const palavras = escolherPalavras(briefing.palavras_chave, historico.map((h) => h.palavras_chave ?? []));
   const anteriores = historico.map((h) => h.texto).filter((t): t is string => !!t);
+  const fontes = fontesDaImagem({
+    comImagem: opcoes.comImagem ?? true,
+    temPasta: String(perfil.drive_pasta_url ?? "").trim() !== "",
+    temFotosSite: fotosDoSiteComDescricao(perfil).length > 0,
+    usaIa: !!perfil.usa_ia_imagem,
+  });
+
+  // Imagem que falha não derruba o texto (já gerado e pago): vira aviso em `erro` e o post segue sem imagem.
+  let imagem: Imagem | null = null;
+  const avisos: string[] = [];
+  // Foto do Drive é escolhida antes do texto: a descrição dela vai para o prompt do post.
+  if (fontes[0] === "drive") {
+    try {
+      const doDrive = await imagemDoDrive(sb, perfil, postId, total);
+      if (doDrive === "vazia") avisos.push(AVISO_PASTA_SEM_FOTO);
+      else if (doDrive === null) avisos.push(AVISO_LINK_DRIVE);
+      else imagem = doDrive;
+    } catch (e) {
+      avisos.push(`Pasta do Drive: ${msg(e)}`);
+    }
+  }
 
   let motivo: string | null = null;
   let resposta = { texto: "", palavras_chave: [] as string[] };
   for (let tentativa = 0; tentativa < 2; tentativa++) {
     const m = montarMensagensPost({
       nome: perfil.nome, categoria: perfil.categoria, briefing, saude: perfil.saude, tema, palavras, anteriores,
-      motivoReprovacao: motivo, contextoPosts: perfil.contexto_posts ?? null,
+      motivoReprovacao: motivo, contextoPosts: perfil.contexto_posts ?? null, descricaoImagem: imagem?.descricao || null,
     });
     resposta = await gerarJson<{ texto: string; palavras_chave: string[] }>(m.system, m.user, "post_gmn", ESQUEMA_POST, total);
     const c = checarTexto(resposta.texto, { termosProibidos: briefing.termos_proibidos, saude: perfil.saude });
@@ -242,30 +294,27 @@ export async function gerarConteudo(
     };
   }
 
-  // Imagem que falha não derruba o texto (já gerado e pago): vira aviso em `erro` e o post segue sem imagem.
-  let imagem: Imagem | null = null;
-  const avisos: string[] = [];
-  const origem = decidirImagem({
-    comImagem: opcoes.comImagem ?? true,
-    temPasta: String(perfil.drive_pasta_url ?? "").trim() !== "",
-    usaIa: !!perfil.usa_ia_imagem,
-  });
-  if (origem === "drive") {
-    try {
-      const doDrive = await imagemDoDrive(sb, perfil, postId, total);
-      if (doDrive === "vazia") avisos.push(AVISO_PASTA_SEM_FOTO);
-      else if (doDrive === null) avisos.push(AVISO_LINK_DRIVE);
-      else imagem = doDrive;
-    } catch (e) {
-      avisos.push(`Pasta do Drive: ${msg(e)}`);
-    }
-  } else if (origem === "ia") {
-    try {
-      const r = await imagemDaIa(perfil, postId, tema, prazoFinal, total);
-      imagem = r.imagem;
-      if (r.aviso) avisos.push(r.aviso);
-    } catch (e) {
-      avisos.push(`Imagem da IA: ${msg(e)}`);
+  // Sem Drive: depois do texto, tenta cada fonte na ordem e para na primeira que dá imagem (site: só se combinar com o texto).
+  if (fontes[0] !== "drive") {
+    for (const fonte of fontes) {
+      if (imagem) break;
+      if (fonte === "site") {
+        try {
+          imagem = await imagemDoSite(sb, perfil, resposta.texto.trim(), total);
+        } catch (e) {
+          console.error("Imagem do site:", msg(e));
+        }
+        // Com a IA depois do site, ela é quem avisa se também não sair imagem.
+        if (!imagem && !fontes.includes("ia")) avisos.push(AVISO_SITE_SEM_FOTO);
+      } else if (fonte === "ia") {
+        try {
+          const r = await imagemDaIa(perfil, postId, tema, prazoFinal, total);
+          imagem = r.imagem;
+          if (r.aviso) avisos.push(r.aviso);
+        } catch (e) {
+          avisos.push(`Imagem da IA: ${msg(e)}`);
+        }
+      }
     }
   }
   if (avisos.length) console.error(avisos.join(" · "));

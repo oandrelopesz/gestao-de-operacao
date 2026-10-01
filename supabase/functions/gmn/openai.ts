@@ -2,7 +2,10 @@
 // imagem gerada.
 // deno-lint-ignore-file no-explicit-any
 import { foiPrazo, PRAZO, sinal } from "./prazo.ts";
-import { ESQUEMA_CHECAGEM_IMAGEM, promptChecagemImagem } from "./regras.ts";
+import {
+  ESQUEMA_CHECAGEM_IMAGEM, ESQUEMA_CLASSIFICACAO_IMAGEM, ESQUEMA_FOTOS_QUE_COMBINAM, PROMPT_CLASSIFICAR_IMAGEM,
+  montarMensagensFotosQueCombinam, promptChecagemImagem,
+} from "./regras.ts";
 
 const BASE = "https://api.openai.com/v1";
 
@@ -123,4 +126,61 @@ export async function checarImagem(
     throw new Error("A OpenAI devolveu uma checagem da imagem que não deu para ler.");
   }
   return { tem_pessoas: r.tem_pessoas, tem_texto: r.tem_texto };
+}
+
+/** Uma frase curta, em português, do que a foto mostra (para o texto do post). URL pública da imagem (R2). */
+export async function descreverImagem(url: string, total?: AbortSignal): Promise<string> {
+  const d = await chamar("/chat/completions", {
+    model: modeloVisao(),
+    messages: [{
+      role: "user",
+      content: [
+        { type: "text", text: "Descreva em uma frase curta, em português do Brasil, o que esta foto mostra, para ajudar a escrever um post do Google Meu Negócio. Responda só com a descrição, sem aspas." },
+        { type: "image_url", image_url: { url, detail: "low" } },
+      ],
+    }],
+  }, PRAZO.texto, total, "texto");
+  const t = d?.choices?.[0]?.message?.content;
+  return typeof t === "string" ? t.trim().replace(/^["']|["']$/g, "").slice(0, 300) : "";
+}
+
+/**
+ * O modelo de visão olha uma imagem do site de um negócio (URL pública) e diz se é logo, foto ou outra coisa; para foto,
+ * uma frase curta do que ela mostra. Resposta fora do esquema lança.
+ */
+export async function classificarImagem(
+  url: string, total?: AbortSignal,
+): Promise<{ tipo: "logo" | "foto" | "outro"; descricao: string }> {
+  const d = await chamar("/chat/completions", {
+    model: modeloVisao(),
+    messages: [{
+      role: "user",
+      content: [
+        { type: "text", text: PROMPT_CLASSIFICAR_IMAGEM },
+        { type: "image_url", image_url: { url, detail: "low" } },
+      ],
+    }],
+    response_format: {
+      type: "json_schema", json_schema: { name: "classificacao_imagem_gmn", strict: true, schema: ESQUEMA_CLASSIFICACAO_IMAGEM },
+    },
+  }, PRAZO.texto, total, "imagem");
+  const r = conteudoJson<{ tipo?: unknown; descricao?: unknown }>(d);
+  if ((r.tipo !== "logo" && r.tipo !== "foto" && r.tipo !== "outro") || typeof r.descricao !== "string") {
+    throw new Error("A OpenAI devolveu uma classificação da imagem que não deu para ler.");
+  }
+  return { tipo: r.tipo, descricao: r.descricao.trim().slice(0, 300) };
+}
+
+/**
+ * Dentre as fotos do site (`id` e descrição, até 40), os ids das que combinam com o texto do post; na dúvida, nenhuma. Só
+ * volta id que existe em `fotos` (sem repetição), mesmo que a IA invente outro.
+ */
+export async function fotosQueCombinam(
+  texto: string, fotos: { id: string; descricao: string }[], total?: AbortSignal,
+): Promise<string[]> {
+  const m = montarMensagensFotosQueCombinam(texto, fotos);
+  const r = await gerarJson<{ ids?: unknown }>(m.system, m.user, "fotos_que_combinam_gmn", ESQUEMA_FOTOS_QUE_COMBINAM, total);
+  if (!Array.isArray(r.ids)) throw new Error("A OpenAI devolveu uma escolha de fotos que não deu para ler.");
+  const existentes = new Set(fotos.map((f) => f.id));
+  return [...new Set(r.ids.filter((id): id is string => typeof id === "string" && existentes.has(id)))];
 }
