@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ClienteSelect } from "@/components/ClienteSelect";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -67,6 +67,11 @@ export function NPSForm({ onSuccess, onClose, initialData, defaultClienteId }: N
       return data || [];
     },
   });
+
+  const opcoesClientes = useMemo(
+    () => (clientes ?? []).map((c) => ({ id: c.id, nome: c.nome, agencia: agenciaLabelOf(c.agencia) })),
+    [clientes, agenciaLabelOf]
+  );
 
   const { score: scoreTotal, respondidos } = calcularScoreNPS(metrics);
   const category = getScoreCategory(scoreTotal ?? 0);
@@ -139,19 +144,14 @@ export function NPSForm({ onSuccess, onClose, initialData, defaultClienteId }: N
       <form onSubmit={handleSubmit} className="space-y-6 pt-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Cliente</Label>
-            <Select value={clienteId} onValueChange={setClienteId} disabled={!!initialData}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {clientes?.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nome} — <span className="opacity-60">{agenciaLabelOf(c.agencia)}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="nps-cliente">Cliente</Label>
+            <ClienteSelect
+              id="nps-cliente"
+              clientes={opcoesClientes}
+              value={clienteId || null}
+              onChange={(id) => setClienteId(id ?? "")}
+              disabled={!!initialData}
+            />
           </div>
 
           <div className="space-y-2">

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -10,6 +11,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { ClienteSelect } from "@/components/ClienteSelect";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -60,6 +62,12 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
     },
   });
 
+  // A agência aparece em maiúscula inicial ao lado do cliente, como era na lista antiga
+  const opcoesClientes = useMemo(
+    () => clientes.map((c) => ({ id: c.id, nome: c.nome, agencia: c.agencia ? c.agencia.charAt(0).toUpperCase() + c.agencia.slice(1) : null })),
+    [clientes]
+  );
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -83,23 +91,14 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
           render={({ field }) => (
             <FormItem>
               <FormLabel>Cliente</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sem cliente (opcional)" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {clientes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nome} — {c.agencia && c.agencia.charAt(0).toUpperCase() + c.agencia.slice(1)}
-                    </SelectItem>
-                  ))}
-                  {clientes.length === 0 && (
-                    <SelectItem value="none" disabled>Nenhum cliente cadastrado</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <ClienteSelect
+                  clientes={opcoesClientes}
+                  value={field.value || null}
+                  onChange={(id) => field.onChange(id ?? "")}
+                  opcaoVazia="Sem cliente (opcional)"
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

@@ -1,16 +1,15 @@
 // Aba "Contexto" da gaveta do perfil: contexto completo do cliente para os posts, extração dos dados estruturados
 // (briefing) e marcação de saúde. Os rascunhos ficam na gaveta; aqui só se mostra e se edita.
 import { ChevronDown, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { ClienteSelect } from "@/components/ClienteSelect";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ClienteOpcao, PerfilGmn } from "@/lib/gmn";
 import { LIMITE_CONTEXTO_POSTS, type Briefing } from "../../../supabase/functions/gmn/regras.ts";
 import { BriefingForm } from "./BriefingForm";
 
-const SEM_CLIENTE = "__sem__";
 const AVISO = "text-xs font-medium text-amber-600 dark:text-amber-400";
 
 export function AbaContexto({
@@ -43,13 +42,14 @@ export function AbaContexto({
     <div className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="gmn-cliente">Cliente do sistema (opcional)</Label>
-        <Select value={dados.cliente_id ?? SEM_CLIENTE} onValueChange={(v) => onDados({ cliente_id: v === SEM_CLIENTE ? null : v })}>
-          <SelectTrigger id="gmn-cliente" aria-label="Cliente do sistema (opcional)"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={SEM_CLIENTE}>Sem cliente</SelectItem>
-            {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <ClienteSelect
+          id="gmn-cliente"
+          aria-label="Cliente do sistema (opcional)"
+          clientes={clientes}
+          value={dados.cliente_id}
+          onChange={(id) => onDados({ cliente_id: id })}
+          opcaoVazia="Sem cliente"
+        />
       </div>
       <label className="flex items-center gap-2 text-sm">
         <Checkbox checked={dados.saude} onCheckedChange={(v) => onDados({ saude: v === true })} />

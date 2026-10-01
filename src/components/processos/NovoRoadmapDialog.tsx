@@ -8,7 +8,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ClienteSelect } from "@/components/ClienteSelect";
 import {
   Dialog,
   DialogContent,
@@ -32,8 +32,9 @@ import { fetchPassosLivres, PassoOnboardingSelect, type PassosDoOnboarding } fro
 type Filtro = "onboarding" | "andamento";
 type Base = "template" | "zero";
 
-/** Valor do Select para roadmap pessoal (sem cliente). */
+/** Valor do seletor de cliente para roadmap pessoal (sem cliente). */
 const PESSOAL = "__pessoal__";
+const EXTRAS_PESSOAL = [{ value: PESSOAL, label: "Pessoal" }];
 
 const erroMsg = (e: unknown) => (e && typeof e === "object" && "message" in e ? String((e as any).message) : "Erro ao salvar");
 
@@ -131,6 +132,7 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
   }, [aberto, clienteId]);
 
   const lista = filtro === "onboarding" ? emOnboarding : emAndamento;
+  const opcoesLista = useMemo(() => lista.map((c) => ({ id: c.id, nome: c.nome })), [lista]);
   const ehPessoal = clienteId === PESSOAL;
   const clienteSelecionado = useMemo(
     () => [...emOnboarding, ...emAndamento].find((c) => c.id === clienteId) ?? null,
@@ -208,7 +210,7 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
             {/* Cliente */}
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label className="text-xs">Cliente</Label>
+                <Label htmlFor="roadmap-cliente" className="text-xs">Cliente</Label>
                 <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
                   {([
                     ["onboarding", "Em onboarding", emOnboarding.length],
@@ -228,17 +230,14 @@ export function NovoRoadmapDialog({ aberto, clienteIdInicial, onClose, onCriado 
                   ))}
                 </div>
               </div>
-              <Select value={clienteId} onValueChange={setClienteId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={lista.length ? "Escolha o cliente" : filtro === "onboarding" ? "Nenhum cliente em onboarding" : "Nenhum cliente em andamento"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={PESSOAL}>Pessoal</SelectItem>
-                  {lista.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ClienteSelect
+                id="roadmap-cliente"
+                clientes={opcoesLista}
+                value={clienteId || null}
+                onChange={(id) => setClienteId(id ?? "")}
+                extras={EXTRAS_PESSOAL}
+                placeholder={lista.length ? "Escolha o cliente" : filtro === "onboarding" ? "Nenhum cliente em onboarding" : "Nenhum cliente em andamento"}
+              />
             </div>
 
             {/* Base */}

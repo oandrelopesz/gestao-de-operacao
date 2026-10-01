@@ -3,13 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, MapPin, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { ClienteSelect } from "@/components/ClienteSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,6 @@ const FILTROS: { v: Filtro; rotulo: string }[] = [
   { v: "erro", rotulo: "Com erro" }, { v: "saude", rotulo: "Saúde" }, { v: "sem_acesso", rotulo: "Sem acesso" },
   { v: "sem_briefing", rotulo: "Sem contexto" },
 ];
-const SEM_CLIENTE = "__sem__";
 
 // Estado do último post, no feminino (prévia) e no masculino (post).
 const ESTADO_POST: Record<UltimoPost["status"], [string, string]> = {
@@ -203,14 +202,15 @@ function GmnConteudo() {
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); criar(); } }} />
             </div>
             <div className="space-y-1.5">
-              <Label>Cliente do sistema (opcional)</Label>
-              <Select value={novo?.cliente_id ?? SEM_CLIENTE} onValueChange={(v) => novo && setNovo({ ...novo, cliente_id: v === SEM_CLIENTE ? null : v })}>
-                <SelectTrigger aria-label="Cliente do sistema (opcional)"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SEM_CLIENTE}>Sem cliente</SelectItem>
-                  {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="gmn-novo-cliente">Cliente do sistema (opcional)</Label>
+              <ClienteSelect
+                id="gmn-novo-cliente"
+                aria-label="Cliente do sistema (opcional)"
+                clientes={clientes}
+                value={novo?.cliente_id ?? null}
+                onChange={(id) => novo && setNovo({ ...novo, cliente_id: id })}
+                opcaoVazia="Sem cliente"
+              />
             </div>
           </div>
           <DialogFooter>

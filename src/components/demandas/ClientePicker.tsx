@@ -9,6 +9,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { filtroCmdk } from "@/lib/buscaTexto";
 import { cn } from "@/lib/utils";
 
 interface ClientePickerProps {
@@ -62,18 +63,19 @@ export function ClientePicker({
         // Teclas (espaço, Enter, setas) não podem chegar ao card: iniciariam o arrastar pelo teclado
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <Command>
+        {/* Busca sem acento e sem maiúscula, só pelo nome: o `value` dos itens carrega o id e não entra na busca */}
+        <Command filter={filtroCmdk}>
           <CommandInput placeholder="Buscar cliente…" />
           <CommandList>
             <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
             <CommandGroup>
-              <CommandItem value="Pessoal" onSelect={() => escolher({ cliente_id: null, pessoal: true })}>
+              <CommandItem value="x:pessoal" keywords={["Pessoal"]} onSelect={() => escolher({ cliente_id: null, pessoal: true })}>
                 <User size={14} className="text-violet-500" />
                 <span className="flex-1">Pessoal</span>
                 {pessoalAtual && <Check size={14} />}
               </CommandItem>
               {permitirSemCliente && (
-                <CommandItem value="Sem cliente" onSelect={() => escolher({ cliente_id: null, pessoal: false })}>
+                <CommandItem value="__vazio__" keywords={["Sem cliente"]} onSelect={() => escolher({ cliente_id: null, pessoal: false })}>
                   <span className={cn("flex-1", semCliente ? "" : "text-zinc-500")}>Sem cliente</span>
                   {semCliente && <Check size={14} />}
                 </CommandItem>
@@ -81,7 +83,7 @@ export function ClientePicker({
             </CommandGroup>
             <CommandGroup heading="Clientes">
               {clientesOrdenados.map((c) => (
-                <CommandItem key={c.id} value={`${c.nome} ${c.id}`} onSelect={() => escolher({ cliente_id: c.id, pessoal: false })}>
+                <CommandItem key={c.id} value={`c:${c.id}`} keywords={[c.nome]} onSelect={() => escolher({ cliente_id: c.id, pessoal: false })}>
                   <span className="flex-1 truncate">{c.nome}</span>
                   {!pessoalAtual && clienteIdAtual === c.id && <Check size={14} />}
                 </CommandItem>
