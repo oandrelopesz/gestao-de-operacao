@@ -349,6 +349,7 @@ export type Database = {
         Row: {
           aulas: Json
           categoria_id: string | null
+          concluido_em: string | null
           created_at: string | null
           em_andamento: boolean | null
           expira_em: string | null
@@ -367,6 +368,7 @@ export type Database = {
         Insert: {
           aulas?: Json
           categoria_id?: string | null
+          concluido_em?: string | null
           created_at?: string | null
           em_andamento?: boolean | null
           expira_em?: string | null
@@ -385,6 +387,7 @@ export type Database = {
         Update: {
           aulas?: Json
           categoria_id?: string | null
+          concluido_em?: string | null
           created_at?: string | null
           em_andamento?: boolean | null
           expira_em?: string | null
@@ -1047,6 +1050,8 @@ export type Database = {
           briefing_salvo_em: string | null
           categoria: string | null
           cliente_id: string | null
+          contexto_imagens: string | null
+          contexto_posts: string | null
           created_at: string
           cta_tipo: string
           cta_url: string | null
@@ -1054,7 +1059,9 @@ export type Database = {
           endereco: string | null
           id: string
           location_name: string | null
+          logo_url: string | null
           nome: string
+          permitir_pessoas_ia: boolean
           saude: boolean
           sem_acesso: boolean
           sincronizado_em: string | null
@@ -1071,6 +1078,8 @@ export type Database = {
           briefing_salvo_em?: string | null
           categoria?: string | null
           cliente_id?: string | null
+          contexto_imagens?: string | null
+          contexto_posts?: string | null
           created_at?: string
           cta_tipo?: string
           cta_url?: string | null
@@ -1078,7 +1087,9 @@ export type Database = {
           endereco?: string | null
           id?: string
           location_name?: string | null
+          logo_url?: string | null
           nome: string
+          permitir_pessoas_ia?: boolean
           saude?: boolean
           sem_acesso?: boolean
           sincronizado_em?: string | null
@@ -1095,6 +1106,8 @@ export type Database = {
           briefing_salvo_em?: string | null
           categoria?: string | null
           cliente_id?: string | null
+          contexto_imagens?: string | null
+          contexto_posts?: string | null
           created_at?: string
           cta_tipo?: string
           cta_url?: string | null
@@ -1102,7 +1115,9 @@ export type Database = {
           endereco?: string | null
           id?: string
           location_name?: string | null
+          logo_url?: string | null
           nome?: string
+          permitir_pessoas_ia?: boolean
           saude?: boolean
           sem_acesso?: boolean
           sincronizado_em?: string | null
