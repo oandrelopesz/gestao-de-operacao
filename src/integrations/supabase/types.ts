@@ -3167,6 +3167,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      rolar_colunas_por_dia: { Args: { p_hoje: string }; Returns: number }
       sincronizar_passo: {
         Args: { p_forcar?: boolean; p_passo: string }
         Returns: undefined
