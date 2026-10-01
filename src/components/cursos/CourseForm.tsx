@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,6 +38,8 @@ import { hojeBrasilia } from "@/lib/entrega";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, type CursoCategoriaDef } from "@/lib/cursoCategorias";
+import { MENSAGEM_NENHUM, MENSAGEM_PARECIDOS } from "@/lib/search";
+import { useBusca } from "@/lib/useBusca";
 
 const courseSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
@@ -58,6 +60,10 @@ const courseSchema = z.object({
 });
 
 type CourseFormValues = z.infer<typeof courseSchema>;
+
+/** O que a lista de categorias mostra: as categorias e, havendo categoria escolhida, "Remover categoria" (entra na busca pelo rótulo). */
+type EntradaCategoria = { tipo: "categoria"; cat: CursoCategoriaDef } | { tipo: "remover" };
+const camposDaEntradaCategoria = (e: EntradaCategoria) => [e.tipo === "categoria" ? e.cat.nome : "Remover categoria"];
 
 interface CourseFormProps {
   open: boolean;
@@ -185,6 +191,19 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
   const { fields: aulas, append: addAula, remove: removeAula } = useFieldArray({ control: form.control, name: "aulas" });
   const tipoAcesso = form.watch("tipo_acesso");
   const concluido = form.watch("concluido");
+  const categoriaIdAtual = form.watch("categoria_id");
+
+  // Busca tolerante nas categorias (sem acento, com erro de digitação). Sem texto, a lista sai na ordem recebida.
+  const entradasCategoria = useMemo<EntradaCategoria[]>(
+    () => [
+      ...categorias.map((cat) => ({ tipo: "categoria" as const, cat })),
+      ...(categoriaIdAtual ? [{ tipo: "remover" as const }] : []),
+    ],
+    [categorias, categoriaIdAtual]
+  );
+  const resultadoCategorias = useBusca(entradasCategoria, searchQuery, camposDaEntradaCategoria);
+  const categoriasDoResultado = resultadoCategorias.itens.filter((e) => e.tipo === "categoria");
+  const removerDoResultado = resultadoCategorias.itens.filter((e) => e.tipo === "remover");
 
   const onSubmit = async (values: CourseFormValues) => {
     setLoading(true);
@@ -279,6 +298,27 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 name="categoria_id"
                 render={({ field }) => {
                   const selecionada = categorias.find((cat) => cat.id === field.value);
+                  const itemDaEntrada = (entrada: EntradaCategoria) =>
+                    entrada.tipo === "remover" ? (
+                      <CommandItem key="__sem_categoria" value="__sem_categoria" onSelect={() => selecionarCategoria(null)} className="text-muted-foreground">
+                        <X className="mr-2 h-4 w-4" /> Remover categoria
+                      </CommandItem>
+                    ) : (
+                      <CommandItem
+                        key={entrada.cat.id}
+                        value={entrada.cat.nome}
+                        onSelect={() => selecionarCategoria(entrada.cat.id)}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            field.value === entrada.cat.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <span className="mr-2 h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: corDaCategoria(entrada.cat.cor) }} />
+                        {entrada.cat.nome}
+                      </CommandItem>
+                    );
                   return (
                   <FormItem className="flex flex-col">
                     <FormLabel>Categoria</FormLabel>
@@ -305,32 +345,26 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-[240px] p-0" align="start">
-                        <Command>
+                        <Command shouldFilter={false}>
                           <CommandInput
                             placeholder="Buscar ou criar..."
                             value={searchQuery}
                             onValueChange={setSearchQuery}
                           />
                           <CommandList>
-                            {categorias.length > 0 && (
-                              <CommandGroup heading="Categorias">
-                                {categorias.map((cat) => (
-                                  <CommandItem
-                                    key={cat.id}
-                                    value={cat.nome}
-                                    onSelect={() => selecionarCategoria(cat.id)}
-                                  >
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        field.value === cat.id ? "opacity-100" : "opacity-0"
-                                      )}
-                                    />
-                                    <span className="mr-2 h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: corDaCategoria(cat.cor) }} />
-                                    {cat.nome}
-                                  </CommandItem>
-                                ))}
+                            {resultadoCategorias.modo === "nenhum" && categorias.length > 0 && (
+                              <p className="px-2 py-3 text-center text-xs text-muted-foreground">{MENSAGEM_NENHUM}</p>
+                            )}
+                            {resultadoCategorias.modo === "parecidos" ? (
+                              <CommandGroup heading={MENSAGEM_PARECIDOS}>
+                                {resultadoCategorias.itens.map(itemDaEntrada)}
                               </CommandGroup>
+                            ) : (
+                              categoriasDoResultado.length > 0 && (
+                                <CommandGroup heading="Categorias">
+                                  {categoriasDoResultado.map(itemDaEntrada)}
+                                </CommandGroup>
+                              )
                             )}
                             {searchQuery.trim() && !categorias.some((c) => c.nome.toLowerCase() === searchQuery.trim().toLowerCase()) && (
                               <CommandGroup heading="Nova categoria">
@@ -349,16 +383,12 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                                 </CommandItem>
                               </CommandGroup>
                             )}
-                            {field.value && (
-                              <CommandGroup>
-                                <CommandItem value="__sem_categoria" onSelect={() => selecionarCategoria(null)} className="text-muted-foreground">
-                                  <X className="mr-2 h-4 w-4" /> Remover categoria
-                                </CommandItem>
-                              </CommandGroup>
+                            {resultadoCategorias.modo !== "parecidos" && removerDoResultado.length > 0 && (
+                              <CommandGroup>{removerDoResultado.map(itemDaEntrada)}</CommandGroup>
                             )}
                             <CommandEmpty>
                               <p className="p-2 text-xs text-muted-foreground">
-                                {categorias.length === 0 ? "Digite um nome para criar a primeira categoria." : "Nenhuma categoria encontrada."}
+                                {categorias.length === 0 ? "Digite um nome para criar a primeira categoria." : MENSAGEM_NENHUM}
                               </p>
                             </CommandEmpty>
                           </CommandList>

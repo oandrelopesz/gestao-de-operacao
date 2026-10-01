@@ -4,6 +4,8 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, Search, X } from "lucide-react";
 import { buscarAbas } from "@/lib/buscaAbas";
 import type { NavLink } from "@/lib/nav";
+import { MensagemBusca } from "@/components/MensagemBusca";
+import { MENSAGEM_NENHUM } from "@/lib/search";
 import { cn } from "@/lib/utils";
 
 const CHAVE_RECOLHIDOS = "menu-grupos-recolhidos";
@@ -52,7 +54,8 @@ export function NavLateral({ grupos, onNavegar, onAbrirMenu, contadores }: NavLa
   const campo = useRef<HTMLInputElement>(null);
 
   const itens = useMemo(() => grupos.flatMap((g) => g.links.map((l) => ({ ...l, grupo: g.title }))), [grupos]);
-  const resultados = useMemo(() => buscarAbas(itens, busca), [itens, busca]);
+  const resultado = useMemo(() => buscarAbas(itens, busca), [itens, busca]);
+  const resultados = resultado.itens;
   const buscando = busca.trim().length > 0;
 
   useEffect(() => setDestaque(0), [busca]);
@@ -148,33 +151,36 @@ export function NavLateral({ grupos, onNavegar, onAbrirMenu, contadores }: NavLa
 
       <nav className="flex-1 px-3 pb-4 space-y-5 overflow-y-auto">
         {buscando ? (
-          <div id="menu-busca-resultados" role="listbox" aria-label="Abas encontradas" className="space-y-0.5">
-            {resultados.length === 0 ? (
-              <p className="px-3 py-2 text-[12px] text-muted-foreground">Nenhuma aba encontrada.</p>
-            ) : (
-              resultados.map((link, i) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  role="option"
-                  aria-selected={i === destaque}
-                  activeOptions={{ exact: link.to === "/" }}
-                  className={cn(CLASSE_LINK, i === destaque && "bg-sidebar-accent/70 text-foreground")}
-                  onMouseEnter={() => setDestaque(i)}
-                  onClick={() => {
-                    setBusca("");
-                    onNavegar();
-                  }}
-                >
-                  <span className="text-muted-foreground group-hover/nav:text-foreground group-data-[status=active]/nav:text-primary transition-colors">
-                    {link.icon}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{link.label}</span>
-                  <Contador n={contadores?.[link.to]} />
-                  <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">{link.grupo}</span>
-                </Link>
-              ))
-            )}
+          <div>
+            {resultado.modo === "parecidos" && <MensagemBusca resultado={resultado} className="px-3 pb-1.5 text-[12px]" />}
+            <div id="menu-busca-resultados" role="listbox" aria-label="Abas encontradas" className="space-y-0.5">
+              {resultados.length === 0 ? (
+                <p className="px-3 py-2 text-[12px] text-muted-foreground">{MENSAGEM_NENHUM}</p>
+              ) : (
+                resultados.map((link, i) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    role="option"
+                    aria-selected={i === destaque}
+                    activeOptions={{ exact: link.to === "/" }}
+                    className={cn(CLASSE_LINK, i === destaque && "bg-sidebar-accent/70 text-foreground")}
+                    onMouseEnter={() => setDestaque(i)}
+                    onClick={() => {
+                      setBusca("");
+                      onNavegar();
+                    }}
+                  >
+                    <span className="text-muted-foreground group-hover/nav:text-foreground group-data-[status=active]/nav:text-primary transition-colors">
+                      {link.icon}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{link.label}</span>
+                    <Contador n={contadores?.[link.to]} />
+                    <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">{link.grupo}</span>
+                  </Link>
+                ))
+              )}
+            </div>
           </div>
         ) : (
           grupos.map((group) => {
