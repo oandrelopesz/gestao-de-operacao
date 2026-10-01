@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { semPlataforma, renomearChavePlataforma, MSG_ULTIMA_PLATAFORMA } from "./plataformasOperacao.ts";
+import { semPlataforma, renomearChavePlataforma, comMetodoDasContas, MSG_ULTIMA_PLATAFORMA } from "./plataformasOperacao.ts";
 
 const cfg = (verba: number, metodo_pagamento = "pix") => ({ verba, metodo_pagamento });
 
@@ -142,4 +142,73 @@ test("renomearChavePlataforma tolera config vazia, nula ou de formato estranho",
   const vazio = {};
   assert.equal(renomearChavePlataforma(vazio, "Meta", "Meta Ads"), vazio);
   assert.equal(renomearChavePlataforma("texto", "Meta", "Meta Ads"), "texto");
+});
+
+// ---------- comMetodoDasContas ----------
+
+const conta = (extra: Record<string, unknown> = {}) => ({
+  operacao_id: "op-1",
+  plataformas: ["Meta"],
+  metodo_pagamento: "cartao",
+  ativo: true,
+  ...extra,
+});
+
+test("comMetodoDasContas: conta ativa com cartão vence a configuração pix da operação", () => {
+  const config = { Meta: cfg(3000, "pix"), Google: cfg(1500, "boleto") };
+  const novo = comMetodoDasContas(config, [conta()], "op-1");
+  assert.deepEqual(novo.Meta, cfg(3000, "cartao"));
+  // quem não tem conta continua como está
+  assert.deepEqual(novo.Google, cfg(1500, "boleto"));
+});
+
+test("comMetodoDasContas: conta inativa não vence a configuração", () => {
+  const config = { Meta: cfg(3000, "pix") };
+  const novo = comMetodoDasContas(config, [conta({ ativo: false })], "op-1");
+  assert.deepEqual(novo.Meta, cfg(3000, "pix"));
+});
+
+test("comMetodoDasContas: plataforma sem conta mantém a configuração", () => {
+  const config = { Meta: cfg(3000, "pix"), TikTok: cfg(400, "boleto") };
+  const novo = comMetodoDasContas(config, [conta()], "op-1");
+  assert.deepEqual(novo.TikTok, cfg(400, "boleto"));
+});
+
+test("comMetodoDasContas: contas de outra operação não interferem", () => {
+  const config = { Meta: cfg(3000, "pix") };
+  const novo = comMetodoDasContas(config, [conta({ operacao_id: "op-2" })], "op-1");
+  assert.deepEqual(novo.Meta, cfg(3000, "pix"));
+});
+
+test("comMetodoDasContas: conta antiga com várias plataformas vale para cada uma delas", () => {
+  const config = { Meta: cfg(3000, "pix"), Google: cfg(1500, "pix"), TikTok: cfg(400, "pix") };
+  const novo = comMetodoDasContas(config, [conta({ plataformas: ["Meta", "Google"], metodo_pagamento: "boleto" })], "op-1");
+  assert.equal(novo.Meta.metodo_pagamento, "boleto");
+  assert.equal(novo.Google.metodo_pagamento, "boleto");
+  assert.equal(novo.TikTok.metodo_pagamento, "pix");
+});
+
+test("comMetodoDasContas: só troca o método, a verba da configuração fica", () => {
+  const novo = comMetodoDasContas({ Meta: cfg(3000, "pix") }, [conta()], "op-1");
+  assert.equal(novo.Meta.verba, 3000);
+});
+
+test("comMetodoDasContas: ignora método vazio ou desconhecido e conta sem lista de plataformas", () => {
+  const config = { Meta: cfg(3000, "pix") };
+  assert.deepEqual(comMetodoDasContas(config, [conta({ metodo_pagamento: null })], "op-1").Meta, cfg(3000, "pix"));
+  assert.deepEqual(comMetodoDasContas(config, [conta({ metodo_pagamento: "cheque" })], "op-1").Meta, cfg(3000, "pix"));
+  assert.deepEqual(comMetodoDasContas(config, [conta({ plataformas: null })], "op-1").Meta, cfg(3000, "pix"));
+});
+
+test("comMetodoDasContas: com duas contas ativas na mesma plataforma vale a primeira da lista", () => {
+  const config = { Meta: cfg(3000, "pix") };
+  const novo = comMetodoDasContas(config, [conta({ metodo_pagamento: "boleto" }), conta({ metodo_pagamento: "cartao" })], "op-1");
+  assert.equal(novo.Meta.metodo_pagamento, "boleto");
+});
+
+test("comMetodoDasContas: não altera o objeto recebido", () => {
+  const config = { Meta: cfg(3000, "pix") };
+  const copia = structuredClone(config);
+  comMetodoDasContas(config, [conta()], "op-1");
+  assert.deepEqual(config, copia);
 });

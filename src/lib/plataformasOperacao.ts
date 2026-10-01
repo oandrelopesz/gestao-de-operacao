@@ -64,3 +64,40 @@ export function renomearChavePlataforma<T>(config: T, antigo: string, novo: stri
   if (Object.prototype.hasOwnProperty.call(atual, novo)) return config;
   return Object.fromEntries(Object.entries(atual).map(([nome, valor]) => [nome === antigo ? novo : nome, valor])) as T;
 }
+
+/** O que a regra abaixo precisa saber de um registro de saldo_ads */
+export interface ContaSaldoMetodo {
+  operacao_id: string | null;
+  plataformas: string[] | null;
+  metodo_pagamento: string | null;
+  ativo: boolean | null;
+}
+
+const METODOS_VALIDOS = ["cartao", "pix", "boleto"];
+
+/**
+ * A forma de pagamento pode ser editada direto na conta do Saldo (saldo_ads), sem passar pela operação.
+ * Para o cadastro do cliente não desfazer essa edição ao salvar, o formulário carrega o método da conta
+ * ativa da operação que cobre a plataforma; sem conta ativa, vale o da configuração da operação.
+ *
+ * - Só contas da operação indicada e ativas (`ativo !== false`) entram.
+ * - Conta antiga que junta várias plataformas vale para cada uma delas.
+ * - Método vazio ou desconhecido na conta é ignorado; com duas contas na mesma plataforma vale a primeira.
+ * - Troca só o método: a verba (e qualquer outro campo) da configuração fica como está.
+ * - Não altera o objeto recebido; devolve um novo.
+ */
+export function comMetodoDasContas<C extends { metodo_pagamento: string }>(
+  config: Record<string, C>,
+  contas: ContaSaldoMetodo[],
+  operacaoId: string,
+): Record<string, C> {
+  const daOperacao = contas.filter((c) => c.ativo !== false && c.operacao_id === operacaoId);
+  const out: Record<string, C> = {};
+  Object.entries(config).forEach(([nome, valor]) => {
+    const conta = daOperacao.find(
+      (c) => (c.plataformas || []).includes(nome) && c.metodo_pagamento && METODOS_VALIDOS.includes(c.metodo_pagamento),
+    );
+    out[nome] = conta ? { ...valor, metodo_pagamento: conta.metodo_pagamento as C["metodo_pagamento"] } : valor;
+  });
+  return out;
+}

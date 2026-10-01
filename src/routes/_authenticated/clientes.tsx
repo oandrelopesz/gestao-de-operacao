@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Plus, Search, Users as UsersIcon, DollarSign, TrendingUp, Smile,
   MoreVertical, Pencil, Archive, Trash2, LayoutGrid, Table as TableIcon, Calendar, Play, Pause,
@@ -113,6 +113,9 @@ function ClientesPage() {
   const [operacionalFilter, setOperacionalFilter] = useState<string>("all_active");
   const [showPausados, setShowPausados] = useState(true);
   const [showArquivados, setShowArquivados] = useState(false);
+  /** Valor atual do controle para quem roda depois (o "Desfazer" do aviso guarda uma versão antiga da tela) */
+  const showArquivadosRef = useRef(showArquivados);
+  showArquivadosRef.current = showArquivados;
   /** Arquivados ficam numa lista própria, fora do cache dos ativos: resumo, NPS e verba contam só os ativos */
   const [arquivados, setArquivados] = useState<ClienteView[]>([]);
   const [loadingArquivados, setLoadingArquivados] = useState(false);
@@ -167,8 +170,9 @@ function ClientesPage() {
 
   useEffect(() => { if (showArquivados) fetchArquivados(); }, [showArquivados]);
 
-  /** Arquivar, restaurar e remover mudam as duas listas */
-  const recarregarListas = () => Promise.all([fetchClientes(), fetchArquivados()]);
+  /** Arquivar, restaurar e remover mudam as duas listas; os arquivados só são buscados com o controle ligado
+   *  (ao ligar, o efeito acima busca). Lê o ref: o "Desfazer" do aviso chega aqui com o estado do clique. */
+  const recarregarListas = () => Promise.all([fetchClientes(), showArquivadosRef.current ? fetchArquivados() : undefined]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};

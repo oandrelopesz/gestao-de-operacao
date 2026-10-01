@@ -4,7 +4,7 @@ import {
   type ClientFormValues, type OperacaoFormValues, type PlataformaConfig,
 } from "@/components/ClientForm";
 import { fetchCotacoes, isMoeda, paraBRL } from "@/lib/moedas";
-import { semPlataforma } from "@/lib/plataformasOperacao";
+import { semPlataforma, comMetodoDasContas } from "@/lib/plataformasOperacao";
 
 // Mesmo fallback usado nas outras telas quando não há sessão (preview)
 export const FALLBACK_USER_ID = "b34bdae5-7a67-4b63-a46f-8aad43a06c63";
@@ -124,7 +124,9 @@ export async function loadClienteFormValues(clienteId: string): Promise<ClienteF
   const saldos = ((registros || []) as SaldoAdsRegistro[]).filter((r) => r.ativo !== false);
 
   const operacoes: OperacaoFormValues[] = ((ops || []) as OperacaoRegistro[]).map((op) => {
-    const config = parsePlataformasConfig(op.plataformas_config);
+    // Se a forma de pagamento foi editada direto na conta do Saldo, vale a da conta ativa (senão o
+    // "Salvar" do cadastro devolveria, por exemplo, uma conta migrada para cartão a pix)
+    const config = comMetodoDasContas(parsePlataformasConfig(op.plataformas_config), registros || [], op.id);
     const doSaldo = saldos.filter((r) => r.operacao_id === op.id);
     // Plataformas: as configuradas na operação + qualquer registro de saldo ainda não coberto
     const plataformas = Array.from(new Set([...Object.keys(config), ...doSaldo.flatMap((r) => r.plataformas || [])]));

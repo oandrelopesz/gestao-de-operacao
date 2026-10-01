@@ -136,7 +136,8 @@ function NotasPage() {
     // O clique já começa a baixar o editor (se ainda não chegou). Se falhar, fecha e o próximo clique tenta de novo.
     garantirEditor().catch(() => {
       toast.error("Não foi possível abrir o editor. Tente abrir a nota de novo.");
-      setEdicao((atual) => (atual === e ? null : atual));
+      // Por id: se o usuário já digitou, o objeto de edição é outro, mas a nota aberta é a mesma
+      setEdicao((atual) => (atual?.id === e.id ? null : atual));
     });
   };
   const novo = () => abrir({ titulo: "", conteudo: "", tema_id: temaDoFiltro, doc: null });

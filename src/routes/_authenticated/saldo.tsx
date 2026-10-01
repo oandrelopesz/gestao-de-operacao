@@ -239,8 +239,8 @@ function SaldoPage() {
   const fetchSaldo = async (silent = false) => {
     if (!silent && !hasCached(CACHE_KEYS.saldo)) setLoading(true);
     try {
-      // Plataformas desativadas no cadastro do cliente ficam fora do monitor (histórico preservado)
-      setData(((await loadSaldo()) as unknown as SaldoRow[]).filter((r) => r.ativo !== false));
+      // loadSaldo já deixa de fora as plataformas desativadas no cadastro do cliente
+      setData((await loadSaldo()) as unknown as SaldoRow[]);
     } catch (error) {
       toast.error("Erro ao carregar saldos de mídia");
       console.error(error);

@@ -132,7 +132,9 @@ export async function loadSaldo() {
     .select("*, clientes!inner(status_operacional, verba_ads)")
     .order("dias_restantes", { ascending: true, nullsFirst: false });
   if (error) throw error;
-  return (data || []) as any[];
+  // Plataformas desativadas no cadastro do cliente ficam fora do monitor (histórico preservado).
+  // O filtro mora aqui, e não na página, porque o pré-carregamento guarda este mesmo resultado no cache.
+  return ((data || []) as any[]).filter((r) => r.ativo !== false);
 }
 
 export async function loadAcessos() {
