@@ -31,6 +31,107 @@ test("imagensDoHtml: og, ícones, JSON-LD, img com legenda/alt/srcset e CSS; log
   assert.ok(!r.some((c) => c.url.startsWith("data:")));
 });
 
+test("imagensDoHtml: a pista de logo olha alt, classe, id e nome do arquivo (palavra inteira), nunca o domínio, as pastas nem pedaços de palavra", () => {
+  const html = `<html><body>
+  <img src="https://www.multimarcas.com.br/wp-content/uploads/marcas/patio.jpg" alt="Pátio coberto">
+  <img src="https://brandao.com/foto.jpg" alt="Fachada da loja">
+  <img src="/img/todas.jpg" alt="Seminovos de todas as marcas">
+  <img src="/img/frente.jpg" alt="logo ali na frente">
+  <img src="/img/logo-loja.png" alt="">
+  <img src="/img/cabecalho.png" class="site-logo" alt="">
+  <img src="/img/camel.png" class="siteLogo" alt="">
+  <img src="/img/arquivo.png" id="brand" alt="">
+  <img src="/img/Logomarca-Loja.PNG" alt="">
+  <img src="/img/logotipo_2024.svg" alt="">
+  <img src="/img/logos-clientes/selo.jpg" alt="Selo">
+  <img src="/img/branding.jpg" alt="Equipe">
+  <div style="background:url(/css/multimarcas-fundo.jpg)"></div><div style="background:url(/css/logo.png)"></div>
+  </body></html>`;
+  const r = imagensDoHtml(html, "https://www.loja.com/");
+  const logo = (u: string) => r.find((x) => x.url === u)?.logo;
+  for (const u of [
+    "https://www.multimarcas.com.br/wp-content/uploads/marcas/patio.jpg", "https://brandao.com/foto.jpg",
+    "https://www.loja.com/img/todas.jpg", "https://www.loja.com/img/logos-clientes/selo.jpg", "https://www.loja.com/img/branding.jpg",
+    "https://www.loja.com/css/multimarcas-fundo.jpg",
+  ]) assert.equal(logo(u), false, u);
+  for (const u of [
+    "https://www.loja.com/img/logo-loja.png", "https://www.loja.com/img/cabecalho.png", "https://www.loja.com/img/camel.png",
+    "https://www.loja.com/img/arquivo.png", "https://www.loja.com/img/Logomarca-Loja.PNG", "https://www.loja.com/img/logotipo_2024.svg",
+    "https://www.loja.com/css/logo.png",
+    "https://www.loja.com/img/frente.jpg", // "logo" como palavra solta no alt vale como pista fraca: a visão decide
+  ]) assert.equal(logo(u), true, u);
+  // Pista fraca não tira da busca de fotos: as quatro fotos pedidas continuam candidatas, inclusive a do alt "logo ali na frente".
+  const fotos = candidatosDeFoto(r).map((x) => x.url);
+  for (const u of [
+    "https://www.multimarcas.com.br/wp-content/uploads/marcas/patio.jpg", "https://brandao.com/foto.jpg",
+    "https://www.loja.com/img/todas.jpg", "https://www.loja.com/img/frente.jpg",
+  ]) assert.ok(fotos.includes(u), u);
+  assert.ok(fotos.includes("https://www.loja.com/img/logo-loja.png"), "pista fraca (nome do arquivo): a visão decide");
+  assert.ok(!fotos.includes("https://www.loja.com/img/logotipo_2024.svg"), "SVG é sinal forte");
+  // Na busca de logos entram os de pista fraca e os de pista forte.
+  const logos = candidatosDeLogo(r).map((x) => x.url);
+  for (const u of ["https://www.loja.com/img/logo-loja.png", "https://www.loja.com/img/cabecalho.png", "https://www.loja.com/img/frente.jpg"]) {
+    assert.ok(logos.includes(u), u);
+  }
+  assert.ok(!logos.includes("https://brandao.com/foto.jpg"));
+});
+
+test("imagensDoHtml: og:logo, logo do JSON-LD e ícones são sinal forte; imagem do JSON-LD e og:image não", () => {
+  const html = `<head><meta property="og:image" content="/og.jpg"><meta property="og:logo" content="/og-logo.png">
+  <link rel="icon" href="/favicon.png">
+  <script type="application/ld+json">{"name":"Loja","logo":"/ld-logo.png","image":"/ld-foto.jpg"}</script></head>
+  <body><img class="site-logo" src="/img/cabecalho.png" alt=""></body>`;
+  const r = imagensDoHtml(html, "https://www.loja.com/");
+  const por = (u: string) => r.find((x) => x.url === `https://www.loja.com${u}`);
+  assert.equal(por("/og-logo.png")?.logoForte, true);
+  assert.equal(por("/ld-logo.png")?.logoForte, true);
+  assert.equal(por("/favicon.png")?.fonte, "icone");
+  assert.notEqual(por("/ld-foto.jpg")?.logoForte, true);
+  assert.notEqual(por("/og.jpg")?.logoForte, true);
+  assert.notEqual(por("/img/cabecalho.png")?.logoForte, true);
+  assert.equal(por("/img/cabecalho.png")?.logo, true);
+  const fotos = candidatosDeFoto(r).map((x) => x.url.replace("https://www.loja.com", ""));
+  assert.deepEqual(fotos.sort(), ["/img/cabecalho.png", "/ld-foto.jpg", "/og.jpg"]);
+});
+
+test("imagensDoHtml: imagens preguiçosas (src com placeholder data:, data-original, data-lazy, data-lazy-srcset, data-srcset)", () => {
+  const html = `<body>
+  <img src="data:image/svg+xml,%3Csvg%3E%3C/svg%3E" data-lazy-src="/lazy/a.jpg" alt="Sedã a">
+  <img src="data:image/gif;base64,R0lGOD" data-src="/lazy/b.jpg">
+  <img src="data:image/gif;base64,R0lGOD" data-original="/lazy/c.jpg">
+  <img src="data:image/gif;base64,R0lGOD" data-lazy="/lazy/d.jpg">
+  <img src="data:image/gif;base64,R0lGOD" data-lazy-srcset="/lazy/e-300.jpg 300w, /lazy/e-900.jpg 900w">
+  <img src="data:image/gif;base64,R0lGOD" data-srcset="/lazy/f-300.jpg 300w, /lazy/f-900.jpg 900w">
+  <img data-src="data:image/gif;base64,R0lGOD" data-lazy-src="/lazy/g.jpg">
+  <figure><img src="data:image/gif;base64,R0lGOD" data-lazy-src="/lazy/h.jpg"><figcaption>Interior do <i>SUV</i></figcaption></figure>
+  </body>`;
+  const r = imagensDoHtml(html, "https://www.loja.com/");
+  assert.deepEqual(r.map((x) => x.url), [
+    "https://www.loja.com/lazy/a.jpg", "https://www.loja.com/lazy/b.jpg", "https://www.loja.com/lazy/c.jpg", "https://www.loja.com/lazy/d.jpg",
+    "https://www.loja.com/lazy/e-900.jpg", "https://www.loja.com/lazy/f-900.jpg", "https://www.loja.com/lazy/g.jpg", "https://www.loja.com/lazy/h.jpg",
+  ]);
+  assert.equal(r[0].descricao, "Sedã a");
+  assert.equal(r[7].descricao, "Interior do SUV");
+});
+
+test("imagensDoHtml: JSON-LD com image em lista de textos, em lista de objetos com url e em objeto com url", () => {
+  const html = `<head>
+  <script type="application/ld+json">{"@type":"AutoDealer","name":"Loja","image":["https://cdn.loja.com/a.jpg",{"@type":"ImageObject","url":"/b.jpg"},3,null]}</script>
+  <script type="application/ld+json">{"@type":"Store","name":"Filial","image":{"@type":"ImageObject","url":"https://cdn.loja.com/c.jpg"},"logo":[{"url":"/l1.png"},"/l2.png"]}</script>
+  <script type="application/ld+json">[{"@type":"Product","name":"Sedã","image":["/d.jpg"]}]</script></head>`;
+  const r = imagensDoHtml(html, "https://www.loja.com/");
+  const por = (u: string) => r.find((x) => x.url === u);
+  for (const u of ["https://cdn.loja.com/a.jpg", "https://www.loja.com/b.jpg", "https://cdn.loja.com/c.jpg", "https://www.loja.com/d.jpg"]) {
+    assert.equal(por(u)?.fonte, "jsonld", u);
+    assert.equal(por(u)?.logo, false, u);
+  }
+  assert.equal(por("https://www.loja.com/b.jpg")?.descricao, "Loja");
+  assert.equal(por("https://www.loja.com/d.jpg")?.descricao, "Sedã");
+  assert.equal(por("https://www.loja.com/l1.png")?.logo, true);
+  assert.equal(por("https://www.loja.com/l2.png")?.logoForte, true);
+  assert.equal(r.length, 6);
+});
+
 test("scriptsDoSite e imagensDoBundle: só .js do próprio site; caminhos de imagem dentro do .js", () => {
   assert.deepEqual(scriptsDoSite(HTML, "https://www.loja.com/"), ["https://www.loja.com/assets/index-abc123.js"]);
   const js = `const a="/assets/hero-9f8e.jpg",b='https://cdn.x.com/logo-brand.png',c="/api/dados.json";`;
@@ -52,7 +153,9 @@ test("deduplicar soma descrição e marca de logo; separarCandidatos limita e or
   assert.ok(s.imagens.every((c) => !c.logo));
 });
 
-const c = (url: string, fonte: CandidatoSite["fonte"], logo: boolean, descricao = ""): CandidatoSite => ({ url, descricao, fonte, logo });
+// `forte`: sinal forte de logo (og:logo ou logo do JSON-LD); só ele, e não a pista fraca de texto, tira a imagem da busca de fotos.
+const c = (url: string, fonte: CandidatoSite["fonte"], logo: boolean, descricao = "", forte = false): CandidatoSite =>
+  ({ url, descricao, fonte, logo, ...(forte ? { logoForte: true } : {}) });
 
 test("candidatosDeLogo: os com cara de logo ou de ícone, JSON-LD e og primeiro, até 16, sem rastreadores", () => {
   const lista = [
@@ -75,10 +178,11 @@ test("candidatosDeLogo: os com cara de logo ou de ícone, JSON-LD e og primeiro,
   assert.ok(candidatosDeLogo(muitos).every((x) => x.logo));
 });
 
-test("candidatosDeFoto: os que não são logo nem ícone, com descrição primeiro, até 24, sem rastreadores", () => {
+test("candidatosDeFoto: sem sinal forte de logo nem ícone, com descrição primeiro, até 24, sem rastreadores", () => {
   const lista = [
     c("https://a/sem.jpg", "img", false),
-    c("https://a/logo.png", "img", true),
+    c("https://a/logo-forte.png", "jsonld", true, "", true), // logo do JSON-LD: sinal forte
+    c("https://a/og-logo.png", "og", true, "", true), // og:logo: sinal forte
     c("https://a/favicon.ico", "icone", false),
     c("https://a/com.jpg", "img", false, "Pátio com sedãs"),
     c("https://a/pixel.gif", "img", false), // "/pixel" é rastreador
@@ -88,10 +192,30 @@ test("candidatosDeFoto: os que não são logo nem ícone, com descrição primei
     candidatosDeFoto(lista).map((x) => x.url),
     ["https://a/com.jpg", "https://a/og.jpg", "https://a/sem.jpg"],
   );
-  const muitos = Array.from({ length: 60 }, (_, i) => c(`https://a/${i}.jpg`, "img", i < 12));
+  const muitos = Array.from({ length: 60 }, (_, i) => c(`https://a/${i}.jpg`, "jsonld", i < 12, "", i < 12));
   assert.equal(candidatosDeFoto(muitos).length, 24);
   assert.equal(candidatosDeFoto(muitos, 10).length, 10);
   assert.ok(candidatosDeFoto(muitos).every((x) => !x.logo));
+});
+
+test("candidatosDeFoto: pista fraca de logo (só texto) não tira da busca de fotos: a visão decide; na busca de logos entra", () => {
+  const lista = [
+    c("https://a/patio.jpg", "img", true, "Pátio coberto"), // só a pista de texto (alt, classe, nome)
+    c("https://a/hero.jpg", "og", true), // og:image que repete uma imagem com classe "brand-hero"
+    c("https://a/css.png", "css", true),
+    c("https://a/logo-forte.png", "jsonld", true, "", true),
+  ];
+  assert.deepEqual(candidatosDeFoto(lista).map((x) => x.url), ["https://a/patio.jpg", "https://a/hero.jpg", "https://a/css.png"]);
+  assert.deepEqual(
+    candidatosDeLogo(lista).map((x) => x.url),
+    ["https://a/hero.jpg", "https://a/logo-forte.png", "https://a/patio.jpg", "https://a/css.png"],
+  );
+  // O sinal forte sobrevive à junção da mesma URL, qualquer que seja a fonte que veio primeiro.
+  const junto = deduplicar([c("https://a/x.png", "og", false), c("https://a/x.png", "jsonld", true, "Loja", true)]);
+  assert.equal(junto[0].logoForte, true);
+  assert.deepEqual(candidatosDeFoto(junto), []);
+  assert.equal(deduplicar([c("https://a/y.png", "og", false), c("https://a/y.png", "img", true)])[0].logoForte, undefined);
+  assert.equal(candidatosDeFoto(deduplicar([c("https://a/y.png", "og", false), c("https://a/y.png", "img", true)])).length, 1);
 });
 
 test("candidatosDeFoto: SVG e ICO nunca são foto, mesmo com alt longo (ficam pela pista de logo ou ícone)", () => {

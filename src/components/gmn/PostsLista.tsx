@@ -19,7 +19,7 @@ const ORIGEM_IMAGEM: Record<string, string> = {
 function ImagemPost({ url }: { url: string }) {
   const [quebrou, setQuebrou] = useState(false);
   if (quebrou) return <p className="text-xs text-muted-foreground">Imagem indisponível.</p>;
-  return <img src={url} alt="Imagem do post" className="max-h-72 w-full rounded-md object-cover" onError={() => setQuebrou(true)} />;
+  return <img src={url} alt="Imagem do post" loading="lazy" decoding="async" className="max-h-72 w-full rounded-md object-cover" onError={() => setQuebrou(true)} />;
 }
 
 export type PreviaGerando = "com" | "sem" | null;

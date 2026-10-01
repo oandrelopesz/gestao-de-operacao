@@ -6,7 +6,10 @@ export interface CandidatoSite {
   url: string;
   descricao: string; // alt, título, legenda ou og:image:alt (pode ficar vazio)
   fonte: "img" | "og" | "icone" | "jsonld" | "bundle" | "css";
-  logo: boolean; // tem cara de logo (alt/classe/nome com "logo", ícone, JSON-LD logo)
+  logo: boolean; // tem cara de logo: pista de texto (alt, classe, id ou nome do arquivo com "logo"), ícone, og:logo, JSON-LD logo
+  // Sinal FORTE de logo (og:logo ou logo do JSON-LD): a imagem sai da busca de fotos. Só vem quando é verdadeiro. A pista de
+  // texto sozinha é fraca (o alt "logo ali na frente" é uma foto): ela entra na busca de logos e na de fotos, e a visão decide.
+  logoForte?: boolean;
 }
 
 const EXT_IMAGEM = /\.(png|jpe?g|jfif|webp|avif|gif|svg|bmp|ico|heic|heif|tiff?)(\?[^"'\s)]*)?$/i;
@@ -48,14 +51,53 @@ function maiorDoSrcset(srcset: string): string | null {
   return melhor;
 }
 
-const PARECE_LOGO = /logo|logotipo|marca|brand/i;
+// Palavra inteira (letras ao redor não valem): "multimarcas", "brandão" e "marcas" não casam; "site-logo", "logo_2024" e "marca" casam.
+const PARECE_LOGO = /(^|[^a-zà-ú])(logo|logotipo|logomarca|marca|brand)([^a-zà-ú]|$)/;
+
+/**
+ * Pista de texto de logo: só alt, classe, id e NOME DO ARQUIVO (último trecho do caminho, sem a query) entram, nunca o domínio
+ * nem as pastas ("multimarcas.com.br/…/patio.jpg" e "brandao.com/foto.jpg" não são logo). CamelCase vira palavras ("siteLogo").
+ */
+function parecePorTexto(...partes: (string | undefined)[]): boolean {
+  const texto = partes.filter(Boolean).join(" ").replace(/([a-zà-ú])([A-ZÀ-Ú])/g, "$1 $2").toLowerCase();
+  return PARECE_LOGO.test(texto);
+}
+
+/** Último trecho do caminho de um endereço (sem a query e sem o fragmento); vazio se não houver. */
+function nomeDoArquivo(u: string): string {
+  const caminho = u.split(/[?#]/)[0];
+  const nome = caminho.slice(caminho.lastIndexOf("/") + 1);
+  try { return decodeURIComponent(nome); } catch { return nome; }
+}
+
+const ATRIBUTOS_DE_ARQUIVO = ["src", "data-src", "data-lazy-src", "data-original", "data-lazy"];
+const ATRIBUTOS_DE_SRCSET = ["srcset", "data-srcset", "data-lazy-srcset"];
+
+/**
+ * O arquivo de uma <img>: o 1º atributo que não é placeholder (`data:` do lazy-load não vale) e, de todos os srcset, a maior
+ * imagem. `src` cai para `grande` quando só há srcset.
+ */
+function fontesDaImg(a: Record<string, string>, base: string): { src: string | null; grande: string | null } {
+  const util = (u: string | null | undefined) => (u && absoluta(u, base) ? u : null);
+  const src = ATRIBUTOS_DE_ARQUIVO.map((k) => util(a[k])).find(Boolean) ?? null;
+  const grande = ATRIBUTOS_DE_SRCSET.map((k) => (a[k] ? util(maiorDoSrcset(a[k])) : null)).find(Boolean) ?? null;
+  return { src: src ?? grande, grande };
+}
+
+/** Endereços de imagem de um valor do JSON-LD: texto, lista de textos ou de objetos, ou objeto, com `url`. */
+function imagensDoJsonLd(v: unknown): string[] {
+  if (typeof v === "string") return [v];
+  if (Array.isArray(v)) return v.flatMap(imagensDoJsonLd);
+  const url = v && typeof v === "object" ? (v as Record<string, unknown>).url : null;
+  return typeof url === "string" ? [url] : [];
+}
 
 /** Candidatos de imagem e de logo no HTML de uma página. */
 export function imagensDoHtml(html: string, paginaUrl: string): CandidatoSite[] {
   const out: CandidatoSite[] = [];
-  const add = (u: string | null | undefined, descricao: string, fonte: CandidatoSite["fonte"], logo: boolean) => {
+  const add = (u: string | null | undefined, descricao: string, fonte: CandidatoSite["fonte"], logo: boolean, forte = false) => {
     const url = u ? absoluta(u, paginaUrl) : null;
-    if (url) out.push({ url, descricao: decodificar(descricao).slice(0, 300), fonte, logo });
+    if (url) out.push({ url, descricao: decodificar(descricao).slice(0, 300), fonte, logo, ...(forte ? { logoForte: true } : {}) });
   };
   for (const m of html.matchAll(/<meta\b[^>]*>/gi)) {
     const a = atributos(m[0]);
@@ -63,7 +105,7 @@ export function imagensDoHtml(html: string, paginaUrl: string): CandidatoSite[] 
     if (nome === "og:image" || nome === "og:image:url" || nome === "og:image:secure_url" || nome === "twitter:image") {
       add(a.content, "", "og", false);
     }
-    if (nome === "og:logo") add(a.content, "", "og", true);
+    if (nome === "og:logo") add(a.content, "", "og", true, true);
   }
   const ogAlt = /<meta\b[^>]*(?:property|name)\s*=\s*["']og:image:alt["'][^>]*>/i.exec(html);
   if (ogAlt) { const a = atributos(ogAlt[0]); for (const c of out) if (c.fonte === "og" && !c.descricao) c.descricao = decodificar(a.content ?? ""); }
@@ -78,13 +120,8 @@ export function imagensDoHtml(html: string, paginaUrl: string): CandidatoSite[] 
         if (!v || typeof v !== "object") return;
         if (Array.isArray(v)) { v.forEach(visitar); return; }
         const o = v as Record<string, unknown>;
-        const logo = o.logo;
-        if (typeof logo === "string") add(logo, String(o.name ?? ""), "jsonld", true);
-        else if (logo && typeof logo === "object" && typeof (logo as Record<string, unknown>).url === "string") {
-          add((logo as Record<string, string>).url, String(o.name ?? ""), "jsonld", true);
-        }
-        const image = o.image;
-        if (typeof image === "string") add(image, String(o.name ?? ""), "jsonld", false);
+        for (const u of imagensDoJsonLd(o.logo)) add(u, String(o.name ?? ""), "jsonld", true, true);
+        for (const u of imagensDoJsonLd(o.image)) add(u, String(o.name ?? ""), "jsonld", false);
         for (const k of Object.keys(o)) if (k !== "logo" && k !== "image") visitar(o[k]);
       };
       visitar(JSON.parse(m[1]));
@@ -95,19 +132,18 @@ export function imagensDoHtml(html: string, paginaUrl: string): CandidatoSite[] 
   for (const m of html.matchAll(/<figure\b[\s\S]*?<\/figure>/gi)) {
     const img = /<img\b[^>]*>/i.exec(m[0]);
     const cap = /<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i.exec(m[0]);
-    if (img && cap) { const a = atributos(img[0]); const u = a.src || a["data-src"]; if (u) legendas.set(u, cap[1].replace(/<[^>]+>/g, " ")); }
+    if (img && cap) { const u = fontesDaImg(atributos(img[0]), paginaUrl).src; if (u) legendas.set(u, cap[1].replace(/<[^>]+>/g, " ")); }
   }
   for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
     const a = atributos(m[0]);
-    const src = a.src || a["data-src"] || a["data-lazy-src"] || (a.srcset ? maiorDoSrcset(a.srcset) : null) || (a["data-srcset"] ? maiorDoSrcset(a["data-srcset"]) : null);
+    const { src, grande } = fontesDaImg(a, paginaUrl);
     if (!src) continue;
-    const grande = a.srcset ? maiorDoSrcset(a.srcset) : null;
     const descricao = legendas.get(src) || a.alt || a.title || "";
-    const logo = PARECE_LOGO.test([a.alt, a.class, a.id, src].join(" "));
-    add(grande || src, descricao, "img", logo);
+    const arquivo = grande || src;
+    add(arquivo, descricao, "img", parecePorTexto(a.alt, a.class, a.id, nomeDoArquivo(arquivo)));
   }
   for (const m of html.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)) {
-    if (EXT_IMAGEM.test(m[1])) add(m[1], "", "css", PARECE_LOGO.test(m[1]));
+    if (EXT_IMAGEM.test(m[1])) add(m[1], "", "css", parecePorTexto(nomeDoArquivo(m[1])));
   }
   return deduplicar(out);
 }
@@ -117,7 +153,7 @@ export function imagensDoBundle(js: string, bundleUrl: string): CandidatoSite[] 
   const out: CandidatoSite[] = [];
   for (const m of js.matchAll(/["'`]((?:https?:\/\/|\/)[^"'`\s]{3,300}?\.(?:png|jpe?g|webp|avif|gif|svg))["'`]/gi)) {
     const url = absoluta(m[1], bundleUrl);
-    if (url) out.push({ url, descricao: "", fonte: "bundle", logo: PARECE_LOGO.test(m[1]) });
+    if (url) out.push({ url, descricao: "", fonte: "bundle", logo: parecePorTexto(nomeDoArquivo(m[1])) });
   }
   return deduplicar(out);
 }
@@ -134,13 +170,17 @@ export function scriptsDoSite(html: string, paginaUrl: string, max = 3): string[
   return out;
 }
 
-/** Mesma URL uma vez só (a primeira ocorrência vence, mas descrição e marca de logo se somam). */
+/** Mesma URL uma vez só (a primeira ocorrência vence, mas descrição, marca de logo e sinal forte de logo se somam). */
 export function deduplicar(lista: CandidatoSite[]): CandidatoSite[] {
   const mapa = new Map<string, CandidatoSite>();
   for (const c of lista) {
     const ja = mapa.get(c.url);
     if (!ja) mapa.set(c.url, { ...c });
-    else { if (!ja.descricao && c.descricao) ja.descricao = c.descricao; ja.logo = ja.logo || c.logo; }
+    else {
+      if (!ja.descricao && c.descricao) ja.descricao = c.descricao;
+      ja.logo = ja.logo || c.logo;
+      if (c.logoForte) ja.logoForte = true;
+    }
   }
   return [...mapa.values()];
 }
@@ -150,7 +190,7 @@ const RASTREIO = /facebook\.com\/tr|google-analytics|googletagmanager|doubleclic
 const semRastreio = (lista: CandidatoSite[]) => lista.filter((c) => !RASTREIO.test(c.url));
 // Ícone do HTML (favicon, apple-touch-icon) conta como logo mesmo sem a marca `logo`.
 const temCaraDeLogo = (c: CandidatoSite) => c.logo || c.fonte === "icone";
-const pesoLogo = (c: CandidatoSite) => (c.fonte === "jsonld" || c.fonte === "og" ? 0 : c.fonte === "img" ? 1 : 2);
+const pesoLogo = (c: CandidatoSite) => (c.logoForte || c.fonte === "jsonld" || c.fonte === "og" ? 0 : c.fonte === "img" ? 1 : 2);
 
 function logosDe(lista: CandidatoSite[], max: number): CandidatoSite[] {
   return semRastreio(lista).filter(temCaraDeLogo).sort((a, b) => pesoLogo(a) - pesoLogo(b)).slice(0, max);
@@ -159,23 +199,34 @@ function logosDe(lista: CandidatoSite[], max: number): CandidatoSite[] {
 // SVG e ICO são logo ou ícone, nunca foto: ficam só pela pista de logo (o alt deles não os faz virar foto).
 const EXTENSOES_QUE_NAO_SAO_FOTO = ["svg", "svgz", "ico"];
 
-function fotosDe(lista: CandidatoSite[], max: number): CandidatoSite[] {
-  return semRastreio(lista).filter((c) => !temCaraDeLogo(c) && !EXTENSOES_QUE_NAO_SAO_FOTO.includes(extensaoDaUrl(c.url))).sort((a, b) => Number(!a.descricao) - Number(!b.descricao)).slice(0, max);
-}
+/** Sinal forte de logo: ícone do HTML, og:logo, logo do JSON-LD, ou arquivo SVG/ICO. Só ele tira uma imagem da busca de fotos. */
+const temSinalForteDeLogo = (c: CandidatoSite) =>
+  c.fonte === "icone" || !!c.logoForte || EXTENSOES_QUE_NAO_SAO_FOTO.includes(extensaoDaUrl(c.url));
 
-/** Candidatos de logo para a busca da logo: até `max`, JSON-LD e og primeiro, sem rastreadores. */
+const comDescricaoPrimeiro = (lista: CandidatoSite[]) => lista.sort((a, b) => Number(!a.descricao) - Number(!b.descricao));
+
+/** Candidatos de logo para a busca da logo: até `max`, JSON-LD e og primeiro, sem rastreadores. Pista fraca de texto entra. */
 export function candidatosDeLogo(lista: CandidatoSite[], max = 16): CandidatoSite[] {
   return logosDe(lista, max);
 }
 
-/** Candidatos de foto para a busca das fotos: os que não têm cara de logo e não são SVG nem ICO, até `max`, com descrição primeiro, sem rastreadores. */
+/**
+ * Candidatos de foto para a busca das fotos: até `max`, com descrição primeiro, sem rastreadores e sem sinal forte de logo
+ * (ícone, og:logo, logo do JSON-LD, SVG, ICO). Quem só tem pista fraca de texto (alt, classe ou nome do arquivo com "logo")
+ * continua candidato: a visão decide se é foto.
+ */
 export function candidatosDeFoto(lista: CandidatoSite[], max = 24): CandidatoSite[] {
-  return fotosDe(lista, max);
+  return comDescricaoPrimeiro(semRastreio(lista).filter((c) => !temSinalForteDeLogo(c))).slice(0, max);
 }
 
-/** Logos (até 8; JSON-LD e og:logo primeiro) e imagens (até 40; com descrição primeiro), sem rastreadores. */
+/**
+ * Logos (até 8; JSON-LD e og:logo primeiro) e imagens (até 40; com descrição primeiro), sem rastreadores. Aqui qualquer pista de
+ * logo (também a fraca) tira a imagem da lista de imagens; a busca das fotos usa `candidatosDeFoto`.
+ */
 export function separarCandidatos(lista: CandidatoSite[]): { logos: CandidatoSite[]; imagens: CandidatoSite[] } {
-  return { logos: logosDe(lista, 8), imagens: fotosDe(lista, 40) };
+  const limpos = semRastreio(lista);
+  const imagens = comDescricaoPrimeiro(limpos.filter((c) => !temCaraDeLogo(c) && !temSinalForteDeLogo(c))).slice(0, 40);
+  return { logos: logosDe(lista, 8), imagens };
 }
 
 /**

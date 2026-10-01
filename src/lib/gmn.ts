@@ -247,9 +247,27 @@ export async function usarLogoDoSite(perfilId: string, url: string): Promise<str
   return await enviarLogo(perfilId, await baixarImagemExterna(url), url);
 }
 
+/** O Google só aceita foto de post com pelo menos 250 px no menor lado: foto menor não é marcada. */
+const FOTO_LADO_MINIMO = 250;
+
+/** Menor lado, em pixels, de uma imagem já convertida. Se o navegador não conseguir ler, não barra (a função confere o JPG). */
+async function menorLadoDaImagem(b: Blob): Promise<number> {
+  try {
+    const bmp = await createImageBitmap(b);
+    try {
+      return Math.min(bmp.width, bmp.height);
+    } finally {
+      bmp.close();
+    }
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
 /** Marca uma foto do site para os posts: baixa, converte para JPG e manda guardar (a função descreve se a descrição vier curta). */
 export async function adicionarImagemSite(perfilId: string, c: CandidatoSite): Promise<ImagemSite[]> {
   const jpg = await normalizarFoto(await baixarImagemExterna(c.url));
+  if ((await menorLadoDaImagem(jpg)) < FOTO_LADO_MINIMO) throw new Error("A foto é pequena demais para o Google (mínimo 250 px).");
   const d = await chamar<{ imagens_site: unknown }>({
     acao: "imagem_site", perfil_id: perfilId, origem_url: c.url, descricao: c.descricao, base64: await blobParaBase64(jpg),
   });
