@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
-import { 
-  Plus, Search, MoreVertical, Pencil, Trash2, 
-  ExternalLink, Copy, Check, Eye, EyeOff, 
-  PlayCircle, PauseCircle, BookOpen, Send
+import { useState, useEffect, useMemo, useRef } from "react";
+import {
+  Plus, Search, MoreVertical, Pencil, Trash2,
+  ExternalLink, Copy, Check, Eye, EyeOff,
+  PlayCircle, PauseCircle, BookOpen, Send, CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,11 @@ import { CourseForm } from "@/components/cursos/CourseForm";
 import { corDaCategoria, type CursoCategoriaDef } from "@/lib/cursoCategorias";
 import { parseAulas, tipoAcessoDe } from "@/lib/cursoAcesso";
 import { estadoExpiracao, type NivelExpiracao } from "@/lib/cursoExpiracao";
+import {
+  agruparCursos, contarConclusao, estaConcluido, filtrarPorConclusao, lerFiltroConclusao,
+  patchConclusao, rotuloConclusao, type FiltroConclusao,
+} from "@/lib/cursoConclusao";
+import { hojeBrasilia } from "@/lib/entrega";
 
 type Tema = string; // enum legado; a classificação agora é por categoria_id
 
@@ -61,7 +66,15 @@ interface Curso {
   tipo_acesso?: string | null;
   aulas?: unknown;
   expira_em?: string | null;
+  /** AAAA-MM-DD; vazio = não concluído */
+  concluido_em?: string | null;
 }
+
+const SITUACOES: { id: FiltroConclusao; label: string }[] = [
+  { id: "todos", label: "Todos" },
+  { id: "nao_concluidos", label: "Não concluídos" },
+  { id: "concluidos", label: "Concluídos" },
+];
 
 const SEM_CATEGORIA = { id: "sem_categoria", label: "Sem categoria", hex: "#94a3b8" };
 
@@ -74,13 +87,22 @@ const COR_EXPIRACAO: Record<NivelExpiracao, string> = {
 };
 
 export const Route = createFileRoute("/_authenticated/cursos")({
+  // ?tema=<categoria> e ?situacao=nao_concluidos|concluidos ("todos" não vai para a URL)
+  validateSearch: (s: Record<string, unknown>): { tema?: string; situacao?: FiltroConclusao } => {
+    const situacao = lerFiltroConclusao(s.situacao);
+    return {
+      ...(typeof s.tema === "string" && s.tema ? { tema: s.tema } : {}),
+      ...(situacao !== "todos" ? { situacao } : {}),
+    };
+  },
   component: CursosPage,
 });
 
 function CursosPage() {
   const navigate = useNavigate();
-  const searchParams = Route.useSearch() as { tema?: string };
-  const currentTema = (searchParams.tema as string) || "todos";
+  const searchParams = Route.useSearch();
+  const currentTema = searchParams.tema || "todos";
+  const situacao = lerFiltroConclusao(searchParams.situacao);
 
   const [cursos, setCursos] = useCachedState<Curso[]>(CACHE_KEYS.cursos, []);
   const [categorias, setCategorias] = useCachedState<Categoria[]>(CACHE_KEYS.cursoCategorias, []);
@@ -89,6 +111,9 @@ function CursosPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Curso | null>(null);
   const [deletingCourse, setDeletingCourse] = useState<Curso | null>(null);
+  // Cursos cuja conclusão está sendo gravada (a ref barra o clique duplo antes do próximo render)
+  const [gravandoConclusao, setGravandoConclusao] = useState<string[]>([]);
+  const gravandoRef = useRef(new Set<string>());
 
   useEffect(() => {
     fetchData();
@@ -166,29 +191,53 @@ function CursosPage() {
     }
   };
 
+  // Marca ou desmarca o curso como concluído (concluir desliga o "em andamento"; desmarcar o deixa pausado)
+  const handleToggleConclusao = async (curso: Curso) => {
+    if (gravandoRef.current.has(curso.id)) return;
+    gravandoRef.current.add(curso.id);
+    setGravandoConclusao(prev => [...prev, curso.id]);
+    const concluir = !estaConcluido(curso);
+    const patch = patchConclusao(concluir, hojeBrasilia());
+    try {
+      // `as any`: o types.ts do Supabase ainda não conhece a coluna concluido_em (o Lovable o regenera depois)
+      const { error } = await supabase
+        .from("cursos")
+        .update(patch as any)
+        .eq("id", curso.id);
+
+      if (error) throw error;
+
+      setCursos(prev => prev.map(c =>
+        c.id === curso.id ? { ...c, ...patch } : c
+      ));
+
+      toast.success(concluir ? "Curso concluído" : "Conclusão desmarcada");
+    } catch (error: any) {
+      toast.error("Erro ao atualizar o curso");
+    } finally {
+      gravandoRef.current.delete(curso.id);
+      setGravandoConclusao(prev => prev.filter(id => id !== curso.id));
+    }
+  };
+
   const filteredCursos = useMemo(() => {
-    return cursos
-      .filter(c => {
-        const matchesTema = currentTema === "todos" || c.categoria_id === currentTema || (currentTema === SEM_CATEGORIA.id && !c.categoria_id);
-        const matchesSearch = c.nome.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesTema && matchesSearch;
-      })
+    const porCategoriaEBusca = cursos.filter(c => {
+      const matchesTema = currentTema === "todos" || c.categoria_id === currentTema || (currentTema === SEM_CATEGORIA.id && !c.categoria_id);
+      const matchesSearch = c.nome.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesTema && matchesSearch;
+    });
+    return filtrarPorConclusao(porCategoriaEBusca, situacao)
       .sort((a, b) => {
         if (a.em_andamento !== b.em_andamento) {
           return a.em_andamento ? -1 : 1;
         }
         return a.nome.localeCompare(b.nome);
       });
-  }, [cursos, currentTema, searchQuery]);
+  }, [cursos, currentTema, searchQuery, situacao]);
 
-  const stats = useMemo(() => {
-    const activeOnes = filteredCursos.filter(c => c.em_andamento).length;
-    return {
-      total: filteredCursos.length,
-      active: activeOnes,
-      paused: filteredCursos.length - activeOnes,
-    };
-  }, [filteredCursos]);
+  const stats = useMemo(() => contarConclusao(filteredCursos), [filteredCursos]);
+
+  const grupos = useMemo(() => agruparCursos(filteredCursos), [filteredCursos]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { todos: cursos.length };
@@ -212,15 +261,29 @@ function CursosPage() {
     return tabs;
   }, [categorias, cursos]);
 
+  // Categoria e situação convivem na URL: trocar uma mantém a outra ("todos" da situação não vai para a URL)
   const setTema = (tema: string) => {
     navigate({
       to: "/cursos",
-      search: { tema },
+      search: { tema, ...(situacao !== "todos" ? { situacao } : {}) },
     });
   };
 
-  const inProgress = filteredCursos.filter(c => c.em_andamento);
-  const others = filteredCursos.filter(c => !c.em_andamento);
+  const setSituacao = (nova: FiltroConclusao) => {
+    navigate({
+      to: "/cursos",
+      search: { ...(searchParams.tema ? { tema: searchParams.tema } : {}), ...(nova !== "todos" ? { situacao: nova } : {}) },
+    });
+  };
+
+  const { emAndamento: inProgress, outros: others, concluidos: done } = grupos;
+
+  // Texto do estado vazio quando o filtro de situação está ligado (respeita categoria e busca)
+  const nomeCategoriaAtual = currentTema === "todos" ? null : allTabs.find(t => t.id === currentTema)?.label ?? null;
+  const buscaAtual = searchQuery.trim();
+  const escopoVazio = [nomeCategoriaAtual && `categoria "${nomeCategoriaAtual}"`, buscaAtual && `busca "${buscaAtual}"`]
+    .filter(Boolean)
+    .join(" e ");
 
   return (
     <div className="space-y-6">
@@ -250,7 +313,7 @@ function CursosPage() {
           </TabsList>
         </Tabs>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-card/50">
             <CardHeader className="p-4 pb-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total de cursos</p>
@@ -264,8 +327,8 @@ function CursosPage() {
               <p className="text-xs font-medium text-emerald-500 uppercase tracking-wider">Em andamento</p>
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <p className="text-2xl font-bold text-emerald-600">{stats.active}</p>
-              <p className="text-xs text-muted-foreground mt-1">{stats.active} cursos ativos</p>
+              <p className="text-2xl font-bold text-emerald-600">{stats.emAndamento}</p>
+              <p className="text-xs text-muted-foreground mt-1">{stats.emAndamento} cursos ativos</p>
             </CardContent>
           </Card>
           <Card className="bg-card/50 border-slate-500/20">
@@ -273,20 +336,48 @@ function CursosPage() {
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Não iniciados / pausados</p>
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <p className="text-2xl font-bold text-slate-600">{stats.paused}</p>
-              <p className="text-xs text-muted-foreground mt-1">{stats.paused} cursos parados</p>
+              <p className="text-2xl font-bold text-slate-600">{stats.pausados}</p>
+              <p className="text-xs text-muted-foreground mt-1">{stats.pausados} cursos parados</p>
+            </CardContent>
+          </Card>
+          <Card className="border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30">
+            <CardHeader className="p-4 pb-2">
+              <p className="flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                <CheckCircle2 size={13} className="shrink-0" /> Concluídos
+              </p>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.concluidos}</p>
+              <p className="text-xs text-muted-foreground mt-1">{stats.concluidos} cursos finalizados</p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-          <Input
-            placeholder="Buscar por nome do curso..."
-            className="pl-10"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+            <Input
+              placeholder="Buscar por nome do curso..."
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div role="group" aria-label="Filtrar por situação" className="inline-flex shrink-0 self-start md:self-auto rounded-md bg-muted/50 p-1 gap-1">
+            {SITUACOES.map(s => (
+              <Button
+                key={s.id}
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-pressed={situacao === s.id}
+                onClick={() => setSituacao(s.id)}
+                className={cn("h-8 px-3", situacao === s.id ? "bg-background text-foreground shadow-sm hover:bg-background" : "text-muted-foreground")}
+              >
+                {s.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -300,12 +391,14 @@ function CursosPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {inProgress.map(curso => (
-                <CourseCard 
-                  key={curso.id} 
-                  curso={curso} 
+                <CourseCard
+                  key={curso.id}
+                  curso={curso}
                   onEdit={() => handleEditCourse(curso)}
                   onDelete={() => setDeletingCourse(curso)}
                   onToggleStatus={() => handleToggleStatus(curso.id, curso.em_andamento)}
+                  onToggleConclusao={() => handleToggleConclusao(curso)}
+                  gravandoConclusao={gravandoConclusao.includes(curso.id)}
                 />
               ))}
             </div>
@@ -321,12 +414,37 @@ function CursosPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {others.map(curso => (
-                <CourseCard 
-                  key={curso.id} 
-                  curso={curso} 
+                <CourseCard
+                  key={curso.id}
+                  curso={curso}
                   onEdit={() => handleEditCourse(curso)}
                   onDelete={() => setDeletingCourse(curso)}
                   onToggleStatus={() => handleToggleStatus(curso.id, curso.em_andamento)}
+                  onToggleConclusao={() => handleToggleConclusao(curso)}
+                  gravandoConclusao={gravandoConclusao.includes(curso.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {done.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" size={18} />
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Concluídos</h2>
+              <div className="h-[1px] flex-1 bg-emerald-100 dark:bg-emerald-900/50" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {done.map(curso => (
+                <CourseCard
+                  key={curso.id}
+                  curso={curso}
+                  onEdit={() => handleEditCourse(curso)}
+                  onDelete={() => setDeletingCourse(curso)}
+                  onToggleStatus={() => handleToggleStatus(curso.id, curso.em_andamento)}
+                  onToggleConclusao={() => handleToggleConclusao(curso)}
+                  gravandoConclusao={gravandoConclusao.includes(curso.id)}
                 />
               ))}
             </div>
@@ -336,17 +454,39 @@ function CursosPage() {
         {filteredCursos.length === 0 && !loading && (
           <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
             <div className="bg-muted rounded-full p-4">
-              <BookOpen size={40} className="text-muted-foreground" />
+              {situacao === "concluidos" ? <CheckCircle2 size={40} className="text-muted-foreground" /> : <BookOpen size={40} className="text-muted-foreground" />}
             </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium">Nenhum curso cadastrado ainda</h3>
-              <p className="text-muted-foreground max-w-xs">
-                {currentTema === "todos" 
-                  ? "Comece adicionando seu primeiro curso."
-                  : `Nenhum curso no tema "${allTabs.find(t => t.id === currentTema)?.label}" cadastrado.`}
-              </p>
-            </div>
-            <Button onClick={handleAddCourse}>Criar primeiro curso</Button>
+            {situacao === "todos" ? (
+              <>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-medium">Nenhum curso cadastrado ainda</h3>
+                  <p className="text-muted-foreground max-w-xs">
+                    {currentTema === "todos"
+                      ? "Comece adicionando seu primeiro curso."
+                      : `Nenhum curso no tema "${allTabs.find(t => t.id === currentTema)?.label}" cadastrado.`}
+                  </p>
+                </div>
+                <Button onClick={handleAddCourse}>Criar primeiro curso</Button>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-medium">
+                    {situacao === "concluidos" ? "Nenhum curso concluído ainda." : "Nenhum curso pendente."}
+                  </h3>
+                  <p className="text-muted-foreground max-w-xs">
+                    {escopoVazio
+                      ? `Filtros ativos: ${escopoVazio}.`
+                      : situacao === "concluidos"
+                        ? "Use \"Marcar como concluído\" no card do curso."
+                        : cursos.length === 0
+                          ? "Comece adicionando seu primeiro curso."
+                          : "Todos os cursos já foram concluídos."}
+                  </p>
+                </div>
+                <Button variant="outline" onClick={() => setSituacao("todos")}>Ver todos os cursos</Button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -378,16 +518,19 @@ function CursosPage() {
   );
 }
 
-function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: { 
-  curso: Curso; 
-  onEdit: () => void; 
+function CourseCard({ curso, onEdit, onDelete, onToggleStatus, onToggleConclusao, gravandoConclusao }: {
+  curso: Curso;
+  onEdit: () => void;
   onDelete: () => void;
   onToggleStatus: () => void;
+  onToggleConclusao: () => void;
+  gravandoConclusao: boolean;
 }) {
   const tipoAcesso = tipoAcessoDe(curso.tipo_acesso);
   const aulas = parseAulas(curso.aulas);
   const expiracao = estadoExpiracao(curso.expira_em);
   const expirado = expiracao?.nivel === "expirado";
+  const concluido = estaConcluido(curso);
   const [showPassword, setShowPassword] = useState(false);
   const [copiedLogin, setCopiedLogin] = useState(false);
   const [copiedPass, setCopiedPass] = useState(false);
@@ -422,9 +565,12 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
   return (
     <Card className={cn(
       "overflow-hidden transition-all duration-300",
-      curso.em_andamento && !expirado ? "border-l-4 border-l-emerald-500 shadow-sm" : "opacity-75",
+      // Concluído: verde em volta toda, mesmo se também estiver expirado (a etiqueta de expiração continua)
+      concluido
+        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 shadow-sm"
+        : curso.em_andamento && !expirado ? "border-l-4 border-l-emerald-500 shadow-sm" : "opacity-75",
       // Expirado: cinza, mas tudo continua clicável (nada é apagado)
-      expirado && "bg-muted/60 grayscale opacity-80"
+      expirado && !concluido && "bg-muted/60 grayscale opacity-80"
     )}>
       <CardHeader className="p-4 space-y-0">
         <div className="flex items-start justify-between gap-2">
@@ -434,6 +580,12 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
               <Badge className="text-[10px] h-5 text-white border-transparent" style={{ backgroundColor: theme.hex }}>
                 {theme.label}
               </Badge>
+              {concluido && (
+                <Badge className="h-5 gap-1 border-transparent bg-emerald-700 text-[10px] font-semibold text-white hover:bg-emerald-700">
+                  <CheckCircle2 size={11} className="shrink-0" />
+                  {rotuloConclusao(curso.concluido_em!)}
+                </Badge>
+              )}
               {expiracao && (
                 <Badge variant="outline" className={cn("h-5 gap-1 text-[10px] font-semibold", COR_EXPIRACAO[expiracao.nivel])} title={expiracao.rotulo}>
                   {expirado ? "Expirado" : expiracao.rotulo}
@@ -442,11 +594,15 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <Switch 
-              checked={curso.em_andamento} 
-              onCheckedChange={onToggleStatus}
-              className="data-[state=checked]:bg-emerald-500"
-            />
+            {/* Curso concluído não está em andamento: a chave some */}
+            {!concluido && (
+              <Switch
+                checked={curso.em_andamento}
+                onCheckedChange={onToggleStatus}
+                aria-label="Em andamento"
+                className="data-[state=checked]:bg-emerald-500"
+              />
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -547,7 +703,7 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
         )}
       </CardContent>
 
-      <CardFooter className="p-4 pt-4">
+      <CardFooter className="flex-col items-stretch gap-2 p-4 pt-4">
         {tipoAcesso === "drive" ? (
           <Button
             variant={aulas[0] ? "default" : "secondary"}
@@ -580,6 +736,17 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus }: {
             )}
           </Button>
         )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={cn("w-full gap-2", concluido && "border-emerald-500/60 text-emerald-700 hover:text-emerald-800 dark:text-emerald-400")}
+          onClick={onToggleConclusao}
+          disabled={gravandoConclusao}
+        >
+          <CheckCircle2 size={14} />
+          {concluido ? "Desmarcar conclusão" : "Marcar como concluído"}
+        </Button>
       </CardFooter>
     </Card>
   );
