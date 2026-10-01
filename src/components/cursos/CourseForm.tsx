@@ -34,6 +34,7 @@ import {
 import { Eye, EyeOff, Plus, Check, ChevronsUpDown, X, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TIPOS_ACESSO, tipoAcessoDe } from "@/lib/cursoAcesso";
+import { hojeBrasilia } from "@/lib/entrega";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, type CursoCategoriaDef } from "@/lib/cursoCategorias";
@@ -49,6 +50,8 @@ const courseSchema = z.object({
   login: z.string().optional().or(z.literal("")),
   senha: z.string().optional().or(z.literal("")),
   em_andamento: z.boolean(),
+  /** Curso concluído: ao salvar vira `concluido_em` (data) e desliga o "em andamento" */
+  concluido: z.boolean(),
   observacoes: z.string().optional().or(z.literal("")),
   /** "AAAA-MM-DD" ou vazio (sem expiração) */
   expira_em: z.string().optional().or(z.literal("")),
@@ -83,6 +86,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
       login: "",
       senha: "",
       em_andamento: false,
+      concluido: false,
       observacoes: "",
       expira_em: "",
     },
@@ -132,8 +136,12 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
     }
   };
 
+  // "Em andamento" de antes de ligar "Curso concluído" no popup: desligar a conclusão devolve esse valor
+  const andamentoAntesRef = useRef<boolean | null>(null);
+
   useEffect(() => {
     if (open) {
+      andamentoAntesRef.current = null;
       if (editingCourse) {
         form.reset({
           nome: editingCourse.nome || "",
@@ -144,7 +152,8 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
           link_area_membros: editingCourse.link_area_membros || "",
           login: editingCourse.login || "",
           senha: editingCourse.senha || "",
-          em_andamento: !!editingCourse.em_andamento,
+          em_andamento: !!editingCourse.em_andamento && !editingCourse.concluido_em,
+          concluido: !!editingCourse.concluido_em,
           observacoes: editingCourse.observacoes || "",
           expira_em: editingCourse.expira_em ? String(editingCourse.expira_em).slice(0, 10) : "",
         });
@@ -159,6 +168,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
           login: "",
           senha: "",
           em_andamento: false,
+          concluido: false,
           observacoes: "",
           expira_em: "",
         });
@@ -174,6 +184,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
   const { fields: aulas, append: addAula, remove: removeAula } = useFieldArray({ control: form.control, name: "aulas" });
   const tipoAcesso = form.watch("tipo_acesso");
+  const concluido = form.watch("concluido");
 
   const onSubmit = async (values: CourseFormValues) => {
     setLoading(true);
@@ -206,7 +217,11 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
           : [],
         login: values.login,
         senha: values.senha,
-        em_andamento: values.em_andamento,
+        // Concluído não está em andamento. A data de conclusão que já existia é mantida; senão vale hoje
+        em_andamento: values.concluido ? false : values.em_andamento,
+        concluido_em: values.concluido
+          ? (editingCourse?.concluido_em ? String(editingCourse.concluido_em).slice(0, 10) : hojeBrasilia())
+          : null,
         observacoes: values.observacoes,
         expira_em: values.expira_em || null,
         user_id: userId
@@ -237,7 +252,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editingCourse ? "Editar Curso" : "Novo Curso"}</DialogTitle>
         </DialogHeader>
@@ -356,24 +371,56 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                 }}
               />
 
-              <FormField
-                control={form.control}
-                name="em_andamento"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel className="mb-2 h-6 flex items-center">Em andamento</FormLabel>
-                    <FormControl>
+              <div className="flex flex-col gap-2">
+                <FormField
+                  control={form.control}
+                  name="em_andamento"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel className="mb-2 h-6 flex items-center">Em andamento</FormLabel>
                       <div className="flex items-center h-10">
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          className="data-[state=checked]:bg-emerald-500"
-                        />
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={concluido}
+                            className="data-[state=checked]:bg-emerald-500"
+                          />
+                        </FormControl>
                       </div>
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="concluido"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel className="mb-2 h-6 flex items-center">Curso concluído</FormLabel>
+                      <div className="flex items-center h-10">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={(v) => {
+                              field.onChange(v);
+                              // Um curso concluído não está em andamento; desligar a conclusão aqui devolve o valor de antes
+                              if (v) {
+                                andamentoAntesRef.current = form.getValues("em_andamento");
+                                form.setValue("em_andamento", false, { shouldDirty: true });
+                              } else if (andamentoAntesRef.current !== null) {
+                                form.setValue("em_andamento", andamentoAntesRef.current, { shouldDirty: true });
+                                andamentoAntesRef.current = null;
+                              }
+                            }}
+                            className="data-[state=checked]:bg-emerald-500"
+                          />
+                        </FormControl>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
 
