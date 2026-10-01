@@ -225,6 +225,33 @@ export function decidirImagem(o: { comImagem: boolean; temPasta: boolean; usaIa:
   return o.usaIa ? "ia" : null;
 }
 
+// ------------------------------------------------------------------ logo aplicada sobre a imagem da IA
+
+export const POSICOES_LOGO = ["superior_esquerdo", "superior_direito", "inferior_esquerdo", "inferior_direito"] as const;
+export type PosicaoLogo = (typeof POSICOES_LOGO)[number];
+export const TAMANHOS_LOGO = ["pequena", "media", "grande"] as const;
+export type TamanhoLogo = (typeof TAMANHOS_LOGO)[number];
+export const FUNDOS_LOGO = ["nenhum", "claro", "escuro"] as const;
+export type FundoLogo = (typeof FUNDOS_LOGO)[number];
+
+export const ROTULO_POSICAO_LOGO: Record<PosicaoLogo, string> = {
+  superior_esquerdo: "Canto superior esquerdo", superior_direito: "Canto superior direito",
+  inferior_esquerdo: "Canto inferior esquerdo", inferior_direito: "Canto inferior direito",
+};
+export const ROTULO_TAMANHO_LOGO: Record<TamanhoLogo, string> = { pequena: "Pequena", media: "Média", grande: "Grande" };
+export const ROTULO_FUNDO_LOGO: Record<FundoLogo, string> = { nenhum: "Sem fundo", claro: "Fundo claro", escuro: "Fundo escuro" };
+
+/** Opções da logo do perfil; valor que não é um dos aceitos vira o padrão (inferior direito, média, sem fundo). */
+export function opcoesDaLogo(p: { logo_posicao?: unknown; logo_tamanho?: unknown; logo_fundo?: unknown }) {
+  const um = <T extends string>(lista: readonly T[], v: unknown, padrao: T): T =>
+    (lista as readonly unknown[]).includes(v) ? (v as T) : padrao;
+  return {
+    posicao: um(POSICOES_LOGO, p.logo_posicao, "inferior_direito"),
+    tamanho: um(TAMANHOS_LOGO, p.logo_tamanho, "media"),
+    fundo: um(FUNDOS_LOGO, p.logo_fundo, "nenhum"),
+  };
+}
+
 export const UTM = { utm_source: "google", utm_medium: "organic", utm_campaign: "gmn-post" };
 
 /** URL do botão com a UTM do GMN (mantém parâmetros e UTM já existentes). `null` se não for link. */

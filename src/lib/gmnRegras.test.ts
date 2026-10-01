@@ -5,7 +5,7 @@ import {
   alternarImagem, base64ParaBytes, checarTexto, comUtm, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras,
   idPastaDrive,
   mesmoHorario, montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda,
-  normalizarBriefing, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64,
+  normalizarBriefing, opcoesDaLogo, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64,
 } from "../../supabase/functions/gmn/regras.ts";
 
 const textoBom =
@@ -484,4 +484,13 @@ test("tamanhoBase64 conta os bytes decodificados sem decodificar", () => {
   assert.equal(tamanhoBase64("QU\r\nJD QUJD"), 6); // quebras e espaços não contam
   assert.equal(tamanhoBase64(Buffer.alloc(5 * 1024 * 1024 + 1, 7).toString("base64")), 5 * 1024 * 1024 + 1);
   for (const n of [1, 2, 3, 10, 11, 12, 1000, 1001]) assert.equal(tamanhoBase64(Buffer.alloc(n, 9).toString("base64")), n);
+});
+
+test("opcoesDaLogo: valores válidos passam; o resto vira o padrão", () => {
+  assert.deepEqual(opcoesDaLogo({}), { posicao: "inferior_direito", tamanho: "media", fundo: "nenhum" });
+  assert.deepEqual(
+    opcoesDaLogo({ logo_posicao: "superior_esquerdo", logo_tamanho: "grande", logo_fundo: "escuro" }),
+    { posicao: "superior_esquerdo", tamanho: "grande", fundo: "escuro" },
+  );
+  assert.deepEqual(opcoesDaLogo({ logo_posicao: "meio", logo_tamanho: 3 }), { posicao: "inferior_direito", tamanho: "media", fundo: "nenhum" });
 });
