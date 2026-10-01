@@ -30,6 +30,7 @@ import {
 import {
   PreviewDialog, baixarArquivoFireflies, preCarregarArquivo, salvarBlob, type AlvoPrevia,
 } from "@/components/fireflies/PreviewDialog";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 // Aba "Fireflies": reuniões gravadas pelo robô do Fireflies, importadas pelo worker da VPS
 // (transcrição e resumo em PDF e DOCX no bucket privado "fireflies"). Renomear e excluir gravam a intenção na
@@ -85,7 +86,9 @@ function FirefliesPage() {
     return () => window.clearInterval(t);
   }, [intervalo, carregar]);
 
-  const visiveis = useMemo(() => filtrar(lista ?? [], busca), [lista, busca]);
+  // Busca tolerante (sem acento, com erro de digitação) no título e nos participantes
+  const resultadoBusca = useMemo(() => filtrar(lista ?? [], busca), [lista, busca]);
+  const visiveis = resultadoBusca.itens;
 
   // Desenha POR_VEZ cards e acrescenta mais quando o fim da lista chega perto da tela
   const [limite, setLimite] = useState(POR_VEZ);
@@ -215,8 +218,13 @@ function FirefliesPage() {
               ? `${visiveis.length} de ${lista.length} ${lista.length === 1 ? "reunião" : "reuniões"}`
               : `${lista.length} ${lista.length === 1 ? "reunião" : "reuniões"}`}
           </p>
+          {resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} />}
           {visiveis.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma reunião com esse nome ou participante.</p>
+            resultadoBusca.modo === "nenhum" ? (
+              <MensagemBusca resultado={resultadoBusca} className="py-10 text-center" />
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma reunião com esse nome ou participante.</p>
+            )
           ) : (
             <>
               {visiveis.slice(0, limite).map((r) => (

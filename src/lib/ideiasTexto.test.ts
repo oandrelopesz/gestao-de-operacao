@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   normalizarLink, limparLinks, dominioDoLink, montarDescricaoDemanda, filtrarIdeias, colunaPadrao, tipoIdeiaMeta,
 } from "./ideiasTexto.ts";
+import { MENSAGEM_NENHUM, MENSAGEM_PARECIDOS } from "./search.ts";
 
 test("normalizarLink: vazio fica vazio e sem esquema ganha https://", () => {
   assert.equal(normalizarLink("   "), "");
@@ -42,18 +43,54 @@ const ideias = [
 ];
 
 test("filtrarIdeias: sem filtro devolve tudo", () => {
-  assert.equal(filtrarIdeias(ideias, { tipo: "todos", agencia: "todas", busca: "" }).length, 3);
+  const r = filtrarIdeias(ideias, { tipo: "todos", agencia: "todas", busca: "" });
+  assert.equal(r.itens.length, 3);
+  assert.equal(r.modo, "todos");
+  assert.equal(r.mensagem, null);
 });
 
 test("filtrarIdeias: por tipo e por agência", () => {
-  assert.deepEqual(filtrarIdeias(ideias, { tipo: "cliente", agencia: "todas", busca: "" }).map((i) => i.id), ["2", "3"]);
-  assert.deepEqual(filtrarIdeias(ideias, { tipo: "todos", agencia: "spike", busca: "" }).map((i) => i.id), ["3"]);
+  assert.deepEqual(filtrarIdeias(ideias, { tipo: "cliente", agencia: "todas", busca: "" }).itens.map((i) => i.id), ["2", "3"]);
+  assert.deepEqual(filtrarIdeias(ideias, { tipo: "todos", agencia: "spike", busca: "" }).itens.map((i) => i.id), ["3"]);
 });
 
 test("filtrarIdeias: busca em título, descrição e links, sem diferenciar caixa", () => {
-  assert.deepEqual(filtrarIdeias(ideias, { tipo: "todos", agencia: "todas", busca: "DARK" }).map((i) => i.id), ["1"]);
-  assert.deepEqual(filtrarIdeias(ideias, { tipo: "todos", agencia: "todas", busca: "cliente y" }).map((i) => i.id), ["2"]);
-  assert.deepEqual(filtrarIdeias(ideias, { tipo: "todos", agencia: "todas", busca: "ref.com" }).map((i) => i.id), ["2"]);
+  assert.deepEqual(filtrarIdeias(ideias, { tipo: "todos", agencia: "todas", busca: "DARK" }).itens.map((i) => i.id), ["1"]);
+  assert.deepEqual(filtrarIdeias(ideias, { tipo: "todos", agencia: "todas", busca: "cliente y" }).itens.map((i) => i.id), ["2"]);
+  assert.deepEqual(filtrarIdeias(ideias, { tipo: "todos", agencia: "todas", busca: "ref.com" }).itens.map((i) => i.id), ["2"]);
+});
+
+test("filtrarIdeias: acha sem acento (e com acento onde não tem)", () => {
+  const f = { tipo: "todos", agencia: "todas" };
+  assert.deepEqual(filtrarIdeias(ideias, { ...f, busca: "automacao" }).itens.map((i) => i.id), ["3"]);
+  assert.deepEqual(filtrarIdeias(ideias, { ...f, busca: "AUTOMAÇÃO" }).itens.map((i) => i.id), ["3"]);
+});
+
+test("filtrarIdeias: aceita erro de digitação (letras trocadas, a mais ou a menos)", () => {
+  const f = { tipo: "todos", agencia: "todas" };
+  const trocadas = filtrarIdeias(ideias, { ...f, busca: "dark mdoe" });
+  assert.deepEqual(trocadas.itens.map((i) => i.id), ["1"]);
+  assert.equal(trocadas.modo, "exato");
+  assert.deepEqual(filtrarIdeias(ideias, { ...f, busca: "landding" }).itens.map((i) => i.id), ["2"]);
+  assert.deepEqual(filtrarIdeias(ideias, { ...f, busca: "automaao" }).itens.map((i) => i.id), ["3"]);
+});
+
+test("filtrarIdeias: sem resultado exato mostra os parecidos com a mensagem; sem nada, modo nenhum", () => {
+  const f = { tipo: "todos", agencia: "todas" };
+  const parecidos = filtrarIdeias(ideias, { ...f, busca: "landing zebra" });
+  assert.equal(parecidos.modo, "parecidos");
+  assert.equal(parecidos.mensagem, MENSAGEM_PARECIDOS);
+  assert.deepEqual(parecidos.itens.map((i) => i.id), ["2"]);
+  const nenhum = filtrarIdeias(ideias, { ...f, busca: "zebra" });
+  assert.equal(nenhum.modo, "nenhum");
+  assert.equal(nenhum.mensagem, MENSAGEM_NENHUM);
+  assert.deepEqual(nenhum.itens, []);
+});
+
+test("filtrarIdeias: tipo e agência valem antes da busca (parecido de outra agência não aparece)", () => {
+  const r = filtrarIdeias(ideias, { tipo: "todos", agencia: "spike", busca: "landing" });
+  assert.equal(r.modo, "nenhum");
+  assert.deepEqual(r.itens, []);
 });
 
 test("colunaPadrao: fazer_hoje, senão a primeira não-sistema, senão a primeira", () => {
@@ -78,7 +115,10 @@ test("filtrarIdeias: situação separa abertas de concluídas (padrão: abertas)
     { ...base, titulo: "Feita", concluida_em: "2026-09-23T10:00:00Z" },
   ];
   const f = { tipo: "todos", agencia: "todas", busca: "" };
-  assert.deepEqual(filtrarIdeias(ideias, f).map((i) => i.titulo), ["Aberta"]);
-  assert.deepEqual(filtrarIdeias(ideias, { ...f, situacao: "concluidas" }).map((i) => i.titulo), ["Feita"]);
-  assert.deepEqual(filtrarIdeias(ideias, { ...f, situacao: "abertas" }).map((i) => i.titulo), ["Aberta"]);
+  assert.deepEqual(filtrarIdeias(ideias, f).itens.map((i) => i.titulo), ["Aberta"]);
+  assert.deepEqual(filtrarIdeias(ideias, { ...f, situacao: "concluidas" }).itens.map((i) => i.titulo), ["Feita"]);
+  assert.deepEqual(filtrarIdeias(ideias, { ...f, situacao: "abertas" }).itens.map((i) => i.titulo), ["Aberta"]);
+  // A busca só olha a situação escolhida
+  assert.equal(filtrarIdeias(ideias, { ...f, busca: "feita" }).modo, "nenhum");
+  assert.deepEqual(filtrarIdeias(ideias, { ...f, situacao: "concluidas", busca: "feita" }).itens.map((i) => i.titulo), ["Feita"]);
 });

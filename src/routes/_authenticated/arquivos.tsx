@@ -32,6 +32,7 @@ import {
 import { PastaDialog, ExcluirPastaDialog, type PastaDialogState } from "@/components/pdfs/PastaDialogs";
 import { PdfViewer, PdfEditDialog, EnviarPdfsDialog, type PdfParaEnviar } from "@/components/pdfs/PdfDialogs";
 import { IconeArquivo } from "@/components/pdfs/IconeArquivo";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 // Aba "Arquivos" (antes "PDFs"; /pdfs redireciona para cá). Guarda documentos em geral, sem imagem nem vídeo.
 export const Route = createFileRoute("/_authenticated/arquivos")({
@@ -150,7 +151,9 @@ function PdfsPage() {
     () => (pastaAtual ? bib.pdfs.filter((f) => f.pasta_id === pastaAtual.id) : []),
     [bib.pdfs, pastaAtual],
   );
-  const resultadosBusca = useMemo(() => (busca.trim() ? filtrarPdfs(bib.pdfs, busca) : []), [bib.pdfs, busca]);
+  // Busca tolerante (sem acento, com erro de digitação) em todas as pastas; sem texto digitado a tela mostra as pastas
+  const resultadoBusca = useMemo(() => filtrarPdfs(busca.trim() ? bib.pdfs : [], busca), [bib.pdfs, busca]);
+  const resultadosBusca = resultadoBusca.itens;
   const recentes = useMemo(() => bib.pdfs.slice(0, 8), [bib.pdfs]);
 
   const abrirPasta = (id: string | null) => {
@@ -700,8 +703,11 @@ function PdfsPage() {
               <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 {resultadosBusca.length} {resultadosBusca.length === 1 ? "resultado" : "resultados"}
               </h3>
+              {resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} />}
               {resultadosBusca.length > 0 ? (
                 <Card><div className="divide-y">{resultadosBusca.map((f) => linhaPdf(f, true))}</div></Card>
+              ) : resultadoBusca.modo === "nenhum" ? (
+                <MensagemBusca resultado={resultadoBusca} className="py-10 text-center" />
               ) : (
                 <p className="py-10 text-center text-sm text-muted-foreground">Nenhum arquivo com esse nome.</p>
               )}

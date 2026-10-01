@@ -25,6 +25,7 @@ import {
 } from "@/lib/links";
 import { SEM_TEMA, TODOS, contarPorTema, dominio, filtrarLinks, normalizarUrl } from "@/lib/linksTexto";
 import { TemasLinksDialog } from "@/components/links/TemasLinks";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 export const Route = createFileRoute("/_authenticated/links")({ component: LinksPage });
 
@@ -74,7 +75,9 @@ function LinksPage() {
 
   const temaDe = useMemo(() => new Map(temas.map((t) => [t.id, t])), [temas]);
   const contagem = useMemo(() => contarPorTema(links), [links]);
-  const visiveis = useMemo(() => filtrarLinks(links, filtro, busca), [links, filtro, busca]);
+  // Busca tolerante (sem acento, com erro de digitação): o tema e a ordem alfabética valem antes
+  const resultadoBusca = useMemo(() => filtrarLinks(links, filtro, busca), [links, filtro, busca]);
+  const visiveis = resultadoBusca.itens;
 
   const selecaoAtiva = modoSelecao || selecionados.size > 0;
   const alternar = (id: string) => setSelecionados((prev) => {
@@ -200,6 +203,7 @@ function LinksPage() {
         ))}
       </div>
 
+      {!carregando && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} className="-mb-2.5" />}
       {carregando ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
@@ -208,7 +212,11 @@ function LinksPage() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 px-6 py-14 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Link2 size={26} /></span>
-            <p className="text-base font-semibold">{busca ? "Nenhum link encontrado" : "Nenhum link aqui ainda"}</p>
+            {resultadoBusca.modo === "nenhum" ? (
+              <MensagemBusca resultado={resultadoBusca} className="text-base font-semibold text-foreground" />
+            ) : (
+              <p className="text-base font-semibold">{busca ? "Nenhum link encontrado" : "Nenhum link aqui ainda"}</p>
+            )}
             {!busca && <Button className="mt-1 gap-2" onClick={novo}><Plus size={16} /> Novo link</Button>}
           </CardContent>
         </Card>

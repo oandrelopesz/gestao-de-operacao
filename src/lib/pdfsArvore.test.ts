@@ -5,6 +5,7 @@ import {
   ehPdf, arquivoAceito, tipoDoArquivo, extensaoDe, contentTypeDe, nomeSemExtensao, nomeParaDownload, formatarTamanho, filtrarPdfs, proximaOrdem, corDaPasta, PASTA_CORES,
   type PdfPasta,
 } from "./pdfsArvore.ts";
+import { MENSAGEM_NENHUM, MENSAGEM_PARECIDOS } from "./search.ts";
 
 const p = (id: string, nome: string, parent_id: string | null, ordem = 0): PdfPasta =>
   ({ id, nome, parent_id, cor: null, ordem });
@@ -129,9 +130,38 @@ test("filtrarPdfs: busca sem acento e sem diferenciar maiúsculas, pelo nome ou 
     { nome: "Gestão de tráfego", arquivo_nome: "x.pdf" },
     { nome: "Prompts", arquivo_nome: "claude-prompts.pdf" },
   ];
-  assert.equal(filtrarPdfs(pdfs, "TRAFEGO").length, 1);
-  assert.equal(filtrarPdfs(pdfs, "claude")[0].nome, "Prompts");
-  assert.equal(filtrarPdfs(pdfs, "  ").length, 2);
+  assert.equal(filtrarPdfs(pdfs, "TRAFEGO").itens.length, 1);
+  assert.equal(filtrarPdfs(pdfs, "claude").itens[0].nome, "Prompts");
+  const semBusca = filtrarPdfs(pdfs, "  ");
+  assert.equal(semBusca.itens.length, 2);
+  assert.equal(semBusca.modo, "todos");
+});
+
+test("filtrarPdfs: acha com erro de digitação e sem acento", () => {
+  const pdfs = [
+    { nome: "Gestão de tráfego", arquivo_nome: "x.pdf" },
+    { nome: "Prompts", arquivo_nome: "claude-prompts.pdf" },
+  ];
+  assert.deepEqual(filtrarPdfs(pdfs, "gestao trafego").itens.map((f) => f.nome), ["Gestão de tráfego"]);
+  assert.deepEqual(filtrarPdfs(pdfs, "prompst").itens.map((f) => f.nome), ["Prompts"]); // letras vizinhas trocadas
+  assert.deepEqual(filtrarPdfs(pdfs, "trafgo").itens.map((f) => f.nome), ["Gestão de tráfego"]); // letra a menos
+  assert.equal(filtrarPdfs(pdfs, "prompst").modo, "exato");
+});
+
+test("filtrarPdfs: parecidos e nenhum trazem a mensagem; o nome vem antes do nome do arquivo", () => {
+  const pdfs = [
+    { nome: "Guia", arquivo_nome: "meta-ads.pdf" },
+    { nome: "Meta Ads", arquivo_nome: "guia2.pdf" },
+  ];
+  // "meta" está no nome do 2º (campo principal) e no arquivo do 1º: o 2º vem primeiro
+  assert.deepEqual(filtrarPdfs(pdfs, "meta").itens.map((f) => f.nome), ["Meta Ads", "Guia"]);
+  const parecidos = filtrarPdfs(pdfs, "guia zebra");
+  assert.equal(parecidos.modo, "parecidos");
+  assert.equal(parecidos.mensagem, MENSAGEM_PARECIDOS);
+  const nenhum = filtrarPdfs(pdfs, "zebra");
+  assert.equal(nenhum.modo, "nenhum");
+  assert.equal(nenhum.mensagem, MENSAGEM_NENHUM);
+  assert.deepEqual(nenhum.itens, []);
 });
 
 test("proximaOrdem: depois da maior ordem entre as irmãs", () => {
@@ -152,5 +182,6 @@ test("filtrarPdfs: também encontra pelo player", () => {
     { nome: "Guia", arquivo_nome: "guia.pdf", player: "Pedro Sobral" },
     { nome: "Outro", arquivo_nome: "o.pdf", player: null },
   ];
-  assert.deepEqual(filtrarPdfs(pdfs, "sobral").map((f) => f.nome), ["Guia"]);
+  assert.deepEqual(filtrarPdfs(pdfs, "sobral").itens.map((f) => f.nome), ["Guia"]);
+  assert.deepEqual(filtrarPdfs(pdfs, "sobrla").itens.map((f) => f.nome), ["Guia"]);
 });

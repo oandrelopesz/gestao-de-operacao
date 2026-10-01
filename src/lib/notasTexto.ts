@@ -1,4 +1,5 @@
 // Regras puras da aba Notas (sem dependências: roda no navegador e no `node --test`).
+import { buscar, type ResultadoBusca } from "./search.ts";
 
 export interface NotaBase { id: string; titulo: string; conteudo: string; tema_id: string | null; updated_at: string }
 
@@ -6,15 +7,16 @@ export interface NotaBase { id: string; titulo: string; conteudo: string; tema_i
 export const TODOS = "__todos__";
 export const SEM_TEMA = "__sem_tema__";
 
-const semAcento = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-
-/** Notas do filtro (tema, Sem tema ou Todos) que batem com a busca; as editadas por último primeiro. */
-export function filtrarNotas<T extends NotaBase>(notas: T[], filtro: string, busca: string): T[] {
-  const q = semAcento(busca.trim());
-  return notas
+/**
+ * Notas do filtro (tema, Sem tema ou Todos) que batem com a busca. O tema vale antes e a ordem "editadas por último
+ * primeiro" também: sem busca a lista sai assim e, com busca, as mais parecidas primeiro (no empate, as editadas por
+ * último). A busca é tolerante (sem acento, com erro de digitação) no título e depois no texto.
+ */
+export function filtrarNotas<T extends NotaBase>(notas: T[], filtro: string, busca: string): ResultadoBusca<T> {
+  const base = notas
     .filter((n) => filtro === TODOS || (filtro === SEM_TEMA ? !n.tema_id : n.tema_id === filtro))
-    .filter((n) => !q || semAcento(n.titulo).includes(q) || semAcento(n.conteudo).includes(q))
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  return buscar(base, busca, (n) => [n.titulo, n.conteudo]);
 }
 
 /** Quantas notas por tema (e em Sem tema / Todos), para os filtros. */

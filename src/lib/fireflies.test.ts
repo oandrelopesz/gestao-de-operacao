@@ -8,6 +8,7 @@ import {
   intervaloAtualizacao, chaveArquivo,
 } from "./fireflies.ts";
 import type { ReuniaoFireflies } from "./fireflies.ts";
+import { MENSAGEM_NENHUM, MENSAGEM_PARECIDOS } from "./search.ts";
 
 const base: ReuniaoFireflies = {
   id: "abc123",
@@ -98,20 +99,46 @@ test("nomeArquivo: troca os caracteres que o Windows/Mac não aceitam em nome de
   assert.ok(longo.length < 200);
 });
 
-test("filtrar: sem acento e sem maiúscula, no título e nos participantes (todas as palavras)", () => {
-  const lista = [
-    r({ id: "1", titulo: "Alinhamento semanal", participantes: ["joao@cliente.com"] }),
-    r({ id: "2", titulo: "Kickoff Açaí da Serra", participantes: ["Maria Conceição"] }),
-    r({ id: "3", titulo: "Reunião X", titulo_pendente: "Onboarding Pizzaria", participantes: [] }),
-  ];
-  assert.deepEqual(filtrar(lista, "").map((x) => x.id), ["1", "2", "3"]);
-  assert.deepEqual(filtrar(lista, "  ").map((x) => x.id), ["1", "2", "3"]);
-  assert.deepEqual(filtrar(lista, "ACAI").map((x) => x.id), ["2"]);
-  assert.deepEqual(filtrar(lista, "conceicao").map((x) => x.id), ["2"]);
-  assert.deepEqual(filtrar(lista, "cliente.com").map((x) => x.id), ["1"]);
-  assert.deepEqual(filtrar(lista, "kickoff maria").map((x) => x.id), ["2"]);
-  assert.deepEqual(filtrar(lista, "kickoff joao").map((x) => x.id), []);
-  assert.deepEqual(filtrar(lista, "pizzaria").map((x) => x.id), ["3"]);
+const listaBusca = () => [
+  r({ id: "1", titulo: "Alinhamento semanal", participantes: ["joao@cliente.com"] }),
+  r({ id: "2", titulo: "Kickoff Açaí da Serra", participantes: ["Maria Conceição"] }),
+  r({ id: "3", titulo: "Reunião X", titulo_pendente: "Onboarding Pizzaria", participantes: [] }),
+];
+
+test("filtrar: sem acento e sem maiúscula, no título e nos participantes", () => {
+  const lista = listaBusca();
+  const ids = (busca: string) => filtrar(lista, busca).itens.map((x) => x.id);
+  assert.deepEqual(ids(""), ["1", "2", "3"]);
+  assert.deepEqual(ids("  "), ["1", "2", "3"]);
+  assert.equal(filtrar(lista, "").modo, "todos");
+  assert.deepEqual(ids("ACAI"), ["2"]);
+  assert.deepEqual(ids("conceicao"), ["2"]);
+  assert.deepEqual(ids("cliente.com"), ["1"]);
+  assert.deepEqual(ids("kickoff maria"), ["2"]);
+  assert.deepEqual(ids("pizzaria"), ["3"]);
+  assert.deepEqual(ids("reuniao"), ["3"]); // o título antigo, ainda não renomeado no Fireflies, também vale
+});
+
+test("filtrar: aceita erro de digitação", () => {
+  const lista = listaBusca();
+  const ids = (busca: string) => filtrar(lista, busca).itens.map((x) => x.id);
+  assert.deepEqual(ids("alinhamneto"), ["1"]); // letras vizinhas trocadas
+  assert.deepEqual(ids("kikoff"), ["2"]); // letra a menos
+  assert.deepEqual(ids("conceiçao maira"), ["2"]); // acento diferente e letras trocadas, nos participantes
+  assert.equal(filtrar(lista, "alinhamneto").modo, "exato");
+});
+
+test("filtrar: sem todas as palavras mostra os parecidos com a mensagem; sem nada, modo nenhum", () => {
+  const lista = listaBusca();
+  const parecidos = filtrar(lista, "kickoff joao");
+  assert.equal(parecidos.modo, "parecidos");
+  assert.equal(parecidos.mensagem, MENSAGEM_PARECIDOS);
+  // "kickoff" no título (reunião 2) vem antes de "joao" só nos participantes (reunião 1)
+  assert.deepEqual(parecidos.itens.map((x) => x.id), ["2", "1"]);
+  const nenhum = filtrar(lista, "zebra");
+  assert.equal(nenhum.modo, "nenhum");
+  assert.equal(nenhum.mensagem, MENSAGEM_NENHUM);
+  assert.deepEqual(nenhum.itens, []);
 });
 
 test("ordenar: mais recente primeiro, sem data no fim, sem mexer na lista original", () => {

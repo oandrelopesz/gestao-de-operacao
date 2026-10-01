@@ -2,6 +2,7 @@
 // As reuniões chegam importadas pelo worker da VPS em `fireflies_reunioes`; a aba só grava a intenção de
 // renomear (`titulo_pendente`) ou excluir (`excluir = true`) e o worker aplica no Fireflies em ~1 minuto.
 // Datas e horários são sempre os de Brasília, qualquer que seja o fuso do aparelho.
+import { buscar, type ResultadoBusca } from "./search.ts";
 
 export type StatusReuniao = "importando" | "pronto" | "erro";
 /** O que o card mostra: o status do worker mais os pedidos da aba ainda não aplicados. */
@@ -57,8 +58,6 @@ export const CONTENT_TYPE: Record<FormatoArquivo, string> = {
 
 const CHAVES_ARQUIVO: ChaveArquivo[] = ["transcricao_pdf", "transcricao_docx", "resumo_pdf", "resumo_docx"];
 const STATUS_VALIDOS: StatusReuniao[] = ["importando", "pronto", "erro"];
-
-const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 // ---------------------------------------------------------------- Linha do banco
 
@@ -252,14 +251,13 @@ export function nomeArquivo(r: ReuniaoFireflies, tipo: TipoArquivo, formato: For
 
 // ---------------------------------------------------------------- Lista
 
-/** Busca sem acento e sem maiúscula no título e nos participantes; todas as palavras precisam aparecer. */
-export function filtrar(lista: ReuniaoFireflies[], busca: string): ReuniaoFireflies[] {
-  const termos = semAcento(busca).split(/\s+/).filter(Boolean);
-  if (!termos.length) return lista;
-  return lista.filter((r) => {
-    const onde = semAcento([tituloExibido(r), r.titulo, ...r.participantes].join("\n"));
-    return termos.every((t) => onde.includes(t));
-  });
+/**
+ * Busca tolerante (sem acento, sem maiúscula, com erro de digitação) no título exibido e depois no título do Fireflies
+ * e nos participantes. Sem todas as palavras, mostra as reuniões parecidas (o resultado diz qual foi o caso); os mais
+ * parecidos primeiro e, no empate, a ordem da lista.
+ */
+export function filtrar(lista: ReuniaoFireflies[], busca: string): ResultadoBusca<ReuniaoFireflies> {
+  return buscar(lista, busca, (r) => [tituloExibido(r), r.titulo, ...r.participantes]);
 }
 
 const tempo = (iso: string | null): number | null => {

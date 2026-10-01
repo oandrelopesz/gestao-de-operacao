@@ -66,7 +66,13 @@ function CrmTela() {
   useEffect(() => gravarLocal("crm-filtro", filtro), [filtro]);
 
   const porLead = useMemo(() => agruparEventos(eventos), [eventos]);
-  const filtrados = useMemo(() => filtrarLeads(leads, porLead, filtro, agora), [leads, porLead, filtro, agora]);
+  // Busca tolerante (sem acento, com erro de digitação). O CRM só filtra (manterOrdem): o Kanban, a fila e a planilha
+  // seguem a ordem que já têm. A mensagem de "parecidos"/"nenhum" aparece uma vez, abaixo da barra de busca do topo.
+  const resultadoBusca = useMemo(
+    () => filtrarLeads(leads, porLead, filtro, agora, { manterOrdem: true }),
+    [leads, porLead, filtro, agora],
+  );
+  const filtrados = resultadoBusca.itens;
   const eventosFiltrados = useMemo(() => {
     const ids = new Set(filtrados.map((l) => l.id));
     return eventos.filter((e) => ids.has(e.lead_id));
@@ -80,6 +86,7 @@ function CrmTela() {
         filtro={filtro}
         onFiltro={setFiltro}
         qtd={filtrados.length}
+        resultadoBusca={resultadoBusca}
         onNovoLead={() => setNovoLead(true)}
         onColunas={() => setConfigColunas(true)}
         onExportar={() => abrirExportacao({ tipo: "todos" })}
