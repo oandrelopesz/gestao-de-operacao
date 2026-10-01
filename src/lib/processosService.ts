@@ -1,4 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { ClientFormValues } from "@/components/ClientForm";
+import { loadClienteFormValues, saveCliente } from "@/lib/clientesService";
+import { aplicarVerbaPrincipal } from "@/lib/verbaPrincipal";
 import {
   ordemAlterada,
   ordenarPassosCronologico,
@@ -382,29 +385,15 @@ export async function fetchVerbaPrincipal(clienteId: string): Promise<VerbaPrinc
   return { operacaoId: operacao.id, moeda: operacao.moeda, plataforma, valor, plataformasConfiguradas };
 }
 
+/**
+ * Grava a verba mensal da operação principal pelo cadastro do cliente (`saveCliente`), o único caminho
+ * que também cria/atualiza a conta do Saldo (um `saldo_ads` por plataforma, com a verba diária) e os
+ * campos legados do cliente. Carrega o cadastro, aplica a verba (regra em `verbaPrincipal.ts`, que
+ * recusa operação por período total) e salva. Se a leitura falha, `loadClienteFormValues` lança e
+ * nada é gravado; os erros chegam como mensagem ao `VerbaOnboarding`.
+ */
 export async function salvarVerbaPrincipal(clienteId: string, plataforma: string, valor: number): Promise<void> {
-  const operacao = await fetchOperacaoPrincipal(clienteId);
-  if (!operacao) {
-    const { error } = await supabase.from("operacoes").insert([{
-      cliente_id: clienteId,
-      nome: "Principal",
-      moeda: "BRL",
-      tipo_verba: "mensal",
-      ordem: 0,
-      ativa: true,
-      plataformas_config: { [plataforma]: { verba: valor, metodo_pagamento: "pix" } },
-      verba_ads: valor,
-    } as any]);
-    if (error) throw error;
-    return;
-  }
-
-  const config = { ...operacao.plataformas_config };
-  config[plataforma] = { verba: valor, metodo_pagamento: config[plataforma]?.metodo_pagamento ?? "pix" };
-  const verbaAds = Object.values(config).reduce((acc, c) => acc + (c.verba || 0), 0);
-  const { error } = await supabase
-    .from("operacoes")
-    .update({ plataformas_config: config as any, tipo_verba: "mensal", verba_ads: verbaAds })
-    .eq("id", operacao.id);
-  if (error) throw error;
+  const carregado = (await loadClienteFormValues(clienteId)) as ClientFormValues & { id: string };
+  const values = aplicarVerbaPrincipal(carregado, plataforma, valor);
+  await saveCliente(values, clienteId);
 }

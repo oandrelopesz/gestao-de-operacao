@@ -58,6 +58,7 @@ interface KanbanColumnProps {
   onAtribuirCliente?: (id: string, valor: { cliente_id: string | null; pessoal: boolean }) => void;
   onEnviarRoadmap?: (demanda: Demanda) => void;
   onDesligarRoadmap?: (id: string) => void;
+  onDuplicate?: (demanda: Demanda) => void;
   diasDaColuna?: number[];
   secoes?: { id: string; titulo: string; demandas: Demanda[] }[];
   clientes?: { id: string; nome: string; agencia?: string }[];
@@ -99,6 +100,7 @@ export function KanbanColumn({
   onAtribuirCliente,
   onEnviarRoadmap,
   onDesligarRoadmap,
+  onDuplicate,
   diasDaColuna,
   secoes,
   clientes: clientesDisponiveis,
@@ -160,6 +162,7 @@ export function KanbanColumn({
       onAtribuirCliente={onAtribuirCliente}
       onEnviarRoadmap={onEnviarRoadmap}
       onDesligarRoadmap={onDesligarRoadmap}
+      onDuplicate={onDuplicate}
       diasDaColuna={diasDaColuna}
       clientes={clientesDisponiveis}
       selecionada={selecionadas?.has(demanda.id)}

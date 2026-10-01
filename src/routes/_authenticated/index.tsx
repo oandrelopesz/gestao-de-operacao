@@ -74,6 +74,7 @@ import {
 import { ehEsquemaDesatualizado, recarregarUmaVez } from "@/lib/recuperacaoErro";
 import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
 import { SelecaoBarra } from "@/components/demandas/SelecaoBarra";
+import { montarCopiaDemanda, colunaDaCopia, proximaOrdem } from "@/lib/demandaCopia";
 
 type ColumnDialogState =
   | { mode: "create"; title: string; hex: string; regra: RegraData; dias: number[] }
@@ -352,11 +353,17 @@ function DemandasPage() {
       const userId = user?.id || 'b34bdae5-7a67-4b63-a46f-8aad43a06c63';
 
 
-      const { id, created_at, updated_at, clientes, ...rest } = demanda;
-      
+      // Concluída (Feito) volta como cópia no Standby, sem entrega; as outras ficam na mesma coluna.
+      // A cópia entra no fim da coluna de destino e não repete o passo de onboarding (UNIQUE).
+      const destino = colunaDaCopia(demanda.status);
+      if (!columns.some((c) => c.id === destino)) {
+        toast.error("A coluna Standby não existe mais. Recrie a coluna para duplicar uma demanda concluída.");
+        return;
+      }
+      const copia = montarCopiaDemanda(demanda, proximaOrdem(demandas, destino));
+
       const { error } = await supabase.from("demandas").insert([{
-        ...rest,
-        titulo: `${rest.titulo} (Cópia)`,
+        ...copia,
         user_id: userId,
       }]);
 
@@ -840,6 +847,7 @@ function DemandasPage() {
                     onAtribuirCliente={(id, valor) => handleUpdateDemanda(id, valor)}
                     onEnviarRoadmap={setEnviarRoadmap}
                     onDesligarRoadmap={handleDesligarRoadmap}
+                    onDuplicate={handleDuplicateDemanda}
                     clientes={clientes}
                     selecionadas={selecionadas}
                     modoSelecao={modoSelecao}

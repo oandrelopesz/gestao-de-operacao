@@ -49,6 +49,8 @@ interface KanbanCardProps {
   onAtribuirCliente?: (id: string, valor: { cliente_id: string | null; pessoal: boolean }) => void;
   onEnviarRoadmap?: (demanda: Demanda) => void;
   onDesligarRoadmap?: (id: string) => void;
+  /** Item "Duplicar" do menu: só aparece quando há quem duplique (o card do DragOverlay não passa) */
+  onDuplicate?: (demanda: Demanda) => void;
   diasDaColuna?: number[];
   clientes?: { id: string; nome: string; agencia?: string }[];
   /** Seleção em massa: card marcado, modo "Selecionar" ligado e alternar a marcação */
@@ -82,7 +84,7 @@ export function KanbanCard(props: KanbanCardProps) {
 }
 
 /** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
-export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, onAtribuirCliente, onEnviarRoadmap, onDesligarRoadmap, diasDaColuna, clientes, selecionada, modoSelecao, onAlternarSelecao, qtdNoArrasto, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
+export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, onAtribuirCliente, onEnviarRoadmap, onDesligarRoadmap, onDuplicate, diasDaColuna, clientes, selecionada, modoSelecao, onAlternarSelecao, qtdNoArrasto, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
   const navigate = useNavigate();
   const isRecorrenteMae = demanda.status === "recorrentes";
   const isDragging = sortable?.isDragging ?? false;
@@ -254,9 +256,11 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                       )}
                     </>
                   )}
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); }} className="gap-2 py-1.5">
-                    <Copy size={12} /> Duplicar
-                  </DropdownMenuItem>
+                  {onDuplicate && (
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDuplicate(demanda); }} className="gap-2 py-1.5">
+                      <Copy size={12} /> Duplicar
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem 
                     onClick={(e) => { e.stopPropagation(); onDelete(demanda.id, demanda.titulo); }} 
                     className="gap-2 py-1.5 text-destructive focus:text-destructive"
