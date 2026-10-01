@@ -285,3 +285,50 @@ o briefing e o histórico ficam no manual e a linha sincronizada duplicada é re
 - Texto: cerca de US$ 0,01 por post, até US$ 3/mês.
 - Imagem de IA, só quando falta foto: US$ 0,04 a 0,07 cada, no pior caso cerca de US$ 15/mês.
 - R2: grátis até 10 GB. Supabase e API do Google: sem custo adicional.
+
+## 11. Contexto, imagens e logo (emenda de 2026-10-01, pedido do André)
+
+Depois do primeiro teste real (Brazilian Car: texto correto, mas genérico), o André pediu que cada perfil tenha o
+contexto completo do cliente, escrito fora do sistema numa IA que conhece o cliente (prompts prontos entregues no chat
+de 2026-10-01 e guardados no cofre), e que nem todo post tenha imagem.
+
+### 11.1 Campos novos em `gmn_perfis`
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `contexto_posts` | text NULL | texto longo colado pelo André (identificação, objetivo, público, serviços, diferenciais, SEO local, tom de voz, ideias por tema, guardrails e um bloco "DADOS PARA O SISTEMA"). Vai inteiro para o prompt de cada post |
+| `contexto_imagens` | text NULL | texto longo que orienta a imagem gerada pela IA |
+| `logo_url` | text NULL | URL pública da logo no R2 (`gmn-midia`, chave `logos/<perfil_id>-<carimbo>.<png|jpg>`) |
+| `permitir_pessoas_ia` | bool default false | só o André liga; com ele desligado a IA nunca gera pessoas |
+
+Cada item de `agenda` ganha `imagem` (bool, padrão `true` quando falta): `{dia, hora, imagem}`.
+
+### 11.2 Regras
+
+1. **Dados estruturados extraídos do contexto.** O botão "Extrair do contexto" (ação `briefing` da função `gmn`, com o
+   texto de `contexto_posts`) preenche os campos de 3.2 (palavras-chave, bairros, termos proibidos etc.), que continuam
+   editáveis e seguem valendo para o rodízio de palavras-chave e para a checagem (6.3). Salvar o contexto grava
+   `contexto_posts` e o briefing juntos.
+2. **Post com ou sem imagem.** Na agenda, cada dia ligado escolhe "com imagem" ou "só texto". A prévia tem dois botões:
+   "Gerar prévia com imagem" e "Gerar prévia só texto". Post só texto não busca nem gera imagem.
+3. **Drive obrigatório quando preenchido.** Com `drive_pasta_url` preenchido, a imagem sai sempre da pasta (regra de 6.2,
+   passo 5.1). Se a pasta falhar ou não tiver foto aceita, o post sai só com texto e com o aviso; **não** cai para a IA.
+   Sem pasta: imagem da IA se `usa_ia_imagem`.
+4. **Logo obrigatória nas imagens da IA quando existe.** A imagem da IA usa a logo como referência (endpoint de edição
+   de imagem da OpenAI, `images/edits`, com a logo em `image[]`), pequena e discreta, sem distorcer. As fotos do Drive vão
+   como estão (sem logo).
+5. **Nada de pessoas geradas por IA** (salvo `permitir_pessoas_ia`). O prompt proíbe pessoas, rostos, mãos e silhuetas; e,
+   depois de gerar, uma checagem automática (modelo de texto com visão) olha a imagem: com pessoas, gera de novo uma vez;
+   se ainda houver, o post sai só com texto e com o aviso. Sempre proibido também: texto, letras e números na arte,
+   logos de terceiros e placas legíveis.
+6. **Contexto das imagens** entra no prompt de toda imagem da IA.
+7. **JPG.** A imagem da IA é pedida em JPEG (`output_format: "jpeg"`), mais leve que PNG.
+8. **Modelos** (secrets): `OPENAI_MODELO_TEXTO = gpt-6-luna`, `OPENAI_MODELO_IMAGEM = gpt-image-2.5-flare` (catálogo de
+   outubro de 2026). Os padrões no código seguem como reserva.
+
+### 11.3 Tela
+
+Gaveta do perfil com as abas **Contexto** (contexto para os posts, "Extrair do contexto", dados extraídos recolhidos,
+marcação "saúde", cliente), **Imagens** (pasta do Drive, contexto para as imagens, logo com envio PNG/JPG até 5 MB e
+"Remover", "Gerar imagem com IA quando não houver pasta do Drive", "Permitir pessoas nas imagens da IA"), **Agenda**
+(dias, horários, "com imagem / só texto" por dia, botão do post) e **Posts** (as duas prévias).
