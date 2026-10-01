@@ -172,7 +172,7 @@ export function ClienteSelect({
                   keywords={c.agencia ? [c.nome, c.agencia] : [c.nome]}
                   onSelect={() => escolher(c.id)}
                 >
-                  <span className="min-w-0 flex-1 truncate">{c.nome}</span>
+                  <span className="min-w-0 flex-1 break-words">{c.nome}</span>
                   {c.agencia ? <span className="shrink-0 text-xs text-muted-foreground">{c.agencia}</span> : null}
                   {atual === c.id && <Check aria-hidden="true" />}
                 </CommandItem>
