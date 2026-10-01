@@ -364,7 +364,7 @@ function FotosDoSite({ dados, siteSalvo, site, acoes, onDados }: {
       </div>
       <p id="gmn-fotos-site-dica" className="text-xs text-muted-foreground">
         {ligado
-          ? "Uma foto do site só entra num post quando combina com o assunto dele (a IA confere). Se nenhuma combinar, o post usa a imagem da IA, se estiver ligada, ou sai só com texto."
+          ? "Uma foto do site só entra num post quando combina com o assunto dele (a IA confere). Se nenhuma combinar, o post usa a imagem da IA, se estiver ligada, ou sai só com texto. Com a pasta do Drive preenchida, as fotos do site não são usadas: o Drive vem primeiro."
           : "Desligado: as fotos do site não entram nos posts."}
       </p>
 

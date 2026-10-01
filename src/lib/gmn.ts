@@ -257,8 +257,11 @@ export async function adicionarImagemSite(perfilId: string, c: CandidatoSite): P
 }
 
 /** Desmarca uma foto do site (o arquivo fica no R2). Devolve a lista nova, já gravada. */
-export async function removerImagemSite(perfilId: string, lista: ImagemSite[], id: string): Promise<ImagemSite[]> {
-  const nova = lista.filter((i) => i.id !== id);
+export async function removerImagemSite(perfilId: string, _lista: ImagemSite[], id: string): Promise<ImagemSite[]> {
+  // Relê a lista do banco antes de gravar: uma marcação que o servidor gravou, mas cuja resposta se perdeu, não some aqui.
+  const { data, error } = await perfis().select("imagens_site").eq("id", perfilId).single();
+  if (error) throw error;
+  const nova = normalizarImagensSite((data as { imagens_site?: unknown } | null)?.imagens_site).filter((i) => i.id !== id);
   await salvarPerfil(perfilId, { imagens_site: nova });
   return nova;
 }
