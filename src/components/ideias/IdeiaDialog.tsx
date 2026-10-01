@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +50,11 @@ export function IdeiaDialog({ state, clientes, onClose, onSaved }: Props) {
     setLinks(i?.links?.length ? [...i.links] : []);
   }, [state]);
 
-  const clientesDaAgencia = clientes.filter((c) => c.agencia === agencia);
+  // Só {id, nome}: a agência já foi escolhida acima, então não aparece (nem entra na busca) em cada linha
+  const clientesDaAgencia = useMemo(
+    () => clientes.filter((c) => c.agencia === agencia).map(({ id, nome }) => ({ id, nome })),
+    [clientes, agencia]
+  );
 
   const setLink = (idx: number, v: string) => setLinks((prev) => prev.map((l, i) => (i === idx ? v : l)));
   const removerLink = (idx: number) => setLinks((prev) => prev.filter((_, i) => i !== idx));

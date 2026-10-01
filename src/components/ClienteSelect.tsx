@@ -9,7 +9,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { combinaBusca, pontuarBusca } from "@/lib/buscaTexto";
+import { filtroCmdk } from "@/lib/buscaTexto";
 import { cn } from "@/lib/utils";
 
 export interface ClienteSelectCliente {
@@ -42,20 +42,18 @@ export interface ClienteSelectProps {
   "aria-invalid"?: boolean | "true" | "false";
   disabled?: boolean;
   className?: string;
+  /** false mantém a ordem recebida (ex.: lista por data); o padrão ordena por nome (pt-BR). */
+  ordenar?: boolean;
+  /** Texto do campo de busca (padrão "Buscar cliente…"). */
+  textoBusca?: string;
+  /** Texto quando a busca não acha nada (padrão "Nenhum cliente encontrado."). */
+  textoNenhum?: string;
 }
 
 const VALOR_VAZIO = "__vazio__";
 const valorCliente = (id: string) => `c:${id}`;
 const valorExtra = (v: string) => `x:${v}`;
-
-// O cmdk chama esta função com o `value` do item, o texto digitado e as `keywords` do item (nome e agência).
-// Casa sem acento e sem maiúscula; achar pelo nome vale mais que achar só pela agência.
-function filtrar(_valor: string, busca: string, palavras: string[] = []): number {
-  const [nome = "", agencia = ""] = palavras;
-  const nota = pontuarBusca(nome, busca);
-  if (nota > 0) return nota;
-  return agencia && combinaBusca(`${nome} ${agencia}`, busca) ? 0.25 : 0;
-}
+const TEXTO_FORA_DA_LISTA = "Cliente fora da lista (arquivado?)";
 
 /**
  * Seletor de cliente com busca: no lugar do Select comum, o usuário pode digitar parte do nome (ou da agência)
@@ -75,6 +73,9 @@ export function ClienteSelect({
   "aria-invalid": ariaInvalid,
   disabled,
   className,
+  ordenar = true,
+  textoBusca = "Buscar cliente…",
+  textoNenhum = "Nenhum cliente encontrado.",
 }: ClienteSelectProps) {
   const [open, setOpen] = useState(false);
 
@@ -83,17 +84,27 @@ export function ClienteSelect({
   const jaAbriu = useRef(false);
   if (open) jaAbriu.current = true;
   const clientesOrdenados = useMemo(
-    () => (jaAbriu.current ? [...clientes].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")) : []),
+    () => (!jaAbriu.current ? [] : ordenar ? [...clientes].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")) : clientes),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [clientes, open]
+    [clientes, ordenar, open]
   );
 
   const atual = value || null;
   const extraAtual = atual ? extras?.find((e) => e.value === atual) : undefined;
   const clienteAtual = atual && !extraAtual ? clientes.find((c) => c.id === atual) : undefined;
+  // Valor definido que não está na lista (ex.: cliente arquivado). Com a lista ainda vazia (carregando), não avisa.
+  const foraDaLista = !!atual && !extraAtual && !clienteAtual && clientes.length > 0;
   const textoVazio = atual === null ? opcaoVazia : undefined;
-  const textoBotao = extraAtual?.label ?? clienteAtual?.nome ?? textoVazio ?? placeholder;
+  const textoBotao = extraAtual?.label ?? clienteAtual?.nome ?? (foraDaLista ? TEXTO_FORA_DA_LISTA : textoVazio ?? placeholder);
   const mostraPlaceholder = !extraAtual && !clienteAtual && textoVazio === undefined;
+  // Ao abrir, a linha do valor atual já vem destacada e à vista (o cmdk rola até ela)
+  const valorInicial = extraAtual
+    ? valorExtra(extraAtual.value)
+    : clienteAtual
+      ? valorCliente(clienteAtual.id)
+      : atual === null && opcaoVazia !== undefined
+        ? VALOR_VAZIO
+        : undefined;
 
   const escolher = (novo: string | null) => {
     onChange(novo);
@@ -111,8 +122,14 @@ export function ClienteSelect({
           aria-describedby={ariaDescribedBy}
           aria-invalid={ariaInvalid}
           aria-expanded={open}
-          aria-haspopup="listbox"
           disabled={disabled}
+          // Como no Select antigo: seta para baixo ou para cima, com o botão em foco, abre a lista
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              setOpen(true);
+            }
+          }}
           data-placeholder={mostraPlaceholder ? "" : undefined}
           className={cn(
             "flex h-9 w-full items-center justify-between gap-2 whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-left text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
@@ -131,10 +148,10 @@ export function ClienteSelect({
         onPointerDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <Command filter={filtrar} label="Buscar cliente" loop>
-          <CommandInput placeholder="Buscar cliente…" />
-          <CommandList label="Clientes">
-            <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+        <Command filter={filtroCmdk} defaultValue={valorInicial} label={textoBusca.replace(/…$/, "")} loop>
+          <CommandInput placeholder={textoBusca} />
+          <CommandList label="Opções">
+            <CommandEmpty>{textoNenhum}</CommandEmpty>
             <CommandGroup>
               {opcaoVazia !== undefined && (
                 <CommandItem value={VALOR_VAZIO} keywords={[opcaoVazia]} onSelect={() => escolher(null)}>

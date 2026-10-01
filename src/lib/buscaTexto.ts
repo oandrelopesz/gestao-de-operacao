@@ -35,3 +35,15 @@ export function pontuarBusca(texto: string | null | undefined, termo: string | n
 export function combinaBusca(texto: string | null | undefined, termo: string | null | undefined): boolean {
   return pontuarBusca(texto, termo) > 0;
 }
+
+/**
+ * Função de filtro para o `<Command filter={...}>` do cmdk. O cmdk chama com o `value` do item, o texto digitado e as
+ * `keywords` do item. Aqui `keywords` = [nome, agência (opcional)]: só elas entram na busca, o `value` (que carrega o id)
+ * nunca é comparado. Achar pelo nome vale mais que achar só pela agência (0,25). Nota 0 esconde o item.
+ */
+export function filtroCmdk(_valor: string, busca: string, palavras: string[] = []): number {
+  const [nome = "", agencia = ""] = palavras;
+  const nota = pontuarBusca(nome, busca);
+  if (nota > 0) return nota;
+  return agencia && combinaBusca(`${nome} ${agencia}`, busca) ? 0.25 : 0;
+}

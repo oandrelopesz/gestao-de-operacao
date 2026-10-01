@@ -1,11 +1,11 @@
 // "Gerar com IA": opcionalmente usa um briefing de Dados internos (.txt no Drive) e pede à função gmn um rascunho.
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ClienteSelect } from "@/components/ClienteSelect";
 import { baixarOriginal, listarPasta } from "@/lib/driveLeitura";
 import { FORMULARIOS, extensao, formatarDataHora, rotuloDoItem, type FormularioId } from "@/lib/dadosInternos";
 import { gerarBriefingIa, traduzErroGmn, type PerfilGmn } from "@/lib/gmn";
@@ -21,6 +21,8 @@ export function GerarBriefingDialog({ perfil, aberto, onFechar, onGerado }: {
   const [erroLista, setErroLista] = useState<string | null>(null);
   const [escolhido, setEscolhido] = useState(NENHUM);
   const [gerando, setGerando] = useState(false);
+  // Mesma ordem da lista (mais novo primeiro); o rótulo de cada briefing é o texto que a busca procura
+  const itensBriefing = useMemo(() => (opcoes ?? []).map((o) => ({ id: o.id, nome: o.rotulo })), [opcoes]);
 
   useEffect(() => {
     if (!aberto || opcoes) return;
@@ -70,14 +72,19 @@ export function GerarBriefingDialog({ perfil, aberto, onFechar, onGerado }: {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">
-          <Label>Briefing de Dados internos (opcional)</Label>
-          <Select value={escolhido} onValueChange={setEscolhido} disabled={!opcoes || gerando}>
-            <SelectTrigger aria-label="Briefing de Dados internos (opcional)"><SelectValue placeholder={opcoes ? "Nenhum" : "Carregando…"} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NENHUM}>Nenhum</SelectItem>
-              {(opcoes || []).map((o) => <SelectItem key={o.id} value={o.id}>{o.rotulo}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <Label htmlFor="gmn-briefing-ia">Briefing de Dados internos (opcional)</Label>
+          <ClienteSelect
+            id="gmn-briefing-ia"
+            aria-label="Briefing de Dados internos (opcional)"
+            clientes={itensBriefing}
+            value={escolhido === NENHUM ? null : escolhido}
+            onChange={(id) => setEscolhido(id ?? NENHUM)}
+            opcaoVazia="Nenhum"
+            ordenar={false}
+            textoBusca="Buscar briefing…"
+            textoNenhum="Nenhum briefing encontrado."
+            disabled={!opcoes || gerando}
+          />
           {erroLista && <p className="text-xs text-destructive">Não foi possível listar os briefings: {erroLista}</p>}
         </div>
         <DialogFooter>
