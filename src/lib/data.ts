@@ -11,6 +11,7 @@ import type { Passo } from "@/lib/processosService";
 import { hasCached, setCached } from "@/lib/pageCache";
 import { carregarColunas as carregarColunasCrm, carregarEventos as carregarEventosCrm, carregarLeads as carregarLeadsCrm } from "@/lib/crmDados";
 import { emLotes } from "@/lib/aquecimento";
+import { hojeBrasilia } from "@/lib/entrega";
 import type { QueryClient } from "@tanstack/react-query";
 
 /**
@@ -27,6 +28,8 @@ export const CACHE_KEYS = {
   saldo: "saldo",
   acessos: "acessos",
   financeiro: "financeiro",
+  /** Recebimentos da aba Financeiro desde o primeiro mês cobrado (carregados junto com a financeiro_view) */
+  financeiroRegistros: "financeiro.registros",
   cursos: "cursos",
   cursoCategorias: "curso-categorias",
   livros: "livros",
@@ -147,6 +150,20 @@ export async function loadFinanceiro() {
   const { data, error } = await supabase.from("financeiro_view" as any).select("*").order("nome");
   if (error) throw error;
   return (data as any[]) || [];
+}
+
+/**
+ * Aba Financeiro: as fontes (financeiro_view) e os recebimentos de todas elas desde o primeiro mês cobrado (o
+ * `cobranca_desde` mais antigo), de onde a aba monta a cobrança mês a mês: atrasado acumulado, meses e calendário.
+ */
+export async function loadFinanceiroCompleto() {
+  const fontes = await loadFinanceiro();
+  const [{ mesesNavegaveis }, { buscarRegistrosDesde }] = await Promise.all([
+    import("@/lib/financeiroCobranca"),
+    import("@/lib/financeiroAcoes"),
+  ]);
+  const registros = await buscarRegistrosDesde(`${mesesNavegaveis(fontes, hojeBrasilia())[0]}-01`);
+  return { fontes, registros };
 }
 
 export async function loadCursos() {
@@ -271,7 +288,15 @@ export async function warmAllCaches(
     [CACHE_KEYS.crmLeads, carregarLeadsCrm],
     [CACHE_KEYS.crmEventos, carregarEventosCrm],
     // Pessoal
-    [CACHE_KEYS.financeiro, loadFinanceiro],
+    [
+      CACHE_KEYS.financeiro,
+      async () => {
+        // Fontes e recebimentos juntos, como a aba os carrega
+        const { fontes, registros } = await loadFinanceiroCompleto();
+        setCached(CACHE_KEYS.financeiroRegistros, registros);
+        return fontes;
+      },
+    ],
     [
       CACHE_KEYS.cursos,
       async () => {

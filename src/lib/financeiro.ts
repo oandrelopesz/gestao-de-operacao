@@ -3,7 +3,7 @@
 // `financeiro_fontes.parcelas` a lista [{ dia, valor }] e cada parcela é recebida (e cobrada) à parte.
 // Sem dependências: roda no navegador e no `node --test`. Datas são "YYYY-MM-DD" do dia em Brasília.
 
-export type StatusMes = "recebido" | "atrasado" | "pendente" | "a_vencer";
+export type StatusMes = "recebido" | "isento" | "atrasado" | "pendente" | "a_vencer";
 
 /** Freelancer = trabalho feito para uma agência (financeiro_fontes.agencia_id diz qual). */
 export type TipoFonte = "agencia" | "cliente_pessoal" | "freelancer";
@@ -21,6 +21,8 @@ export function tipoDaFonte(tipo: string) {
 export interface Parcela {
   dia: number;
   valor: number;
+  /** pix | cartao | boleto; ausente = a forma de pagamento da fonte */
+  forma?: string | null;
 }
 
 /** Linha de `financeiro_recebimentos` do mês atual, como a `financeiro_view` entrega em `recebimentos_mes`. */
@@ -28,8 +30,12 @@ export interface RecebimentoMes {
   id: string;
   parcela: number;
   recebido: boolean;
+  /** Parcela abonada neste mês: o que não foi pago deixa de ser cobrado. */
+  isento?: boolean | null;
   data_confirmacao: string | null;
   valor_recebido: number | null;
+  /** Valor da parcela congelado quando ela foi acertada (vence o valor atual da fonte). */
+  valor_devido?: number | null;
 }
 
 export interface FonteDoMes {
@@ -37,6 +43,8 @@ export interface FonteDoMes {
   dia_recebimento: number;
   parcelas?: Parcela[] | null;
   recebimentos_mes?: RecebimentoMes[] | null;
+  /** Primeiro mês cobrado ("YYYY-MM-DD"); antes dele a fonte está fora da cobrança. */
+  cobranca_desde?: string | null;
 }
 
 export interface ParcelaDoMes extends Parcela {
@@ -46,6 +54,14 @@ export interface ParcelaDoMes extends Parcela {
   vencimento: string;
   status: StatusMes;
   recebimento: RecebimentoMes | null;
+  /** O que a parcela vale neste mês: o valor congelado no acerto (`valor_devido`) ou, sem ele, `valor`. */
+  devido: number;
+  /** O que já entrou na parcela, no máximo o devido (o que passa disso não abate outra parcela). */
+  pago: number;
+  /** O que ainda falta receber: 0 se recebida ou isenta. É o valor que o sino cobra. */
+  falta: number;
+  /** O que a isenção abonou: devido menos o que já tinha sido pago; 0 se não é isenta. */
+  abonado: number;
 }
 
 export interface SituacaoDoMes {
@@ -102,12 +118,33 @@ export function statusDaParcela(vencimento: string, recebido: boolean, hoje: str
   return "a_vencer";
 }
 
-/** A pior situação entre as parcelas: atrasado > pendente > a vencer; recebido só com todas pagas. */
+/**
+ * A pior situação entre as parcelas: atrasado > pendente > a vencer. Todas isentas = isento; todas recebidas
+ * ou isentas = recebido.
+ */
 function statusGeral(parcelas: ParcelaDoMes[]): StatusMes {
-  if (parcelas.every((p) => p.status === "recebido")) return "recebido";
+  if (parcelas.every((p) => p.status === "isento")) return "isento";
+  if (parcelas.every((p) => p.status === "recebido" || p.status === "isento")) return "recebido";
   if (parcelas.some((p) => p.status === "atrasado")) return "atrasado";
   if (parcelas.some((p) => p.status === "pendente")) return "pendente";
   return "a_vencer";
+}
+
+const CENTAVO = 0.005;
+/** Arredonda em centavos (soma de valores quebrados não pode sair 0,30000000000000004). */
+const arred = (v: number) => Math.round(v * 100) / 100;
+
+/**
+ * Valor da parcela congelado no registro: `valor_devido`; num registro antigo recebido e não isento sem ele (a tela
+ * antiga gravava o valor da parcela em `valor_recebido`), o que foi recebido. Sem nada congelado: null (vale o atual).
+ */
+export function valorDevidoDoRegistro(
+  registro: { recebido?: boolean | null; isento?: boolean | null; valor_recebido?: number | null; valor_devido?: number | null } | null | undefined,
+): number | null {
+  if (!registro) return null;
+  if (registro.valor_devido != null) return Number(registro.valor_devido);
+  if (registro.recebido && !registro.isento && registro.valor_recebido != null) return Number(registro.valor_recebido);
+  return null;
 }
 
 export function situacaoDoMes(fonte: FonteDoMes, hoje: string): SituacaoDoMes {
@@ -116,45 +153,38 @@ export function situacaoDoMes(fonte: FonteDoMes, hoje: string): SituacaoDoMes {
   const parcelas = lista.map((p, i): ParcelaDoMes => {
     const recebimento = recebimentos.find((r) => r.parcela === i + 1) || null;
     const vencimento = vencimentoNoMes(p.dia, hoje);
-    return { ...p, numero: i + 1, total: lista.length, vencimento, recebimento, status: statusDaParcela(vencimento, !!recebimento?.recebido, hoje) };
+    // O valor congelado no acerto vence o atual; o pago conta no máximo o devido (o excesso não abate outra parcela)
+    const devido = arred(valorDevidoDoRegistro(recebimento) ?? p.valor);
+    const pago = recebimento?.recebido ? arred(Math.max(0, Math.min(Number(recebimento.valor_recebido ?? devido), devido))) : 0;
+    // Recebido de verdade só quando o pago cobre o devido; valor menor é parcial e a parcela segue em aberto pela data
+    const quitada = !!recebimento?.recebido && pago >= devido - CENTAVO;
+    // Quitada vale mais que a isenção: isenta com o pagamento cobrindo o devido é recebida (nada abonado)
+    const isenta = !!recebimento?.isento && !quitada;
+    const status: StatusMes = isenta ? "isento" : statusDaParcela(vencimento, quitada, hoje);
+    const falta = isenta || quitada ? 0 : arred(devido - pago);
+    const abonado = isenta ? arred(devido - pago) : 0;
+    return { ...p, numero: i + 1, total: lista.length, vencimento, recebimento, status, devido, pago, falta, abonado };
   });
-  const recebidas = parcelas.filter((p) => p.status === "recebido");
-  const soma = (ps: ParcelaDoMes[], valor: (p: ParcelaDoMes) => number) => ps.reduce((t, p) => t + valor(p), 0);
+  const soma = (ps: ParcelaDoMes[], valor: (p: ParcelaDoMes) => number) => arred(ps.reduce((t, p) => t + valor(p), 0));
   return {
     parcelas,
     status: statusGeral(parcelas),
     fracionado: ehFracionado(fonte),
-    recebidas: recebidas.length,
-    valorRecebido: soma(recebidas, (p) => p.recebimento?.valor_recebido ?? p.valor),
-    valorEmAberto: soma(parcelas.filter((p) => p.status !== "recebido"), (p) => p.valor),
-    valorAtrasado: soma(parcelas.filter((p) => p.status === "atrasado"), (p) => p.valor),
+    recebidas: parcelas.filter((p) => p.status === "recebido").length,
+    // O que entrou em qualquer parcela com pagamento (inclusive parcial e isenta que já tinha pago), com o valor informado
+    valorRecebido: soma(parcelas.filter((p) => p.recebimento?.recebido), (p) => Math.max(0, Number(p.recebimento?.valor_recebido ?? p.devido))),
+    valorEmAberto: soma(parcelas, (p) => p.falta),
+    valorAtrasado: soma(parcelas.filter((p) => p.status === "atrasado"), (p) => p.falta),
   };
 }
 
-/** Rótulo e classes (Tailwind) de cada situação, para fonte e parcela. */
-export function infoDoStatus(status: StatusMes) {
-  switch (status) {
-    case "recebido": return { label: "Recebido", color: "bg-emerald-500", text: "text-emerald-500", border: "border-emerald-200", bg: "bg-emerald-50/50" };
-    case "atrasado": return { label: "Atrasado", color: "bg-red-500", text: "text-red-500", border: "border-red-200", bg: "bg-red-50/50" };
-    case "pendente": return { label: "Pendente", color: "bg-amber-500", text: "text-amber-500", border: "border-amber-200", bg: "bg-amber-50/50" };
-    default: return { label: "A vencer", color: "bg-zinc-400", text: "text-zinc-500", border: "border-zinc-200", bg: "bg-zinc-50/50" };
-  }
-}
-
-/** Cartões do topo: valores somados por parcela, contagens por fonte. */
-export function resumoDoMes(fontes: FonteDoMes[], hoje: string) {
-  const situacoes = fontes.map((f) => situacaoDoMes(f, hoje));
-  const soma = (valor: (s: SituacaoDoMes) => number) => situacoes.reduce((t, s) => t + valor(s), 0);
-  return {
-    previsto: soma((s) => s.parcelas.reduce((t, p) => t + p.valor, 0)),
-    recebido: soma((s) => s.valorRecebido),
-    emAberto: soma((s) => s.valorEmAberto),
-    atrasado: soma((s) => s.valorAtrasado),
-    fontes: fontes.length,
-    fontesRecebidas: situacoes.filter((s) => s.status === "recebido").length,
-    fontesEmAberto: situacoes.filter((s) => s.status !== "recebido").length,
-    fontesAtrasadas: situacoes.filter((s) => s.status === "atrasado").length,
-  };
+/**
+ * Parcelas do mês de `hoje` que o sino avisa: pendentes ou atrasadas com algo ainda a receber, só de fonte já cobrada
+ * neste mês ("cobrar a partir de" depois do mês atual = fora da cobrança, como na aba).
+ */
+export function parcelasParaAvisar(fonte: FonteDoMes, hoje: string): ParcelaDoMes[] {
+  if (fonte.cobranca_desde && String(fonte.cobranca_desde).slice(0, 7) > hoje.slice(0, 7)) return [];
+  return situacaoDoMes(fonte, hoje).parcelas.filter((p) => (p.status === "pendente" || p.status === "atrasado") && p.falta > 0);
 }
 
 // ---- Formulário
@@ -211,6 +241,18 @@ export function validarParcelas(parcelas: Parcela[]): string | null {
 
 export function ordenarParcelas(parcelas: Parcela[]): Parcela[] {
   return [...parcelas].sort(porDia);
+}
+
+/**
+ * A configuração do pagamento mudou? Quantidade, dias ou valores (em centavos); trocar entre pagamento único e parcelado
+ * muda a quantidade. A forma de pagamento não conta.
+ */
+export function mudouAsParcelas(antes: Parcela[], depois: Parcela[]): boolean {
+  const a = ordenarParcelas(antes);
+  const b = ordenarParcelas(depois);
+  if (a.length !== b.length) return true;
+  const centavos = (v: number) => Math.round((Number(v) || 0) * 100);
+  return a.some((p, i) => Number(p.dia) !== Number(b[i].dia) || centavos(p.valor) !== centavos(b[i].valor));
 }
 
 /** Valor em reais no formato da máscara de moeda ("3.500,00"); a máscara lê dígitos como centavos. */

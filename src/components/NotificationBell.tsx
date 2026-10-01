@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/clientes";
 import { hojeBrasilia } from "@/lib/entrega";
-import { situacaoDoMes } from "@/lib/financeiro";
+import { parcelasParaAvisar } from "@/lib/financeiro";
 import { useNavigate } from "@tanstack/react-router";
 
 interface SaldoAlerta {
@@ -63,7 +63,8 @@ export function NotificationBell() {
 
       if (saldoError) throw saldoError;
 
-      // A situação de cada parcela é calculada aqui (fonte fracionada tem uma por dia de pagamento)
+      // A situação de cada parcela é calculada aqui (fonte fracionada tem uma por dia de pagamento); fonte que ainda não é
+      // cobrada neste mês ("cobrar a partir de" mais adiante) e parcela sem nada a receber não avisam
       const { data: finData, error: finError } = await supabase
         .from("financeiro_view" as any)
         .select("*");
@@ -72,13 +73,12 @@ export function NotificationBell() {
 
       const hoje = hojeBrasilia();
       const finAlertas = ((finData as any[]) || []).flatMap((fonte): FinanceiroAlerta[] =>
-        situacaoDoMes(fonte, hoje).parcelas
-          .filter((p) => p.status === "pendente" || p.status === "atrasado")
+        parcelasParaAvisar(fonte, hoje)
           .map((p) => ({
             id: p.total > 1 ? `${fonte.fonte_id}:${fonte.mes_atual}:${p.numero}` : fonte.fonte_id,
             fonte_id: fonte.fonte_id,
             nome: fonte.nome,
-            valor: p.valor,
+            valor: p.falta, // o que ainda falta (parcial não cobra o valor cheio)
             dia: p.dia,
             vencimento: p.vencimento,
             parcela: p.numero,
