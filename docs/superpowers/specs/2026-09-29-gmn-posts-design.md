@@ -412,3 +412,26 @@ site, disponível para seleção com checkbox de usar aquela logo".
 `gmn_perfis`: `logo_posicao` text padrão `inferior_direito`, `logo_tamanho` text padrão `media`, `logo_fundo` text padrão
 `nenhum` (com CHECK dos valores), `logo_origem_url` text, `imagens_site` jsonb padrão `[]` (CHECK de array). Os CHECKs de
 `gmn_posts.imagem_origem` e `gmn_imagens_uso.origem` são refeitos com `site`.
+
+### 12.7 Emenda (2026-10-01, noite): busca de logo e de fotos separadas, chave das fotos do site e foto só com contexto
+
+Pedido do André: "toda foto puxada do site deve ter contexto com o post pra ser usada; deixe a opção de puxar fotos do
+site para ativar ou desativar no painel; essa função puxa fotos e a outra função puxa somente logos; tem que reconhecer
+o que é logo e o que é foto". Substitui o que 12.4 e 12.5 dizem sobre as imagens do site.
+
+- **Duas buscas:** "Buscar logo no site" (ação `site` com `tipo: "logos"`) e "Buscar fotos no site" (`tipo: "fotos"`).
+  As pistas do HTML separam os candidatos (ícones, `og:logo`, `logo` do JSON-LD, "logo/marca/brand" no alt, classe ou
+  nome → logo; o resto → foto). Depois, cada candidato em formato que o modelo de visão lê (PNG, JPG, WEBP, GIF) é
+  **classificado pela IA** (`logo`, `foto` ou `outro`, com uma descrição curta da foto), em paralelo (até 6 ao mesmo
+  tempo; até 16 candidatos na busca de logos e 24 na de fotos). SVG e ICO ficam pela pista (são logo ou ícone). Se a IA
+  não conseguir abrir um candidato, vale a pista. A busca de logos devolve só o que é logo; a de fotos, só o que é foto
+  e tem descrição.
+- **Chave "Usar fotos do site nos posts"** (`gmn_perfis.usa_fotos_site`, padrão **desligada**), na aba Imagens, gravada
+  pelo "Salvar imagens". A busca de fotos e a lista de fotos marcadas só aparecem com ela ligada. Desligada, nenhuma foto
+  do site entra num post (as marcadas continuam guardadas).
+- **Foto só com contexto:** a foto do site é escolhida **depois** do texto. A IA de texto recebe o texto do post e as
+  descrições das fotos marcadas e devolve só as que combinam claramente com o assunto (na dúvida, nenhuma). Entre as que
+  combinam, entra a menos usada (`gmn_imagens_uso`, origem `site`). Foto sem descrição nunca entra.
+- **Ordem da imagem do post:** Drive (preenchido = só Drive, como antes; foto escolhida antes do texto) → com a chave
+  ligada e fotos marcadas, a foto do site que combina → IA (se ligada) → sem imagem.
+- Migration `20261001190000_gmn_fotos_site.sql`: `usa_fotos_site BOOLEAN NOT NULL DEFAULT false`.
