@@ -1027,7 +1027,7 @@ function FinanceiroPage() {
             )}
 
             <div className="pt-4">
-              <Button className="w-full" variant="outline" onClick={() => { setHistoryOpen(false); abrirFormulario(fonteHistorico); }}>
+              <Button className="w-full" variant="outline" onClick={() => { setHistoryOpen(false); historicoRef.current = null; abrirFormulario(fonteHistorico); }}>
                 <Pencil size={14} className="mr-2" /> Editar Configurações da Fonte
               </Button>
             </div>
