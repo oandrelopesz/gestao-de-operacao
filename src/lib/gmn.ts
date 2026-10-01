@@ -73,12 +73,18 @@ function comBriefing(p: any): PerfilGmn {
   return { ...p, briefing: normalizarBriefing(p.briefing), agenda: normalizarAgenda(p.agenda) } as PerfilGmn;
 }
 
-/** Tabela ainda não criada no banco (migration pendente) vira uma mensagem clara. */
+/** Tabela ou coluna ainda não criada no banco (migration pendente) e falha de rede viram uma mensagem clara. */
 export function traduzErroGmn(e: unknown): string {
   const msg = e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e ?? "");
-  if (/gmn_/i.test(msg) && /schema cache|does not exist|not find/i.test(msg)) {
+  const faltaNoBanco = /schema cache|does not exist|not find/i.test(msg);
+  // As colunas do contexto, da logo e das pessoas nas imagens vieram numa migration própria.
+  if (faltaNoBanco && /contexto_posts|contexto_imagens|logo_url|permitir_pessoas_ia/i.test(msg)) {
+    return "As colunas novas do Google Meu Negócio (contexto, logo e pessoas nas imagens) ainda não existem no banco (migration 20261001120000_gmn_contexto.sql).";
+  }
+  if (/gmn_/i.test(msg) && faltaNoBanco) {
     return "As tabelas do Google Meu Negócio ainda não existem no banco (migration 20260929120000_gmn.sql).";
   }
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) return "Não foi possível falar com o servidor. Confira a conexão e tente de novo.";
   return msg || "Erro inesperado";
 }
 

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { fetchPosts, gerarPrevia, traduzErroGmn, type PerfilGmn, type PostGmn } from "@/lib/gmn";
+import { fetchPosts, traduzErroGmn, type PerfilGmn, type PostGmn } from "@/lib/gmn";
 import { ROTULO_TEMA, type Tema } from "../../../supabase/functions/gmn/regras.ts";
 
 const STATUS: Record<PostGmn["status"], string> = {
@@ -20,10 +20,16 @@ function ImagemPost({ url }: { url: string }) {
   return <img src={url} alt="Imagem do post" className="max-h-72 w-full rounded-md object-cover" onError={() => setQuebrou(true)} />;
 }
 
-export function PostsLista({ perfil }: { perfil: PerfilGmn }) {
+export type PreviaGerando = "com" | "sem" | null;
+
+/**
+ * A prévia em andamento (`gerando`) e o aviso de "há post novo" (`versao`) ficam na gaveta: assim, trocar de aba durante a
+ * geração não destrava os botões nem deixa a lista velha.
+ */
+export function PostsLista({ perfil, gerando, versao, onGerar }: {
+  perfil: PerfilGmn; gerando: PreviaGerando; versao: number; onGerar: (comImagem: boolean) => void;
+}) {
   const [posts, setPosts] = useState<PostGmn[] | null>(null);
-  // Qual prévia está sendo gerada: as duas ficam travadas enquanto uma roda.
-  const [gerando, setGerando] = useState<"com" | "sem" | null>(null);
   const [falhou, setFalhou] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -37,33 +43,16 @@ export function PostsLista({ perfil }: { perfil: PerfilGmn }) {
     }
   }, [perfil.id]);
 
-  useEffect(() => { carregar(); }, [carregar]);
-
-  async function previa(comImagem: boolean) {
-    setGerando(comImagem ? "com" : "sem");
-    try {
-      const p = await gerarPrevia(perfil.id, comImagem);
-      if (p.status === "gerado") {
-        if (p.erro) toast.warning(`Prévia gerada com aviso: ${p.erro}`);
-        else toast.success("Prévia pronta.");
-      } else if (p.status === "pulado") toast.warning(`Prévia pulada: ${p.erro ?? "motivo não informado"}`);
-      else toast.error(`Não foi possível gerar a prévia: ${p.erro ?? "motivo não informado"}`);
-      await carregar();
-    } catch (e) {
-      toast.error(traduzErroGmn(e));
-    } finally {
-      setGerando(null);
-    }
-  }
+  useEffect(() => { carregar(); }, [carregar, versao]);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => previa(true)} disabled={gerando !== null || !perfil.briefing_salvo_em}>
+        <Button onClick={() => onGerar(true)} disabled={gerando !== null || !perfil.briefing_salvo_em}>
           {gerando === "com" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
           {gerando === "com" ? "Gerando (até 2 min)…" : "Gerar prévia com imagem"}
         </Button>
-        <Button variant="outline" onClick={() => previa(false)} disabled={gerando !== null || !perfil.briefing_salvo_em}>
+        <Button variant="outline" onClick={() => onGerar(false)} disabled={gerando !== null || !perfil.briefing_salvo_em}>
           {gerando === "sem" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
           {gerando === "sem" ? "Gerando (até 2 min)…" : "Gerar prévia só texto"}
         </Button>

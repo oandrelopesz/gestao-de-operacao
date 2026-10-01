@@ -2,7 +2,6 @@
 // A logo é gravada no próprio envio (não passa pelo "Salvar imagens"); o resto é rascunho da gaveta.
 import { useRef, useState } from "react";
 import { Loader2, Trash2, Upload } from "lucide-react";
-import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
@@ -12,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { enviarLogo, removerLogo, traduzErroGmn, type PerfilGmn } from "@/lib/gmn";
+import { LOGO_TIPOS, type PerfilGmn } from "@/lib/gmn";
 import { LIMITE_CONTEXTO_IMAGENS } from "../../../supabase/functions/gmn/regras.ts";
 
 const AVISO = "text-xs font-medium text-amber-600 dark:text-amber-400";
@@ -33,42 +32,26 @@ function Miniatura({ url, nome }: { url: string; nome: string }) {
   );
 }
 
-function LogoCliente({ perfilId, nome, logoUrl, onLogo }: {
-  perfilId: string; nome: string; logoUrl: string | null; onLogo: (url: string | null) => void;
+export type LogoOcupada = "enviando" | "removendo" | null;
+
+function LogoCliente({ nome, logoUrl, ocupada, onEnviar, onRemover }: {
+  nome: string; logoUrl: string | null; ocupada: LogoOcupada;
+  onEnviar: (arquivo: File) => void; onRemover: () => Promise<boolean>;
 }) {
   const entrada = useRef<HTMLInputElement>(null);
-  const [enviando, setEnviando] = useState(false);
+  const botaoEnviar = useRef<HTMLButtonElement>(null);
   const [confirmar, setConfirmar] = useState(false);
-  const [removendo, setRemovendo] = useState(false);
+  const enviando = ocupada === "enviando";
+  const removendo = ocupada === "removendo";
 
-  async function aoEscolher(e: React.ChangeEvent<HTMLInputElement>) {
+  function aoEscolher(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = e.target.files?.[0];
     e.target.value = ""; // permite escolher o mesmo arquivo de novo
-    if (!arquivo) return;
-    setEnviando(true);
-    try {
-      const url = await enviarLogo(perfilId, arquivo);
-      onLogo(url);
-      toast.success("Logo enviada.");
-    } catch (err) {
-      toast.error(traduzErroGmn(err));
-    } finally {
-      setEnviando(false);
-    }
+    if (arquivo) onEnviar(arquivo);
   }
 
   async function remover() {
-    setRemovendo(true);
-    try {
-      await removerLogo(perfilId);
-      onLogo(null);
-      toast.success("Logo removida.");
-      setConfirmar(false);
-    } catch (err) {
-      toast.error(traduzErroGmn(err));
-    } finally {
-      setRemovendo(false);
-    }
+    if (await onRemover()) setConfirmar(false);
   }
 
   return (
@@ -76,24 +59,25 @@ function LogoCliente({ perfilId, nome, logoUrl, onLogo }: {
       <Label id="gmn-logo-rotulo">Logo do cliente</Label>
       <div className="flex flex-wrap items-center gap-3" role="group" aria-labelledby="gmn-logo-rotulo">
         {logoUrl ? <Miniatura key={logoUrl} url={logoUrl} nome={nome} /> : <span className="text-sm text-muted-foreground">Sem logo</span>}
-        <input ref={entrada} type="file" accept="image/png,image/jpeg" className="hidden" tabIndex={-1} aria-label="Arquivo da logo (PNG ou JPG, até 5 MB)" onChange={aoEscolher} />
-        <Button type="button" variant="outline" size="sm" onClick={() => entrada.current?.click()} disabled={enviando || removendo}>
+        <input ref={entrada} type="file" accept={LOGO_TIPOS.join(",")} className="hidden" tabIndex={-1} aria-label="Arquivo da logo (PNG ou JPG, até 5 MB)" onChange={aoEscolher} />
+        <Button ref={botaoEnviar} type="button" variant="outline" size="sm" onClick={() => entrada.current?.click()} disabled={ocupada !== null}>
           {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
           {enviando ? "Enviando…" : "Enviar logo"}
         </Button>
         {logoUrl && (
-          <Button type="button" variant="outline" size="sm" className="text-destructive" onClick={() => setConfirmar(true)} disabled={enviando || removendo}>
+          <Button type="button" variant="outline" size="sm" className="text-destructive" onClick={() => setConfirmar(true)} disabled={ocupada !== null}>
             <Trash2 className="mr-2 h-4 w-4" />Remover
           </Button>
         )}
       </div>
       <p className="text-xs text-muted-foreground">
         Opcional. Se houver logo, ela entra em toda imagem gerada pela IA (pequena e discreta). As fotos do Drive vão como estão.
-        Aceita PNG ou JPG de até 5 MB.
+        Aceita PNG ou JPG de até 5 MB. A logo é gravada assim que você envia. A remoção também vale na hora.
       </p>
 
       <AlertDialog open={confirmar} onOpenChange={(o) => { if (!o && !removendo) setConfirmar(false); }}>
-        <AlertDialogContent>
+        {/* Sem logo, o botão Remover some: o foco volta para Enviar logo em vez de se perder. */}
+        <AlertDialogContent onCloseAutoFocus={(e) => { if (!logoUrl) { e.preventDefault(); botaoEnviar.current?.focus(); } }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Remover a logo?</AlertDialogTitle>
             <AlertDialogDescription>As próximas imagens geradas pela IA deste perfil saem sem a logo.</AlertDialogDescription>
@@ -110,10 +94,16 @@ function LogoCliente({ perfilId, nome, logoUrl, onLogo }: {
   );
 }
 
-export function AbaImagens({ dados, alterado, salvando, onDados, onLogo, onSalvar }: {
-  dados: PerfilGmn; alterado: boolean; salvando: boolean; onDados: (patch: Partial<PerfilGmn>) => void;
-  /** A logo já foi gravada no servidor; a gaveta só atualiza a miniatura. */
-  onLogo: (url: string | null) => void; onSalvar: () => void;
+export function AbaImagens({ dados, alterado, salvando, ocupado, logoOcupada, onDados, onEnviarLogo, onRemoverLogo, onSalvar }: {
+  dados: PerfilGmn; alterado: boolean;
+  /** Este botão é o que está gravando (mostra o spinner). */
+  salvando: boolean;
+  /** Alguma gravação da gaveta está em andamento: todos os botões de salvar ficam travados. */
+  ocupado: boolean;
+  logoOcupada: LogoOcupada;
+  onDados: (patch: Partial<PerfilGmn>) => void;
+  /** O envio e a remoção da logo (com espera e avisos) ficam na gaveta; aqui só se dispara e se mostra. */
+  onEnviarLogo: (arquivo: File) => void; onRemoverLogo: () => Promise<boolean>; onSalvar: () => void;
 }) {
   const contexto = dados.contexto_imagens ?? "";
 
@@ -150,12 +140,7 @@ export function AbaImagens({ dados, alterado, salvando, onDados, onLogo, onSalva
         )}
       </div>
 
-      <LogoCliente
-        perfilId={dados.id}
-        nome={dados.nome}
-        logoUrl={dados.logo_url}
-        onLogo={onLogo}
-      />
+      <LogoCliente nome={dados.nome} logoUrl={dados.logo_url} ocupada={logoOcupada} onEnviar={onEnviarLogo} onRemover={onRemoverLogo} />
 
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">
@@ -169,11 +154,16 @@ export function AbaImagens({ dados, alterado, salvando, onDados, onLogo, onSalva
       </div>
 
       <div className="flex flex-wrap items-center gap-3 pt-2">
-        <Button onClick={onSalvar} disabled={salvando}>
+        <Button onClick={onSalvar} disabled={ocupado}>
           {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar imagens
         </Button>
         {alterado && <span className={AVISO}>Alterações não salvas</span>}
       </div>
+      {alterado && (
+        <p className="text-xs text-muted-foreground">
+          Há alterações não salvas: a IA e a prévia usam o que está salvo. A logo não entra nessa conta, porque é gravada no envio.
+        </p>
+      )}
     </div>
   );
 }

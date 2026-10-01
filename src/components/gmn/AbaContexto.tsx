@@ -14,7 +14,7 @@ const SEM_CLIENTE = "__sem__";
 const AVISO = "text-xs font-medium text-amber-600 dark:text-amber-400";
 
 export function AbaContexto({
-  perfil, dados, briefing, clientes, alterado, salvando, extraindo, dadosAbertos,
+  perfil, dados, briefing, clientes, alterado, salvando, ocupado, extraindo, dadosAbertos,
   onDados, onBriefing, onDadosAbertos, onExtrair, onGerarIa, onSalvar,
 }: {
   /** O perfil como está salvo (só para a data do último salvamento). */
@@ -23,7 +23,10 @@ export function AbaContexto({
   briefing: Briefing;
   clientes: ClienteOpcao[];
   alterado: boolean;
+  /** Este botão é o que está gravando (mostra o spinner). */
   salvando: boolean;
+  /** Alguma gravação da gaveta está em andamento: todos os botões de salvar ficam travados. */
+  ocupado: boolean;
   extraindo: boolean;
   dadosAbertos: boolean;
   onDados: (patch: Partial<PerfilGmn>) => void;
@@ -80,14 +83,14 @@ export function AbaContexto({
           {extraindo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
           {extraindo ? "Extraindo…" : "Extrair do contexto"}
         </Button>
-        {extraindo ? (
-          <span role="status" className="text-xs text-muted-foreground">Lendo o contexto e preenchendo os dados extraídos…</span>
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            Preenche os dados extraídos abaixo a partir do texto da tela; nada é salvo até você clicar em Salvar contexto.
-          </span>
-        )}
+        {/* Região sempre montada: só o texto muda, para o leitor de tela anunciar o início e o fim da espera. */}
+        <span role="status" aria-live="polite" className="text-xs text-muted-foreground">
+          {extraindo ? "Lendo o contexto e preenchendo os dados extraídos…" : ""}
+        </span>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Substitui os dados extraídos abaixo pelo que a IA tirar do texto da tela; nada é salvo até você clicar em Salvar contexto.
+      </p>
 
       <div className="space-y-3 rounded-md border p-3">
         <button
@@ -118,14 +121,15 @@ export function AbaContexto({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={onSalvar} disabled={salvando}>
+        <Button onClick={onSalvar} disabled={ocupado}>
           {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar contexto
         </Button>
         {alterado && <span className={AVISO}>Alterações não salvas</span>}
       </div>
       {alterado && (
         <p className="text-xs text-muted-foreground">
-          Há alterações não salvas: a prévia e o botão Gerar com IA usam o que está salvo (cliente, saúde, contexto e dados extraídos).
+          Há alterações não salvas. A prévia e o botão Gerar com IA usam o que está salvo. O botão Extrair do contexto usa o texto
+          da tela, mas o nome, a categoria, o site, o endereço, o cliente e os dados extraídos que a IA considera são os salvos.
         </p>
       )}
       {perfil.briefing_salvo_em && (

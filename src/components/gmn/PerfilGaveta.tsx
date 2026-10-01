@@ -1,5 +1,5 @@
 // Gaveta do perfil: Contexto, Imagens, Agenda e Posts.
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Image as ImageIcon, Loader2, Trash2, Type } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -13,16 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  excluirPerfil, gerarBriefingIa, salvarBriefing, salvarPerfil, traduzErroGmn, type ClienteOpcao, type CtaTipo, type PerfilGmn,
+  enviarLogo, excluirPerfil, gerarBriefingIa, gerarPrevia, removerLogo, salvarBriefing, salvarPerfil, traduzErroGmn,
+  type ClienteOpcao, type CtaTipo, type PerfilGmn,
 } from "@/lib/gmn";
 import {
   DIAS_CURTOS, HORARIOS, alternarDia, alternarImagem, comUtm, idPastaDrive, mesmoHorario, mudarHora, normalizarAgenda,
   normalizarBriefing, type Briefing, type ItemAgenda,
 } from "../../../supabase/functions/gmn/regras.ts";
 import { AbaContexto } from "./AbaContexto";
-import { AbaImagens } from "./AbaImagens";
+import { AbaImagens, type LogoOcupada } from "./AbaImagens";
 import { GerarBriefingDialog } from "./GerarBriefingDialog";
-import { PostsLista } from "./PostsLista";
+import { PostsLista, type PreviaGerando } from "./PostsLista";
 
 const CTAS: { v: CtaTipo; rotulo: string }[] = [
   { v: "LEARN_MORE", rotulo: "Saiba mais (abre o link)" },
@@ -70,6 +71,10 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
   const [dados, setDados] = useState<PerfilGmn | null>(null);
   const [salvando, setSalvando] = useState<"contexto" | "imagens" | "config" | null>(null);
   const [extraindo, setExtraindo] = useState(false);
+  const [logoOcupada, setLogoOcupada] = useState<LogoOcupada>(null);
+  const [previaGerando, setPreviaGerando] = useState<PreviaGerando>(null);
+  const [postsVersao, setPostsVersao] = useState(0);
+  const [substituir, setSubstituir] = useState(false);
   const [dadosAbertos, setDadosAbertos] = useState(true);
   const [iaAberto, setIaAberto] = useState(false);
   const [excluir, setExcluir] = useState(false);
@@ -80,18 +85,25 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
   // novo em `perfil`, mas não pode apagar o que ainda não foi salvo na outra aba.
   const [chave, setChave] = useState<string | null>(null);
   const chaveAtual = aberto && perfil ? perfil.id : null;
+  // Cada abertura da gaveta (e cada troca de perfil) é uma sessão nova. Toda resposta que chega depois só vale se a sessão
+  // for a mesma em que o pedido começou: o resultado velho não entra no rascunho novo, nem o fim de um pedido antigo
+  // destrava a espera de um pedido novo.
+  const sessaoRef = useRef(0);
   if (chave !== chaveAtual) {
+    sessaoRef.current += 1;
     setChave(chaveAtual);
+    // Os "ocupado" voltam ao início junto com os rascunhos: o perfil novo não herda a espera do anterior.
+    setSalvando(null);
+    setExtraindo(false);
+    setLogoOcupada(null);
+    setPreviaGerando(null);
+    setSubstituir(false);
     if (perfil && chaveAtual) {
       setBriefing(perfil.briefing);
       setDados(perfil);
       setDadosAbertos(!vazioNulo(perfil.contexto_posts)); // os dados extraídos só abrem sozinhos se ainda não há contexto
     }
   }
-
-  // Respostas que chegam depois (extração, envio da logo) só valem se a gaveta ainda estiver no mesmo perfil.
-  const chaveRef = useRef<string | null>(null);
-  useEffect(() => { chaveRef.current = chaveAtual; }, [chaveAtual]);
 
   if (!perfil || !dados || !briefing) return null;
 
@@ -107,42 +119,59 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
     else onFechar();
   }
 
+  // Início de um pedido ao servidor: devolve o "ainda é esta sessão?" para conferir quando a resposta chegar.
+  function iniciarPedido() {
+    const sessao = sessaoRef.current;
+    return () => sessaoRef.current === sessao;
+  }
+
   async function gravarContexto() {
     const d = dados!;
+    const id = perfil!.id;
+    const mesma = iniciarPedido();
     setSalvando("contexto");
     try {
-      await salvarPerfil(perfil!.id, { contexto_posts: vazioNulo(d.contexto_posts), saude: d.saude, cliente_id: d.cliente_id });
-      await salvarBriefing(perfil!.id, briefing!);
+      await salvarPerfil(id, { contexto_posts: vazioNulo(d.contexto_posts), saude: d.saude, cliente_id: d.cliente_id });
+      await salvarBriefing(id, briefing!);
+      // Já está gravado no servidor: o aviso e a recarga valem mesmo que a gaveta tenha sido fechada nesse meio-tempo.
       toast.success("Contexto salvo.");
       onMudou();
     } catch (e) {
       toast.error(traduzErroGmn(e));
     } finally {
-      setSalvando(null);
+      if (mesma()) setSalvando(null);
     }
+  }
+
+  // Com alterações não salvas nos dados extraídos, a extração só segue depois de confirmar a substituição.
+  function pedirExtracao() {
+    if (JSON.stringify(normalizarBriefing(briefing!)) !== JSON.stringify(normalizarBriefing(perfil!.briefing))) setSubstituir(true);
+    else extrairDoContexto();
   }
 
   async function extrairDoContexto() {
     const id = perfil!.id;
     const texto = vazioNulo(dados!.contexto_posts);
     if (!texto) return;
+    const mesma = iniciarPedido();
     setExtraindo(true);
     try {
       const b = await gerarBriefingIa(id, null, texto);
-      if (chaveRef.current !== id) return; // a gaveta já foi fechada ou trocou de perfil
+      if (!mesma()) return; // a gaveta foi fechada ou trocou de perfil: o resultado é do contexto de outra sessão
       setBriefing(b);
       setDadosAbertos(true);
       toast.success("Dados extraídos do contexto. Revise e clique em Salvar contexto.");
     } catch (e) {
-      toast.error(traduzErroGmn(e));
+      if (mesma()) toast.error(traduzErroGmn(e));
     } finally {
-      setExtraindo(false);
+      if (mesma()) setExtraindo(false);
     }
   }
 
   async function gravarImagens() {
     const a = ajustesImagens(dados!);
     if (a.drive_pasta_url && !idPastaDrive(a.drive_pasta_url)) return toast.error("O link da pasta do Drive não foi reconhecido.");
+    const mesma = iniciarPedido();
     setSalvando("imagens");
     try {
       await salvarPerfil(perfil!.id, a);
@@ -151,7 +180,7 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
     } catch (e) {
       toast.error(traduzErroGmn(e));
     } finally {
-      setSalvando(null);
+      if (mesma()) setSalvando(null);
     }
   }
 
@@ -164,6 +193,7 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
       if (!comUtm(a.cta_url)) return toast.error("O link do botão não parece um endereço válido.");
     }
     if (!a.agenda.length) return toast.error("Escolha pelo menos um dia da semana.");
+    const mesma = iniciarPedido();
     setSalvando("config");
     try {
       await salvarPerfil(d.id, a);
@@ -172,7 +202,64 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
     } catch (e) {
       toast.error(traduzErroGmn(e));
     } finally {
-      setSalvando(null);
+      if (mesma()) setSalvando(null);
+    }
+  }
+
+  // A logo é gravada no servidor no próprio envio (não é rascunho). Por isso a miniatura é atualizada se a gaveta ainda
+  // estiver no mesmo perfil, mesmo numa sessão nova; só a espera ("ocupado") fica presa à sessão do pedido.
+  async function enviarLogoDoPerfil(arquivo: File) {
+    const id = perfil!.id;
+    const mesma = iniciarPedido();
+    setLogoOcupada("enviando");
+    try {
+      const url = await enviarLogo(id, arquivo);
+      setDados((d) => (d && d.id === id ? { ...d, logo_url: url } : d));
+      toast.success("Logo enviada.");
+      onMudou();
+    } catch (e) {
+      toast.error(traduzErroGmn(e));
+    } finally {
+      if (mesma()) setLogoOcupada(null);
+    }
+  }
+
+  /** Devolve true quando a logo foi removida (a tela fecha a confirmação). */
+  async function removerLogoDoPerfil(): Promise<boolean> {
+    const id = perfil!.id;
+    const mesma = iniciarPedido();
+    setLogoOcupada("removendo");
+    try {
+      await removerLogo(id);
+      setDados((d) => (d && d.id === id ? { ...d, logo_url: null } : d));
+      toast.success("Logo removida.");
+      onMudou();
+      return true;
+    } catch (e) {
+      toast.error(traduzErroGmn(e));
+      return false;
+    } finally {
+      if (mesma()) setLogoOcupada(null);
+    }
+  }
+
+  async function gerarPreviaDoPerfil(comImagem: boolean) {
+    const id = perfil!.id;
+    const mesma = iniciarPedido();
+    setPreviaGerando(comImagem ? "com" : "sem");
+    try {
+      const p = await gerarPrevia(id, comImagem);
+      // O post já existe no servidor: o aviso vale sempre; a lista só é recarregada se esta sessão ainda estiver na tela.
+      if (p.status === "gerado") {
+        if (p.erro) toast.warning(`Prévia gerada com aviso: ${p.erro}`);
+        else toast.success("Prévia pronta.");
+      } else if (p.status === "pulado") toast.warning(`Prévia pulada: ${p.erro ?? "motivo não informado"}`);
+      else toast.error(`Não foi possível gerar a prévia: ${p.erro ?? "motivo não informado"}`);
+      if (mesma()) setPostsVersao((v) => v + 1);
+    } catch (e) {
+      toast.error(traduzErroGmn(e));
+    } finally {
+      if (mesma()) setPreviaGerando(null);
     }
   }
 
@@ -192,13 +279,7 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
   }
 
   const set = (patch: Partial<PerfilGmn>) => setDados((d) => (d ? { ...d, ...patch } : d));
-
-  // A logo já está gravada no servidor: atualiza a miniatura e recarrega o perfil salvo, sem mexer nos outros rascunhos.
-  const id = perfil.id;
-  const logoMudou = (url: string | null) => {
-    setDados((d) => (d && d.id === id ? { ...d, logo_url: url } : d));
-    onMudou();
-  };
+  const gravando = salvando !== null; // enquanto uma gravação roda, nenhum botão de salvar fica livre
 
   return (
     <Sheet open={aberto} onOpenChange={(v) => !v && tentarFechar()}>
@@ -225,12 +306,13 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
               clientes={clientes}
               alterado={contextoAlterado}
               salvando={salvando === "contexto"}
+              ocupado={gravando}
               extraindo={extraindo}
               dadosAbertos={dadosAbertos}
               onDados={set}
               onBriefing={setBriefing}
               onDadosAbertos={setDadosAbertos}
-              onExtrair={extrairDoContexto}
+              onExtrair={pedirExtracao}
               onGerarIa={() => setIaAberto(true)}
               onSalvar={gravarContexto}
             />
@@ -241,8 +323,11 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
               dados={dados}
               alterado={imagensAlteradas}
               salvando={salvando === "imagens"}
+              ocupado={gravando}
+              logoOcupada={logoOcupada}
               onDados={set}
-              onLogo={logoMudou}
+              onEnviarLogo={enviarLogoDoPerfil}
+              onRemoverLogo={removerLogoDoPerfil}
               onSalvar={gravarImagens}
             />
           </TabsContent>
@@ -340,7 +425,7 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
               </Button>
               <div className="flex flex-wrap items-center gap-3">
                 {configAlterada && <span className={AVISO}>Alterações não salvas</span>}
-                <Button onClick={gravarConfig} disabled={salvando !== null}>
+                <Button onClick={gravarConfig} disabled={gravando}>
                   {salvando === "config" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar configurações
                 </Button>
               </div>
@@ -351,11 +436,26 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
             {algoAlterado && (
               <p className="text-xs text-muted-foreground">Há alterações não salvas: a prévia usa o que está salvo.</p>
             )}
-            <PostsLista perfil={perfil} />
+            <PostsLista perfil={perfil} gerando={previaGerando} versao={postsVersao} onGerar={gerarPreviaDoPerfil} />
           </TabsContent>
         </Tabs>
 
         <GerarBriefingDialog perfil={perfil} aberto={iaAberto} onFechar={() => setIaAberto(false)} onGerado={(b) => { setBriefing(b); setDadosAbertos(true); }} />
+
+        <AlertDialog open={substituir} onOpenChange={setSubstituir}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Substituir os dados extraídos?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Os dados extraídos têm alterações não salvas. Extrair do contexto vai trocá-las pelo que a IA tirar do texto.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={extrairDoContexto}>Substituir e extrair</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={descartar} onOpenChange={setDescartar}>
           <AlertDialogContent>
