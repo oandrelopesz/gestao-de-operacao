@@ -5,7 +5,7 @@ import {
   idPastaDrive, montarMensagensPost, montarPromptImagem, normalizarBriefing, opcoesDaLogo, proximoTema, LOGO_LADO_MAX, type Tema,
 } from "./regras.ts";
 import { checarImagem, gerarImagem, gerarJson } from "./openai.ts";
-import { lerPng, gravarPng } from "./png.ts";
+import { lerPng, gravarPng, type ImagemRgba } from "./png.ts";
 import { aplicarLogo } from "./compor.ts";
 import { enviarR2 } from "./r2.ts";
 import { baixarDoDrive, imagensDaPasta, tokenGoogle } from "./google.ts";
@@ -107,13 +107,21 @@ async function imagemDaIa(
 ): Promise<{ imagem: Imagem | null; aviso: string | null }> {
   const permitirPessoas = !!perfil.permitir_pessoas_ia;
   const opcoes = opcoesDaLogo(perfil);
-  let logoPng: Uint8Array | null = null;
+  // A logo é baixada e lida antes de gerar: logo que não serve não deixa pagar pela imagem e pela checagem à toa.
+  let logo: ImagemRgba | null = null;
   if (perfil.logo_url) {
+    let logoPng: Uint8Array;
     try {
       logoPng = await baixarLogo(String(perfil.logo_url), total);
     } catch (e) {
       console.error("Logo do perfil:", msg(e));
       return { imagem: null, aviso: e instanceof ErroDeAviso ? e.message : AVISO_LOGO };
+    }
+    try {
+      logo = await lerPng(logoPng, LOGO_LADO_MAX);
+    } catch (e) {
+      console.error("Ler a logo do perfil:", msg(e));
+      return { imagem: null, aviso: AVISO_APLICAR_LOGO };
     }
   }
   let versaoAnterior: { tem_pessoas: boolean; tem_texto: boolean } | null = null;
@@ -121,7 +129,7 @@ async function imagemDaIa(
     const prompt = montarPromptImagem({
       nome: perfil.nome, categoria: perfil.categoria, briefing: normalizarBriefing(perfil.briefing), tema,
       contextoImagens: perfil.contexto_imagens ?? null, permitirPessoas,
-      cantoLivre: logoPng ? opcoes.posicao : null, versaoAnterior,
+      cantoLivre: logo ? opcoes.posicao : null, versaoAnterior,
     });
     const b64 = await gerarImagem(prompt, total);
     // A checagem roda na imagem da IA, ainda sem a logo.
@@ -135,9 +143,9 @@ async function imagemDaIa(
     let bytes: Uint8Array;
     try {
       bytes = bytesDaImagemDaIa(b64);
-      if (logoPng) {
+      if (logo) {
         const inicio = Date.now();
-        bytes = await gravarPng(aplicarLogo(await lerPng(bytes), await lerPng(logoPng, LOGO_LADO_MAX), opcoes));
+        bytes = await gravarPng(aplicarLogo(await lerPng(bytes), logo, opcoes));
         // Medida em produção: mostra quanto da CPU do isolate a composição usa (o Deno pode ser mais lento que o Node).
         console.log("Logo aplicada em", Date.now() - inicio, "ms");
       }

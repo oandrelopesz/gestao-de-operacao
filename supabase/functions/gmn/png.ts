@@ -40,12 +40,27 @@ function paeth(a: number, b: number, c: number): number {
 /** Lado máximo (largura ou altura) que `lerPng` aceita quando o chamador não informa outro. */
 export const LADO_MAX_PADRAO = 4096;
 
+const PEDACO_ENTRADA = 8 * 1024;
+
 /**
  * Descomprime só até `esperado` bytes e cancela o resto do fluxo: um arquivo pequeno que descomprime para centenas de MB
  * (bomba de deflate) não chega a ocupar memória além do tamanho que o IHDR declara. Fluxo mais curto que isso lança erro.
  */
 async function inflarAte(bytes: Uint8Array, esperado: number): Promise<Uint8Array> {
-  const leitor = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate")).getReader();
+  // Entrada em pedaços de 8 KB, entregues sob demanda: o descompressor nunca recebe o arquivo inteiro de uma vez, então
+  // o teto vale mesmo num runtime que infla cada pedaço de entrada por inteiro.
+  let pos = 0;
+  const entrada = new ReadableStream<BufferSource>({
+    pull(c) {
+      if (pos >= bytes.length) {
+        c.close();
+        return;
+      }
+      c.enqueue(bytes.slice(pos, pos + PEDACO_ENTRADA));
+      pos += PEDACO_ENTRADA;
+    },
+  }, { highWaterMark: 0 });
+  const leitor = entrada.pipeThrough(new DecompressionStream("deflate")).getReader();
   const out = new Uint8Array(esperado);
   let n = 0;
   try {
