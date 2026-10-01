@@ -37,6 +37,9 @@ export interface ClienteSelectProps {
   extras?: ClienteSelectExtra[];
   id?: string;
   "aria-label"?: string;
+  /** Repassados pelo FormControl do shadcn quando o seletor fica dentro de um FormField. */
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean | "true" | "false";
   disabled?: boolean;
   className?: string;
 }
@@ -68,6 +71,8 @@ export function ClienteSelect({
   extras,
   id,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
   disabled,
   className,
 }: ClienteSelectProps) {
@@ -103,6 +108,8 @@ export function ClienteSelect({
           id={id}
           role="combobox"
           aria-label={ariaLabel}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={ariaInvalid}
           aria-expanded={open}
           aria-haspopup="listbox"
           disabled={disabled}

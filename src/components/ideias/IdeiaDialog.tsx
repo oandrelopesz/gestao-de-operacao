@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ClienteSelect } from "@/components/ClienteSelect";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAgencias } from "@/lib/agencias";
 import { salvarIdeia, mensagemErro, type Ideia } from "@/lib/ideias";
@@ -191,15 +192,14 @@ export function IdeiaDialog({ state, clientes, onClose, onSaved }: Props) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ideia-cliente">Cliente</Label>
-                <Select value={clienteId || undefined} onValueChange={setClienteId} disabled={!agencia}>
-                  <SelectTrigger id="ideia-cliente"><SelectValue placeholder={agencia ? "Escolher" : "Escolha a agência"} /></SelectTrigger>
-                  <SelectContent>
-                    {clientesDaAgencia.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-                    {agencia && clientesDaAgencia.length === 0 && (
-                      <SelectItem value="__nenhum" disabled>Nenhum cliente nessa agência</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <ClienteSelect
+                  id="ideia-cliente"
+                  clientes={clientesDaAgencia}
+                  value={clienteId || null}
+                  onChange={(id) => setClienteId(id ?? "")}
+                  placeholder={agencia ? "Escolher" : "Escolha a agência"}
+                  disabled={!agencia}
+                />
               </div>
             </div>
           )}

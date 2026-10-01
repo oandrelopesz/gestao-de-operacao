@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -11,6 +11,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { ClienteSelect } from "@/components/ClienteSelect";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -115,6 +116,11 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
     }
   };
 
+  const opcoesClientes = useMemo(
+    () => clientes.map((c) => ({ id: c.id, nome: c.nome, agencia: agenciaLabelOf(c.agencia) })),
+    [clientes, agenciaLabelOf]
+  );
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -124,20 +130,14 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
           render={({ field }) => (
             <FormItem>
               <FormLabel>Cliente</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um cliente" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {clientes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nome} — <span>{agenciaLabelOf(c.agencia)}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <ClienteSelect
+                  clientes={opcoesClientes}
+                  value={field.value || null}
+                  onChange={(id) => field.onChange(id ?? "")}
+                  placeholder="Selecione um cliente"
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
