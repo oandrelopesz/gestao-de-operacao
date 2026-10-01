@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { extensaoDoMime, lerCena, type ArquivoSalvo, type CenaSalva } from "@/lib/fluxoCena";
 import type { ApiTemas, Tema } from "@/components/temas/TemasLista";
 import { apagarNosDois, baixarComReserva, copiarComReserva, enviarR2, listarNosDois } from "@/lib/r2";
+import { exclusoesPendentes } from "@/lib/exclusoesPendentes";
 
 /** Disparado a cada mudança nos temas, para a aba e o Admin recarregarem. */
 export const EVENTO_TEMAS_FLUXOS = "fluxos-temas";
@@ -166,6 +167,8 @@ export async function excluirFluxo(id: string): Promise<void> {
 export async function subirImagem(fluxoId: string, fileId: string, dataURL: string, mimeType: string): Promise<ArquivoSalvo> {
   const blob = await (await fetch(dataURL)).blob();
   const caminho = `${fluxoId}/${fileId}.${extensaoDoMime(mimeType)}`;
+  // Apagar e desfazer em seguida reenvia na mesma chave: se a exclusão ainda estiver a caminho, espera, senão ela apaga o arquivo novo
+  await exclusoesPendentes.esperar(caminho, 10_000);
   await enviarR2("fluxogramas", caminho, blob, mimeType);
   return { caminho, mimeType };
 }
@@ -192,8 +195,11 @@ export async function baixarImagens(arquivos: Record<string, ArquivoSalvo>): Pro
 
 export async function apagarImagens(caminhos: string[]): Promise<void> {
   if (!caminhos.length) return;
-  // Durante a transição, apaga no R2 e no bucket antigo do Supabase
-  await apagarNosDois("fluxogramas", caminhos).catch(() => {});
+  // Durante a transição, apaga no R2 e no bucket antigo do Supabase.
+  // A exclusão fica registrada por caminho (antes de qualquer await) para o envio do mesmo caminho esperar por ela.
+  const exclusao = apagarNosDois("fluxogramas", caminhos).catch(() => {});
+  for (const c of caminhos) exclusoesPendentes.registrar(c, exclusao);
+  await exclusao;
 }
 
 // ---------------------------------------------------------------- Temas

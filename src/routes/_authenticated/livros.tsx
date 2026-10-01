@@ -54,6 +54,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCachedState, hasCached } from "@/lib/pageCache";
 import { useConfig } from "@/lib/appConfig";
 import { CACHE_KEYS, loadLivros } from "@/lib/data";
+import { hojeBrasilia } from "@/lib/entrega";
+import { anoDaData, contarLidosNoAno } from "@/lib/livrosDatas";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays } from "date-fns";
@@ -119,7 +121,7 @@ function LivrosPage() {
   const metrics = useMemo(() => {
     const total = livros.length;
     const emAndamento = livros.filter(l => l.em_andamento && !l.lido).length;
-    const esteAno = livros.filter(l => l.lido && l.data_conclusao && new Date(l.data_conclusao).getFullYear() === new Date().getFullYear()).length;
+    const esteAno = contarLidosNoAno(livros, hojeBrasilia());
     return { total, emAndamento, esteAno };
   }, [livros]);
 
@@ -182,7 +184,7 @@ function LivrosPage() {
     setFadeId(livro.id);
     setTimeout(async () => {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = hojeBrasilia();
         const { error } = await supabase
           .from("livros")
           .update({ 
@@ -207,7 +209,7 @@ function LivrosPage() {
     const updates: any = { em_andamento: newVal };
     
     if (newVal && !livro.data_inicio) {
-      updates.data_inicio = new Date().toISOString().split('T')[0];
+      updates.data_inicio = hojeBrasilia();
     }
 
     try {
@@ -283,7 +285,7 @@ function LivrosPage() {
         <Card className="bg-blue-500/10 border-blue-500/20 shadow-none cursor-pointer hover:bg-blue-500/15 transition-colors" onClick={() => setAba("lidos")}>
           <CardHeader className="p-4 pb-1">
             <CardTitle className="text-xs font-bold uppercase text-blue-600 flex items-center gap-2">
-              <CheckCircle2 size={14} /> Lidos em {new Date().getFullYear()}
+              <CheckCircle2 size={14} /> Lidos em {anoDaData(hojeBrasilia())}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
