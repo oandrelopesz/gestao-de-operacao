@@ -692,8 +692,10 @@ export type Database = {
         Row: {
           agencia_id: string | null
           ativo: boolean | null
+          cobranca_desde: string
           created_at: string | null
           dia_recebimento: number
+          forma_pagamento: string | null
           id: string
           nome: string
           observacoes: string | null
@@ -706,8 +708,10 @@ export type Database = {
         Insert: {
           agencia_id?: string | null
           ativo?: boolean | null
+          cobranca_desde?: string
           created_at?: string | null
           dia_recebimento: number
+          forma_pagamento?: string | null
           id?: string
           nome: string
           observacoes?: string | null
@@ -720,8 +724,10 @@ export type Database = {
         Update: {
           agencia_id?: string | null
           ativo?: boolean | null
+          cobranca_desde?: string
           created_at?: string | null
           dia_recebimento?: number
+          forma_pagamento?: string | null
           id?: string
           nome?: string
           observacoes?: string | null
@@ -747,11 +753,13 @@ export type Database = {
           data_confirmacao: string | null
           fonte_id: string
           id: string
+          isento: boolean
           mes_referencia: string
           observacoes: string | null
           parcela: number
           recebido: boolean | null
           user_id: string
+          valor_devido: number | null
           valor_recebido: number | null
         }
         Insert: {
@@ -759,11 +767,13 @@ export type Database = {
           data_confirmacao?: string | null
           fonte_id: string
           id?: string
+          isento?: boolean
           mes_referencia: string
           observacoes?: string | null
           parcela?: number
           recebido?: boolean | null
           user_id: string
+          valor_devido?: number | null
           valor_recebido?: number | null
         }
         Update: {
@@ -771,11 +781,13 @@ export type Database = {
           data_confirmacao?: string | null
           fonte_id?: string
           id?: string
+          isento?: boolean
           mes_referencia?: string
           observacoes?: string | null
           parcela?: number
           recebido?: boolean | null
           user_id?: string
+          valor_devido?: number | null
           valor_recebido?: number | null
         }
         Relationships: [
@@ -1058,7 +1070,12 @@ export type Database = {
           drive_pasta_url: string | null
           endereco: string | null
           id: string
+          imagens_site: Json
           location_name: string | null
+          logo_fundo: string
+          logo_origem_url: string | null
+          logo_posicao: string
+          logo_tamanho: string
           logo_url: string | null
           nome: string
           permitir_pessoas_ia: boolean
@@ -1068,6 +1085,7 @@ export type Database = {
           site: string | null
           telefone: string | null
           updated_at: string
+          usa_fotos_site: boolean
           usa_ia_imagem: boolean
         }
         Insert: {
@@ -1086,7 +1104,12 @@ export type Database = {
           drive_pasta_url?: string | null
           endereco?: string | null
           id?: string
+          imagens_site?: Json
           location_name?: string | null
+          logo_fundo?: string
+          logo_origem_url?: string | null
+          logo_posicao?: string
+          logo_tamanho?: string
           logo_url?: string | null
           nome: string
           permitir_pessoas_ia?: boolean
@@ -1096,6 +1119,7 @@ export type Database = {
           site?: string | null
           telefone?: string | null
           updated_at?: string
+          usa_fotos_site?: boolean
           usa_ia_imagem?: boolean
         }
         Update: {
@@ -1114,7 +1138,12 @@ export type Database = {
           drive_pasta_url?: string | null
           endereco?: string | null
           id?: string
+          imagens_site?: Json
           location_name?: string | null
+          logo_fundo?: string
+          logo_origem_url?: string | null
+          logo_posicao?: string
+          logo_tamanho?: string
           logo_url?: string | null
           nome?: string
           permitir_pessoas_ia?: boolean
@@ -1124,6 +1153,7 @@ export type Database = {
           site?: string | null
           telefone?: string | null
           updated_at?: string
+          usa_fotos_site?: boolean
           usa_ia_imagem?: boolean
         }
         Relationships: [
@@ -2979,9 +3009,11 @@ export type Database = {
         Row: {
           agencia_id: string | null
           ativo: boolean | null
+          cobranca_desde: string | null
           data_confirmacao: string | null
           dia_recebimento: number | null
           fonte_id: string | null
+          forma_pagamento: string | null
           mes_atual: string | null
           nome: string | null
           observacoes: string | null
