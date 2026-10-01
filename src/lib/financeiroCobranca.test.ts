@@ -25,6 +25,12 @@ test("mesesCobrados: do mês de desde até o de hoje; padrão set/2026; desde in
   // mês 00 e mês 13 ou mais não são meses: valem como o padrão
   assert.deepEqual(mesesCobrados("2026-13-01", "2026-10-02"), ["2026-09", "2026-10"]);
   assert.deepEqual(mesesCobrados("2026-00-01", "2026-10-02"), ["2026-09", "2026-10"]);
+  // ano digitado pela metade (0026) ou fora de 2020-2100 também vale como o padrão, não vira mês fantasma
+  assert.deepEqual(mesesCobrados("0026-09-01", "2026-10-02"), ["2026-09", "2026-10"]);
+  assert.deepEqual(mesesCobrados("2019-12-01", "2026-10-02"), ["2026-09", "2026-10"]);
+  assert.deepEqual(mesesCobrados("2101-01-01", "2026-10-02"), ["2026-09", "2026-10"]);
+  assert.equal(mesesCobrados("2020-01-01", "2020-03-10").length, 3);
+  assert.deepEqual(mesesNavegaveis([{ ...unica, cobranca_desde: "0026-09-01" }], "2026-10-02"), ["2026-09", "2026-10"]);
 });
 
 test("ultimosMeses: n meses terminando no de hoje, mais antigo primeiro", () => {

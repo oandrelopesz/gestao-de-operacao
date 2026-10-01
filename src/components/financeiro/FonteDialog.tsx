@@ -28,7 +28,7 @@ import {
   type Parcela,
   type RecebimentoMes,
 } from "@/lib/financeiro";
-import { COBRANCA_DESDE_PADRAO, FORMAS_DE_PAGAMENTO, formaDePagamento, type FormaPagamento } from "@/lib/financeiroCobranca";
+import { ANO_COBRANCA_MAX, ANO_COBRANCA_MIN, COBRANCA_DESDE_PADRAO, FORMAS_DE_PAGAMENTO, formaDePagamento, type FormaPagamento } from "@/lib/financeiroCobranca";
 import { hojeBrasilia } from "@/lib/entrega";
 import { ParcelasEditor } from "@/components/financeiro/ParcelasEditor";
 import { useAgencias } from "@/lib/agencias";
@@ -158,8 +158,10 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
     e.preventDefault();
     // parcelas como tipo literal (não a interface Parcela) para caber no Json do Supabase
     let pagamento: { valor_mensal: number; dia_recebimento: number; parcelas: { dia: number; valor: number; forma?: string }[] | null };
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(cobrancaDesdeForm)) {
-      toast.error('Informe o mês em "Cobrar a partir de"');
+    // Chrome aceita ano de até 6 dígitos no campo de mês: "26" vira 0026 e não pode ser gravado
+    const anoCobranca = Number(cobrancaDesdeForm.slice(0, 4));
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(cobrancaDesdeForm) || anoCobranca < ANO_COBRANCA_MIN || anoCobranca > ANO_COBRANCA_MAX) {
+      toast.error(`Informe o mês e o ano (de ${ANO_COBRANCA_MIN} a ${ANO_COBRANCA_MAX}).`);
       return;
     }
     if (fracionado) {
@@ -338,6 +340,8 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
                   <Input
                     id="cobranca_desde"
                     type="month"
+                    min={`${ANO_COBRANCA_MIN}-01`}
+                    max={`${ANO_COBRANCA_MAX}-12`}
                     placeholder="AAAA-MM"
                     value={cobrancaDesdeForm}
                     onChange={(e) => setCobrancaDesdeForm(e.target.value)}

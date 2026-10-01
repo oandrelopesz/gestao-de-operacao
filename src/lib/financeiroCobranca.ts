@@ -53,6 +53,14 @@ export const COBRANCA_DESDE_PADRAO = "2026-09-01";
 const CENTAVO = 0.005;
 const arred = (v: number) => Math.round(v * 100) / 100;
 const MES = /^\d{4}-(0[1-9]|1[0-2])$/;
+/** Anos aceitos em "cobrar a partir de" (um ano digitado pela metade, como 0026, não pode virar mês fantasma). */
+export const ANO_COBRANCA_MIN = 2020;
+export const ANO_COBRANCA_MAX = 2100;
+/** "YYYY-MM" válido (mês 01..12) com ano entre ANO_COBRANCA_MIN e ANO_COBRANCA_MAX. */
+function mesDeCobrancaValido(mes: string): boolean {
+  const ano = Number(mes.slice(0, 4));
+  return MES.test(mes) && ano >= ANO_COBRANCA_MIN && ano <= ANO_COBRANCA_MAX;
+}
 
 function proximoMes(mes: string): string {
   let [y, m] = mes.split("-").map(Number);
@@ -61,9 +69,10 @@ function proximoMes(mes: string): string {
   return `${y}-${String(m).padStart(2, "0")}`;
 }
 
-/** "YYYY-MM" de cada mês de `desde` até o mês de `hoje` (inclusive). Data inválida vale como setembro de 2026. */
+/** "YYYY-MM" de cada mês de `desde` até o mês de `hoje` (inclusive). Data inválida ou de ano fora de 2020-2100 vale como setembro de 2026. */
 export function mesesCobrados(desde: string | null | undefined, hoje: string): string[] {
-  const inicio = MES.test(String(desde ?? "").slice(0, 7)) ? String(desde).slice(0, 7) : COBRANCA_DESDE_PADRAO.slice(0, 7);
+  const pedido = String(desde ?? "").slice(0, 7);
+  const inicio = mesDeCobrancaValido(pedido) ? pedido : COBRANCA_DESDE_PADRAO.slice(0, 7);
   const fim = hoje.slice(0, 7);
   const out: string[] = [];
   for (let mes = inicio; mes <= fim && out.length < 600; mes = proximoMes(mes)) out.push(mes);
@@ -177,7 +186,7 @@ export function mesesNavegaveis(fontes: FonteCobravel[], hoje: string): string[]
   const inicios = fontes
     .map((f) => {
       const m = String(f.cobranca_desde ?? "").slice(0, 7);
-      return MES.test(m) ? m : padrao;
+      return mesDeCobrancaValido(m) ? m : padrao;
     })
     .sort();
   const primeiro = inicios[0] ?? padrao;

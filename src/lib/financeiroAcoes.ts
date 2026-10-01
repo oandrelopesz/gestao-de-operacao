@@ -18,17 +18,31 @@ async function gravar(fonteId: string, c: Cobranca, campos: Record<string, unkno
   if (error) throw error;
 }
 
-/** Quita a parcela daquele mês com o valor cheio. */
+/** Quita a parcela daquele mês com o valor cheio (zera a isenção e o motivo antigo). */
 export async function confirmarValorCheio(fonteId: string, c: Cobranca) {
-  await gravar(fonteId, c, { recebido: true, isento: false, valor_recebido: c.valor, valor_devido: c.valor, data_confirmacao: new Date().toISOString() });
+  await gravar(fonteId, c, {
+    recebido: true, isento: false, valor_recebido: c.valor, valor_devido: c.valor, observacoes: null,
+    data_confirmacao: new Date().toISOString(),
+  });
 }
 
-/** Valor recebido NO TOTAL daquela parcela (menor que o devido deixa o resto em aberto). `dataIso` = "YYYY-MM-DD". */
+/** "YYYY-MM-DD" de um dia que existe no calendário (recusa 2026-02-31, 2026-13-01 e texto livre). */
+function diaExiste(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const [a, m, d] = iso.split("-").map(Number);
+  const volta = new Date(Date.UTC(a, m - 1, d));
+  return !Number.isNaN(volta.getTime()) && volta.toISOString().slice(0, 10) === iso;
+}
+
+/**
+ * Valor recebido NO TOTAL daquela parcela (menor que o devido deixa o resto em aberto; zera a isenção e o motivo antigo).
+ * `dataIso` = "YYYY-MM-DD".
+ */
 export async function confirmarValorRecebido(fonteId: string, c: Cobranca, valorTotal: number, dataIso: string) {
   if (!(valorTotal > 0)) throw new Error("Informe um valor maior que zero.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataIso)) throw new Error("Informe a data do recebimento.");
+  if (!diaExiste(dataIso)) throw new Error("Informe a data do recebimento.");
   await gravar(fonteId, c, {
-    recebido: true, isento: false, valor_recebido: Math.round(valorTotal * 100) / 100, valor_devido: c.valor,
+    recebido: true, isento: false, valor_recebido: Math.round(valorTotal * 100) / 100, valor_devido: c.valor, observacoes: null,
     data_confirmacao: new Date(`${dataIso}T12:00:00-03:00`).toISOString(),
   });
 }
@@ -43,19 +57,33 @@ export async function isentarMes(fonteId: string, doMes: Cobranca[], motivo: str
   for (const c of doMes) if (c.situacao !== "recebido" && c.situacao !== "isento") await isentarCobranca(fonteId, c, motivo);
 }
 
-/** Volta a parcela daquele mês a "não acertada" (apaga o registro). */
+/**
+ * Desfaz o acerto da parcela daquele mês. Isenta que já tinha pagamento só perde a isenção (e o motivo): o pagamento fica e a
+ * parcela volta a parcial (ou recebida, se o pago cobre o valor). Qualquer outro caso apaga o registro (volta a "não acertada").
+ */
 export async function desfazerCobranca(c: Cobranca) {
   if (!c.registro) return;
-  const { error } = await tabela().delete().eq("id", c.registro.id);
+  const { error } = c.situacao === "isento" && c.pago > 0
+    ? await tabela().update({ isento: false, observacoes: null }).eq("id", c.registro.id)
+    : await tabela().delete().eq("id", c.registro.id);
   if (error) throw error;
 }
 
-/** Registros a partir de um mês ("YYYY-MM-DD"), de todas as fontes. */
+const PAGINA = 1000;
+
+/** Registros a partir de um mês ("YYYY-MM-DD"), de todas as fontes. Pagina de 1000 em 1000 (limite do Supabase) até vir uma página curta. */
 export async function buscarRegistrosDesde(desde: string): Promise<RegistroRecebimento[]> {
-  const { data, error } = await tabela()
-    .select("id, fonte_id, mes_referencia, parcela, recebido, isento, valor_recebido, valor_devido, data_confirmacao, observacoes")
-    .gte("mes_referencia", desde)
-    .order("mes_referencia");
-  if (error) throw error;
-  return (data ?? []) as RegistroRecebimento[];
+  const todos: RegistroRecebimento[] = [];
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await tabela()
+      .select("id, fonte_id, mes_referencia, parcela, recebido, isento, valor_recebido, valor_devido, data_confirmacao, observacoes")
+      .gte("mes_referencia", desde)
+      .order("mes_referencia")
+      .order("id") // desempate: sem ele as páginas podem repetir ou pular linhas do mesmo mês
+      .range(de, de + PAGINA - 1);
+    if (error) throw error;
+    const pagina = (data ?? []) as RegistroRecebimento[];
+    todos.push(...pagina);
+    if (pagina.length < PAGINA) return todos;
+  }
 }
