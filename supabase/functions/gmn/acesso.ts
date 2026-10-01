@@ -1,9 +1,12 @@
 // Libera a chamada como o `google-token`: ID token do Google de um e-mail permitido OU a chave do swipe file.
+import { PRAZO } from "./prazo.ts";
 
 async function verificarIdToken(idToken: string, clientId: string, permitidos: string[]): Promise<boolean> {
   if (!idToken || !clientId || permitidos.length === 0) return false;
   try {
-    const r = await fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken));
+    const r = await fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken), {
+      signal: AbortSignal.timeout(PRAZO.google),
+    });
     if (!r.ok) return false;
     const c = await r.json();
     const issOk = c.iss === "accounts.google.com" || c.iss === "https://accounts.google.com";

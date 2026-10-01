@@ -9,6 +9,9 @@ import { enviarR2 } from "./r2.ts";
 import { baixarDoDrive, imagensDaPasta, tokenGoogle } from "./google.ts";
 
 type Sb = any;
+type Imagem = { origem: "drive" | "ia"; ref: string; url: string };
+
+const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export interface CamposPost {
   status: "gerado" | "pulado";
@@ -21,19 +24,20 @@ export interface CamposPost {
   erro: string | null;
 }
 
-async function imagemDoDrive(sb: Sb, perfil: any, postId: string) {
+/** null: perfil sem pasta do Drive; "vazia": a pasta não tem nenhuma foto aceita. */
+async function imagemDoDrive(sb: Sb, perfil: any, postId: string, total?: AbortSignal): Promise<Imagem | "vazia" | null> {
   const pastaId = perfil.drive_pasta_url ? idPastaDrive(perfil.drive_pasta_url) : null;
   if (!pastaId) return null;
-  const token = await tokenGoogle(sb);
-  const fotos = await imagensDaPasta(token, pastaId);
-  if (!fotos.length) return null;
+  const token = await tokenGoogle(sb, total);
+  const fotos = await imagensDaPasta(token, pastaId, total);
+  if (!fotos.length) return "vazia";
   const { data: usos } = await sb.from("gmn_imagens_uso").select("ref, usado_em").eq("perfil_id", perfil.id).eq("origem", "drive");
   const mapa: Record<string, string> = Object.fromEntries((usos ?? []).map((u: any) => [u.ref, u.usado_em]));
   const ref = escolherImagem(fotos.map((f) => f.id), mapa);
   const foto = fotos.find((f) => f.id === ref)!;
-  const bytes = await baixarDoDrive(token, foto.id);
+  const bytes = await baixarDoDrive(token, foto.id, total);
   const ext = foto.mimeType === "image/png" ? "png" : "jpg";
-  const url = await enviarR2(`${perfil.id}/${postId}.${ext}`, bytes, foto.mimeType);
+  const url = await enviarR2(`${perfil.id}/${postId}.${ext}`, bytes, foto.mimeType, total);
   await sb.from("gmn_imagens_uso").upsert(
     { perfil_id: perfil.id, origem: "drive", ref: foto.id, usado_em: new Date().toISOString() },
     { onConflict: "perfil_id,origem,ref" },
@@ -41,15 +45,15 @@ async function imagemDoDrive(sb: Sb, perfil: any, postId: string) {
   return { origem: "drive" as const, ref: foto.id, url };
 }
 
-async function imagemDaIa(perfil: any, postId: string, tema: Tema) {
+async function imagemDaIa(perfil: any, postId: string, tema: Tema, total?: AbortSignal): Promise<Imagem> {
   const prompt = montarPromptImagem({ nome: perfil.nome, categoria: perfil.categoria, briefing: normalizarBriefing(perfil.briefing), tema });
-  const bytes = await gerarImagem(prompt);
+  const bytes = await gerarImagem(prompt, total);
   const chave = `${perfil.id}/${postId}.png`;
-  const url = await enviarR2(chave, bytes, "image/png");
+  const url = await enviarR2(chave, bytes, "image/png", total);
   return { origem: "ia" as const, ref: chave, url };
 }
 
-export async function gerarConteudo(sb: Sb, perfil: any, postId: string): Promise<CamposPost> {
+export async function gerarConteudo(sb: Sb, perfil: any, postId: string, total?: AbortSignal): Promise<CamposPost> {
   const briefing = normalizarBriefing(perfil.briefing);
   const { data: hist } = await sb
     .from("gmn_posts")
@@ -71,7 +75,7 @@ export async function gerarConteudo(sb: Sb, perfil: any, postId: string): Promis
       nome: perfil.nome, categoria: perfil.categoria, briefing, saude: perfil.saude, tema, palavras, anteriores,
       motivoReprovacao: motivo,
     });
-    resposta = await gerarJson<{ texto: string; palavras_chave: string[] }>(m.system, m.user, "post_gmn", ESQUEMA_POST);
+    resposta = await gerarJson<{ texto: string; palavras_chave: string[] }>(m.system, m.user, "post_gmn", ESQUEMA_POST, total);
     const c = checarTexto(resposta.texto, { termosProibidos: briefing.termos_proibidos, saude: perfil.saude });
     motivo = c.ok ? null : c.motivos.join("; ");
     if (c.ok) break;
@@ -85,18 +89,27 @@ export async function gerarConteudo(sb: Sb, perfil: any, postId: string): Promis
     };
   }
 
-  let imagem: { origem: "drive" | "ia"; ref: string; url: string } | null = null;
-  let aviso: string | null = null;
+  // Imagem que falha não derruba o texto (já gerado e pago): vira aviso em `erro` e o post segue sem imagem.
+  let imagem: Imagem | null = null;
+  const avisos: string[] = [];
   try {
-    imagem = await imagemDoDrive(sb, perfil, postId);
+    const doDrive = await imagemDoDrive(sb, perfil, postId, total);
+    if (doDrive === "vazia") avisos.push("A pasta do Drive não tem fotos JPG ou PNG de até 5 MB.");
+    else imagem = doDrive;
   } catch (e) {
-    aviso = `Pasta do Drive: ${e instanceof Error ? e.message : String(e)}`;
-    console.error(aviso);
+    avisos.push(`Pasta do Drive: ${msg(e)}`);
   }
-  if (!imagem && perfil.usa_ia_imagem) imagem = await imagemDaIa(perfil, postId, tema);
+  if (!imagem && perfil.usa_ia_imagem) {
+    try {
+      imagem = await imagemDaIa(perfil, postId, tema, total);
+    } catch (e) {
+      avisos.push(`Imagem da IA: ${msg(e)}`);
+    }
+  }
+  if (avisos.length) console.error(avisos.join(" · "));
 
   return {
     status: "gerado", tema, palavras_chave: usadas, texto: resposta.texto.trim(), imagem_origem: imagem?.origem ?? null,
-    imagem_ref: imagem?.ref ?? null, imagem_url: imagem?.url ?? null, erro: aviso,
+    imagem_ref: imagem?.ref ?? null, imagem_url: imagem?.url ?? null, erro: avisos.length ? avisos.join(" · ") : null,
   };
 }
