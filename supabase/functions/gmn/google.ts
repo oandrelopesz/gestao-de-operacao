@@ -4,7 +4,7 @@ import { foiPrazo, PRAZO, sinal } from "./prazo.ts";
 import { linkDoGoogle, miniaturaGrande, tipoPelaAssinatura } from "./regras.ts";
 
 const LIMITE_MINIATURA_BYTES = 5 * 1024 * 1024;
-const AVISO_PASTA = "Não foi possível ler a pasta do Drive.";
+const AVISO_PASTA = "Não foi possível listar as fotos.";
 
 type Sb = any;
 

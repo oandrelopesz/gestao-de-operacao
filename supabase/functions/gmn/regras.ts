@@ -185,7 +185,7 @@ export function miniaturaGrande(link: string, lado = 2048): string {
   const corte = link.search(/[?#]/);
   const caminho = corte === -1 ? link : link.slice(0, corte);
   const resto = corte === -1 ? "" : link.slice(corte);
-  return `${caminho.replace(/=(?:s\d+|w\d+-h\d+)(?:-[a-z]+)*$/i, "")}=s${lado}${resto}`;
+  return `${caminho.replace(/=[swh]\d+(?:-[a-z0-9]+)*$/i, "")}=s${lado}${resto}`;
 }
 
 /** O link é https e fica em googleusercontent.com ou google.com (ou subdomínio): só para esses o token do Google pode ir. */
