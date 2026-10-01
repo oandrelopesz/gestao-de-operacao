@@ -7,8 +7,11 @@ import { normalizarAgenda, normalizarBriefing, type Briefing, type ItemAgenda } 
 /** Fase 1: nada é publicado no Google; o liga/desliga fica desabilitado até a API ser aprovada. */
 export const PUBLICACAO_LIBERADA = false;
 
-/** Fase 1: a aba só funciona no servidor local; no site publicado mostra "Em preparação". Tirar na Fase 2. */
-export const ABA_LIBERADA = import.meta.env.DEV;
+/**
+ * Aba no site desde 01/10/2026, em modo de teste (pedido do André, para validar o layout com um cliente real): perfis,
+ * contexto e prévias funcionam; nada vai para o Google e o liga/desliga segue travado (PUBLICACAO_LIBERADA).
+ */
+export const ABA_LIBERADA = true;
 
 export type CtaTipo = "LEARN_MORE" | "CALL" | "BOOK";
 

@@ -128,10 +128,15 @@ function GmnConteudo() {
     <div className="space-y-4 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold"><MapPin className="h-6 w-6" />Google Meu Negócio</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <MapPin className="h-6 w-6" />Google Meu Negócio
+            {!PUBLICACAO_LIBERADA && (
+              <Badge variant="outline" className="border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400">Em teste</Badge>
+            )}
+          </h1>
           <p className="text-sm text-muted-foreground">
             Posts automáticos nos perfis dos clientes.
-            {!PUBLICACAO_LIBERADA && " Publicação liberada quando a API do Google for aprovada — por enquanto, só prévias."}
+            {!PUBLICACAO_LIBERADA && " Modo de teste: perfis, contexto e prévias funcionam; nada é publicado no Google e os perfis só podem ser ligados quando a API do Google for aprovada."}
           </p>
         </div>
         <Button onClick={() => setNovo({ nome: "", cliente_id: null })}><Plus className="mr-2 h-4 w-4" />Novo perfil</Button>
