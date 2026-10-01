@@ -143,9 +143,9 @@ function LogoCliente({ dados, ocupada, onDados, onEnviar, onRemover }: {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="gmn-logo-tamanho">Tamanho</Label>
+          <Label htmlFor="gmn-logo-tamanho">Tamanho da logo</Label>
           <Select value={dados.logo_tamanho} onValueChange={(v) => onDados({ logo_tamanho: v as TamanhoLogo })}>
-            <SelectTrigger id="gmn-logo-tamanho" aria-label="Tamanho"><SelectValue /></SelectTrigger>
+            <SelectTrigger id="gmn-logo-tamanho" aria-label="Tamanho da logo"><SelectValue /></SelectTrigger>
             <SelectContent>
               {TAMANHOS_LOGO.map((v) => <SelectItem key={v} value={v}>{ROTULO_TAMANHO_LOGO[v]}</SelectItem>)}
             </SelectContent>

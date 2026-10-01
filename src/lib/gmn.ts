@@ -89,6 +89,8 @@ function comBriefing(p: any): PerfilGmn {
   return {
     ...p, briefing: normalizarBriefing(p.briefing), agenda: normalizarAgenda(p.agenda),
     logo_posicao: logo.posicao, logo_tamanho: logo.tamanho, logo_fundo: logo.fundo,
+    // Linha sem a chave (mock, consulta antiga) vale como "logo enviada do computador".
+    logo_origem_url: typeof p.logo_origem_url === "string" ? p.logo_origem_url : null,
     imagens_site: normalizarImagensSite(p.imagens_site),
   } as PerfilGmn;
 }
