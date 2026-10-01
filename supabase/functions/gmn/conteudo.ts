@@ -1,18 +1,20 @@
 // Um post completo, sem publicar: tema → texto (com checagem e 1 nova tentativa) → imagem (Drive, IA ou nenhuma).
 // deno-lint-ignore-file no-explicit-any
 import {
-  ESQUEMA_POST, base64ParaBytes, checarTexto, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras,
-  idPastaDrive, montarMensagensPost, montarPromptImagem, normalizarBriefing, opcoesDaLogo, proximoTema, LOGO_LADO_MAX, type Tema,
+  ESQUEMA_POST, base64ParaBytes, checarTexto, decidirImagem, decisaoChecagem, descricaoDaFoto, escolherImagem, escolherPalavras,
+  fotoDiretaDoDrive, idPastaDrive, montarMensagensPost, montarPromptImagem, normalizarBriefing, opcoesDaLogo, proximoTema,
+  LOGO_LADO_MAX, type Tema,
 } from "./regras.ts";
 import { checarImagem, gerarImagem, gerarJson } from "./openai.ts";
 import { lerPng, gravarPng, type ImagemRgba } from "./png.ts";
 import { aplicarLogo } from "./compor.ts";
 import { enviarR2 } from "./r2.ts";
-import { baixarDoDrive, imagensDaPasta, tokenGoogle } from "./google.ts";
+import { baixarDoDrive, baixarMiniatura, imagensDaPasta, tokenGoogle, type ImagemDrive } from "./google.ts";
 import { PRAZO, sinal } from "./prazo.ts";
 
 type Sb = any;
-type Imagem = { origem: "drive" | "ia"; ref: string; url: string };
+/** `descricao`: o que a foto mostra (descrição ou nome do arquivo no Drive; vazia na imagem da IA), para o texto do post. */
+type Imagem = { origem: "drive" | "ia" | "site"; ref: string; url: string; descricao: string };
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -21,13 +23,32 @@ export interface CamposPost {
   tema: Tema;
   palavras_chave: string[];
   texto: string;
-  imagem_origem: "drive" | "ia" | null;
+  imagem_origem: "drive" | "ia" | "site" | null;
   imagem_ref: string | null;
   imagem_url: string | null;
   erro: string | null;
 }
 
-/** null: o link da pasta do Drive não foi reconhecido; "vazia": a pasta não tem nenhuma foto aceita. */
+const FOTOS_TENTADAS = 3;
+
+/**
+ * Bytes da foto do Drive: JPG/PNG de até 5 MB vão como estão; o resto (HEIC, WEBP, TIFF… ou arquivo grande) usa a miniatura
+ * grande que o Google gera. Sem miniatura (ou com erro) lança, e quem chama passa para a próxima foto.
+ */
+async function baixarFoto(
+  token: string, foto: ImagemDrive, total?: AbortSignal,
+): Promise<{ bytes: Uint8Array; tipo: "image/jpeg" | "image/png" }> {
+  if (fotoDiretaDoDrive(foto.mimeType, foto.size)) {
+    return { bytes: await baixarDoDrive(token, foto.id, total), tipo: foto.mimeType as "image/jpeg" | "image/png" };
+  }
+  if (!foto.thumbnailLink) throw new Error("o Drive não gerou miniatura para esta foto");
+  return await baixarMiniatura(token, foto.thumbnailLink, total);
+}
+
+/**
+ * null: o link da pasta do Drive não foi reconhecido; "vazia": nenhuma das fotos tentadas deu para usar. Tenta até 3 fotos,
+ * na ordem do rodízio (a escolhida e, se ela falhar, as próximas); o uso só é registrado para a foto que entrou.
+ */
 async function imagemDoDrive(sb: Sb, perfil: any, postId: string, total?: AbortSignal): Promise<Imagem | "vazia" | null> {
   const pastaId = idPastaDrive(String(perfil.drive_pasta_url ?? ""));
   if (!pastaId) return null;
@@ -36,16 +57,30 @@ async function imagemDoDrive(sb: Sb, perfil: any, postId: string, total?: AbortS
   if (!fotos.length) return "vazia";
   const { data: usos } = await sb.from("gmn_imagens_uso").select("ref, usado_em").eq("perfil_id", perfil.id).eq("origem", "drive");
   const mapa: Record<string, string> = Object.fromEntries((usos ?? []).map((u: any) => [u.ref, u.usado_em]));
-  const ref = escolherImagem(fotos.map((f) => f.id), mapa);
-  const foto = fotos.find((f) => f.id === ref)!;
-  const bytes = await baixarDoDrive(token, foto.id, total);
-  const ext = foto.mimeType === "image/png" ? "png" : "jpg";
-  const url = await enviarR2(`${perfil.id}/${postId}.${ext}`, bytes, foto.mimeType, total);
-  await sb.from("gmn_imagens_uso").upsert(
-    { perfil_id: perfil.id, origem: "drive", ref: foto.id, usado_em: new Date().toISOString() },
-    { onConflict: "perfil_id,origem,ref" },
-  );
-  return { origem: "drive" as const, ref: foto.id, url };
+  let restantes = fotos.map((f) => f.id);
+  for (let i = 0; i < FOTOS_TENTADAS; i++) {
+    const ref = escolherImagem(restantes, mapa);
+    if (!ref) break;
+    restantes = restantes.filter((id) => id !== ref);
+    const foto = fotos.find((f) => f.id === ref)!;
+    let baixada: { bytes: Uint8Array; tipo: "image/jpeg" | "image/png" };
+    try {
+      baixada = await baixarFoto(token, foto, total);
+    } catch (e) {
+      // Prazo total estourado: as próximas também falhariam, e o aviso certo é o do prazo.
+      if (total?.aborted) throw e;
+      console.error(`Foto do Drive ${foto.id} (${foto.mimeType}, ${foto.size} bytes) não serviu:`, msg(e));
+      continue;
+    }
+    const ext = baixada.tipo === "image/png" ? "png" : "jpg";
+    const url = await enviarR2(`${perfil.id}/${postId}.${ext}`, baixada.bytes, baixada.tipo, total);
+    await sb.from("gmn_imagens_uso").upsert(
+      { perfil_id: perfil.id, origem: "drive", ref: foto.id, usado_em: new Date().toISOString() },
+      { onConflict: "perfil_id,origem,ref" },
+    );
+    return { origem: "drive" as const, ref: foto.id, url, descricao: descricaoDaFoto(foto.description, foto.name) };
+  }
+  return "vazia";
 }
 
 const LOGO_BAIXAR_MAX_BYTES = 6 * 1024 * 1024;
@@ -93,6 +128,7 @@ function bytesDaImagemDaIa(b64: string): Uint8Array {
 
 const AVISO_PESSOAS_OU_TEXTO = "A imagem da IA tinha pessoas ou texto; o post seguiu só com texto.";
 const AVISO_LINK_DRIVE = "O link da pasta do Drive não foi reconhecido.";
+const AVISO_PASTA_SEM_FOTO = "A pasta do Drive não tem nenhuma foto que deu para usar.";
 
 /**
  * Imagem da IA (PNG), gerada sem a logo e com a logo do perfil aplicada por cima, sem a IA (compor.ts), quando houver
@@ -155,7 +191,7 @@ async function imagemDaIa(
     }
     const chave = `${perfil.id}/${postId}.png`;
     const url = await enviarR2(chave, bytes, "image/png", total);
-    return { imagem: { origem: "ia" as const, ref: chave, url }, aviso: null };
+    return { imagem: { origem: "ia" as const, ref: chave, url, descricao: "" }, aviso: null };
   }
   return { imagem: null, aviso: AVISO_PESSOAS_OU_TEXTO };
 }
@@ -216,7 +252,7 @@ export async function gerarConteudo(
   if (origem === "drive") {
     try {
       const doDrive = await imagemDoDrive(sb, perfil, postId, total);
-      if (doDrive === "vazia") avisos.push("A pasta do Drive não tem fotos JPG ou PNG de até 5 MB.");
+      if (doDrive === "vazia") avisos.push(AVISO_PASTA_SEM_FOTO);
       else if (doDrive === null) avisos.push(AVISO_LINK_DRIVE);
       else imagem = doDrive;
     } catch (e) {

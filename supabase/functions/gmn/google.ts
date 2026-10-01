@@ -1,6 +1,7 @@
 // Token do Google guardado em google_oauth_tokens (Fase 1: linha mais recente = contato@) e leitura do Drive.
 // deno-lint-ignore-file no-explicit-any
 import { foiPrazo, PRAZO, sinal } from "./prazo.ts";
+import { miniaturaGrande } from "./regras.ts";
 
 type Sb = any;
 
@@ -54,14 +55,21 @@ export async function tokenGoogle(sb: Sb, total?: AbortSignal): Promise<string> 
   return d.access_token;
 }
 
-export interface ImagemDrive { id: string; name: string; mimeType: string }
+export interface ImagemDrive {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  description: string;
+  thumbnailLink: string | null;
+}
 
-const LIMITE_BYTES = 5 * 1024 * 1024;
-
-/** Imagens JPG/PNG de até 5 MB direto na pasta (sem subpastas), mais novas primeiro. */
+/** Toda imagem direto na pasta (sem subpastas), mais novas primeiro; o formato e o tamanho são tratados por quem baixa. */
 export async function imagensDaPasta(token: string, pastaId: string, total?: AbortSignal): Promise<ImagemDrive[]> {
-  const q = `'${pastaId.replace(/'/g, "\\'")}' in parents and trashed = false and (mimeType = 'image/jpeg' or mimeType = 'image/png')`;
-  const params = new URLSearchParams({ q, fields: "files(id,name,mimeType,size)", pageSize: "200", orderBy: "createdTime desc" });
+  const q = `'${pastaId.replace(/'/g, "\\'")}' in parents and trashed = false and mimeType contains 'image/'`;
+  const params = new URLSearchParams({
+    q, fields: "files(id,name,mimeType,size,description,thumbnailLink)", pageSize: "200", orderBy: "createdTime desc",
+  });
   params.set("supportsAllDrives", "true");
   params.set("includeItemsFromAllDrives", "true");
   const d = await comPrazo("pasta do Drive", async (signal) => {
@@ -73,7 +81,10 @@ export async function imagensDaPasta(token: string, pastaId: string, total?: Abo
     if (!r.ok) throw new Error(corpo?.error?.message || `Drive respondeu ${r.status} ao listar a pasta`);
     return corpo;
   }, total);
-  return (d.files ?? []).filter((f: any) => Number(f.size || 0) <= LIMITE_BYTES);
+  return (d.files ?? []).map((f: any): ImagemDrive => ({
+    id: f.id, name: f.name ?? "", mimeType: f.mimeType ?? "", size: Number(f.size || 0),
+    description: f.description ?? "", thumbnailLink: f.thumbnailLink ?? null,
+  }));
 }
 
 export async function baixarDoDrive(token: string, id: string, total?: AbortSignal): Promise<Uint8Array> {
@@ -84,5 +95,19 @@ export async function baixarDoDrive(token: string, id: string, total?: AbortSign
     });
     if (!r.ok) throw new Error(`Drive respondeu ${r.status} ao baixar a foto`);
     return new Uint8Array(await r.arrayBuffer());
+  }, total);
+}
+
+/** Miniatura grande que o Google gera (JPG ou PNG), para formatos como HEIC/WEBP ou arquivos acima de 5 MB. */
+export async function baixarMiniatura(token: string, link: string, total?: AbortSignal): Promise<{ bytes: Uint8Array; tipo: "image/jpeg" | "image/png" }> {
+  return await comPrazo("miniatura do Drive", async (signal) => {
+    const r = await fetch(miniaturaGrande(link), { headers: { Authorization: `Bearer ${token}` }, signal });
+    if (!r.ok) throw new Error(`Drive respondeu ${r.status} ao baixar a miniatura`);
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    const png = bytes[0] === 0x89 && bytes[1] === 0x50;
+    const jpg = bytes[0] === 0xff && bytes[1] === 0xd8;
+    if (!png && !jpg) throw new Error("miniatura do Drive não veio em JPG nem PNG");
+    if (bytes.length > 5 * 1024 * 1024) throw new Error("miniatura do Drive grande demais");
+    return { bytes, tipo: png ? "image/png" : "image/jpeg" };
   }, total);
 }

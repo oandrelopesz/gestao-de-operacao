@@ -145,6 +145,25 @@ export function escolherImagem(candidatos: string[], usos: Record<string, string
   return [...candidatos].sort((a, b) => Date.parse(usos[a]) - Date.parse(usos[b]))[0];
 }
 
+const LIMITE_FOTO_DIRETA = 5 * 1024 * 1024;
+
+/** Foto do Drive que pode ir como está (JPG ou PNG de até 5 MB). O resto usa a miniatura que o Google gera. */
+export function fotoDiretaDoDrive(mime: string, tamanho: number): boolean {
+  return (mime === "image/jpeg" || mime === "image/png") && tamanho <= LIMITE_FOTO_DIRETA;
+}
+
+/** Link de miniatura do Drive no tamanho grande (o sufixo `=s220`, `=w400-h300` etc. vira `=s2048`). */
+export function miniaturaGrande(link: string, lado = 2048): string {
+  return /=[a-z0-9-]+$/i.test(link) ? link.replace(/=[a-z0-9-]+$/i, `=s${lado}`) : `${link}=s${lado}`;
+}
+
+/** O que a foto mostra, para o texto do post: a descrição do arquivo no Drive ou, sem ela, o nome sem extensão. */
+export function descricaoDaFoto(descricao: string | null | undefined, nome: string): string {
+  const d = (descricao ?? "").trim();
+  if (d) return d.slice(0, 300);
+  return nome.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+}
+
 // ------------------------------------------------------------------ agenda (dias e horários dos posts)
 
 /**

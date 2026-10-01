@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AGENDA_PADRAO, BRIEFING_VAZIO, ESQUEMA_CHECAGEM_IMAGEM, HORARIOS, PROMPT_CHECAGEM_IMAGEM, TEMAS, alternarDia,
-  alternarImagem, base64ParaBytes, checarTexto, comUtm, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras,
-  idPastaDrive,
+  alternarImagem, base64ParaBytes, checarTexto, comUtm, decidirImagem, decisaoChecagem, descricaoDaFoto, escolherImagem,
+  escolherPalavras, fotoDiretaDoDrive, idPastaDrive, miniaturaGrande,
   mesmoHorario, montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda,
   normalizarBriefing, normalizarImagensSite, opcoesDaLogo, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64,
   type PosicaoLogo,
@@ -88,6 +88,25 @@ test("escolherImagem: nunca usada primeiro, depois a usada há mais tempo", () =
   assert.equal(escolherImagem([], {}), null);
   assert.equal(escolherImagem(["a", "b"], { a: "2026-09-01T00:00:00Z" }), "b");
   assert.equal(escolherImagem(["a", "b"], { a: "2026-09-02T00:00:00Z", b: "2026-09-01T00:00:00Z" }), "b");
+});
+
+test("fotoDiretaDoDrive: só JPG/PNG de até 5 MB vão direto; o resto usa a miniatura do Google", () => {
+  assert.equal(fotoDiretaDoDrive("image/jpeg", 1_000_000), true);
+  assert.equal(fotoDiretaDoDrive("image/png", 5 * 1024 * 1024), true);
+  assert.equal(fotoDiretaDoDrive("image/png", 5 * 1024 * 1024 + 1), false);
+  assert.equal(fotoDiretaDoDrive("image/heif", 900_000), false);
+  assert.equal(fotoDiretaDoDrive("image/webp", 10), false);
+});
+
+test("miniaturaGrande: troca o tamanho do link de miniatura (ou acrescenta) por =s2048", () => {
+  assert.equal(miniaturaGrande("https://lh3.googleusercontent.com/drive-storage/abc=s220"), "https://lh3.googleusercontent.com/drive-storage/abc=s2048");
+  assert.equal(miniaturaGrande("https://lh3.googleusercontent.com/abc=w400-h300"), "https://lh3.googleusercontent.com/abc=s2048");
+  assert.equal(miniaturaGrande("https://lh3.googleusercontent.com/abc"), "https://lh3.googleusercontent.com/abc=s2048");
+});
+
+test("descricaoDaFoto: descrição do Drive vence; sem ela, o nome sem extensão e sem _-", () => {
+  assert.equal(descricaoDaFoto("Fachada da loja à noite", "IMG_1.jpg"), "Fachada da loja à noite");
+  assert.equal(descricaoDaFoto("", "fachada-da-loja_2024.HEIC"), "fachada da loja 2024");
 });
 
 test("normalizarAgenda: um item por dia, ordenado, descarta lixo", () => {
