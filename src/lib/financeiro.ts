@@ -162,17 +162,6 @@ export function situacaoDoMes(fonte: FonteDoMes, hoje: string): SituacaoDoMes {
   };
 }
 
-/** Rótulo e classes (Tailwind) de cada situação, para fonte e parcela. */
-export function infoDoStatus(status: StatusMes) {
-  switch (status) {
-    case "recebido": return { label: "Recebido", color: "bg-emerald-500", text: "text-emerald-500", border: "border-emerald-200", bg: "bg-emerald-50/50" };
-    case "isento": return { label: "Isento", color: "bg-sky-500", text: "text-sky-600", border: "border-sky-200", bg: "bg-sky-50/50" };
-    case "atrasado": return { label: "Atrasado", color: "bg-red-500", text: "text-red-500", border: "border-red-200", bg: "bg-red-50/50" };
-    case "pendente": return { label: "Pendente", color: "bg-amber-500", text: "text-amber-500", border: "border-amber-200", bg: "bg-amber-50/50" };
-    default: return { label: "A vencer", color: "bg-zinc-400", text: "text-zinc-500", border: "border-zinc-200", bg: "bg-zinc-50/50" };
-  }
-}
-
 /**
  * Cartões do topo: valores somados por parcela, contagens por fonte. O previsto não inclui o que a isenção abonou;
  * fonte isenta conta como resolvida (junto com a recebida), não como em aberto.

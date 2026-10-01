@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { formatBRL } from "@/lib/clientes";
 import { cn } from "@/lib/utils";
 import { nomeDoMes } from "@/lib/financeiro";
+import { hojeBrasilia } from "@/lib/entrega";
 import { INFO_SITUACAO, type Cobranca } from "@/lib/financeiroCobranca";
 import { FormaBadge } from "@/components/financeiro/FormaBadge";
 
@@ -17,10 +18,21 @@ interface Props {
   onDesfazer: (cobranca: Cobranca) => void;
   /** Uma gravação em andamento: trava os botões. */
   ocupado: boolean;
+  /** Esconde o "Isentar" da linha (o card do pagamento único isenta pelo "Isentar este mês"). */
+  semIsentar?: boolean;
+}
+
+/** "Recebido em dd/mm/aaaa" no dia de Brasília; nada se a data não existe ou não é válida. */
+function textoDoRecebimento(dataConfirmacao: string | null | undefined): string | null {
+  if (!dataConfirmacao) return null;
+  const quando = new Date(dataConfirmacao);
+  if (Number.isNaN(quando.getTime())) return null;
+  const dia = hojeBrasilia(quando);
+  return `Recebido em ${dia.slice(8, 10)}/${dia.slice(5, 7)}/${dia.slice(0, 4)}`;
 }
 
 /** Uma parcela de um mês: valor, forma, situação (texto + cor) e as ações de acertar, isentar ou desfazer. */
-export function CobrancaLinha({ cobranca: c, mostrarMes, onValorCheio, onConfigurar, onIsentar, onDesfazer, ocupado }: Props) {
+export function CobrancaLinha({ cobranca: c, mostrarMes, onValorCheio, onConfigurar, onIsentar, onDesfazer, ocupado, semIsentar }: Props) {
   const info = INFO_SITUACAO[c.situacao];
   const parcelado = c.total > 1;
   // Quitada ou isenta: só desfazer. Parcial: ainda dá para acertar o resto e também desfazer (volta a não acertada)
@@ -29,8 +41,12 @@ export function CobrancaLinha({ cobranca: c, mostrarMes, onValorCheio, onConfigu
   const motivo = c.registro?.observacoes?.trim();
 
   let detalhe: string | null = null;
-  if (c.situacao === "parcial") {
-    detalhe = `Pago ${formatBRL(c.pago)} · falta ${formatBRL(c.falta)}`;
+  if (c.situacao === "recebido") {
+    detalhe = textoDoRecebimento(c.registro?.data_confirmacao);
+  } else if (c.situacao === "parcial") {
+    detalhe = [`Pago ${formatBRL(c.pago)} · falta ${formatBRL(c.falta)}`, textoDoRecebimento(c.registro?.data_confirmacao)]
+      .filter(Boolean)
+      .join(" · ");
   } else if (c.situacao === "isento") {
     detalhe = [
       c.pago > 0 ? `Pago ${formatBRL(c.pago)}` : null,
@@ -70,9 +86,11 @@ export function CobrancaLinha({ cobranca: c, mostrarMes, onValorCheio, onConfigu
             <Button type="button" variant="outline" size="sm" disabled={ocupado} onClick={acionar(onConfigurar)}>
               Configurar valor recebido
             </Button>
-            <Button type="button" variant="outline" size="sm" disabled={ocupado} onClick={acionar(onIsentar)}>
-              {parcelado ? "Isentar parcela" : "Isentar"}
-            </Button>
+            {!semIsentar && (
+              <Button type="button" variant="outline" size="sm" disabled={ocupado} onClick={acionar(onIsentar)}>
+                {parcelado ? "Isentar parcela" : "Isentar"}
+              </Button>
+            )}
           </>
         )}
         {(quitadaOuIsenta || c.situacao === "parcial") && (

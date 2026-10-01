@@ -149,13 +149,17 @@ const contagem = (n: number, uma: string, varias: string) => `${n} ${n === 1 ? u
 
 const quitadaOuIsenta = (c: Cobranca) => c.situacao === "recebido" || c.situacao === "isento";
 
-/** As parcelas de um mês com as ações e, enquanto houver parcela em aberto, "Isentar este mês" ou "Isentar mês inteiro". */
+/**
+ * As parcelas de um mês com as ações e, enquanto houver parcela em aberto, "Isentar este mês" ou "Isentar mês inteiro".
+ * O clique não sobe para o card/linha (que abre o histórico): nem nos botões travados, que deixam o clique passar.
+ */
 function CobrancasDoMes({
   doMes,
   ocupado,
   acoes,
   onIsentarMes,
   grade,
+  isentarPeloMes,
 }: {
   doMes: Cobranca[];
   ocupado: boolean;
@@ -163,14 +167,22 @@ function CobrancasDoMes({
   onIsentarMes: () => void;
   /** Colunas da grade das parcelas (a lista usa mais de uma em telas largas). */
   grade?: string;
+  /** Pagamento único: só o "Isentar este mês" (a linha não repete o "Isentar"). Card e lista; não o histórico. */
+  isentarPeloMes?: boolean;
 }) {
   if (!doMes.length) return <p className="text-xs text-muted-foreground">Fora da cobrança neste mês.</p>;
   const parcelado = doMes[0].total > 1;
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
       <div className={cn("grid gap-1.5", grade)}>
         {doMes.map((c) => (
-          <CobrancaLinha key={`${c.mes}-${c.parcela}`} cobranca={c} ocupado={ocupado} {...acoes} />
+          <CobrancaLinha
+            key={`${c.mes}-${c.parcela}`}
+            cobranca={c}
+            ocupado={ocupado}
+            semIsentar={isentarPeloMes && !parcelado}
+            {...acoes}
+          />
         ))}
       </div>
       {doMes.some((c) => !quitadaOuIsenta(c)) && (
@@ -188,19 +200,18 @@ function CobrancasDoMes({
   );
 }
 
-/** Botão vermelho do atrasado acumulado da fonte (abre a lista do que está devendo). */
+/**
+ * Botão vermelho do atrasado acumulado da fonte (abre a lista do que está devendo). O invólucro segura o clique: travado,
+ * o botão deixa o clique passar e ele abriria o histórico do card/linha.
+ */
 function BotaoAtrasado({ total, ocupado, onAbrir }: { total: number; ocupado: boolean; onAbrir: () => void }) {
   return (
-    <Button
-      type="button"
-      variant="destructive"
-      size="sm"
-      disabled={ocupado}
-      onClick={(e) => { e.stopPropagation(); onAbrir(); }}
-    >
-      <AlertCircle aria-hidden="true" />
-      {`Atrasado: ${formatBRL(total)}`}
-    </Button>
+    <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+      <Button type="button" variant="destructive" size="sm" disabled={ocupado} onClick={onAbrir}>
+        <AlertCircle aria-hidden="true" />
+        {`Atrasado: ${formatBRL(total)}`}
+      </Button>
+    </span>
   );
 }
 
@@ -479,7 +490,8 @@ function FinanceiroPage() {
   };
 
   const openHistory = (fonte: FinanceiroView) => {
-    if (historicoRef.current !== fonte.fonte_id) setHistoryData([]);
+    // Outro cliente: a lista do anterior não aparece enquanto a dele carrega
+    if (historicoId !== fonte.fonte_id) setHistoryData([]);
     historicoRef.current = fonte.fonte_id;
     setHistoricoId(fonte.fonte_id);
     // O calendário abre no mês escolhido na aba, se ele está nos 12 meses e foi cobrado
@@ -493,6 +505,12 @@ function FinanceiroPage() {
   const fonteHistorico = historicoId ? data.find((f) => f.fonte_id === historicoId) ?? null : null;
   const resumoHistorico = fonteHistorico ? resumoDe(fonteHistorico.fonte_id) : null;
   const calendarioHistorico = resumoHistorico ? calendarioDaFonte(resumoHistorico.cobrancas, hoje, 12) : [];
+  // Todos os meses do calendário fora da cobrança (ex.: começa a cobrar no mês que vem): não há o que escolher
+  const semMesesCobrados = calendarioHistorico.every((m) => m.situacao === "fora");
+  // O selo do cabeçalho é o do mês de hoje, não o do mês escolhido na aba
+  const situacaoAtualHistorico = resumoHistorico
+    ? situacaoDoMesCobrado(resumoHistorico.cobrancas.filter((c) => c.mes === mesAtual))
+    : null;
   const doMesHistorico = resumoHistorico && mesHistorico ? resumoHistorico.cobrancas.filter((c) => c.mes === mesHistorico) : [];
   const parcelasHistorico = fonteHistorico && ehFracionado(fonteHistorico) ? parcelasComForma(fonteHistorico) : [];
 
@@ -754,6 +772,7 @@ function FinanceiroPage() {
                       ocupado={ocupado}
                       acoes={acoesDe(fonte.fonte_id)}
                       onIsentarMes={() => isentarMesDe(fonte.fonte_id, resumo.doMes)}
+                      isentarPeloMes
                     />
                   </div>
                 </CardContent>
@@ -814,7 +833,7 @@ function FinanceiroPage() {
                       </Badge>
                     </td>
                     <td className="py-3 px-3 sm:px-4 text-right">
-                      <div className="flex justify-end gap-1">
+                      <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); abrirFormulario(fonte); }}>
                           <Pencil size={14} />
                         </Button>
@@ -825,7 +844,8 @@ function FinanceiroPage() {
                     </td>
                   </tr>
                   <tr>
-                    <td colSpan={6} className="px-3 pb-3 sm:px-4">
+                    {/* Área das ações: o clique aqui (inclusive em botão travado) não abre o histórico */}
+                    <td colSpan={6} className="px-3 pb-3 sm:px-4" onClick={(e) => e.stopPropagation()}>
                       <div className="space-y-2">
                         {resumo.atrasado.total > 0 && (
                           <BotaoAtrasado total={resumo.atrasado.total} ocupado={ocupado} onAbrir={() => abrirAtrasado(fonte.fonte_id)} />
@@ -836,6 +856,7 @@ function FinanceiroPage() {
                           acoes={acoesDe(fonte.fonte_id)}
                           onIsentarMes={() => isentarMesDe(fonte.fonte_id, resumo.doMes)}
                           grade="sm:grid-cols-2 xl:grid-cols-3"
+                          isentarPeloMes
                         />
                       </div>
                     </td>
@@ -856,7 +877,14 @@ function FinanceiroPage() {
       />
 
       {/* Histórico e Detalhes - Sheet */}
-      <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+      <Sheet
+        open={historyOpen}
+        onOpenChange={(aberto) => {
+          setHistoryOpen(aberto);
+          // Fechado, as ações daquela fonte não recarregam mais o histórico (ao abrir de novo ele é buscado)
+          if (!aberto) historicoRef.current = null;
+        }}
+      >
         <SheetContent className="sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -866,7 +894,7 @@ function FinanceiroPage() {
                   <FormaBadge forma={formaDePagamento(fonteHistorico.forma_pagamento)} className="text-[9px]" />
                 </>
               )}
-              {resumoHistorico?.situacao === 'recebido' && (
+              {situacaoAtualHistorico === 'recebido' && (
                 <Badge className="bg-emerald-500 text-[9px] h-4">✓ Recebido</Badge>
               )}
             </div>
@@ -927,7 +955,9 @@ function FinanceiroPage() {
                   />
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">Escolha um mês para ver as parcelas dele.</p>
+                <p className="text-xs text-muted-foreground">
+                  {semMesesCobrados ? "Este cliente ainda não tem meses cobrados." : "Escolha um mês para ver as parcelas dele."}
+                </p>
               )}
             </div>
 
