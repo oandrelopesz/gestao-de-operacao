@@ -1,5 +1,6 @@
 // Aba "Imagens" da gaveta do perfil: pasta do Drive, imagem por IA, contexto das imagens, logo e pessoas nas imagens.
-// A logo é gravada no próprio envio (não passa pelo "Salvar imagens"); o resto é rascunho da gaveta.
+// O arquivo da logo é gravado no próprio envio (não passa pelo "Salvar imagens"); o resto, inclusive a posição, o
+// tamanho e o fundo da logo, é rascunho da gaveta.
 import { useRef, useState } from "react";
 import { Loader2, Trash2, Upload } from "lucide-react";
 import {
@@ -9,12 +10,66 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { LOGO_TIPOS, type PerfilGmn } from "@/lib/gmn";
-import { LIMITE_CONTEXTO_IMAGENS } from "../../../supabase/functions/gmn/regras.ts";
+import { type PerfilGmn } from "@/lib/gmn";
+import { ACEITA_IMAGENS } from "@/lib/gmnImagem";
+import { caixaDaLogo } from "../../../supabase/functions/gmn/compor.ts";
+import {
+  FUNDOS_LOGO, LIMITE_CONTEXTO_IMAGENS, POSICOES_LOGO, ROTULO_FUNDO_LOGO, ROTULO_POSICAO_LOGO, ROTULO_TAMANHO_LOGO, TAMANHOS_LOGO,
+  type FundoLogo, type PosicaoLogo, type TamanhoLogo,
+} from "../../../supabase/functions/gmn/regras.ts";
 
 const AVISO = "text-xs font-medium text-amber-600 dark:text-amber-400";
+
+/** Tamanho da imagem da IA (paisagem 3:2): a prévia usa as mesmas contas da função que aplica a logo. */
+const IMAGEM_PREVIA = { largura: 1536, altura: 1024 };
+const pct = (v: number, total: number) => `${(v / total) * 100}%`;
+
+/** Caixa 3:2 que faz de conta de imagem da IA e mostra onde a logo (e o fundo atrás dela) entra com as opções do rascunho. */
+function PreviaLogo({ url, nome, posicao, tamanho, fundo }: {
+  url: string; nome: string; posicao: PosicaoLogo; tamanho: TamanhoLogo; fundo: FundoLogo;
+}) {
+  const [natural, setNatural] = useState<{ largura: number; altura: number } | null>(null);
+  const [quebrou, setQuebrou] = useState(false);
+  if (quebrou) {
+    return <p className="text-xs text-destructive">Não foi possível carregar a logo para a prévia da posição.</p>;
+  }
+  const caixa = natural ? caixaDaLogo(IMAGEM_PREVIA, natural, tamanho, posicao, fundo !== "nenhum") : null;
+  const { largura: L, altura: A } = IMAGEM_PREVIA;
+  return (
+    <figure className="m-0 space-y-1.5">
+      <div className="relative aspect-[3/2] w-full max-w-sm overflow-hidden rounded-md border bg-gradient-to-br from-neutral-500 to-neutral-700">
+        <span className="pointer-events-none absolute inset-0 flex select-none items-center justify-center text-sm font-medium text-white/70">
+          Imagem da IA
+        </span>
+        {caixa?.fundo && (
+          <div
+            aria-hidden
+            className={`absolute rounded-md ${fundo === "claro" ? "bg-white/90" : "bg-neutral-900/90"}`}
+            style={{ left: pct(caixa.fundo.x, L), top: pct(caixa.fundo.y, A), width: pct(caixa.fundo.largura, L), height: pct(caixa.fundo.altura, A) }}
+          />
+        )}
+        <img
+          src={url}
+          alt={`Prévia da posição da logo de ${nome}`}
+          className={`absolute object-contain ${caixa ? "" : "invisible"}`}
+          style={caixa ? { left: pct(caixa.logo.x, L), top: pct(caixa.logo.y, A), width: pct(caixa.logo.largura, L), height: pct(caixa.logo.altura, A) } : undefined}
+          onLoad={(e) => {
+            const { naturalWidth, naturalHeight } = e.currentTarget;
+            if (naturalWidth > 0 && naturalHeight > 0) setNatural({ largura: naturalWidth, altura: naturalHeight });
+            else setQuebrou(true);
+          }}
+          onError={() => setQuebrou(true)}
+        />
+      </div>
+      <figcaption className="text-xs text-muted-foreground">
+        Prévia de onde a logo entra. A posição e o tamanho valem depois de Salvar imagens.
+      </figcaption>
+    </figure>
+  );
+}
 
 /** Miniatura da logo; se o arquivo não carregar, diz isso em texto em vez de mostrar uma imagem quebrada. */
 function Miniatura({ url, nome }: { url: string; nome: string }) {
@@ -34,10 +89,11 @@ function Miniatura({ url, nome }: { url: string; nome: string }) {
 
 export type LogoOcupada = "enviando" | "removendo" | null;
 
-function LogoCliente({ nome, logoUrl, ocupada, onEnviar, onRemover }: {
-  nome: string; logoUrl: string | null; ocupada: LogoOcupada;
+function LogoCliente({ dados, ocupada, onDados, onEnviar, onRemover }: {
+  dados: PerfilGmn; ocupada: LogoOcupada; onDados: (patch: Partial<PerfilGmn>) => void;
   onEnviar: (arquivo: File) => void; onRemover: () => Promise<boolean>;
 }) {
+  const { nome, logo_url: logoUrl } = dados;
   const entrada = useRef<HTMLInputElement>(null);
   const botaoEnviar = useRef<HTMLButtonElement>(null);
   const [confirmar, setConfirmar] = useState(false);
@@ -59,7 +115,7 @@ function LogoCliente({ nome, logoUrl, ocupada, onEnviar, onRemover }: {
       <Label id="gmn-logo-rotulo">Logo do cliente</Label>
       <div className="flex flex-wrap items-center gap-3" role="group" aria-labelledby="gmn-logo-rotulo">
         {logoUrl ? <Miniatura key={logoUrl} url={logoUrl} nome={nome} /> : <span className="text-sm text-muted-foreground">Sem logo</span>}
-        <input ref={entrada} type="file" accept={LOGO_TIPOS.join(",")} className="hidden" tabIndex={-1} aria-label="Arquivo da logo (PNG ou JPG, até 5 MB)" onChange={aoEscolher} />
+        <input ref={entrada} type="file" accept={ACEITA_IMAGENS} className="hidden" tabIndex={-1} aria-label="Arquivo da logo (qualquer imagem)" onChange={aoEscolher} />
         <Button ref={botaoEnviar} type="button" variant="outline" size="sm" onClick={() => entrada.current?.click()} disabled={ocupada !== null}>
           {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
           {enviando ? "Enviando…" : "Enviar logo"}
@@ -71,9 +127,46 @@ function LogoCliente({ nome, logoUrl, ocupada, onEnviar, onRemover }: {
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Opcional. Se houver logo, ela entra em toda imagem gerada pela IA (pequena e discreta). As fotos do Drive vão como estão.
-        Aceita PNG ou JPG de até 5 MB. A logo é gravada assim que você envia. A remoção também vale na hora.
+        Opcional. Qualquer imagem (PNG, JPG, WEBP, SVG…), de qualquer tamanho: ela é convertida para PNG antes de subir. Se
+        houver logo, ela é aplicada por cima de toda imagem gerada pela IA, exatamente como é (a IA nunca a redesenha). As
+        fotos do Drive e do site vão como estão. A logo é gravada assim que você envia. A remoção também vale na hora.
       </p>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="gmn-logo-posicao">Posição da logo</Label>
+          <Select value={dados.logo_posicao} onValueChange={(v) => onDados({ logo_posicao: v as PosicaoLogo })}>
+            <SelectTrigger id="gmn-logo-posicao" aria-label="Posição da logo"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {POSICOES_LOGO.map((v) => <SelectItem key={v} value={v}>{ROTULO_POSICAO_LOGO[v]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="gmn-logo-tamanho">Tamanho</Label>
+          <Select value={dados.logo_tamanho} onValueChange={(v) => onDados({ logo_tamanho: v as TamanhoLogo })}>
+            <SelectTrigger id="gmn-logo-tamanho" aria-label="Tamanho"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {TAMANHOS_LOGO.map((v) => <SelectItem key={v} value={v}>{ROTULO_TAMANHO_LOGO[v]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="gmn-logo-fundo">Fundo atrás da logo</Label>
+          <Select value={dados.logo_fundo} onValueChange={(v) => onDados({ logo_fundo: v as FundoLogo })}>
+            <SelectTrigger id="gmn-logo-fundo" aria-label="Fundo atrás da logo"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {FUNDOS_LOGO.map((v) => <SelectItem key={v} value={v}>{ROTULO_FUNDO_LOGO[v]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {logoUrl && (
+        <PreviaLogo
+          key={logoUrl} url={logoUrl} nome={nome} posicao={dados.logo_posicao} tamanho={dados.logo_tamanho} fundo={dados.logo_fundo}
+        />
+      )}
 
       <AlertDialog open={confirmar} onOpenChange={(o) => { if (!o && !removendo) setConfirmar(false); }}>
         {/* Sem logo, o botão Remover some: o foco volta para Enviar logo em vez de se perder. */}
@@ -140,7 +233,7 @@ export function AbaImagens({ dados, alterado, salvando, ocupado, logoOcupada, on
         )}
       </div>
 
-      <LogoCliente nome={dados.nome} logoUrl={dados.logo_url} ocupada={logoOcupada} onEnviar={onEnviarLogo} onRemover={onRemoverLogo} />
+      <LogoCliente dados={dados} ocupada={logoOcupada} onDados={onDados} onEnviar={onEnviarLogo} onRemover={onRemoverLogo} />
 
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">
@@ -161,7 +254,7 @@ export function AbaImagens({ dados, alterado, salvando, ocupado, logoOcupada, on
       </div>
       {alterado && (
         <p className="text-xs text-muted-foreground">
-          Há alterações não salvas: a IA e a prévia usam o que está salvo. A logo não entra nessa conta, porque é gravada no envio.
+          Há alterações não salvas: a IA e a prévia usam o que está salvo. O arquivo da logo não entra nessa conta, porque é gravado no envio.
         </p>
       )}
     </div>

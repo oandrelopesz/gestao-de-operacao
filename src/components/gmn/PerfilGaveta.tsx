@@ -48,11 +48,12 @@ function ajustesContexto(d: PerfilGmn, b: Briefing) {
   return { contexto_posts: vazioNulo(d.contexto_posts), briefing: normalizarBriefing(b), saude: d.saude, cliente_id: d.cliente_id };
 }
 
-/** O que "Salvar imagens" grava (a logo é gravada no envio, fora daqui). */
+/** O que "Salvar imagens" grava (o arquivo da logo é gravado no envio, fora daqui; posição, tamanho e fundo entram). */
 function ajustesImagens(d: PerfilGmn) {
   return {
     drive_pasta_url: vazioNulo(d.drive_pasta_url), usa_ia_imagem: d.usa_ia_imagem,
     contexto_imagens: vazioNulo(d.contexto_imagens), permitir_pessoas_ia: d.permitir_pessoas_ia,
+    logo_posicao: d.logo_posicao, logo_tamanho: d.logo_tamanho, logo_fundo: d.logo_fundo,
   };
 }
 
@@ -207,14 +208,15 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
   }
 
   // A logo é gravada no servidor no próprio envio (não é rascunho). Por isso a miniatura é atualizada se a gaveta ainda
-  // estiver no mesmo perfil, mesmo numa sessão nova; só a espera ("ocupado") fica presa à sessão do pedido.
+  // estiver no mesmo perfil, mesmo numa sessão nova; só a espera ("ocupado") fica presa à sessão do pedido. O envio do
+  // computador não tem site de origem: `logo_origem_url` volta a null (a recarga traz o mesmo valor para o "salvo").
   async function enviarLogoDoPerfil(arquivo: File) {
     const id = perfil!.id;
     const mesma = iniciarPedido();
     setLogoOcupada("enviando");
     try {
-      const url = await enviarLogo(id, arquivo);
-      setDados((d) => (d && d.id === id ? { ...d, logo_url: url } : d));
+      const url = await enviarLogo(id, arquivo, null);
+      setDados((d) => (d && d.id === id ? { ...d, logo_url: url, logo_origem_url: null } : d));
       toast.success("Logo enviada.");
       onMudou();
     } catch (e) {
@@ -231,7 +233,7 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
     setLogoOcupada("removendo");
     try {
       await removerLogo(id);
-      setDados((d) => (d && d.id === id ? { ...d, logo_url: null } : d));
+      setDados((d) => (d && d.id === id ? { ...d, logo_url: null, logo_origem_url: null } : d));
       toast.success("Logo removida.");
       onMudou();
       return true;

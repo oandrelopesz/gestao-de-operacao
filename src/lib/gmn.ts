@@ -2,7 +2,11 @@
 // O types.ts gerado ainda não conhece as tabelas novas: por isso `as any` nos `.from(...)`.
 import { supabase } from "@/integrations/supabase/client";
 import { cabecalhosDeAcesso } from "@/lib/googleDrive";
-import { normalizarAgenda, normalizarBriefing, type Briefing, type ItemAgenda } from "../../supabase/functions/gmn/regras.ts";
+import { blobParaBase64, normalizarLogo } from "@/lib/gmnImagem";
+import {
+  normalizarAgenda, normalizarBriefing, normalizarImagensSite, opcoesDaLogo,
+  type Briefing, type FundoLogo, type ImagemSite, type ItemAgenda, type PosicaoLogo, type TamanhoLogo,
+} from "../../supabase/functions/gmn/regras.ts";
 
 /** Fase 1: nada é publicado no Google; o liga/desliga fica desabilitado até a API ser aprovada. */
 export const PUBLICACAO_LIBERADA = false;
@@ -37,6 +41,13 @@ export interface PerfilGmn {
   contexto_imagens: string | null;
   /** URL pública da logo do cliente (R2). */
   logo_url: string | null;
+  logo_posicao: PosicaoLogo;
+  logo_tamanho: TamanhoLogo;
+  logo_fundo: FundoLogo;
+  /** URL do site de onde a logo veio (a caixa "Usar esta logo" aparece marcada nela); null se foi enviada do computador. */
+  logo_origem_url: string | null;
+  /** Imagens do site marcadas para os posts (gravadas na hora, fora do "Salvar imagens"). */
+  imagens_site: ImagemSite[];
   /** Só o André liga: com isso desligado a IA nunca gera pessoas nas imagens. */
   permitir_pessoas_ia: boolean;
   saude: boolean;
@@ -53,7 +64,7 @@ export interface PostGmn {
   tema: string | null;
   palavras_chave: string[];
   texto: string | null;
-  imagem_origem: "drive" | "google" | "ia" | null;
+  imagem_origem: "drive" | "google" | "ia" | "site" | null;
   imagem_url: string | null;
   google_url: string | null;
   erro: string | null;
@@ -69,11 +80,17 @@ const FUNCAO = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmn`;
 const CAMPOS_PERFIL =
   "id, location_name, nome, endereco, categoria, site, telefone, cliente_id, ativo, sem_acesso, agenda, " +
   "cta_tipo, cta_url, drive_pasta_url, usa_ia_imagem, contexto_posts, contexto_imagens, logo_url, permitir_pessoas_ia, " +
+  "logo_posicao, logo_tamanho, logo_fundo, logo_origem_url, imagens_site, " +
   "saude, briefing, briefing_salvo_em, created_at";
 const CAMPOS_POST = "id, perfil_id, origem, status, tema, palavras_chave, texto, imagem_origem, imagem_url, google_url, erro, created_at";
 
 function comBriefing(p: any): PerfilGmn {
-  return { ...p, briefing: normalizarBriefing(p.briefing), agenda: normalizarAgenda(p.agenda) } as PerfilGmn;
+  const logo = opcoesDaLogo(p);
+  return {
+    ...p, briefing: normalizarBriefing(p.briefing), agenda: normalizarAgenda(p.agenda),
+    logo_posicao: logo.posicao, logo_tamanho: logo.tamanho, logo_fundo: logo.fundo,
+    imagens_site: normalizarImagensSite(p.imagens_site),
+  } as PerfilGmn;
 }
 
 /** Tabela ou coluna ainda não criada no banco (migration pendente) e falha de rede viram uma mensagem clara. */
@@ -83,6 +100,10 @@ export function traduzErroGmn(e: unknown): string {
   // As colunas do contexto, da logo e das pessoas nas imagens vieram numa migration própria.
   if (faltaNoBanco && /contexto_posts|contexto_imagens|logo_url|permitir_pessoas_ia/i.test(msg)) {
     return "As colunas novas do Google Meu Negócio (contexto, logo e pessoas nas imagens) ainda não existem no banco (migration 20261001120000_gmn_contexto.sql).";
+  }
+  // As opções da logo e as imagens do site vieram na migration das imagens.
+  if (faltaNoBanco && /logo_posicao|logo_tamanho|logo_fundo|logo_origem_url|imagens_site/i.test(msg)) {
+    return "As colunas novas das imagens do Google Meu Negócio (opções da logo e imagens do site) ainda não existem no banco (migration 20261001170000_gmn_imagens.sql).";
   }
   if (/gmn_/i.test(msg) && faltaNoBanco) {
     return "As tabelas do Google Meu Negócio ainda não existem no banco (migration 20260929120000_gmn.sql).";
@@ -171,28 +192,11 @@ export async function gerarPrevia(perfilId: string, comImagem = true): Promise<P
   return d.post;
 }
 
-export const LOGO_TIPOS = ["image/png", "image/jpeg"];
-export const LOGO_MAX_BYTES = 5 * 1024 * 1024;
-
-/** Conteúdo do arquivo em base64, sem o prefixo `data:...;base64,`. */
-function lerBase64(arquivo: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const leitor = new FileReader();
-    leitor.onload = () => {
-      const r = String(leitor.result ?? "");
-      resolve(r.slice(r.indexOf(",") + 1));
-    };
-    leitor.onerror = () => reject(new Error("Não foi possível ler o arquivo da logo."));
-    leitor.readAsDataURL(arquivo);
-  });
-}
-
-/** Envia a logo do cliente (PNG ou JPG até 5 MB) e devolve a URL pública gravada no perfil. */
-export async function enviarLogo(perfilId: string, arquivo: File): Promise<string> {
-  if (!LOGO_TIPOS.includes(arquivo.type)) throw new Error("Envie a logo em PNG ou JPG.");
-  if (arquivo.size > LOGO_MAX_BYTES) throw new Error("A logo pode ter até 5 MB.");
-  const base64 = await lerBase64(arquivo);
-  const d = await chamar<{ logo_url: string }>({ acao: "logo", perfil_id: perfilId, tipo: arquivo.type, base64 });
+/** Converte a imagem (qualquer formato que o navegador abre) para PNG e grava como a logo do perfil. */
+export async function enviarLogo(perfilId: string, arquivo: Blob, origemUrl: string | null = null): Promise<string> {
+  const png = await normalizarLogo(arquivo);
+  const base64 = await blobParaBase64(png);
+  const d = await chamar<{ logo_url: string }>({ acao: "logo", perfil_id: perfilId, tipo: "image/png", base64, origem_url: origemUrl });
   return d.logo_url;
 }
 

@@ -5,7 +5,8 @@ import {
   alternarImagem, base64ParaBytes, checarTexto, comUtm, decidirImagem, decisaoChecagem, escolherImagem, escolherPalavras,
   idPastaDrive,
   mesmoHorario, montarMensagensBriefing, montarMensagensPost, montarPromptImagem, mudarHora, normalizarAgenda,
-  normalizarBriefing, opcoesDaLogo, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64, type PosicaoLogo,
+  normalizarBriefing, normalizarImagensSite, opcoesDaLogo, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64,
+  type PosicaoLogo,
 } from "../../supabase/functions/gmn/regras.ts";
 
 const textoBom =
@@ -477,4 +478,12 @@ test("opcoesDaLogo: valores válidos passam; o resto vira o padrão", () => {
     { posicao: "superior_esquerdo", tamanho: "grande", fundo: "escuro" },
   );
   assert.deepEqual(opcoesDaLogo({ logo_posicao: "meio", logo_tamanho: 3 }), { posicao: "inferior_direito", tamanho: "media", fundo: "nenhum" });
+});
+
+test("normalizarImagensSite: só itens completos, sem id repetido", () => {
+  assert.deepEqual(normalizarImagensSite(null), []);
+  assert.deepEqual(
+    normalizarImagensSite([{ id: "a", url: "https://r2/a.jpg", origem_url: "https://s/a.jpg", descricao: "Pátio" }, { id: "a", url: "x" }, { url: "y" }, 3]),
+    [{ id: "a", url: "https://r2/a.jpg", origem_url: "https://s/a.jpg", descricao: "Pátio" }],
+  );
 });

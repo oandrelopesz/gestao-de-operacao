@@ -549,3 +549,21 @@ export function base64ParaBytes(b64: string): Uint8Array {
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
 }
+
+// ------------------------------------------------------------------ imagens do site do cliente
+
+export interface ImagemSite { id: string; url: string; origem_url: string; descricao: string }
+
+/** jsonb `imagens_site` → lista válida (itens com id, url e origem_url em texto; id repetido: o primeiro vence). */
+export function normalizarImagensSite(v: unknown): ImagemSite[] {
+  const out: ImagemSite[] = [];
+  for (const x of Array.isArray(v) ? v : []) {
+    const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    const id = typeof o.id === "string" ? o.id : "";
+    const url = typeof o.url === "string" ? o.url : "";
+    const origem = typeof o.origem_url === "string" ? o.origem_url : "";
+    if (!id || !url || !origem || out.some((i) => i.id === id)) continue;
+    out.push({ id, url, origem_url: origem, descricao: typeof o.descricao === "string" ? o.descricao.slice(0, 300) : "" });
+  }
+  return out;
+}
