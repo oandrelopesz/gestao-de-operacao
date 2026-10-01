@@ -136,8 +136,12 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
     }
   };
 
+  // "Em andamento" de antes de ligar "Curso concluído" no popup: desligar a conclusão devolve esse valor
+  const andamentoAntesRef = useRef<boolean | null>(null);
+
   useEffect(() => {
     if (open) {
+      andamentoAntesRef.current = null;
       if (editingCourse) {
         form.reset({
           nome: editingCourse.nome || "",
@@ -248,7 +252,7 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editingCourse ? "Editar Curso" : "Novo Curso"}</DialogTitle>
         </DialogHeader>
@@ -400,8 +404,14 @@ export function CourseForm({ open, onOpenChange, editingCourse, onSuccess }: Cou
                             checked={field.value}
                             onCheckedChange={(v) => {
                               field.onChange(v);
-                              // Um curso concluído não está em andamento
-                              if (v) form.setValue("em_andamento", false, { shouldDirty: true });
+                              // Um curso concluído não está em andamento; desligar a conclusão aqui devolve o valor de antes
+                              if (v) {
+                                andamentoAntesRef.current = form.getValues("em_andamento");
+                                form.setValue("em_andamento", false, { shouldDirty: true });
+                              } else if (andamentoAntesRef.current !== null) {
+                                form.setValue("em_andamento", andamentoAntesRef.current, { shouldDirty: true });
+                                andamentoAntesRef.current = null;
+                              }
                             }}
                             className="data-[state=checked]:bg-emerald-500"
                           />

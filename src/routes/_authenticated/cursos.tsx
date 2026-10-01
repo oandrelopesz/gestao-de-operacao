@@ -211,7 +211,11 @@ function CursosPage() {
         c.id === curso.id ? { ...c, ...patch } : c
       ));
 
-      toast.success(concluir ? "Curso concluído" : "Conclusão desmarcada");
+      toast.success(concluir ? "Curso concluído" : "Conclusão desmarcada", {
+        // Sob um filtro que esconde o card, diz para onde ele foi
+        description: concluir && situacao === "nao_concluidos" ? "Ele agora aparece no filtro Concluídos."
+          : !concluir && situacao === "concluidos" ? "Ele agora aparece no filtro Não concluídos." : undefined,
+      });
     } catch (error: any) {
       toast.error("Erro ao atualizar o curso");
     } finally {
@@ -328,7 +332,7 @@ function CursosPage() {
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <p className="text-2xl font-bold text-emerald-600">{stats.emAndamento}</p>
-              <p className="text-xs text-muted-foreground mt-1">{stats.emAndamento} cursos ativos</p>
+              <p className="text-xs text-muted-foreground mt-1">{stats.emAndamento} {stats.emAndamento === 1 ? "curso ativo" : "cursos ativos"}</p>
             </CardContent>
           </Card>
           <Card className="bg-card/50 border-slate-500/20">
@@ -337,7 +341,7 @@ function CursosPage() {
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <p className="text-2xl font-bold text-slate-600">{stats.pausados}</p>
-              <p className="text-xs text-muted-foreground mt-1">{stats.pausados} cursos parados</p>
+              <p className="text-xs text-muted-foreground mt-1">{stats.pausados} {stats.pausados === 1 ? "curso parado" : "cursos parados"}</p>
             </CardContent>
           </Card>
           <Card className="border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30">
@@ -348,7 +352,7 @@ function CursosPage() {
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.concluidos}</p>
-              <p className="text-xs text-muted-foreground mt-1">{stats.concluidos} cursos finalizados</p>
+              <p className="text-xs text-muted-foreground mt-1">{stats.concluidos} {stats.concluidos === 1 ? "curso finalizado" : "cursos finalizados"}</p>
             </CardContent>
           </Card>
         </div>
@@ -565,9 +569,10 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus, onToggleConclusao
   return (
     <Card className={cn(
       "overflow-hidden transition-all duration-300",
-      // Concluído: verde em volta toda, mesmo se também estiver expirado (a etiqueta de expiração continua)
+      // Concluído: verde em volta toda, mesmo se também estiver expirado (a etiqueta de expiração continua).
+      // O `surface` do Card pinta o fundo com gradientes (background-image): sem o `!` o verde ficaria por baixo deles.
       concluido
-        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 shadow-sm"
+        ? "border-emerald-500 bg-none! bg-emerald-100! dark:bg-emerald-900/40! shadow-sm"
         : curso.em_andamento && !expirado ? "border-l-4 border-l-emerald-500 shadow-sm" : "opacity-75",
       // Expirado: cinza, mas tudo continua clicável (nada é apagado)
       expirado && !concluido && "bg-muted/60 grayscale opacity-80"
@@ -599,7 +604,7 @@ function CourseCard({ curso, onEdit, onDelete, onToggleStatus, onToggleConclusao
               <Switch
                 checked={curso.em_andamento}
                 onCheckedChange={onToggleStatus}
-                aria-label="Em andamento"
+                aria-label={`Em andamento: ${curso.nome}`}
                 className="data-[state=checked]:bg-emerald-500"
               />
             )}
