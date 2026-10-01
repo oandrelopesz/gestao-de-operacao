@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { parseOperacoesResumo } from "@/lib/clientes";
 import { formatMoeda } from "@/lib/moedas";
+import { categoriaDoScore } from "@/lib/nps";
 import { fetchDemandaColunas } from "@/lib/demandaColunas";
 import { fetchCursoCategorias } from "@/lib/cursoCategorias";
 import { fetchHabilidades } from "@/lib/habilidades";
@@ -52,12 +53,15 @@ export async function loadClientesLite() {
 
 export const loadColunas = fetchDemandaColunas;
 
-/** clientes_view enriquecida com resumo de plataformas/verba (aba Clientes Ativos) */
-export async function loadClientesView() {
+/**
+ * clientes_view enriquecida com resumo de plataformas/verba (aba Clientes Ativos).
+ * `arquivado` escolhe entre os clientes ativos (padrão, os do cache da aba) e os arquivados.
+ */
+async function buscarClientesView(arquivado: boolean) {
   const { data, error } = await supabase
     .from("clientes_view" as any)
     .select("*")
-    .eq("arquivado", false)
+    .eq("arquivado", arquivado)
     .order("nome");
   if (error) throw error;
 
@@ -79,8 +83,25 @@ export async function loadClientesView() {
       })
       .join(" / ");
     const uniquePlats = Array.from(new Set(cliSaldos.flatMap((s) => s.plataformas || [])));
-    return { ...cli, operacoes, saldo_ads_summary: summary, plataformas_ativas: uniquePlats };
+    // A view ainda calcula nps_status em 45/35/25; a escala oficial é a 40/30/20 (a mesma da aba NPS)
+    return {
+      ...cli,
+      nps_status: categoriaDoScore(cli.ultima_nps_score),
+      operacoes,
+      saldo_ads_summary: summary,
+      plataformas_ativas: uniquePlats,
+    };
   });
+}
+
+/** Clientes ativos (não arquivados) para a aba Clientes Ativos */
+export function loadClientesView() {
+  return buscarClientesView(false);
+}
+
+/** Clientes arquivados, para a opção "Mostrar arquivados" (fora do cache dos ativos) */
+export function loadClientesArquivados() {
+  return buscarClientesView(true);
 }
 
 export async function loadSaldo() {

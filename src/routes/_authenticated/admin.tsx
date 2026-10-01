@@ -29,6 +29,7 @@ import { NOMES_DIA_CURTO } from "@/lib/colunasDias";
 import { useConfig } from "@/lib/appConfig";
 import { usePlataformas, slugifyPlataformaId, type PlataformaDef } from "@/lib/plataformas";
 import { renomearChavePlataforma } from "@/lib/plataformasOperacao";
+import { categoriaDoScore } from "@/lib/nps";
 import { useTheme } from "@/lib/theme";
 import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, CATEGORIA_COLORS, type CursoCategoriaDef } from "@/lib/cursoCategorias";
 import { HabilidadesAdminCard } from "@/components/habilidades/HabilidadesAdminCard";
@@ -556,7 +557,9 @@ function AdminPage() {
     }
     const cols = ["nome", "agencia", "nicho", "status_operacional", "data_inicio", "verba_ads", "tipo_verba", "verba_total_contratada", "data_limite_verba", "nps_status", "demandas_ativas", "observacoes"];
     const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const csv = [cols.join(";"), ...(data as any[]).map((row) => cols.map((c) => escape(row[c])).join(";"))].join("\n");
+    // nps_status pela escala oficial 40/30/20 (a view ainda calcula 45/35/25)
+    const linhas = (data as any[]).map((row) => ({ ...row, nps_status: categoriaDoScore(row.ultima_nps_score) }));
+    const csv = [cols.join(";"), ...linhas.map((row) => cols.map((c) => escape(row[c])).join(";"))].join("\n");
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

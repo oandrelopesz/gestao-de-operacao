@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Plus, Search, Users as UsersIcon, DollarSign, TrendingUp, Smile,
   MoreVertical, Pencil, Archive, Trash2, LayoutGrid, Table as TableIcon, Calendar, Play, Pause,
-  AlertCircle, Settings2
+  AlertCircle, Settings2, ArchiveRestore
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,11 +45,11 @@ import {
 import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { supabase } from "@/integrations/supabase/client";
 import { useCachedState, hasCached } from "@/lib/pageCache";
-import { CACHE_KEYS, loadClientesView } from "@/lib/data";
+import { CACHE_KEYS, loadClientesView, loadClientesArquivados } from "@/lib/data";
 import { toast } from "sonner";
 import {
   formatBRL, tempoDeCasa, type OperacaoResumo,
-  NPS_STATUS_META, PAGAMENTO_META,
+  NPS_STATUS_META,
 } from "@/lib/clientes";
 import { useAgencias, agenciaBadgeStyle, agenciaBorderStyle } from "@/lib/agencias";
 import { saveCliente, loadClienteFormValues, setTrafegoAtivo, type ClienteFormInitial } from "@/lib/clientesService";
@@ -82,6 +82,7 @@ interface ClienteView {
   ultima_nps_data: string | null;
   nps_status: "ancora" | "saudavel" | "em_risco" | "critico" | "sem_avaliacao";
   demandas_ativas: number;
+  /** A view ainda devolve (constante "em_dia"), mas a tela não mostra mais */
   status_pagamento_mes: "em_dia" | "pendente" | "atrasado" | null;
   tipo_verba: "mensal" | "total_periodo";
   verba_total_contratada: number | null;
@@ -111,6 +112,10 @@ function ClientesPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [operacionalFilter, setOperacionalFilter] = useState<string>("all_active");
   const [showPausados, setShowPausados] = useState(true);
+  const [showArquivados, setShowArquivados] = useState(false);
+  /** Arquivados ficam numa lista própria, fora do cache dos ativos: resumo, NPS e verba contam só os ativos */
+  const [arquivados, setArquivados] = useState<ClienteView[]>([]);
+  const [loadingArquivados, setLoadingArquivados] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ClienteView | null>(null);
   /** Cadastro completo (cliente + forma de pagamento e verba de cada plataforma) do cliente em edição */
@@ -148,6 +153,23 @@ function ClientesPage() {
     }
   };
 
+  const fetchArquivados = async () => {
+    setLoadingArquivados(true);
+    try {
+      setArquivados((await loadClientesArquivados()) as ClienteView[]);
+    } catch (err: any) {
+      console.error("Erro ao carregar clientes arquivados:", err);
+      toast.error("Erro ao carregar arquivados: " + (err?.message || ""));
+    } finally {
+      setLoadingArquivados(false);
+    }
+  };
+
+  useEffect(() => { if (showArquivados) fetchArquivados(); }, [showArquivados]);
+
+  /** Arquivar, restaurar e remover mudam as duas listas */
+  const recarregarListas = () => Promise.all([fetchClientes(), fetchArquivados()]);
+
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     clientes.forEach((cli) => { c[cli.agencia] = (c[cli.agencia] || 0) + 1; });
@@ -155,13 +177,15 @@ function ClientesPage() {
   }, [clientes]);
 
   const filtered = useMemo(() => {
-    return clientes
+    // Ativos primeiro, arquivados no fim; os cartões de resumo continuam usando só "clientes"
+    const base = showArquivados ? [...clientes, ...arquivados] : clientes;
+    return base
       .filter((c) => agencia === "todos" ? true : c.agencia === agencia)
       .filter((c) => !subAgencia || c.agencia === subAgencia)
       .filter((c) => statusFilter === "all" || c.nps_status === statusFilter)
-      .filter((c) => showPausados || c.status_operacional === "ativo")
+      .filter((c) => c.arquivado || showPausados || c.status_operacional === "ativo")
       .filter((c) => !search || c.nome.toLowerCase().includes(search.toLowerCase()));
-  }, [clientes, agencia, subAgencia, statusFilter, search, showPausados]);
+  }, [clientes, arquivados, showArquivados, agencia, subAgencia, statusFilter, search, showPausados]);
 
   const metrics = useMemo(() => {
     const list = clientes.filter((c) => agencia === "todos" ? true : c.agencia === agencia);
@@ -221,15 +245,24 @@ function ClientesPage() {
   const handleArchive = async (id: string) => {
     const { error } = await supabase.from("clientes")
       .update({ arquivado: true } as any).eq("id", id);
-    if (error) toast.error("Erro ao arquivar");
-    else { toast.success("Cliente arquivado"); fetchClientes(); }
+    if (error) { toast.error("Erro ao arquivar"); return; }
+    toast.success("Cliente arquivado", { action: { label: "Desfazer", onClick: () => handleRestore(id) } });
+    recarregarListas();
+  };
+
+  const handleRestore = async (id: string) => {
+    const { error } = await supabase.from("clientes")
+      .update({ arquivado: false } as any).eq("id", id);
+    if (error) { toast.error("Erro ao restaurar"); return; }
+    toast.success("Cliente restaurado.");
+    recarregarListas();
   };
 
   const handleDelete = async () => {
     if (!deletingId) return;
     const { error } = await supabase.from("clientes").delete().eq("id", deletingId);
     if (error) toast.error("Erro ao deletar");
-    else { toast.success("Cliente deletado"); fetchClientes(); }
+    else { toast.success("Cliente deletado"); recarregarListas(); }
     setDeletingId(null);
   };
 
@@ -241,7 +274,7 @@ function ClientesPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Clientes Ativos</h1>
-          <p className="text-muted-foreground">Visão por agência, com NPS e financeiro consolidados.</p>
+          <p className="text-muted-foreground">Visão por agência, com verba de ads, NPS e demandas de cada cliente.</p>
         </div>
         <div className="flex items-center gap-2">
           <Tabs value={view} onValueChange={(v) => navigate({ search: { agencia, view: v as any } })}>
@@ -505,6 +538,11 @@ function ClientesPage() {
           <span className="font-medium">Mostrar pausados</span>
           <Checkbox checked={showPausados} onCheckedChange={(v) => setShowPausados(!!v)} />
         </div>
+        <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs">
+          <span className="font-medium">Mostrar arquivados</span>
+          <Checkbox aria-label="Mostrar arquivados" checked={showArquivados} onCheckedChange={(v) => setShowArquivados(!!v)} />
+          {showArquivados && loadingArquivados && <span className="text-muted-foreground">Carregando...</span>}
+        </div>
       </div>
 
       {/* Conteúdo */}
@@ -550,6 +588,7 @@ function ClientesPage() {
               showAgenciaBadge={agencia === "todos"}
               onEdit={() => openEdit(c)}
               onArchive={() => handleArchive(c.id)}
+              onRestore={() => handleRestore(c.id)}
               onDelete={() => { setDeletingId(c.id); setDeletingName(c.nome); }}
               onToggleTrafego={() => handleToggleTrafego(c)}
             />
@@ -567,18 +606,16 @@ function ClientesPage() {
                 <TableHead>Verba/mês</TableHead>
                 <TableHead>NPS</TableHead>
                 <TableHead>Demandas</TableHead>
-                <TableHead>Pagamento</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((c) => {
                 const nps = NPS_STATUS_META[c.nps_status];
-                const pag = c.status_pagamento_mes ? PAGAMENTO_META[c.status_pagamento_mes] : null;
                 return (
                   <TableRow 
                     key={c.id}
-                    className="group outline-none focus:bg-muted/50"
+                    className={cn("group outline-none focus:bg-muted/50", c.arquivado && "opacity-70")}
                     tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === "Delete" || e.key === "Backspace") {
@@ -587,7 +624,14 @@ function ClientesPage() {
                       }
                     }}
                   >
-                    <TableCell className="font-medium">{c.nome}</TableCell>
+                    <TableCell className="font-medium">
+                      {c.nome}
+                      {c.arquivado && (
+                        <Badge variant="secondary" className="ml-2 bg-slate-200 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider">
+                          Arquivado
+                        </Badge>
+                      )}
+                    </TableCell>
                     {agencia === "todos" && (
                       <TableCell>
                         <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-bold uppercase" style={agenciaBadgeStyle(agenciaMetaOf(c.agencia)?.hex)}>
@@ -604,7 +648,6 @@ function ClientesPage() {
                     </TableCell>
                     <TableCell><Badge variant="outline" className={cn("font-normal", nps.classes)}>{nps.label}</Badge></TableCell>
                     <TableCell>{c.demandas_ativas}</TableCell>
-                    <TableCell>{pag ? <Badge variant="outline" className={cn("font-normal", pag.classes)}>{pag.label}</Badge> : <span className="text-muted-foreground text-xs">—</span>}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -613,15 +656,23 @@ function ClientesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-[140px]">
-                          <DropdownMenuItem onClick={() => openEdit(c)}>
-                            <Pencil size={14} className="mr-2" /> Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleToggleTrafego(c)}>
-                            {c.trafego_ativo === false ? <><Play size={14} className="mr-2" /> Ativar tráfego</> : <><Pause size={14} className="mr-2" /> Pausar tráfego</>}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleArchive(c.id)}>
-                            <Archive size={14} className="mr-2" /> Arquivar
-                          </DropdownMenuItem>
+                          {c.arquivado ? (
+                            <DropdownMenuItem onClick={() => handleRestore(c.id)}>
+                              <ArchiveRestore size={14} className="mr-2" /> Restaurar
+                            </DropdownMenuItem>
+                          ) : (
+                            <>
+                              <DropdownMenuItem onClick={() => openEdit(c)}>
+                                <Pencil size={14} className="mr-2" /> Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleToggleTrafego(c)}>
+                                {c.trafego_ativo === false ? <><Play size={14} className="mr-2" /> Ativar tráfego</> : <><Pause size={14} className="mr-2" /> Pausar tráfego</>}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleArchive(c.id)}>
+                                <Archive size={14} className="mr-2" /> Arquivar
+                              </DropdownMenuItem>
+                            </>
+                          )}
                           <DropdownMenuItem 
                             className="text-destructive focus:text-destructive" 
                             onClick={() => { setDeletingId(c.id); setDeletingName(c.nome); }}
@@ -643,7 +694,7 @@ function ClientesPage() {
         <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar cliente" : "Novo cliente"}</DialogTitle>
-            <DialogDescription>Preencha os dados do cliente. O status é calculado a partir do NPS.</DialogDescription>
+            <DialogDescription>Preencha os dados do cliente. O status de NPS vem das avaliações da aba NPS de Clientes.</DialogDescription>
           </DialogHeader>
           {editing && !editingValues ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Carregando cliente...</p>
@@ -695,26 +746,26 @@ function MetricCard({ icon, label, value, hint }: { icon: React.ReactNode; label
 }
 
 function ClienteCard({
-  cliente, borderColor, showAgenciaBadge, onEdit, onArchive, onDelete, onToggleTrafego,
+  cliente, borderColor, showAgenciaBadge, onEdit, onArchive, onRestore, onDelete, onToggleTrafego,
 }: {
   cliente: ClienteView;
   borderColor?: string;
   showAgenciaBadge?: boolean;
   onEdit: () => void;
   onArchive: () => void;
+  onRestore: () => void;
   onDelete: () => void;
   onToggleTrafego: () => void;
 }) {
   const { meta: agenciaMetaOf, label: agenciaLabelOf } = useAgencias();
   const nps = NPS_STATUS_META[cliente.nps_status];
-  const pag = cliente.status_pagamento_mes ? PAGAMENTO_META[cliente.status_pagamento_mes] : null;
   const obsTrim = cliente.observacoes && cliente.observacoes.length > 110
     ? cliente.observacoes.slice(0, 110) + "…"
     : cliente.observacoes;
 
   return (
     <Card 
-      className={cn("border-l-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default flex flex-col group relative outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2", !borderColor && "border-l-primary")}
+      className={cn("border-l-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default flex flex-col group relative outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2", !borderColor && "border-l-primary", cliente.arquivado && "opacity-75")}
       style={agenciaBorderStyle(borderColor)}
       tabIndex={0}
       onKeyDown={(e) => {
@@ -729,15 +780,23 @@ function ClienteCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[140px]">
-            <DropdownMenuItem onClick={onEdit}>
-              <Pencil size={14} className="mr-2" /> Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onToggleTrafego}>
-              {cliente.trafego_ativo === false ? <><Play size={14} className="mr-2" /> Ativar tráfego</> : <><Pause size={14} className="mr-2" /> Pausar tráfego</>}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onArchive}>
-              <Archive size={14} className="mr-2" /> Arquivar
-            </DropdownMenuItem>
+            {cliente.arquivado ? (
+              <DropdownMenuItem onClick={onRestore}>
+                <ArchiveRestore size={14} className="mr-2" /> Restaurar
+              </DropdownMenuItem>
+            ) : (
+              <>
+                <DropdownMenuItem onClick={onEdit}>
+                  <Pencil size={14} className="mr-2" /> Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onToggleTrafego}>
+                  {cliente.trafego_ativo === false ? <><Play size={14} className="mr-2" /> Ativar tráfego</> : <><Pause size={14} className="mr-2" /> Pausar tráfego</>}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onArchive}>
+                  <Archive size={14} className="mr-2" /> Arquivar
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem 
               className="text-destructive focus:text-destructive" 
               onClick={onDelete}
@@ -758,6 +817,11 @@ function ClienteCard({
                 </Badge>
               )}
               <CardTitle className="text-base font-semibold truncate">{cliente.nome}</CardTitle>
+              {cliente.arquivado && (
+                <Badge variant="secondary" className="bg-slate-200 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
+                  Arquivado
+                </Badge>
+              )}
               {cliente.em_onboarding && (
                 <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 h-5 px-1.5 text-[9px] font-bold uppercase tracking-wider shrink-0">
                   Onboarding
@@ -851,15 +915,6 @@ function ClienteCard({
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Demandas ativas</p>
             <p className="font-medium">{cliente.demandas_ativas}</p>
           </div>
-        </div>
-
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Pagamento do mês</p>
-          {pag ? (
-            <Badge variant="outline" className={cn("font-normal", pag.classes)}>{pag.label}</Badge>
-          ) : (
-            <span className="text-xs text-muted-foreground">Sem registro</span>
-          )}
         </div>
 
         {obsTrim && (

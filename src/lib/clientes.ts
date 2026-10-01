@@ -59,12 +59,6 @@ export const NPS_STATUS_META: Record<string, { label: string; classes: string; d
   },
 };
 
-export const PAGAMENTO_META: Record<string, { label: string; classes: string }> = {
-  em_dia: { label: "Em dia", classes: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
-  pendente: { label: "Pendente", classes: "bg-amber-500/10 text-amber-700 dark:text-amber-300" },
-  atrasado: { label: "Atrasado", classes: "bg-red-500/10 text-red-700 dark:text-red-300" },
-};
-
 /** Resumo de uma operação do cliente, como vem no JSON `operacoes` da clientes_view */
 export interface OperacaoResumo {
   id: string;

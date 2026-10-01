@@ -117,8 +117,26 @@ export const NPS_SCORE_CATEGORIES: NPSScoreCategory[] = [
   }
 ];
 
+/** Ids possíveis da categoria de uma nota (as 4 faixas de NPS_SCORE_CATEGORIES + "sem avaliação") */
+export type NPSCategoriaId = "ancora" | "saudavel" | "em_risco" | "critico" | "sem_avaliacao";
+
+/**
+ * Escala única do sistema (40/30/20): Âncora >= 40, Saudável 30-39, Em risco 20-29, Crítico < 20.
+ * Sem nota (null) devolve "sem_avaliacao". Usada pela aba NPS, pelo formulário, pelo histórico,
+ * pela aba Clientes e pela exportação do Admin (a clientes_view ainda calcula 45/35/25, mas o app ignora).
+ */
+export function categoriaDoScore(score: number | null | undefined): NPSCategoriaId {
+  if (score === null || score === undefined) return "sem_avaliacao";
+  const nota = Number(score);
+  if (Number.isNaN(nota)) return "sem_avaliacao";
+  // A tabela está da maior para a menor faixa: a primeira cujo mínimo a nota alcança
+  const faixa = NPS_SCORE_CATEGORIES.find((c) => nota >= c.min);
+  return (faixa?.id ?? "critico") as NPSCategoriaId;
+}
+
 export function getScoreCategory(score: number): NPSScoreCategory {
-  return NPS_SCORE_CATEGORIES.find(c => score >= c.min && score <= c.max) || NPS_SCORE_CATEGORIES[3];
+  const id = categoriaDoScore(score);
+  return NPS_SCORE_CATEGORIES.find((c) => c.id === id) || NPS_SCORE_CATEGORIES[3];
 }
 
 export function getMetricColor(nota: number): string {
