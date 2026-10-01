@@ -1214,7 +1214,7 @@ Em `https://dash.cloudflare.com/b4e84eaa8099c0e841a2eb35824027ca/r2/api-tokens` 
 
 - [ ] **Step 2: Chave da OpenAI**
 
-O usuário cria em `https://platform.openai.com/api-keys` a chave `gestao-de-operacao gmn` (projeto padrão) e a mantém à vista para o Step 3. Conferir, na página de modelos da OpenAI, os nomes atuais do modelo de texto barato e do modelo de imagem. Os padrões do código são `gpt-5-mini` e `gpt-image-1`; se mudaram, usar os nomes atuais nos secrets `OPENAI_MODELO_TEXTO` e `OPENAI_MODELO_IMAGEM`.
+O usuário cria em `https://platform.openai.com/api-keys` a chave `gestao-de-operacao gmn` (projeto padrão) e a mantém à vista para o Step 3. Conferir, na página de modelos da OpenAI, os nomes atuais do modelo de texto barato e do modelo de imagem. O `gpt-image-1` exige **organização verificada** (platform.openai.com → Settings → Organization → Verify): sem isso, a imagem da IA falha com "A OpenAI negou acesso a este modelo" e a prévia sai só com texto. Os padrões do código são `gpt-5-mini` e `gpt-image-1`; se mudaram, usar os nomes atuais nos secrets `OPENAI_MODELO_TEXTO` e `OPENAI_MODELO_IMAGEM`.
 
 - [ ] **Step 3: Secrets no Lovable Cloud (o usuário cola os valores sensíveis)**
 
@@ -2193,6 +2193,8 @@ Matar vites antigos (memória `dev-server-local`) e rodar `npm run dev`. Abrir `
 - Segunda prévia: tema diferente ("Dúvida frequente de clientes") e texto que não repete o primeiro.
 - Com pasta do Drive: pedir ao usuário um link de pasta com fotos da loja (acessível pela contato@), salvar e gerar prévia → **Foto do Drive**; a seguinte usa outra foto.
 - Checagem: acrescentar temporariamente um termo proibido que certamente aparecerá (ex.: "seminovos") → prévia termina **Pulado** com o motivo; remover o termo e salvar de novo.
+- Saúde (spec §8): marcar "saúde" na aba Briefing por um instante, salvar e gerar prévia → **Pulado** ou texto sem superlativo (o Posicionamento diz "a melhor"); desmarcar e salvar.
+- Tempo: anotar quanto leva cada prévia e o "Gerar com IA"; se o texto passar de ~25 s, enviar `reasoning_effort: "low"` para modelos `gpt-5*` em `openai.ts`.
 
 - [ ] **Step 4: Mostrar ao usuário e registrar**
 

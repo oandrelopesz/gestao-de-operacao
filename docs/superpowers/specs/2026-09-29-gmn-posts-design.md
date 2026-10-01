@@ -1,6 +1,6 @@
 # Posts automáticos no Google Meu Negócio — desenho
 
-Data: 29/09/2026. Status: aprovado no brainstorming, aguardando revisão da spec.
+Data: 29/09/2026. Status: aprovada; Fase 1 implementada em 30/09/2026 (branch `gmn-fase1`), com emendas ao longo da implementação.
 
 ## 1. Objetivo
 
@@ -111,13 +111,16 @@ O uso é registrado quando a foto é escolhida, inclusive na prévia: prévias s
 A conexão da andfalopes@ ganha uma linha própria em `google_oauth_tokens`, identificada por uma coluna nova
 `finalidade text default 'geral'` (`'gmn'` para esta conta). A linha atual da contato@ continua como `geral`. Os escopos
 pedidos na conexão GMN são `business.manage` e `drive.readonly`. As funções `google-oauth-exchange` e `google-token`
-passam a aceitar `finalidade` (no `state` e como parâmetro); sem ela, o comportamento atual não muda. (Fase 2 — na Fase 1 a função usa a linha mais recente, que é a da contato@.)
+passam a aceitar `finalidade` (no `state` e como parâmetro); sem ela, o comportamento atual não muda. (Fase 2 — na Fase 1 a função usa a linha mais recente, que é a da contato@.) Atenção: o `tokenGoogle` de
+`supabase/functions/gmn/google.ts` também pega a linha mais recente e precisa filtrar por `finalidade` junto com o
+`google-token`; sem isso, a linha nova da andfalopes@ passaria a ser usada por Swipe, Drive e Agenda.
 
 ## 4. Imagens no Cloudflare R2
 
 - Bucket `gmn-midia` (criado em 29/09/2026 na conta Cloudflare da contato@, id `b4e84eaa8099c0e841a2eb35824027ca`,
   região ENAM), acesso público em `https://pub-ae3cb23015f64d9183be1720f7c52e2e.r2.dev`. A chave de API é criada na
-  implementação e vai direto para os secrets, sem passar pelo repositório. Chave de API do R2 só com escrita nesse bucket. Secrets:
+  implementação e vai direto para os secrets, sem passar pelo repositório. A chave de API do R2 é a mesma dos Arquivos (token `sistema gestao - arquivos e gmn`, criado em 30/09/2026, com
+  leitura e escrita nos dois buckets). Secrets:
   `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE`.
 - Chave do objeto: `{perfil_id}/{post_id}.{jpg|png}`. Só entram imagens de fato usadas em post: foto do Drive
   copiada ou imagem da IA. Fotos do perfil no Google usam a `googleUrl` do próprio Google, sem cópia.
@@ -224,8 +227,9 @@ A lista fixa de saúde fica em `supabase/functions/gmn/regras.ts` e é testada c
     para ativar");
   - perfis que não vieram na lista ficam `sem_acesso=true, ativo=false`;
   - perfis que voltaram ficam `sem_acesso=false` e continuam desligados.
-- **`gmn-briefing-ia`:** recebe `perfil_id` e, opcionalmente, o id de um envio de briefing de Dados internos
-  (`formularios_envios`; o `.txt` é lido no Drive como o visualizador de Dados internos já faz). Junta os dados do Google
+- **Briefing com IA** (ação `briefing` da função `gmn`, implementada assim na Fase 1): recebe `perfil_id` e,
+  opcionalmente, o texto de um envio de briefing de Dados internos (o front lê o `.txt` no Drive como o visualizador de
+  Dados internos já faz e manda o texto). Junta os dados do Google
   (descrição, categorias, site e endereço), o nicho do cliente ligado e o briefing escolhido, e devolve o JSON de 3.2 para
   o front preencher. Não salva nada: o usuário revisa e salva.
 
@@ -235,9 +239,11 @@ A lista fixa de saúde fica em `supabase/functions/gmn/regras.ts` e é testada c
 
 - Migration (seção 3), R2 (seção 4) e secrets da OpenAI.
 - Aba `/gmn` completa, com perfis criados **à mão** (nome + cliente opcional, `location_name` nulo) para testar.
-- `gmn-briefing-ia` (sem dados do Google), **Gerar prévia** (texto + imagem do Drive ou da IA + R2) e checagem.
+- Briefing com IA (ação `briefing` da função `gmn`, sem dados do Google), **Gerar prévia** (texto + imagem do Drive ou da IA + R2) e checagem.
 - **Nada vai ao ar na Fase 1** (decisão do usuário, 29/09/2026). A aba não é publicada no Lovable, os crons não são
-  criados e nenhum perfil é ativado. Os testes rodam no dev server local; as tabelas novas existem no banco, mas ficam
+  criados e nenhum perfil é ativado. Como a função `gmn` precisa ir para a `main` para o Lovable publicá-la, a tela só
+  funciona no servidor local (`ABA_LIBERADA = import.meta.env.DEV` em `src/lib/gmn.ts`); no site publicado, `/gmn`
+  mostra "Em preparação". Tirar essa trava na Fase 2. Os testes rodam no dev server local; as tabelas novas existem no banco, mas ficam
   sem uso.
 - **Perfil de teste: Brazilian Car** (Brasília, compra e venda de seminovos). Objetivo do cliente: fortalecer a
   percepção de "a melhor loja de Brasília para comprar e vender seminovos". Não é perfil de saúde, então o
