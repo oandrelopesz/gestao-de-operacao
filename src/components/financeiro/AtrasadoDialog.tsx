@@ -9,21 +9,22 @@ interface Props {
   onFechar: () => void;
   /** Nome da fonte (cliente). */
   nome: string;
-  /** O que está devendo, do mês mais antigo ao mais novo, e o total (resultado de `atrasadoDe`). */
+  /** O que está devendo e o total (resultado de `atrasadoDe`); a janela ordena do mês mais antigo ao mais novo. */
   atrasado: { itens: Cobranca[]; total: number };
   onValorCheio: (cobranca: Cobranca) => void;
   onConfigurar: (cobranca: Cobranca) => void;
   onIsentar: (cobranca: Cobranca) => void;
   onDesfazer: (cobranca: Cobranca) => void;
-  /** Uma gravação em andamento: trava os botões das linhas. */
+  /** Uma gravação em andamento: trava os botões das linhas (o "Desfazer" aparece nas parciais). */
   ocupado: boolean;
 }
 
 /** Lista do atrasado acumulado de um cliente: as parcelas vencidas e não quitadas, agrupadas por mês, com as ações. */
 export function AtrasadoDialog({ aberto, onFechar, nome, atrasado, onValorCheio, onConfigurar, onIsentar, onDesfazer, ocupado }: Props) {
-  // Uma seção por mês, na ordem em que os meses aparecem (do mais antigo)
+  // Do mais antigo ao mais novo (mês e depois parcela), qualquer que seja a ordem de quem chama; uma seção por mês
+  const ordenados = [...atrasado.itens].sort((a, b) => a.mes.localeCompare(b.mes) || a.parcela - b.parcela);
   const meses: { mes: string; itens: Cobranca[] }[] = [];
-  for (const c of atrasado.itens) {
+  for (const c of ordenados) {
     const grupo = meses.find((m) => m.mes === c.mes);
     if (grupo) grupo.itens.push(c);
     else meses.push({ mes: c.mes, itens: [c] });

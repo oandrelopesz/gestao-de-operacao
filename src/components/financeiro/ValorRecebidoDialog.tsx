@@ -11,7 +11,9 @@ import type { Cobranca } from "@/lib/financeiroCobranca";
 interface Props {
   /** A parcela que está sendo acertada; null = janela fechada. */
   cobranca: Cobranca | null;
-  /** Gravação em andamento: trava o botão. */
+  /** Id da fonte (cliente) da parcela: a janela reinicia o formulário também ao trocar de cliente. */
+  fonteId?: string;
+  /** Gravação em andamento: trava os botões e ignora fechar (Cancelar, X e Esc). */
   ocupado: boolean;
   onFechar: () => void;
   /** `valor` = o recebido NO TOTAL da parcela; `data` = "YYYY-MM-DD". */
@@ -21,7 +23,7 @@ interface Props {
 const DATA_VALIDA = /^\d{4}-\d{2}-\d{2}$/;
 
 /** "Configurar valor recebido": o total recebido da parcela e a data. Valor menor que o devido deixa o resto em aberto. */
-export function ValorRecebidoDialog({ cobranca, ocupado, onFechar, onConfirmar }: Props) {
+export function ValorRecebidoDialog({ cobranca, fonteId, ocupado, onFechar, onConfirmar }: Props) {
   const id = useId();
   const [valorTexto, setValorTexto] = useState("");
   const [data, setData] = useState("");
@@ -30,7 +32,7 @@ export function ValorRecebidoDialog({ cobranca, ocupado, onFechar, onConfirmar }
   const [chaveAberta, setChaveAberta] = useState<string | null>(null);
 
   // Ao abrir (ou trocar de parcela), prepara o formulário: o já pago ou o valor cheio, e hoje
-  const chave = cobranca ? `${cobranca.mes}|${cobranca.parcela}` : null;
+  const chave = cobranca ? `${fonteId ?? ""}|${cobranca.mes}|${cobranca.parcela}` : null;
   if (chave !== chaveAberta) {
     setChaveAberta(chave);
     if (cobranca) {
@@ -45,7 +47,7 @@ export function ValorRecebidoDialog({ cobranca, ocupado, onFechar, onConfirmar }
   const podeSalvar = valor > 0 && DATA_VALIDA.test(data) && !ocupado;
 
   return (
-    <Dialog open={cobranca !== null} onOpenChange={(aberto) => { if (!aberto) onFechar(); }}>
+    <Dialog open={cobranca !== null} onOpenChange={(aberto) => { if (!aberto && !ocupado) onFechar(); }}>
       <DialogContent className="sm:max-w-[420px]">
         {c && (
           <form
@@ -83,7 +85,7 @@ export function ValorRecebidoDialog({ cobranca, ocupado, onFechar, onConfirmar }
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onFechar}>Cancelar</Button>
+              <Button type="button" variant="outline" disabled={ocupado} onClick={onFechar}>Cancelar</Button>
               <Button type="submit" disabled={!podeSalvar}>{ocupado ? "Salvando..." : "Salvar"}</Button>
             </DialogFooter>
           </form>

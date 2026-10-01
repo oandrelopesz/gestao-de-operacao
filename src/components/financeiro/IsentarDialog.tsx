@@ -19,7 +19,9 @@ export interface AlvoIsencao {
 interface Props {
   /** O que será isentado; null = janela fechada. */
   alvo: AlvoIsencao | null;
-  /** Gravação em andamento: trava o botão. */
+  /** Id da fonte (cliente): a janela reinicia o motivo também ao trocar de cliente. */
+  fonteId?: string;
+  /** Gravação em andamento: trava os botões e ignora fechar (Cancelar, X e Esc). */
   ocupado: boolean;
   onFechar: () => void;
   /** Motivo digitado (pode ser vazio). */
@@ -46,7 +48,7 @@ function textoDoAbono(alvo: AlvoIsencao): string {
 }
 
 /** Isenta uma parcela, o mês ou o mês inteiro, com um motivo opcional. */
-export function IsentarDialog({ alvo, ocupado, onFechar, onConfirmar }: Props) {
+export function IsentarDialog({ alvo, fonteId, ocupado, onFechar, onConfirmar }: Props) {
   const id = useId();
   const [motivo, setMotivo] = useState("");
   // O alvo fica guardado para a janela não esvaziar durante a animação de fechar
@@ -54,7 +56,7 @@ export function IsentarDialog({ alvo, ocupado, onFechar, onConfirmar }: Props) {
   const [chaveAberta, setChaveAberta] = useState<string | null>(null);
 
   // Ao abrir (ou trocar de alvo), limpa o motivo
-  const chave = alvo ? `${alvo.modo}|${alvo.cobrancas.map((c) => `${c.mes}:${c.parcela}`).join(",")}` : null;
+  const chave = alvo ? `${fonteId ?? ""}|${alvo.modo}|${alvo.cobrancas.map((c) => `${c.mes}:${c.parcela}`).join(",")}` : null;
   if (chave !== chaveAberta) {
     setChaveAberta(chave);
     if (alvo) {
@@ -66,7 +68,7 @@ export function IsentarDialog({ alvo, ocupado, onFechar, onConfirmar }: Props) {
   const a = alvo ?? fixo;
 
   return (
-    <Dialog open={alvo !== null} onOpenChange={(aberto) => { if (!aberto) onFechar(); }}>
+    <Dialog open={alvo !== null} onOpenChange={(aberto) => { if (!aberto && !ocupado) onFechar(); }}>
       <DialogContent className="sm:max-w-[420px]">
         {a && a.cobrancas.length > 0 && (
           <form
@@ -90,7 +92,7 @@ export function IsentarDialog({ alvo, ocupado, onFechar, onConfirmar }: Props) {
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onFechar}>Cancelar</Button>
+              <Button type="button" variant="outline" disabled={ocupado} onClick={onFechar}>Cancelar</Button>
               <Button type="submit" disabled={ocupado}>{ocupado ? "Isentando..." : "Isentar"}</Button>
             </DialogFooter>
           </form>

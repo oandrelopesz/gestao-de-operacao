@@ -23,7 +23,8 @@ interface Props {
 export function CobrancaLinha({ cobranca: c, mostrarMes, onValorCheio, onConfigurar, onIsentar, onDesfazer, ocupado }: Props) {
   const info = INFO_SITUACAO[c.situacao];
   const parcelado = c.total > 1;
-  const acertada = c.situacao === "recebido" || c.situacao === "isento";
+  // Quitada ou isenta: só desfazer. Parcial: ainda dá para acertar o resto e também desfazer (volta a não acertada)
+  const quitadaOuIsenta = c.situacao === "recebido" || c.situacao === "isento";
   const mes = nomeDoMes(`${c.mes}-01`);
   const motivo = c.registro?.observacoes?.trim();
 
@@ -63,11 +64,7 @@ export function CobrancaLinha({ cobranca: c, mostrarMes, onValorCheio, onConfigu
       {detalhe && <p className="text-xs text-muted-foreground">{detalhe}</p>}
 
       <div className="flex flex-wrap gap-1.5">
-        {acertada ? (
-          <Button type="button" variant="outline" size="sm" disabled={ocupado || !c.registro} onClick={acionar(onDesfazer)}>
-            Desfazer
-          </Button>
-        ) : (
+        {!quitadaOuIsenta && (
           <>
             <Button type="button" size="sm" disabled={ocupado} onClick={acionar(onValorCheio)}>Valor cheio</Button>
             <Button type="button" variant="outline" size="sm" disabled={ocupado} onClick={acionar(onConfigurar)}>
@@ -77,6 +74,11 @@ export function CobrancaLinha({ cobranca: c, mostrarMes, onValorCheio, onConfigu
               {parcelado ? "Isentar parcela" : "Isentar"}
             </Button>
           </>
+        )}
+        {(quitadaOuIsenta || c.situacao === "parcial") && (
+          <Button type="button" variant="outline" size="sm" disabled={ocupado || !c.registro} onClick={acionar(onDesfazer)}>
+            Desfazer
+          </Button>
         )}
       </div>
     </div>
