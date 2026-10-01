@@ -15,6 +15,8 @@
 //        baixa uma imagem de outro site para a tela converter (o navegador não pode, por CORS)
 //   POST { acao: "imagem_site", perfil_id, base64 (JPG), origem_url, descricao } -> { imagens_site: ImagemSite[] }
 //        guarda a foto do site (JPG já convertido pela tela) no R2 e a acrescenta a gmn_perfis.imagens_site
+// LIMITE CONHECIDO das ações que baixam de outros sites (site, baixar_imagem): só o endereço e cada redirecionamento são
+// conferidos (urlPublicaHttp). O DNS não é resolvido: um nome público que aponte para um IP interno passa.
 // POST exige x-google-id-token (e-mail em ALLOWED_GOOGLE_EMAILS) ou x-swipe-key, como o google-token.
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
@@ -26,11 +28,11 @@ import { gerarConteudo } from "./conteudo.ts";
 import { lerPng } from "./png.ts";
 import {
   ESQUEMA_BRIEFING, LOGO_LADO_MAX, base64ParaBytes, fotosDoSiteComDescricao, montarMensagensBriefing, normalizarBriefing,
-  normalizarImagensSite, tamanhoBase64, visaoLeFormato,
+  normalizarImagensSite, pareceImagem, tamanhoBase64, visaoLeFormato,
 } from "./regras.ts";
 import {
-  candidatosDeFoto, candidatosDeLogo, deduplicar, imagensDoBundle, imagensDoHtml, scriptsDoSite, urlPublicaHttp,
-  type CandidatoSite,
+  candidatosDeFoto, candidatosDeLogo, decodificarPagina, deduplicar, imagensDoBundle, imagensDoHtml, scriptsDoSite,
+  urlPublicaHttp, type CandidatoSite,
 } from "./site.ts";
 
 const cors = {
@@ -329,25 +331,28 @@ async function acaoSite(sb: any, body: any, total: AbortSignal): Promise<Respons
       await r.body?.cancel().catch(() => {});
       throw new ErroHttp(502, `O site respondeu ${r.status}.`);
     }
-    html = new TextDecoder().decode(await lerAte(r, SITE_HTML_MAX_BYTES));
+    // O charset do cabeçalho (ou do <meta>) vale: site antigo em ISO-8859-1 não troca "Pátio" por "P?tio" no alt.
+    html = decodificarPagina(await lerAte(r, SITE_HTML_MAX_BYTES), r.headers.get("content-type"));
     base = url;
   } catch (e) {
     if (e instanceof ErroHttp) throw e;
     console.error("Site:", msg(e));
     throw new ErroHttp(502, "Não foi possível abrir o site.");
   }
-  let lista = imagensDoHtml(html, base);
-  for (const s of scriptsDoSite(html, base)) {
+  // Os .js do site (até 3) são lidos ao mesmo tempo, cada um com os seus 10 s (e o prazo total); um que falha vale como vazio.
+  const doBundle = await Promise.all(scriptsDoSite(html, base).map(async (s): Promise<CandidatoSite[]> => {
     const alvoJs = urlPublicaHttp(s);
-    if (!alvoJs) continue;
+    if (!alvoJs) return [];
     try {
       const { r } = await buscarPublico(alvoJs, { "user-agent": UA }, 10_000, total);
-      if (r.ok) lista = deduplicar([...lista, ...imagensDoBundle(new TextDecoder().decode(await lerAte(r, SITE_SCRIPT_MAX_BYTES)), s)]);
-      else await r.body?.cancel().catch(() => {});
+      if (r.ok) return imagensDoBundle(new TextDecoder().decode(await lerAte(r, SITE_SCRIPT_MAX_BYTES)), s);
+      await r.body?.cancel().catch(() => {});
     } catch (e) {
       console.error("Site, script:", msg(e));
     }
-  }
+    return [];
+  }));
+  let lista = deduplicar([...imagensDoHtml(html, base), ...doBundle.flat()]);
   // Endereço de imagem que não é público não serve (a tela não consegue baixar nem a IA ver).
   lista = lista.filter((c) => urlPublicaHttp(c.url));
 
@@ -396,6 +401,8 @@ async function acaoBaixarImagem(body: any, total: AbortSignal): Promise<Response
     throw new ErroHttp(502, SEM_BAIXAR);
   }
   if (bytes.length > IMAGEM_EXTERNA_MAX) throw new ErroHttp(400, GRANDE);
+  // Sem Content-Type de imagem (vazio ou octet-stream) o conteúdo é quem diz: página, JSON e texto não voltam para o navegador.
+  if (!tipo.startsWith("image/") && !pareceImagem(bytes)) throw new ErroHttp(400, "O endereço não é de uma imagem.");
   return new Response(bytes as BlobPart, {
     status: 200, headers: { ...cors, "Content-Type": tipo.startsWith("image/") ? tipo : "application/octet-stream" },
   });
@@ -455,6 +462,22 @@ async function acaoImagemSite(sb: any, body: any, total: AbortSignal): Promise<R
   return json({ imagens_site: lista });
 }
 
+/**
+ * O pedido (grande demais para ser lido) é da ação `logo`? Olha só o 1º pedaço do corpo (até 1 KB) atrás de
+ * `"acao": "logo"`; qualquer dúvida (sem corpo, pedaço sem a chave, erro de leitura) vale como outra ação.
+ */
+async function corpoDaLogo(req: Request): Promise<boolean> {
+  try {
+    const leitor = req.body?.getReader();
+    if (!leitor) return false;
+    const { value } = await leitor.read();
+    await leitor.cancel().catch(() => {});
+    return /"acao"\s*:\s*"logo"/.test(new TextDecoder().decode(value?.subarray(0, 1024)));
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method === "GET") return json({ openai: openaiConfigurada(), r2: r2Configurado(), acesso: acessoConfigurado() });
@@ -464,8 +487,11 @@ Deno.serve(async (req) => {
   const total = AbortSignal.timeout(PRAZO_TOTAL_MS);
   if (!(await acessoLiberado(req))) return json({ error: "Acesso não autorizado. Entre com o Google ou informe a chave." }, 403);
 
-  // Corpo grande demais (só a logo chega perto disso): recusa antes de ler e copiar o JSON inteiro.
-  if (Number(req.headers.get("content-length")) > CORPO_MAX_BYTES) return json({ error: "A logo pode ter até 5 MB." }, 400);
+  // Corpo grande demais (só a logo e a imagem do site chegam perto disso): recusa antes de ler e copiar o JSON inteiro. A
+  // mensagem da logo só vale para a ação `logo`, que se reconhece pelo começo do corpo.
+  if (Number(req.headers.get("content-length")) > CORPO_MAX_BYTES) {
+    return json({ error: (await corpoDaLogo(req)) ? "A logo pode ter até 5 MB." : "O pedido passa do tamanho permitido." }, 400);
+  }
 
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const body = (await req.json().catch(() => null)) ?? {};

@@ -4,8 +4,8 @@ import {
   AGENDA_PADRAO, BRIEFING_VAZIO, ESQUEMA_CHECAGEM_IMAGEM, ESQUEMA_CLASSIFICACAO_IMAGEM, ESQUEMA_FOTOS_QUE_COMBINAM, HORARIOS,
   PROMPT_CHECAGEM_IMAGEM, PROMPT_CLASSIFICAR_IMAGEM, TEMAS, alternarDia,
   alternarImagem, base64ParaBytes, checarTexto, comUtm, decisaoChecagem, descricaoDaFoto, escolherImagem,
-  escolherPalavras, fontesDaImagem, fotoDiretaDoDrive, fotosDoSiteComDescricao, idPastaDrive, linkDoGoogle, miniaturaGrande,
-  ordemDeTentativa, tipoPelaAssinatura,
+  escolherPalavras, extensaoDaUrl, fontesDaImagem, fotoDiretaDoDrive, fotosDoSiteComDescricao, idPastaDrive, linkDoGoogle,
+  miniaturaGrande, ordemDeTentativa, pareceImagem, tipoPelaAssinatura,
   mesmoHorario, montarMensagensBriefing, montarMensagensFotosQueCombinam, montarMensagensPost, montarPromptImagem, mudarHora,
   normalizarAgenda,
   normalizarBriefing, normalizarImagensSite, opcoesDaLogo, promptChecagemImagem, proximoTema, resumoAgenda, tamanhoBase64,
@@ -665,13 +665,49 @@ test("ESQUEMA_CLASSIFICACAO_IMAGEM e PROMPT_CLASSIFICAR_IMAGEM: logo, foto ou ou
   }
 });
 
-test("visaoLeFormato: o modelo lê PNG, JPG, WEBP e GIF (e o que não tem extensão); o resto fica pela pista do HTML", () => {
+test("visaoLeFormato: só os formatos que o modelo sabe que não lê (SVG, ICO, BMP, TIFF, AVIF, HEIC) ficam pela pista do HTML", () => {
   for (const u of [
     "https://x.com/a.png", "https://x.com/a.JPG?v=2", "https://x.com/a.jpeg", "https://x.com/a.jfif", "https://x.com/a.webp",
     "https://x.com/a.gif#topo", "https://x.com/imagem", "https://x.com/", "https://x.com/media/12345?w=800",
+    // Endereços dinâmicos entregam foto: a visão tenta (se falhar, vale a pista).
+    "https://x.com/foto.php?id=12", "https://x.com/Imagem.aspx?i=3", "https://x.com/get.ashx", "https://x.com/cgi-bin/img.cgi",
   ]) assert.equal(visaoLeFormato(u), true, u);
   for (const u of [
-    "https://x.com/a.svg", "https://x.com/favicon.ico", "https://x.com/a.avif", "https://x.com/a.heic", "https://x.com/a.bmp",
-    "https://x.com/a.tiff", "https://x.com/A.SVG?x=1", "https://x.com/a.svg#icone",
+    "https://x.com/a.svg", "https://x.com/favicon.ico", "https://x.com/a.avif", "https://x.com/a.heic", "https://x.com/a.heif",
+    "https://x.com/a.bmp", "https://x.com/a.tif", "https://x.com/a.tiff", "https://x.com/A.SVG?x=1", "https://x.com/a.svg#icone",
   ]) assert.equal(visaoLeFormato(u), false, u);
+});
+
+test("extensaoDaUrl: minúscula, sem ponto, só do caminho; vazia sem extensão ou com URL ilegível", () => {
+  assert.equal(extensaoDaUrl("https://x.com/a/B.JPG?v=2#x"), "jpg");
+  assert.equal(extensaoDaUrl("https://x.com/a.v2/imagem"), "");
+  assert.equal(extensaoDaUrl("https://x.com/"), "");
+  assert.equal(extensaoDaUrl("não é url"), "");
+});
+
+test("pareceImagem: reconhece as imagens pelos primeiros bytes e recusa página, JSON e texto", () => {
+  const txt = (s: string) => new TextEncoder().encode(s);
+  const com = (...partes: (number[] | string)[]) =>
+    Uint8Array.from(partes.flatMap((p) => (typeof p === "string" ? [...p].map((c) => c.charCodeAt(0)) : p)));
+  const mais = (b: Uint8Array) => { const o = new Uint8Array(b.length + 20); o.set(b); return o; };
+  for (const [nome, b] of Object.entries({
+    png: com([0x89], "PNG", [0x0d, 0x0a, 0x1a, 0x0a], [0, 0, 0, 13]),
+    jpg: com([0xff, 0xd8, 0xff, 0xe0, 0, 16], "JFIF"),
+    gif87: com("GIF87a", [1, 0, 1, 0]), gif89: com("GIF89a", [1, 0, 1, 0]),
+    webp: com("RIFF", [10, 0, 0, 0], "WEBPVP8 "),
+    bmp: com("BM", [26, 0, 0, 0], [0, 0, 0, 0], [26, 0, 0, 0], [12, 0, 0, 0]),
+    ico: com([0, 0, 1, 0, 1, 0], [16, 16, 0, 0]),
+    avif: com([0, 0, 0, 28], "ftypavif", [0, 0, 0, 0]),
+    heic: com([0, 0, 0, 24], "ftypheic", [0, 0, 0, 0]),
+    tiff: com("II", [42, 0, 8, 0, 0, 0]), tiffBe: com("MM", [0, 42, 0, 0, 0, 8]),
+    svg: txt('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"></svg>'),
+    svgProlog: txt('﻿  <?xml version="1.0" encoding="UTF-8"?>\n<!-- Created with Inkscape -->\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "x.dtd">\n<SVG width="1"/>'),
+    svgSubset: txt('<!DOCTYPE svg [ <!ENTITY a "b"> ]><svg/>'),
+  })) assert.equal(pareceImagem(mais(b)), true, nome);
+  for (const [nome, b] of Object.entries({
+    vazio: new Uint8Array(0), html: txt("<!doctype html><html><body>oi</body></html>"), htmlComSvg: txt("<html><svg></svg></html>"),
+    json: txt('{"ip":"10.0.0.1","iam":"segredo"}'), texto: txt("Not an image at all, only text."), curto: Uint8Array.from([0xff, 0xd8]),
+    xmlQualquer: txt('<?xml version="1.0"?><dados><svg/></dados>'), comentarioSemFim: txt("<!-- sem fim <svg>"),
+    ftypOutro: com([0, 0, 0, 24], "ftypmp42", [0, 0, 0, 0]), bmpFalso: txt("BM isto é um texto qualquer que começa com BM"),
+  })) assert.equal(pareceImagem(b), false, nome);
 });

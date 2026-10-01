@@ -687,9 +687,57 @@ export const PROMPT_CLASSIFICAR_IMAGEM =
   "(banner com muito texto, ícone genérico, gráfico, captura de tela, imagem decorativa). Para foto, descreva em " +
   "uma frase curta, em português do Brasil, o que ela mostra; para logo e outro, descricao vazia.";
 
-/** O modelo de visão lê PNG, JPG, WEBP e GIF; SVG, ICO, BMP, TIFF, AVIF e HEIC ficam só pela pista do HTML. */
+/** Extensão (minúscula, sem ponto) do caminho de uma URL; vazia se não houver ou se a URL não der para ler. */
+export function extensaoDaUrl(url: string): string {
+  try {
+    return /\.([a-z0-9]+)(?:[?#]|$)/i.exec(new URL(url).pathname)?.[1]?.toLowerCase() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+const FORMATOS_QUE_A_VISAO_NAO_LE = ["svg", "ico", "bmp", "tif", "tiff", "avif", "heic", "heif"];
+
+/**
+ * O modelo de visão lê PNG, JPG, WEBP e GIF; SVG, ICO, BMP, TIFF, AVIF e HEIC ficam só pela pista do HTML. Qualquer outra
+ * extensão (ou nenhuma, ou endereço dinâmico como `.php` e `.aspx`) tenta a visão: se ela falhar, vale a pista.
+ */
 export function visaoLeFormato(url: string): boolean {
-  const ext = /\.([a-z0-9]+)(?:[?#]|$)/i.exec(new URL(url).pathname)?.[1]?.toLowerCase() ?? "";
-  if (!ext) return true; // sem extensão: tenta
-  return ["png", "jpg", "jpeg", "jfif", "webp", "gif"].includes(ext);
+  return !FORMATOS_QUE_A_VISAO_NAO_LE.includes(extensaoDaUrl(url));
+}
+
+/**
+ * Os primeiros bytes são de uma imagem (PNG, JPEG, GIF, WEBP, BMP, ICO, TIFF, AVIF/HEIC ou SVG em texto, com BOM, prólogo
+ * `<?xml`, comentários e `<!DOCTYPE` antes)? Serve para recusar página, JSON e texto quando o servidor não diz o tipo.
+ */
+export function pareceImagem(b: Uint8Array): boolean {
+  const e = (i: number, s: string) => b.length >= i + s.length && [...s].every((c, k) => b[i + k] === c.charCodeAt(0));
+  if (b.length >= 8 && b[0] === 0x89 && e(1, "PNG") && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return true;
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return true;
+  if (e(0, "GIF87a") || e(0, "GIF89a")) return true;
+  if (e(0, "RIFF") && e(8, "WEBP")) return true;
+  if (e(0, "BM") && b.length >= 14 && b[6] === 0 && b[7] === 0 && b[8] === 0 && b[9] === 0) return true; // reservados do cabeçalho BMP
+  if (b.length >= 6 && b[0] === 0 && b[1] === 0 && (b[2] === 1 || b[2] === 2) && b[3] === 0 && (b[4] | b[5]) !== 0) return true; // ICO e CUR
+  if ((e(0, "II") && b[2] === 0x2a && b[3] === 0) || (e(0, "MM") && b[2] === 0 && b[3] === 0x2a)) return true; // TIFF
+  if (e(4, "ftyp") && b.length >= 12) {
+    const marca = String.fromCharCode(b[8], b[9], b[10], b[11]);
+    if (["avif", "avis", "heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "msf1"].includes(marca)) return true;
+  }
+  // SVG: texto que, depois de BOM, espaços, prólogo, comentários e DOCTYPE, abre com <svg
+  const depoisDe = (s: string, marca: string) => { const i = s.indexOf(marca); return i === -1 ? -1 : i + marca.length; };
+  let t = new TextDecoder().decode(b.subarray(0, 4096)).replace(/^﻿/, "");
+  for (let volta = 0; volta < 20; volta++) {
+    t = t.trimStart();
+    let fim: number;
+    if (t.startsWith("<?")) fim = depoisDe(t, "?>");
+    else if (t.startsWith("<!--")) fim = depoisDe(t, "-->");
+    else if (/^<!doctype/i.test(t)) {
+      const abre = t.indexOf("[");
+      const fecha = t.indexOf(">");
+      fim = abre !== -1 && abre < fecha ? depoisDe(t, "]>") : fecha === -1 ? -1 : fecha + 1;
+    } else return /^<svg[\s/>]/i.test(t);
+    if (fim === -1) return false; // construção sem fim dentro dos 4 KB lidos
+    t = t.slice(fim);
+  }
+  return false;
 }

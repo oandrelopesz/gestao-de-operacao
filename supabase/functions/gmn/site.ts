@@ -1,5 +1,6 @@
 // Leitura das imagens e da logo de um site, só por texto (HTML e, em site montado por JavaScript, os arquivos .js).
 // Funções puras: recebem o texto e a URL da página e devolvem candidatos com URL absoluta.
+import { extensaoDaUrl } from "./regras.ts";
 
 export interface CandidatoSite {
   url: string;
@@ -155,8 +156,11 @@ function logosDe(lista: CandidatoSite[], max: number): CandidatoSite[] {
   return semRastreio(lista).filter(temCaraDeLogo).sort((a, b) => pesoLogo(a) - pesoLogo(b)).slice(0, max);
 }
 
+// SVG e ICO são logo ou ícone, nunca foto: ficam só pela pista de logo (o alt deles não os faz virar foto).
+const EXTENSOES_QUE_NAO_SAO_FOTO = ["svg", "ico"];
+
 function fotosDe(lista: CandidatoSite[], max: number): CandidatoSite[] {
-  return semRastreio(lista).filter((c) => !temCaraDeLogo(c)).sort((a, b) => Number(!a.descricao) - Number(!b.descricao)).slice(0, max);
+  return semRastreio(lista).filter((c) => !temCaraDeLogo(c) && !EXTENSOES_QUE_NAO_SAO_FOTO.includes(extensaoDaUrl(c.url))).sort((a, b) => Number(!a.descricao) - Number(!b.descricao)).slice(0, max);
 }
 
 /** Candidatos de logo para a busca da logo: até `max`, JSON-LD e og primeiro, sem rastreadores. */
@@ -164,7 +168,7 @@ export function candidatosDeLogo(lista: CandidatoSite[], max = 16): CandidatoSit
   return logosDe(lista, max);
 }
 
-/** Candidatos de foto para a busca das fotos: os que não têm cara de logo, até `max`, com descrição primeiro, sem rastreadores. */
+/** Candidatos de foto para a busca das fotos: os que não têm cara de logo e não são SVG nem ICO, até `max`, com descrição primeiro, sem rastreadores. */
 export function candidatosDeFoto(lista: CandidatoSite[], max = 24): CandidatoSite[] {
   return fotosDe(lista, max);
 }
@@ -176,8 +180,9 @@ export function separarCandidatos(lista: CandidatoSite[]): { logos: CandidatoSit
 
 /**
  * URL http(s) de host público: nada de localhost, IP privado, link-local, IPv6 interno (loopback, ULA, link-local, IPv4
- * embutido) ou nome de máquina da rede interna (sem ponto, `.internal`, `.local`). Não resolve DNS: um nome público que
- * aponte para IP interno passa (quem baixa confere também cada redirecionamento).
+ * embutido, 6to4) ou nome de máquina da rede interna (sem ponto, `.internal`, `.local`).
+ * LIMITE CONHECIDO: não resolve DNS. Um nome público que aponte para um IP interno (ex.: 10.0.0.5.nip.io) passa; quem
+ * baixa confere cada redirecionamento, mas não o IP que o nome resolve.
  */
 export function urlPublicaHttp(u: string): URL | null {
   let url: URL;
@@ -185,16 +190,39 @@ export function urlPublicaHttp(u: string): URL | null {
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
   const h = url.hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "").toLowerCase();
   if (h.includes(":")) {
-    // IPv6: "::" e "::1", tudo que começa com "::" (IPv4 embutido), ULA (fc00::/7), link-local (fe80::/10) e NAT64.
-    return h.startsWith("::") || /^f[cd]/.test(h) || /^fe[89ab]/.test(h) || h.startsWith("64:ff9b:") ? null : url;
+    // IPv6: "::" e "::1", tudo que começa com "::" (IPv4 embutido), ULA (fc00::/7), link-local e site-local (fe80::/10 a
+    // fec0::/10), 6to4 (2002::/16) e NAT64.
+    return h.startsWith("::") || /^f[cd]/.test(h) || /^fe[89a-f]/.test(h) || h.startsWith("2002:") || h.startsWith("64:ff9b:") ? null : url;
   }
   if (h === "localhost" || /\.(localhost|internal|local|localdomain)$/.test(h)) return null;
   const ip = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (ip) {
-    const [a, b] = [Number(ip[1]), Number(ip[2])];
-    if (a === 10 || a === 127 || a === 0 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127)) return null;
+    const [a, b, c] = [Number(ip[1]), Number(ip[2]), Number(ip[3])];
+    if (
+      a === 10 || a === 127 || a === 0 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) || (a === 192 && b === 0 && c === 0) || (a === 100 && b >= 64 && b <= 127) ||
+      (a === 198 && (b === 18 || b === 19))
+    ) return null;
   } else if (!h.includes(".")) {
     return null;
   }
   return url;
+}
+
+/**
+ * Texto da página (bytes do HTML) com o charset do cabeçalho Content-Type ou, sem ele, do `<meta charset>` / `http-equiv` dos
+ * primeiros 2 KB; sem nenhum dos dois (ou com um rótulo que o decodificador não conhece), UTF-8. Nunca lança.
+ */
+export function decodificarPagina(bytes: Uint8Array, contentType: string | null): string {
+  const rotulo = (s: string) => /charset\s*=\s*["']?\s*([\w:.-]+)/i.exec(s)?.[1];
+  const inicio = new TextDecoder("latin1").decode(bytes.subarray(0, 2048));
+  const meta = /<meta\b[^>]*charset\s*=\s*["']?\s*([\w:.-]+)/i.exec(inicio)?.[1];
+  // Meta que diz UTF-16 num texto que se lê como ASCII/UTF-8 é erro do site (a regra do HTML é tratar como UTF-8).
+  for (const r of [contentType ? rotulo(contentType) : undefined, meta && !/^utf-?16/i.test(meta) ? meta : undefined]) {
+    if (!r) continue;
+    try {
+      return new TextDecoder(r).decode(bytes);
+    } catch { /* rótulo que o decodificador não conhece: tenta o próximo e, por fim, UTF-8 */ }
+  }
+  return new TextDecoder().decode(bytes);
 }

@@ -49,36 +49,56 @@ async function baixarFoto(
   return await baixarMiniatura(token, foto.thumbnailLink, total);
 }
 
+/** O Drive roda antes do texto: o texto precisa de pelo menos isto (2 tentativas de até 60 s cada, no pior caso) do prazo total. */
+const MARGEM_DO_TEXTO_MS = 70_000;
+
+/** Marca a foto como usada agora (rodízio). Falha só vai para o log: não derruba o post. */
+async function registrarUso(sb: Sb, perfilId: string, origem: "drive" | "site", ref: string): Promise<void> {
+  try {
+    const { error } = await sb.from("gmn_imagens_uso").upsert(
+      { perfil_id: perfilId, origem, ref, usado_em: new Date().toISOString() },
+      { onConflict: "perfil_id,origem,ref" },
+    );
+    if (error) console.error(`Uso da foto (${origem}) não registrado:`, error.message);
+  } catch (e) {
+    console.error(`Uso da foto (${origem}) não registrado:`, msg(e));
+  }
+}
+
 /**
- * null: o link da pasta do Drive não foi reconhecido; "vazia": nenhuma das fotos tentadas deu para usar. Só entram no rodízio
- * as fotos que têm como ser baixadas (JPG/PNG de até 5 MB ou com miniatura): as que nunca servem não ocupam as 3 tentativas.
- * Tenta até 3 fotos, na ordem do rodízio (a escolhida e, se ela falhar, as próximas); o uso só é registrado para a foto que entrou.
+ * null: o link da pasta do Drive não foi reconhecido; "vazia": nenhuma das fotos tentadas deu para usar; "demorou": o tempo
+ * reservado ao Drive acabou (o texto precisa de `MARGEM_DO_TEXTO_MS` até `prazoFinal`). Só entram no rodízio as fotos que têm
+ * como ser baixadas (JPG/PNG de até 5 MB ou com miniatura): as que nunca servem não ocupam as 3 tentativas. Tenta até 3 fotos,
+ * na ordem do rodízio (a escolhida e, se ela falhar, as próximas), e antes de cada uma confere se ainda sobra tempo; as chamadas
+ * ao Google e ao R2 também param quando o tempo reservado acaba. O uso da foto NÃO é registrado aqui: quem chama registra depois
+ * que o texto passar (a cópia no R2 de um post reprovado pode ficar sem uso).
  */
-async function imagemDoDrive(sb: Sb, perfil: any, postId: string, total?: AbortSignal): Promise<Imagem | "vazia" | null> {
+async function imagemDoDrive(
+  sb: Sb, perfil: any, postId: string, prazoFinal: number, total?: AbortSignal,
+): Promise<Imagem | "vazia" | "demorou" | null> {
   const pastaId = idPastaDrive(String(perfil.drive_pasta_url ?? ""));
   if (!pastaId) return null;
-  const token = await tokenGoogle(sb, total);
-  const fotos = (await imagensDaPasta(token, pastaId, total)).filter((f) => fotoDiretaDoDrive(f.mimeType, f.size) || f.thumbnailLink);
+  const orcamento = sinal(Math.max(prazoFinal - Date.now() - MARGEM_DO_TEXTO_MS, 0), total);
+  const token = await tokenGoogle(sb, orcamento);
+  const fotos = (await imagensDaPasta(token, pastaId, orcamento)).filter((f) => fotoDiretaDoDrive(f.mimeType, f.size) || f.thumbnailLink);
   if (!fotos.length) return "vazia";
   const { data: usos } = await sb.from("gmn_imagens_uso").select("ref, usado_em").eq("perfil_id", perfil.id).eq("origem", "drive");
   const mapa: Record<string, string> = Object.fromEntries((usos ?? []).map((u: any) => [u.ref, u.usado_em]));
   for (const ref of ordemDeTentativa(fotos.map((f) => f.id), mapa, FOTOS_TENTADAS)) {
+    if (prazoFinal - Date.now() < MARGEM_DO_TEXTO_MS) return "demorou";
     const foto = fotos.find((f) => f.id === ref)!;
     let baixada: { bytes: Uint8Array; tipo: "image/jpeg" | "image/png" };
     try {
-      baixada = await baixarFoto(token, foto, total);
+      baixada = await baixarFoto(token, foto, orcamento);
     } catch (e) {
-      // Prazo total estourado: as próximas também falhariam, e o aviso certo é o do prazo.
+      // Prazo total estourado: as próximas também falhariam, e o aviso certo é o do prazo. Tempo do Drive esgotado: segue sem foto.
       if (total?.aborted) throw e;
+      if (orcamento.aborted) return "demorou";
       console.error(`Foto do Drive ${foto.id} (${foto.mimeType}, ${foto.size} bytes) não serviu:`, msg(e));
       continue;
     }
     const ext = baixada.tipo === "image/png" ? "png" : "jpg";
-    const url = await enviarR2(`${perfil.id}/${postId}.${ext}`, baixada.bytes, baixada.tipo, total);
-    await sb.from("gmn_imagens_uso").upsert(
-      { perfil_id: perfil.id, origem: "drive", ref: foto.id, usado_em: new Date().toISOString() },
-      { onConflict: "perfil_id,origem,ref" },
-    );
+    const url = await enviarR2(`${perfil.id}/${postId}.${ext}`, baixada.bytes, baixada.tipo, orcamento);
     return { origem: "drive" as const, ref: foto.id, url, descricao: descricaoDaFoto(foto.description, foto.name) };
   }
   return "vazia";
@@ -103,10 +123,7 @@ async function imagemDoSite(sb: Sb, perfil: any, texto: string, total?: AbortSig
   const ref = ordem.find((id) => combinam.has(id));
   if (!ref) return null;
   const item = lista.find((f) => f.id === ref)!;
-  await sb.from("gmn_imagens_uso").upsert(
-    { perfil_id: perfil.id, origem: "site", ref: item.id, usado_em: new Date().toISOString() },
-    { onConflict: "perfil_id,origem,ref" },
-  );
+  await registrarUso(sb, perfil.id, "site", item.id);
   return { origem: "site" as const, ref: item.id, url: item.url, descricao: item.descricao };
 }
 
@@ -156,7 +173,9 @@ function bytesDaImagemDaIa(b64: string): Uint8Array {
 const AVISO_PESSOAS_OU_TEXTO = "A imagem da IA tinha pessoas ou texto; o post seguiu só com texto.";
 const AVISO_LINK_DRIVE = "O link da pasta do Drive não foi reconhecido.";
 const AVISO_PASTA_SEM_FOTO = "A pasta do Drive não tem nenhuma foto que deu para usar.";
+const AVISO_DRIVE_DEMOROU = "O Drive demorou demais; o post seguiu só com texto.";
 const AVISO_SITE_SEM_FOTO = "Nenhuma foto do site combinou com este post.";
+const AVISO_SITE_NAO_CONFERIDA = "Não foi possível conferir as fotos do site.";
 
 /**
  * Imagem da IA (PNG), gerada sem a logo e com a logo do perfil aplicada por cima, sem a IA (compor.ts), quando houver
@@ -227,7 +246,9 @@ async function imagemDaIa(
 /**
  * `opcoes.comImagem` (padrão true): false gera só texto, sem buscar nem gerar imagem. Fontes da imagem (`fontesDaImagem`):
  *  - com pasta do Drive preenchida, só o Drive (falhou, vazia ou link não reconhecido: sem imagem e com aviso, sem cair para
- *    outra fonte); a foto é escolhida ANTES do texto e a descrição dela vai para o prompt do post;
+ *    outra fonte); a foto é escolhida ANTES do texto (a descrição dela vai para o prompt do post) com tempo próprio: o texto
+ *    precisa de 70 s até `prazoFinal`, e se o Drive passar disso o post segue só com texto e com aviso. A foto só conta como
+ *    usada no rodízio depois que o texto passa;
  *  - sem pasta, a foto do site (só com a chave `usa_fotos_site` ligada e foto com descrição) e depois a IA, se ligada. A foto
  *    do site é escolhida DEPOIS do texto e só entra se a IA conferir que combina com ele; nenhuma combina: segue para a IA
  *    (ou, sem IA, o post sai só com texto e com aviso).
@@ -264,8 +285,9 @@ export async function gerarConteudo(
   // Foto do Drive é escolhida antes do texto: a descrição dela vai para o prompt do post.
   if (fontes[0] === "drive") {
     try {
-      const doDrive = await imagemDoDrive(sb, perfil, postId, total);
+      const doDrive = await imagemDoDrive(sb, perfil, postId, prazoFinal, total);
       if (doDrive === "vazia") avisos.push(AVISO_PASTA_SEM_FOTO);
+      else if (doDrive === "demorou") avisos.push(AVISO_DRIVE_DEMOROU);
       else if (doDrive === null) avisos.push(AVISO_LINK_DRIVE);
       else imagem = doDrive;
     } catch (e) {
@@ -294,18 +316,24 @@ export async function gerarConteudo(
     };
   }
 
+  // O texto passou: só agora a foto do Drive conta como usada no rodízio (reprovado, a foto volta para a fila).
+  if (fontes[0] === "drive" && imagem) await registrarUso(sb, perfil.id, "drive", imagem.ref);
+
   // Sem Drive: depois do texto, tenta cada fonte na ordem e para na primeira que dá imagem (site: só se combinar com o texto).
   if (fontes[0] !== "drive") {
     for (const fonte of fontes) {
       if (imagem) break;
       if (fonte === "site") {
+        let conferiu = true;
         try {
           imagem = await imagemDoSite(sb, perfil, resposta.texto.trim(), total);
         } catch (e) {
+          // A conferência da IA falhou (prazo ou resposta ilegível): não é "nenhuma combinou", e o detalhe vai só para o log.
+          conferiu = false;
           console.error("Imagem do site:", msg(e));
         }
         // Com a IA depois do site, ela é quem avisa se também não sair imagem.
-        if (!imagem && !fontes.includes("ia")) avisos.push(AVISO_SITE_SEM_FOTO);
+        if (!imagem && !fontes.includes("ia")) avisos.push(conferiu ? AVISO_SITE_SEM_FOTO : AVISO_SITE_NAO_CONFERIDA);
       } else if (fonte === "ia") {
         try {
           const r = await imagemDaIa(perfil, postId, tema, prazoFinal, total);

@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  candidatosDeFoto, candidatosDeLogo, deduplicar, imagensDoBundle, imagensDoHtml, scriptsDoSite, separarCandidatos,
-  urlPublicaHttp, type CandidatoSite,
+  candidatosDeFoto, candidatosDeLogo, decodificarPagina, deduplicar, imagensDoBundle, imagensDoHtml, scriptsDoSite,
+  separarCandidatos, urlPublicaHttp, type CandidatoSite,
 } from "../../supabase/functions/gmn/site.ts";
 
 const HTML = `<!doctype html><html><head>
@@ -94,6 +94,56 @@ test("candidatosDeFoto: os que não são logo nem ícone, com descrição primei
   assert.ok(candidatosDeFoto(muitos).every((x) => !x.logo));
 });
 
+test("candidatosDeFoto: SVG e ICO nunca são foto, mesmo com alt longo (ficam pela pista de logo ou ícone)", () => {
+  const lista = [
+    c("https://a/garantia.svg", "img", false, "Garantia de 3 meses em todos os carros"),
+    c("https://a/whatsapp.SVG?v=2", "img", false, "Fale conosco pelo WhatsApp"),
+    c("https://a/atalho.ico", "img", false, "Atalho do site para a loja"),
+    c("https://a/fundo.svg#x", "css", false),
+    c("https://a/foto.jpg", "img", false),
+    c("https://a/foto.avif", "img", false, "Fachada da loja em AVIF"),
+    c("https://a/imagem", "img", false),
+    c("https://a/foto.php?id=1", "img", false, "Pátio coberto"),
+  ];
+  assert.deepEqual(
+    candidatosDeFoto(lista).map((x) => x.url),
+    ["https://a/foto.avif", "https://a/foto.php?id=1", "https://a/foto.jpg", "https://a/imagem"],
+  );
+  assert.deepEqual(separarCandidatos(lista).imagens.map((x) => x.url), candidatosDeFoto(lista).map((x) => x.url));
+  // Um bando de SVG com legenda não empurra as fotos do bundle (sem alt) para fora do limite de 24.
+  const bando = [
+    ...Array.from({ length: 30 }, (_, i) => c(`https://a/selo${i}.svg`, "img", false, `Selo de qualidade número ${i}`)),
+    ...Array.from({ length: 5 }, (_, i) => c(`https://a/bundle${i}.jpg`, "bundle", false)),
+  ];
+  assert.deepEqual(candidatosDeFoto(bando).map((x) => x.url), Array.from({ length: 5 }, (_, i) => `https://a/bundle${i}.jpg`));
+});
+
+test("decodificarPagina: charset do cabeçalho, ou do meta nos primeiros 2 KB, senão UTF-8; rótulo desconhecido não derruba", () => {
+  const latin1 = (s: string) => Uint8Array.from([...s].map((ch) => ch.charCodeAt(0)));
+  const utf8 = (s: string) => new TextEncoder().encode(s);
+  // Cabeçalho vence o meta
+  assert.equal(decodificarPagina(latin1("<img alt='Pátio'>"), "text/html; charset=ISO-8859-1"), "<img alt='Pátio'>");
+  assert.equal(decodificarPagina(latin1("<img alt='Pátio'>"), 'text/html; charset="windows-1252"'), "<img alt='Pátio'>");
+  assert.equal(decodificarPagina(utf8("<meta charset='iso-8859-1'>Pátio"), "text/html; charset=utf-8"), "<meta charset='iso-8859-1'>Pátio");
+  // Sem charset no cabeçalho: <meta charset> e <meta http-equiv>
+  assert.equal(decodificarPagina(latin1("<meta charset=\"iso-8859-1\"><p>Pátio</p>"), "text/html"), "<meta charset=\"iso-8859-1\"><p>Pátio</p>");
+  assert.equal(decodificarPagina(latin1("<META HTTP-EQUIV='Content-Type' CONTENT='text/html; charset=windows-1252'>Pátio"), null), "<META HTTP-EQUIV='Content-Type' CONTENT='text/html; charset=windows-1252'>Pátio");
+  // Padrão UTF-8 (com e sem cabeçalho) e BOM
+  assert.equal(decodificarPagina(utf8("<p>Pátio</p>"), "text/html"), "<p>Pátio</p>");
+  assert.equal(decodificarPagina(utf8("<p>Pátio</p>"), null), "<p>Pátio</p>");
+  assert.equal(decodificarPagina(Uint8Array.from([0xef, 0xbb, 0xbf, ...utf8("<p>Pátio</p>")]), null), "<p>Pátio</p>");
+  // Rótulo desconhecido: UTF-8, sem lançar
+  assert.equal(decodificarPagina(utf8("<p>Pátio</p>"), "text/html; charset=nao-existe-9"), "<p>Pátio</p>");
+  assert.equal(decodificarPagina(utf8("<meta charset=\"xyz\"><p>Pátio</p>"), null), "<meta charset=\"xyz\"><p>Pátio</p>");
+  // Meta que diz UTF-16 num texto que é UTF-8: erro do site, vale UTF-8
+  assert.equal(decodificarPagina(utf8('<meta charset="utf-16"><p>Pátio</p>'), null), '<meta charset="utf-16"><p>Pátio</p>');
+  // O meta só vale nos primeiros 2 KB
+  const longe = latin1(`${" ".repeat(3000)}<meta charset="iso-8859-1"><p>Pátio</p>`);
+  assert.equal(decodificarPagina(longe, null), new TextDecoder().decode(longe));
+  assert.ok(decodificarPagina(longe, null).includes("�"));
+  assert.equal(decodificarPagina(new Uint8Array(0), null), "");
+});
+
 test("candidatosDeLogo e candidatosDeFoto repartem a lista do HTML de exemplo", () => {
   const lista = imagensDoHtml(HTML, "https://www.loja.com/");
   const logos = candidatosDeLogo(lista).map((x) => x.url);
@@ -122,9 +172,10 @@ test("urlPublicaHttp: faixas internas, IPv6 interno, hosts sem ponto e domínios
     "http://0.0.0.0/x", "http://172.16.0.1/x", "http://172.31.255.255/x", "http://100.64.0.1/x", "http://2130706433/x",
     "http://[::]/x", "http://[fe80::1]/x", "http://[fd00::1]/x", "http://[fc00::1]/x", "http://[::ffff:127.0.0.1]/x",
     "http://servidor/x", "http://metadata.google.internal/x", "http://app.localhost/x", "http://impressora.local/x",
+    "http://198.18.0.1/x", "http://198.19.255.255/x", "http://192.0.0.8/x", "http://[fec0::1]/x", "http://[2002:a9fe:a9fe::1]/x",
   ]) assert.equal(urlPublicaHttp(u), null, u);
   for (const u of [
     "https://fcbarcelona.com/x.jpg", "https://fdic.gov/x.jpg", "https://fedex.com/x.jpg", "http://172.32.0.1/x", "http://100.63.0.1/x",
-    "http://8.8.8.8/x", "https://localhost.com/x.jpg",
+    "http://8.8.8.8/x", "https://localhost.com/x.jpg", "http://198.17.0.1/x", "http://198.20.0.1/x", "http://192.0.1.1/x",
   ]) assert.ok(urlPublicaHttp(u), u);
 });
