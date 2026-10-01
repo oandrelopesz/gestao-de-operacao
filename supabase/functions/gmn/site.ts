@@ -216,7 +216,9 @@ export function candidatosDeLogo(lista: CandidatoSite[], max = 16): CandidatoSit
  * continua candidato: a visão decide se é foto.
  */
 export function candidatosDeFoto(lista: CandidatoSite[], max = 24): CandidatoSite[] {
-  return comDescricaoPrimeiro(semRastreio(lista).filter((c) => !temSinalForteDeLogo(c))).slice(0, max);
+  // Candidato com pista fraca de logo vai para o fim: muitas logos de marca com alt não tomam as vagas das fotos.
+  const ordenados = comDescricaoPrimeiro(semRastreio(lista).filter((c) => !temSinalForteDeLogo(c)));
+  return [...ordenados.filter((c) => !c.logo), ...ordenados.filter((c) => c.logo)].slice(0, max);
 }
 
 /**
