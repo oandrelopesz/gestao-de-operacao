@@ -389,7 +389,7 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
                   className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
                 >
                   <p>
-                    {"Os meses anteriores passam a ser cobrados com as parcelas novas (pode aparecer atraso que não existia). Para não mexer no que já passou, cobre a partir deste mês."}
+                    {"Os meses anteriores passam a ser cobrados com as parcelas novas (pode aparecer atraso que não existia). Para não mexer no que já passou, cobre a partir deste mês (os meses anteriores saem da conta, inclusive o que ainda estiver em aberto neles)."}
                   </p>
                   <Button type="button" variant="outline" size="sm" className="whitespace-normal text-left" onClick={() => setCobrancaDesdeForm(mesAtual)}>
                     {`Cobrar a partir de ${nomeDoMes(hoje)}`}

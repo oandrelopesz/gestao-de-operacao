@@ -67,7 +67,8 @@ export async function isentarMes(fonteId: string, doMes: Cobranca[], motivo: str
 
 /**
  * Desfaz o acerto da parcela daquele mês. Isenta que já tinha pagamento só perde a isenção (e o motivo): o pagamento fica e a
- * parcela volta a parcial (ou recebida, se o pago cobre o valor). Qualquer outro caso apaga o registro (volta a "não acertada").
+ * parcela volta a parcial (isenta e paga por inteiro já conta como recebida, então cai no outro caso). Qualquer outro caso apaga
+ * o registro (volta a "não acertada").
  */
 export async function desfazerCobranca(c: Cobranca) {
   if (!c.registro) return;
