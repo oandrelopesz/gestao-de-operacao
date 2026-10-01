@@ -16,13 +16,16 @@ const ORIGEM_IMAGEM: Record<string, string> = { drive: "Foto do Drive", google: 
 export function PostsLista({ perfil }: { perfil: PerfilGmn }) {
   const [posts, setPosts] = useState<PostGmn[] | null>(null);
   const [gerando, setGerando] = useState(false);
+  const [falhou, setFalhou] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
       setPosts(await fetchPosts(perfil.id));
+      setFalhou(false);
     } catch (e) {
       toast.error(traduzErroGmn(e));
-      setPosts([]);
+      setPosts((atual) => atual ?? []);
+      setFalhou(true);
     }
   }, [perfil.id]);
 
@@ -32,8 +35,11 @@ export function PostsLista({ perfil }: { perfil: PerfilGmn }) {
     setGerando(true);
     try {
       const p = await gerarPrevia(perfil.id);
-      if (p.status === "gerado") toast.success("Prévia pronta.");
-      else toast.warning(`Prévia ${STATUS[p.status].toLowerCase()}: ${p.erro ?? ""}`);
+      if (p.status === "gerado") {
+        if (p.erro) toast.warning(`Prévia gerada com aviso: ${p.erro}`);
+        else toast.success("Prévia pronta.");
+      } else if (p.status === "pulado") toast.warning(`Prévia pulada: ${p.erro ?? "motivo não informado"}`);
+      else toast.error(`Não foi possível gerar a prévia: ${p.erro ?? "motivo não informado"}`);
       await carregar();
     } catch (e) {
       toast.error(traduzErroGmn(e));
@@ -47,13 +53,14 @@ export function PostsLista({ perfil }: { perfil: PerfilGmn }) {
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={previa} disabled={gerando || !perfil.briefing_salvo_em}>
           {gerando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-          {gerando ? "Gerando (até 1 min)…" : "Gerar prévia"}
+          {gerando ? "Gerando (até 2 min)…" : "Gerar prévia"}
         </Button>
         {!perfil.briefing_salvo_em && <span className="text-sm text-muted-foreground">Salve o briefing primeiro.</span>}
         <span className="text-xs text-muted-foreground">A prévia não é publicada no Google.</span>
       </div>
       {posts === null && <p className="text-sm text-muted-foreground">Carregando…</p>}
-      {posts?.length === 0 && <p className="text-sm text-muted-foreground">Nenhum post ainda.</p>}
+      {falhou && <p className="text-sm text-destructive">Não foi possível carregar os posts.</p>}
+      {!falhou && posts?.length === 0 && <p className="text-sm text-muted-foreground">Nenhum post ainda.</p>}
       {posts?.map((p) => (
         <Card key={p.id}>
           <CardContent className="space-y-3 p-4">

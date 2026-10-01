@@ -111,6 +111,20 @@ export async function fetchPosts(perfilId: string): Promise<PostGmn[]> {
   return (data || []) as PostGmn[];
 }
 
+export interface UltimoPost { status: PostGmn["status"]; origem: PostGmn["origem"]; created_at: string; erro: string | null }
+
+/** Último post (inclusive prévia) de cada perfil. */
+export async function fetchUltimosPosts(): Promise<Record<string, UltimoPost>> {
+  const { data, error } = await posts().select("perfil_id, status, origem, created_at, erro").order("created_at", { ascending: false }).limit(500);
+  if (error) throw error;
+  const ultimos: Record<string, UltimoPost> = {};
+  for (const r of (data || []) as (UltimoPost & { perfil_id: string })[]) {
+    // a lista vem do mais novo para o mais antigo: o primeiro de cada perfil é o último post
+    if (!ultimos[r.perfil_id]) ultimos[r.perfil_id] = { status: r.status, origem: r.origem, created_at: r.created_at, erro: r.erro };
+  }
+  return ultimos;
+}
+
 async function chamar<T>(body: Record<string, unknown>): Promise<T> {
   const headers = await cabecalhosDeAcesso();
   const r = await fetch(FUNCAO, { method: "POST", headers, body: JSON.stringify(body) });

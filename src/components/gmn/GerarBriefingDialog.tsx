@@ -49,7 +49,7 @@ export function GerarBriefingDialog({ perfil, aberto, onFechar, onGerado }: {
       const texto = escolhido === NENHUM ? null : await (await baixarOriginal(escolhido)).text();
       const b = await gerarBriefingIa(perfil.id, texto);
       onGerado(b);
-      toast.success("Rascunho do briefing preenchido. Revise e salve.");
+      toast.success("Formulário preenchido com o rascunho da IA. Revise e clique em Salvar briefing.");
       onFechar();
     } catch (e) {
       toast.error(traduzErroGmn(e));
@@ -64,14 +64,15 @@ export function GerarBriefingDialog({ perfil, aberto, onFechar, onGerado }: {
         <DialogHeader>
           <DialogTitle>Gerar briefing com IA</DialogTitle>
           <DialogDescription>
-            A IA usa os dados do perfil, o nicho do cliente ligado e, se você escolher, as respostas de um briefing de Dados
-            internos. Nada é salvo até você clicar em Salvar briefing.
+            A IA usa os dados salvos do perfil (cliente, saúde e briefing), o nicho do cliente ligado e, se você escolher, as
+            respostas de um briefing de Dados internos. O resultado substitui os campos do formulário do briefing, e nada é
+            salvo até você clicar em Salvar briefing.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">
           <Label>Briefing de Dados internos (opcional)</Label>
           <Select value={escolhido} onValueChange={setEscolhido} disabled={!opcoes || gerando}>
-            <SelectTrigger><SelectValue placeholder={opcoes ? "Nenhum" : "Carregando…"} /></SelectTrigger>
+            <SelectTrigger aria-label="Briefing de Dados internos (opcional)"><SelectValue placeholder={opcoes ? "Nenhum" : "Carregando…"} /></SelectTrigger>
             <SelectContent>
               <SelectItem value={NENHUM}>Nenhum</SelectItem>
               {(opcoes || []).map((o) => <SelectItem key={o.id} value={o.id}>{o.rotulo}</SelectItem>)}
