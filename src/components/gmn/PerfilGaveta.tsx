@@ -255,10 +255,11 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
         else toast.success("Prévia pronta.");
       } else if (p.status === "pulado") toast.warning(`Prévia pulada: ${p.erro ?? "motivo não informado"}`);
       else toast.error(`Não foi possível gerar a prévia: ${p.erro ?? "motivo não informado"}`);
-      setPostsVersao((v) => v + 1); // sempre: reabrir o mesmo perfil no meio da geração também precisa da lista nova
     } catch (e) {
       toast.error(traduzErroGmn(e));
     } finally {
+      // Sempre, mesmo com erro (ex.: 409 de prévia já em andamento) ou com a gaveta reaberta: a lista precisa ficar em dia
+      setPostsVersao((v) => v + 1);
       if (mesma()) setPreviaGerando(null);
     }
   }
