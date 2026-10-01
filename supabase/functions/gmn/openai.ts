@@ -17,7 +17,8 @@ function cabecalhos(): HeadersInit {
 /** Mensagem fixa em português pelo status; o detalhe da OpenAI (em inglês) vai só para o log. */
 function erroOpenai(status: number, detalhe: { error?: { message?: string } }): Error {
   console.error(`OpenAI respondeu ${status}:`, detalhe?.error?.message || "sem detalhe");
-  if (status === 401 || status === 403) return new Error("A chave da OpenAI foi recusada (confira o secret OPENAI_API_KEY).");
+  if (status === 401) return new Error("A chave da OpenAI foi recusada (confira o secret OPENAI_API_KEY).");
+  if (status === 403) return new Error("A OpenAI negou acesso a este modelo (a organização pode precisar de verificação em platform.openai.com).");
   if (status === 429) return new Error("Limite de uso ou de crédito da OpenAI atingido.");
   if (status === 400) return new Error("A OpenAI recusou o pedido (conteúdo ou parâmetros).");
   if (status >= 500) return new Error("A OpenAI está com problema agora; tente de novo em alguns minutos.");
@@ -56,7 +57,12 @@ export async function gerarJson<T>(
   }, PRAZO.texto, total, "texto");
   const conteudo = d?.choices?.[0]?.message?.content;
   if (!conteudo) throw new Error("OpenAI devolveu resposta vazia.");
-  return JSON.parse(conteudo) as T;
+  try {
+    return JSON.parse(conteudo) as T;
+  } catch (e) {
+    console.error("OpenAI devolveu JSON ilegível:", e);
+    throw new Error("A OpenAI devolveu uma resposta que não deu para ler.");
+  }
 }
 
 /** PNG gerado pela OpenAI (paisagem). */

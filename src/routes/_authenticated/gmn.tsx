@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
-  PUBLICACAO_LIBERADA, criarPerfil, fetchClientesOpcoes, fetchPerfis, fetchUltimosPosts, salvarPerfil, traduzErroGmn,
+  ABA_LIBERADA, PUBLICACAO_LIBERADA, criarPerfil, fetchClientesOpcoes, fetchPerfis, fetchUltimosPosts, salvarPerfil, traduzErroGmn,
   type ClienteOpcao, type PerfilGmn, type UltimoPost,
 } from "@/lib/gmn";
 import { PerfilGaveta } from "@/components/gmn/PerfilGaveta";
@@ -47,7 +47,20 @@ function textoUltimoPost(u: UltimoPost): string {
 }
 const comProblema = (u?: UltimoPost) => u?.status === "erro" || u?.status === "pulado";
 
+/** Fase 1: no site publicado a aba só mostra o aviso e não toca no banco; os hooks ficam em GmnConteudo. */
 function GmnPage() {
+  if (!ABA_LIBERADA) {
+    return (
+      <div className="space-y-4 p-4 md:p-6">
+        <h1 className="flex items-center gap-2 text-2xl font-semibold"><MapPin className="h-6 w-6" />Google Meu Negócio</h1>
+        <p className="text-sm text-muted-foreground">Em preparação: esta aba será liberada quando a API do Google for aprovada.</p>
+      </div>
+    );
+  }
+  return <GmnConteudo />;
+}
+
+function GmnConteudo() {
   const [perfis, setPerfis] = useState<PerfilGmn[]>([]);
   const [clientes, setClientes] = useState<ClienteOpcao[]>([]);
   const [carregando, setCarregando] = useState(true);

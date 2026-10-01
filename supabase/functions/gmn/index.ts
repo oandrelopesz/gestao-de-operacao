@@ -93,9 +93,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method === "GET") return json({ openai: openaiConfigurada(), r2: r2Configurado(), acesso: acessoConfigurado() });
   if (req.method !== "POST") return json({ error: "Método não suportado" }, 405);
+  // O prazo total começa antes da checagem de acesso: um tokeninfo lento também conta.
+  const total = AbortSignal.timeout(PRAZO_TOTAL_MS);
   if (!(await acessoLiberado(req))) return json({ error: "Acesso não autorizado. Entre com o Google ou informe a chave." }, 403);
 
-  const total = AbortSignal.timeout(PRAZO_TOTAL_MS);
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const body = (await req.json().catch(() => null)) ?? {};
   try {

@@ -7,6 +7,9 @@ import { normalizarAgenda, normalizarBriefing, type Briefing, type ItemAgenda } 
 /** Fase 1: nada é publicado no Google; o liga/desliga fica desabilitado até a API ser aprovada. */
 export const PUBLICACAO_LIBERADA = false;
 
+/** Fase 1: a aba só funciona no servidor local; no site publicado mostra "Em preparação". Tirar na Fase 2. */
+export const ABA_LIBERADA = import.meta.env.DEV;
+
 export type CtaTipo = "LEARN_MORE" | "CALL" | "BOOK";
 
 export interface PerfilGmn {

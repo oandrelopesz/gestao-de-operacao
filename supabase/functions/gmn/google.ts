@@ -39,7 +39,12 @@ export async function tokenGoogle(sb: Sb, total?: AbortSignal): Promise<string> 
       }),
       signal,
     });
-    return await r.json();
+    // Página de erro em HTML não é JSON; prazo estourado segue para o tratamento de prazo.
+    return await r.json().catch((e) => {
+      if (foiPrazo(e)) throw e;
+      console.error("Google devolveu resposta ilegível ao renovar o token:", e);
+      throw new Error("O Google respondeu de forma inesperada ao renovar o token.");
+    });
   }, total);
   if (d.error) throw new Error(`Google recusou renovar o token (${d.error}).`);
   const novo = new Date(Date.now() + Number(d.expires_in || 3600) * 1000).toISOString();
@@ -55,7 +60,7 @@ const LIMITE_BYTES = 5 * 1024 * 1024;
 
 /** Imagens JPG/PNG de até 5 MB direto na pasta (sem subpastas), mais novas primeiro. */
 export async function imagensDaPasta(token: string, pastaId: string, total?: AbortSignal): Promise<ImagemDrive[]> {
-  const q = `'${pastaId.replace(/'/g, "\'")}' in parents and trashed = false and (mimeType = 'image/jpeg' or mimeType = 'image/png')`;
+  const q = `'${pastaId.replace(/'/g, "\\'")}' in parents and trashed = false and (mimeType = 'image/jpeg' or mimeType = 'image/png')`;
   const params = new URLSearchParams({ q, fields: "files(id,name,mimeType,size)", pageSize: "200", orderBy: "createdTime desc" });
   params.set("supportsAllDrives", "true");
   params.set("includeItemsFromAllDrives", "true");
