@@ -4,6 +4,7 @@ import {
   type ClientFormValues, type OperacaoFormValues, type PlataformaConfig,
 } from "@/components/ClientForm";
 import { fetchCotacoes, isMoeda, paraBRL } from "@/lib/moedas";
+import { semPlataforma } from "@/lib/plataformasOperacao";
 
 // Mesmo fallback usado nas outras telas quando não há sessão (preview)
 export const FALLBACK_USER_ID = "b34bdae5-7a67-4b63-a46f-8aad43a06c63";
@@ -100,7 +101,7 @@ function parsePlataformasConfig(raw: unknown): Record<string, PlataformaConfig> 
  * formulário sempre abra com os dados completos e nunca sobrescreva com defaults.
  */
 export async function loadClienteFormValues(clienteId: string): Promise<ClienteFormInitial> {
-  const [{ data: cliente, error }, { data: ops }, { data: registros }] = await Promise.all([
+  const [{ data: cliente, error }, { data: ops, error: erroOps }, { data: registros, error: erroRegistros }] = await Promise.all([
     supabase.from("clientes").select("*").eq("id", clienteId).single(),
     supabase
       .from("operacoes")
@@ -116,6 +117,9 @@ export async function loadClienteFormValues(clienteId: string): Promise<ClienteF
       .order("created_at", { ascending: true }),
   ]);
   if (error || !cliente) throw error || new Error("Cliente não encontrado");
+  // Sem isto uma falha parcial devolveria um cadastro incompleto (e quem salva em seguida apagaria dados)
+  if (erroOps) throw erroOps;
+  if (erroRegistros) throw erroRegistros;
 
   const saldos = ((registros || []) as SaldoAdsRegistro[]).filter((r) => r.ativo !== false);
 
@@ -348,6 +352,23 @@ export async function saveCliente(values: ClientFormValues, editingId?: string |
   }
 
   return clienteId;
+}
+
+/**
+ * Tira uma plataforma da operação do cliente (menu "Remover plataforma" da aba Saldo): carrega o
+ * cadastro, tira a plataforma da operação e grava pelo saveCliente, que recalcula a verba e deixa
+ * a conta inativa (ativo = false) com as recargas guardadas. Nada é apagado. Se for a última
+ * plataforma da operação, lança erro sem gravar nada.
+ * `operacaoId` vazio = primeira operação; uma conta antiga pode juntar várias plataformas (lista).
+ */
+export async function removerPlataformaDaOperacao(
+  clienteId: string,
+  operacaoId: string | null | undefined,
+  plataforma: string | string[],
+): Promise<void> {
+  const carregado = (await loadClienteFormValues(clienteId)) as ClientFormValues & { id: string };
+  const values = semPlataforma(carregado, operacaoId, plataforma);
+  await saveCliente(values, clienteId);
 }
 
 /** Liga/desliga o tráfego do cliente sem abrir o formulário (alavanca no card) */

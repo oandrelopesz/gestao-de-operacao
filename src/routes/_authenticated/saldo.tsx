@@ -33,7 +33,7 @@ import { CACHE_KEYS, loadSaldo } from "@/lib/data";
 import { formatBRL } from "@/lib/clientes";
 import { formatMoeda } from "@/lib/moedas";
 import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
-import { saveCliente, loadClienteFormValues, getUserId } from "@/lib/clientesService";
+import { saveCliente, loadClienteFormValues, getUserId, removerPlataformaDaOperacao } from "@/lib/clientesService";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -193,7 +193,11 @@ function SaldoPage() {
   const [novoRegistroClienteId, setNovoRegistroClienteId] = useState<string | null>(null);
   const [selectedForHistory, setSelectedForHistory] = useState<SaldoRow | null>(null);
   const [historyIsConsolidated, setHistoryIsConsolidated] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  /** Conta cuja plataforma está sendo removida da operação (guardada além do diálogo para o texto não sumir ao fechar) */
+  const [removendo, setRemovendo] = useState<SaldoRow | null>(null);
+  const [confirmRemover, setConfirmRemover] = useState(false);
+  /** Impede duas remoções ao mesmo tempo: cada uma recarrega e regrava o cadastro do cliente */
+  const [removendoAndamento, setRemovendoAndamento] = useState(false);
   const [saving, setSaving] = useState(false);
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -343,17 +347,23 @@ function SaldoPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deletingId) return;
+  /**
+   * "Remover plataforma": tira a plataforma da operação do cliente pelo mesmo caminho do cadastro
+   * (saveCliente). A conta fica inativa e as recargas ficam guardadas; nada é apagado.
+   */
+  const handleRemoverPlataforma = async () => {
+    if (!removendo || removendoAndamento) return;
+    const alvo = removendo;
+    const nome = (alvo.plataformas || []).join(", ") || "Plataforma";
+    setRemovendoAndamento(true);
     try {
-      const { error } = await supabase.from("saldo_ads").delete().eq("id", deletingId);
-      if (error) throw error;
-      toast.success("Registro removido");
+      await removerPlataformaDaOperacao(alvo.cliente_id, alvo.operacao_id, alvo.plataformas || []);
+      toast.success(`${nome} removida de ${alvo.cliente_nome}. As recargas ficam guardadas.`);
       fetchSaldo(true);
-    } catch {
-      toast.error("Erro ao remover registro");
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao remover a plataforma");
     } finally {
-      setDeletingId(null);
+      setRemovendoAndamento(false);
     }
   };
 
@@ -879,7 +889,7 @@ function SaldoPage() {
                                     </>
                                   )}
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(plat.id)}>
+                                  <DropdownMenuItem className="text-destructive" disabled={removendoAndamento} onClick={() => { setRemovendo(plat); setConfirmRemover(true); }}>
                                     <Trash2 size={12} className="mr-2" /> Remover plataforma
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -1078,15 +1088,19 @@ function SaldoPage() {
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={!!deletingId} onOpenChange={(o) => { if (!o) setDeletingId(null); }}>
+      <AlertDialog open={confirmRemover} onOpenChange={setConfirmRemover}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Tem certeza que deseja remover?</AlertDialogTitle>
-            <AlertDialogDescription>Esta ação remove o monitoramento desta conta de mídia e todo o histórico de recargas.</AlertDialogDescription>
+            <AlertDialogTitle>
+              Remover {(removendo?.plataformas || []).join(", ") || "a plataforma"} de {removendo?.cliente_nome}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              A plataforma sai do cadastro do cliente e a verba é recalculada. As recargas ficam guardadas e voltam se a plataforma for adicionada de novo.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Remover</AlertDialogAction>
+            <AlertDialogAction onClick={handleRemoverPlataforma} className="bg-destructive hover:bg-destructive/90">Remover</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -28,6 +28,7 @@ import { RegraDataCampos } from "@/components/demandas/RegraDataCampos";
 import { NOMES_DIA_CURTO } from "@/lib/colunasDias";
 import { useConfig } from "@/lib/appConfig";
 import { usePlataformas, slugifyPlataformaId, type PlataformaDef } from "@/lib/plataformas";
+import { renomearChavePlataforma } from "@/lib/plataformasOperacao";
 import { useTheme } from "@/lib/theme";
 import { fetchCursoCategorias, createCursoCategoria, corDaCategoria, CATEGORIA_COLORS, type CursoCategoriaDef } from "@/lib/cursoCategorias";
 import { HabilidadesAdminCard } from "@/components/habilidades/HabilidadesAdminCard";
@@ -114,6 +115,45 @@ function traduzErroPlataforma(e: any): string {
     return "A tabela de plataformas ainda não existe no banco. Rode supabase/migrations/20260909120000_plataformas_ads.sql no SQL Editor do Supabase.";
   }
   return msg || "Erro ao salvar plataforma";
+}
+
+/**
+ * Propaga o novo nome de uma plataforma para tudo que a guarda pelo nome: saldo_ads.plataformas,
+ * operacoes.plataformas_config (fonte da verba e da forma de pagamento por plataforma) e o espelho
+ * legado clientes.plataformas_config. Confere o erro de cada leitura e de cada gravação e devolve
+ * as mensagens das que falharam (lista vazia = tudo certo). Refazer é seguro: só mexe no que ainda
+ * tem o nome antigo.
+ */
+async function propagarRenomeacaoPlataforma(antigo: string, novo: string): Promise<string[]> {
+  const falhas: string[] = [];
+  const conferir = (erro: { message?: string } | null) => {
+    if (erro) falhas.push(erro.message || "erro desconhecido");
+  };
+
+  const { data: contas, error: erroContas } = await supabase.from("saldo_ads").select("id, plataformas").contains("plataformas", [antigo]);
+  conferir(erroContas);
+  const resContas = await Promise.all((contas || []).map((r) =>
+    supabase.from("saldo_ads").update({ plataformas: (r.plataformas || []).map((p: string) => (p === antigo ? novo : p)) }).eq("id", r.id)
+  ));
+  resContas.forEach((r) => conferir(r.error));
+
+  const { data: ops, error: erroOps } = await supabase.from("operacoes").select("id, plataformas_config").not("plataformas_config", "is", null);
+  conferir(erroOps);
+  const resOps = await Promise.all((ops || [])
+    .map((o) => ({ id: o.id, antes: o.plataformas_config, depois: renomearChavePlataforma(o.plataformas_config, antigo, novo) }))
+    .filter((o) => o.depois !== o.antes)
+    .map((o) => supabase.from("operacoes").update({ plataformas_config: o.depois }).eq("id", o.id)));
+  resOps.forEach((r) => conferir(r.error));
+
+  const { data: clis, error: erroClis } = await supabase.from("clientes").select("id, plataformas_config").not("plataformas_config", "is", null);
+  conferir(erroClis);
+  const resClis = await Promise.all((clis || [])
+    .map((c) => ({ id: c.id, antes: c.plataformas_config, depois: renomearChavePlataforma(c.plataformas_config, antigo, novo) }))
+    .filter((c) => c.depois !== c.antes)
+    .map((c) => supabase.from("clientes").update({ plataformas_config: c.depois }).eq("id", c.id)));
+  resClis.forEach((r) => conferir(r.error));
+
+  return Array.from(new Set(falhas));
 }
 
 // Texto da regra de data de uma coluna, exibido na lista do Admin
@@ -295,20 +335,15 @@ function AdminPage() {
       if (plataformaDialog.mode === "edit") {
         const { error } = await supabase.from("plataformas_ads").update({ nome }).eq("id", plataformaDialog.id);
         if (error) throw error;
-        // O nome é o valor gravado nos clientes: renomear propaga para o saldo de cada um
+        // O nome é o valor gravado nos clientes: renomear propaga para o saldo, as operações e o cadastro legado
         if (nome !== plataformaDialog.nomeOriginal) {
-          const { data: rows } = await supabase.from("saldo_ads").select("id, plataformas").contains("plataformas", [plataformaDialog.nomeOriginal]);
-          await Promise.all((rows || []).map((r) =>
-            supabase.from("saldo_ads").update({ plataformas: (r.plataformas || []).map((p: string) => (p === plataformaDialog.nomeOriginal ? nome : p)) }).eq("id", r.id)
-          ));
-          // ...e para a verba/forma de pagamento por plataforma guardada no cadastro do cliente
-          const { data: clis } = await supabase.from("clientes").select("id, plataformas_config").not("plataformas_config", "is", null);
-          await Promise.all(((clis || []) as any[])
-            .filter((c) => c.plataformas_config && c.plataformas_config[plataformaDialog.nomeOriginal] !== undefined)
-            .map((c) => {
-              const { [plataformaDialog.nomeOriginal]: cfg, ...rest } = c.plataformas_config;
-              return supabase.from("clientes").update({ plataformas_config: { ...rest, [nome]: cfg } }).eq("id", c.id);
-            }));
+          const falhas = await propagarRenomeacaoPlataforma(plataformaDialog.nomeOriginal, nome);
+          if (falhas.length > 0) {
+            // O nome em plataformas_ads já mudou. O diálogo fica aberto: salvar de novo refaz só o que faltou
+            toast.error(`Não foi possível renomear em todos os lugares: ${falhas.join("; ")}. Confira os clientes que usam esta plataforma.`);
+            await Promise.all([reloadPlataformas(), loadClientesPorPlataforma()]);
+            return;
+          }
         }
         toast.success("Plataforma atualizada");
       } else {
