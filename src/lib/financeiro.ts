@@ -3,7 +3,7 @@
 // `financeiro_fontes.parcelas` a lista [{ dia, valor }] e cada parcela é recebida (e cobrada) à parte.
 // Sem dependências: roda no navegador e no `node --test`. Datas são "YYYY-MM-DD" do dia em Brasília.
 
-export type StatusMes = "recebido" | "atrasado" | "pendente" | "a_vencer";
+export type StatusMes = "recebido" | "isento" | "atrasado" | "pendente" | "a_vencer";
 
 /** Freelancer = trabalho feito para uma agência (financeiro_fontes.agencia_id diz qual). */
 export type TipoFonte = "agencia" | "cliente_pessoal" | "freelancer";
@@ -28,8 +28,12 @@ export interface RecebimentoMes {
   id: string;
   parcela: number;
   recebido: boolean;
+  /** Parcela abonada neste mês: o que não foi pago deixa de ser cobrado. */
+  isento?: boolean | null;
   data_confirmacao: string | null;
   valor_recebido: number | null;
+  /** Valor da parcela congelado quando ela foi acertada (vence o valor atual da fonte). */
+  valor_devido?: number | null;
 }
 
 export interface FonteDoMes {
@@ -102,32 +106,46 @@ export function statusDaParcela(vencimento: string, recebido: boolean, hoje: str
   return "a_vencer";
 }
 
-/** A pior situação entre as parcelas: atrasado > pendente > a vencer; recebido só com todas pagas. */
+/**
+ * A pior situação entre as parcelas: atrasado > pendente > a vencer. Todas isentas = isento; todas recebidas
+ * ou isentas = recebido.
+ */
 function statusGeral(parcelas: ParcelaDoMes[]): StatusMes {
-  if (parcelas.every((p) => p.status === "recebido")) return "recebido";
+  if (parcelas.every((p) => p.status === "isento")) return "isento";
+  if (parcelas.every((p) => p.status === "recebido" || p.status === "isento")) return "recebido";
   if (parcelas.some((p) => p.status === "atrasado")) return "atrasado";
   if (parcelas.some((p) => p.status === "pendente")) return "pendente";
   return "a_vencer";
 }
 
+const CENTAVO = 0.005;
+
 export function situacaoDoMes(fonte: FonteDoMes, hoje: string): SituacaoDoMes {
   const lista = parcelasDaFonte(fonte);
   const recebimentos = fonte.recebimentos_mes || [];
+  // O que a parcela vale neste mês (o valor congelado no acerto, se houver) e o que já entrou nela
+  const devidoDe = (p: ParcelaDoMes) => Number(p.recebimento?.valor_devido ?? p.valor);
+  const pagoDe = (p: ParcelaDoMes) => (p.recebimento?.recebido ? Number(p.recebimento.valor_recebido ?? devidoDe(p)) : 0);
+  const faltaDe = (p: ParcelaDoMes) => Math.max(0, Math.round((devidoDe(p) - pagoDe(p)) * 100) / 100);
   const parcelas = lista.map((p, i): ParcelaDoMes => {
     const recebimento = recebimentos.find((r) => r.parcela === i + 1) || null;
     const vencimento = vencimentoNoMes(p.dia, hoje);
-    return { ...p, numero: i + 1, total: lista.length, vencimento, recebimento, status: statusDaParcela(vencimento, !!recebimento?.recebido, hoje) };
+    const devido = Number(recebimento?.valor_devido ?? p.valor);
+    // Recebido de verdade só quando o pago cobre o devido; valor menor é parcial e a parcela segue em aberto pela data
+    const quitada = !!recebimento?.recebido && (recebimento.valor_recebido == null || recebimento.valor_recebido >= devido - CENTAVO);
+    const status = recebimento?.isento ? "isento" : statusDaParcela(vencimento, quitada, hoje);
+    return { ...p, numero: i + 1, total: lista.length, vencimento, recebimento, status };
   });
-  const recebidas = parcelas.filter((p) => p.status === "recebido");
   const soma = (ps: ParcelaDoMes[], valor: (p: ParcelaDoMes) => number) => ps.reduce((t, p) => t + valor(p), 0);
   return {
     parcelas,
     status: statusGeral(parcelas),
     fracionado: ehFracionado(fonte),
-    recebidas: recebidas.length,
-    valorRecebido: soma(recebidas, (p) => p.recebimento?.valor_recebido ?? p.valor),
-    valorEmAberto: soma(parcelas.filter((p) => p.status !== "recebido"), (p) => p.valor),
-    valorAtrasado: soma(parcelas.filter((p) => p.status === "atrasado"), (p) => p.valor),
+    recebidas: parcelas.filter((p) => p.status === "recebido").length,
+    // Conta o que entrou em qualquer parcela com pagamento (inclusive parcial e isenta que já tinha pago)
+    valorRecebido: soma(parcelas.filter((p) => p.recebimento?.recebido), pagoDe),
+    valorEmAberto: soma(parcelas.filter((p) => p.status !== "recebido" && p.status !== "isento"), faltaDe),
+    valorAtrasado: soma(parcelas.filter((p) => p.status === "atrasado"), faltaDe),
   };
 }
 
@@ -135,6 +153,7 @@ export function situacaoDoMes(fonte: FonteDoMes, hoje: string): SituacaoDoMes {
 export function infoDoStatus(status: StatusMes) {
   switch (status) {
     case "recebido": return { label: "Recebido", color: "bg-emerald-500", text: "text-emerald-500", border: "border-emerald-200", bg: "bg-emerald-50/50" };
+    case "isento": return { label: "Isento", color: "bg-sky-500", text: "text-sky-600", border: "border-sky-200", bg: "bg-sky-50/50" };
     case "atrasado": return { label: "Atrasado", color: "bg-red-500", text: "text-red-500", border: "border-red-200", bg: "bg-red-50/50" };
     case "pendente": return { label: "Pendente", color: "bg-amber-500", text: "text-amber-500", border: "border-amber-200", bg: "bg-amber-50/50" };
     default: return { label: "A vencer", color: "bg-zinc-400", text: "text-zinc-500", border: "border-zinc-200", bg: "bg-zinc-50/50" };

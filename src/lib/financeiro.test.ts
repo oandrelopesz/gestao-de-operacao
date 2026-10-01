@@ -83,9 +83,10 @@ test("situacaoDoMes: parcela atrasada deixa a fonte atrasada, mesmo com outra pe
 test("situacaoDoMes: pendente vence a_vencer; valor recebido informado prevalece sobre o previsto", () => {
   const s = situacaoDoMes({ ...unica, recebimentos_mes: [] }, "2026-09-26");
   assert.equal(s.status, "pendente");
-  const r = situacaoDoMes({ ...unica, recebimentos_mes: [receb(1, true, 3400)] }, "2026-09-26");
+  // valor informado acima do previsto quita e prevalece (abaixo do previsto seria parcial: teste da parcial mais adiante)
+  const r = situacaoDoMes({ ...unica, recebimentos_mes: [receb(1, true, 3600)] }, "2026-09-26");
   assert.equal(r.status, "recebido");
-  assert.equal(r.valorRecebido, 3400);
+  assert.equal(r.valorRecebido, 3600);
   assert.equal(r.valorEmAberto, 0);
 });
 
@@ -94,6 +95,17 @@ test("situacaoDoMes: recebimento de parcela que não existe mais (fonte editada)
   assert.equal(s.recebidas, 0);
   assert.equal(s.valorRecebido, 0);
   assert.equal(s.parcelas[0].recebimento, null);
+});
+
+test("situacaoDoMes: parcela isenta fica isenta e sai do em aberto; parcial continua em aberto pelo resto", () => {
+  const isenta = situacaoDoMes({ ...unica, recebimentos_mes: [{ id: "1", parcela: 1, recebido: false, isento: true, data_confirmacao: null, valor_recebido: null }] }, "2026-09-30");
+  assert.equal(isenta.status, "isento");
+  assert.equal(isenta.valorEmAberto, 0);
+  // unica vence no dia 25 e tem 5 dias de tolerância: em 31/10 (depois de 30/10) a parcela já está atrasada
+  const parcial = situacaoDoMes({ ...unica, recebimentos_mes: [{ id: "1", parcela: 1, recebido: true, data_confirmacao: null, valor_recebido: 1000, valor_devido: 3500 }] }, "2026-10-31");
+  assert.equal(parcial.status, "atrasado");
+  assert.equal(parcial.valorEmAberto, 2500);
+  assert.equal(parcial.valorRecebido, 1000);
 });
 
 test("resumoDoMes: totais por parcela e contagem de fontes", () => {
