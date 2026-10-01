@@ -1653,3 +1653,114 @@ git commit -m "GMN: buscar imagens e logo no site, com caixas para usar a logo e
   **regra: a Task 4 cria `ImagemSite` e `normalizarImagensSite` em `regras.ts` com o código da Task 6 Step 3, e a Task 6
   não os recria**). `Imagem.descricao` nasce na Task 5 e é usada na 6.
 - **Sem lacunas:** cada passo de código traz o código ou a troca exata; as integrações citam funções e mensagens literais.
+
+---
+
+## Emenda às Tasks 6 e 7 (spec 12.7, 2026-10-01 noite) — vale por cima do texto delas
+
+Pedido do André no meio da execução: buscas de logo e de fotos separadas, com reconhecimento de logo × foto; chave
+"Usar fotos do site nos posts" (desligada por padrão); foto do site só entra quando combina com o post. A migration
+`20261001190000_gmn_fotos_site.sql` (`usa_fotos_site`) já foi aplicada no banco.
+
+### Task 6 (função) — o que muda
+
+1. **`regras.ts`** (puro, TDD):
+   - Troque `decidirImagem` por `fontesDaImagem(o: { comImagem: boolean; temPasta: boolean; temFotosSite: boolean; usaIa: boolean }): ("drive" | "site" | "ia")[]`:
+     `!comImagem` → `[]`; `temPasta` → `["drive"]` (sem cair para outra fonte); senão, nesta ordem, `"site"` se
+     `temFotosSite` e `"ia"` se `usaIa`. Tire `decidirImagem` e o teste dela; teste novo:
+     ```ts
+     test("fontesDaImagem: Drive sozinho; senão site (se ligado) e depois IA; só texto pula tudo", () => {
+       const b = { comImagem: true, temPasta: false, temFotosSite: false, usaIa: false };
+       assert.deepEqual(fontesDaImagem({ ...b, comImagem: false, temPasta: true, temFotosSite: true, usaIa: true }), []);
+       assert.deepEqual(fontesDaImagem({ ...b, temPasta: true, temFotosSite: true, usaIa: true }), ["drive"]);
+       assert.deepEqual(fontesDaImagem({ ...b, temFotosSite: true, usaIa: true }), ["site", "ia"]);
+       assert.deepEqual(fontesDaImagem({ ...b, temFotosSite: true }), ["site"]);
+       assert.deepEqual(fontesDaImagem({ ...b, usaIa: true }), ["ia"]);
+       assert.deepEqual(fontesDaImagem(b), []);
+     });
+     ```
+   - `fotosDoSiteComDescricao(perfil: { usa_fotos_site?: unknown; imagens_site?: unknown }): ImagemSite[]` → `[]` se
+     `usa_fotos_site !== true`; senão `normalizarImagensSite(...)` só com `descricao.trim() !== ""`. Teste (desligada →
+     `[]`; ligada → só as com descrição).
+   - Combinar foto e post:
+     ```ts
+     export const ESQUEMA_FOTOS_QUE_COMBINAM = {
+       type: "object", additionalProperties: false, required: ["ids"],
+       properties: { ids: { type: "array", items: { type: "string" } } },
+     } as const;
+
+     /** Pede à IA as fotos do site cuja descrição combina com o post (na dúvida, nenhuma). Até 40 fotos. */
+     export function montarMensagensFotosQueCombinam(texto: string, fotos: { id: string; descricao: string }[]): Mensagens {
+       const system = [
+         "Você escolhe fotos para um post do Perfil da Empresa no Google (Google Meu Negócio).",
+         "Responda só com os ids das fotos cuja descrição combina claramente com o assunto do post.",
+         "Na dúvida, não inclua. Pode não haver nenhuma: aí responda com a lista vazia.",
+       ].join("\n");
+       const lista = fotos.slice(0, 40).map((f) => `- ${f.id}: ${f.descricao}`).join("\n");
+       return { system, user: `Post:\n${texto}\n\nFotos:\n${lista}` };
+     }
+     ```
+     Teste: o `user` contém o texto e cada `- id: descricao`; com 50 fotos, só 40 entram; o `system` fala em "Na dúvida".
+   - Classificar imagem do site:
+     ```ts
+     export const ESQUEMA_CLASSIFICACAO_IMAGEM = {
+       type: "object", additionalProperties: false, required: ["tipo", "descricao"],
+       properties: { tipo: { type: "string", enum: ["logo", "foto", "outro"] }, descricao: { type: "string" } },
+     } as const;
+
+     export const PROMPT_CLASSIFICAR_IMAGEM =
+       "Esta imagem saiu do site de um negócio local. Classifique: logo (logotipo, marca ou ícone da empresa), " +
+       "foto (fotografia ou imagem que poderia ilustrar um post: produto, ambiente, fachada, serviço, equipe) ou outro " +
+       "(banner com muito texto, ícone genérico, gráfico, captura de tela, imagem decorativa). Para foto, descreva em " +
+       "uma frase curta, em português do Brasil, o que ela mostra; para logo e outro, descricao vazia.";
+
+     /** O modelo de visão lê PNG, JPG, WEBP e GIF; SVG, ICO, BMP, TIFF, AVIF e HEIC ficam só pela pista do HTML. */
+     export function visaoLeFormato(url: string): boolean {
+       const ext = /\.([a-z0-9]+)(?:[?#]|$)/i.exec(new URL(url).pathname)?.[1]?.toLowerCase() ?? "";
+       if (!ext) return true; // sem extensão: tenta
+       return ["png", "jpg", "jpeg", "jfif", "webp", "gif"].includes(ext);
+     }
+     ```
+     Teste: `.png`, `.JPG?v=2`, `.webp`, sem extensão → true; `.svg`, `.ico`, `.avif`, `.heic` → false.
+2. **`site.ts`** (puro, TDD): mantenha `separarCandidatos` e acrescente
+   `candidatosDeLogo(lista, max = 16)` (os com `logo` ou `fonte === "icone"`; JSON-LD e og primeiro) e
+   `candidatosDeFoto(lista, max = 24)` (os outros, sem rastreadores; com descrição primeiro). Testes com a lista do
+   teste existente.
+3. **`openai.ts`**:
+   - `classificarImagem(url: string, total?: AbortSignal): Promise<{ tipo: "logo" | "foto" | "outro"; descricao: string }>`
+     — `/chat/completions` com `modeloVisao()`, `PROMPT_CLASSIFICAR_IMAGEM` + `image_url { url, detail: "low" }`,
+     `response_format` com `ESQUEMA_CLASSIFICACAO_IMAGEM`; resposta fora do esquema lança.
+   - `fotosQueCombinam(texto: string, fotos: { id: string; descricao: string }[], total?: AbortSignal): Promise<string[]>`
+     — `gerarJson` com `montarMensagensFotosQueCombinam` e `ESQUEMA_FOTOS_QUE_COMBINAM`; devolve só ids que existem em
+     `fotos`.
+4. **`index.ts` — `acaoSite`**: o corpo traz `tipo: "logos" | "fotos"` (outro → 400 `"Escolha buscar a logo ou as fotos."`).
+   Depois de juntar a lista (como no plano), pegue `candidatosDeLogo` ou `candidatosDeFoto` e classifique em paralelo
+   (até 6 ao mesmo tempo, helper local `emParalelo`): se `openaiConfigurada()` e `visaoLeFormato(url)`,
+   `classificarImagem` (erro → vale a pista: logo na busca de logos, foto com o alt na de fotos); senão vale a pista.
+   Logos: devolve `{ logos }` com os classificados como `logo` (e os de pista). Fotos: devolve `{ fotos }` com os
+   classificados como `foto` e descrição de pelo menos 10 caracteres (`descricao` = a da IA ou, sem ela, o alt).
+5. **`conteudo.ts`**: `const fontes = fontesDaImagem({ comImagem, temPasta, temFotosSite: fotosDoSiteComDescricao(perfil).length > 0, usaIa })`.
+   - `fontes[0] === "drive"`: como na Task 5 (foto antes do texto; `descricaoImagem` = descrição dela).
+   - Senão: gere o texto (`descricaoImagem: null`) e depois percorra `fontes`: `"site"` → `imagemDoSite(sb, perfil, texto, total)`
+     (lista = `fotosDoSiteComDescricao(perfil)`; `fotosQueCombinam`; nenhuma → `null`; entre as que combinam, a menos
+     usada pelo rodízio, registrando o uso) — achou, para; erro → log e segue; `"ia"` → `imagemDaIa` (como hoje).
+   - Terminou sem imagem depois de tentar o site (e sem IA ligada): aviso `"Nenhuma foto do site combinou com este post."`.
+     Se a IA entrar depois do site, sem aviso do site.
+   - `acaoPrevia`: `podeTerImagem` passa a usar `fotosDoSiteComDescricao(perfil).length > 0`.
+6. **`imagem_site`**: continua igual (a descrição vem da busca; `descreverImagem` só se vier curta).
+
+### Task 7 (tela) — o que muda
+
+1. **`gmn.ts`**: `PerfilGmn.usa_fotos_site: boolean` (em `CAMPOS_PERFIL`); `buscarLogosNoSite(perfilId): Promise<CandidatoSite[]>`
+   (`acao: "site", tipo: "logos"` → `logos`) e `buscarFotosNoSite(perfilId): Promise<CandidatoSite[]>` (`tipo: "fotos"` → `fotos`)
+   no lugar de `buscarNoSite`.
+2. **`PerfilGaveta.tsx`**: `ajustesImagens` grava também `usa_fotos_site`.
+3. **`AbaImagens.tsx`**:
+   - Na seção da logo: botão **"Buscar logo no site"** (ícone `Globe`; precisa do site salvo, dica "Preencha o site na aba
+     Agenda e salve.") e a grade **"Logos encontradas no site"** com a caixa **"Usar esta logo"** (como no plano).
+   - Seção **"Fotos do site"** com o `Switch` **"Usar fotos do site nos posts"** (rascunho, gravado no "Salvar imagens").
+     - Desligado: só o texto "Desligado: as fotos do site não entram nos posts." (a lista marcada fica guardada, oculta).
+     - Ligado: botão **"Buscar fotos no site"**, a grade com descrição e a caixa **"Usar nos posts"**, e
+       **"Fotos do site marcadas (N)"**. Texto: "Uma foto do site só entra num post quando combina com o assunto dele (a
+       IA confere). Se nenhuma combinar, o post usa a imagem da IA, se estiver ligada, ou sai só com texto."
+   - Busca de fotos sem resultado: "Nenhuma foto encontrada nesse site."; de logos: "Nenhuma logo encontrada nesse site."
