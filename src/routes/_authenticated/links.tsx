@@ -78,6 +78,8 @@ function LinksPage() {
   // Busca tolerante (sem acento, com erro de digitação): o tema e a ordem alfabética valem antes
   const resultadoBusca = useMemo(() => filtrarLinks(links, filtro, busca), [links, filtro, busca]);
   const visiveis = resultadoBusca.itens;
+  // Sem busca a função não indexa nada: serve para saber se havia o que buscar neste filtro
+  const temLinksNoFiltro = useMemo(() => filtrarLinks(links, filtro, "").itens.length > 0, [links, filtro]);
 
   const selecaoAtiva = modoSelecao || selecionados.size > 0;
   const alternar = (id: string) => setSelecionados((prev) => {
@@ -212,7 +214,7 @@ function LinksPage() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 px-6 py-14 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Link2 size={26} /></span>
-            {resultadoBusca.modo === "nenhum" ? (
+            {resultadoBusca.modo === "nenhum" && temLinksNoFiltro ? (
               <MensagemBusca resultado={resultadoBusca} className="text-base font-semibold text-foreground" />
             ) : (
               <p className="text-base font-semibold">{busca ? "Nenhum link encontrado" : "Nenhum link aqui ainda"}</p>

@@ -323,7 +323,7 @@ function NotasPage() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 px-6 py-14 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><StickyNote size={26} /></span>
-            {resultadoBusca.modo === "nenhum" ? (
+            {resultadoBusca.modo === "nenhum" && baseNotas.length > 0 ? (
               <MensagemBusca resultado={resultadoBusca} className="text-base font-semibold text-foreground" />
             ) : (
               <p className="text-base font-semibold">{busca ? "Nenhuma nota encontrada" : "Nenhuma nota aqui ainda"}</p>

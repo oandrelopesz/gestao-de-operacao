@@ -81,6 +81,11 @@ function IdeiasPage() {
     [ideias, filtroTipo, filtroAgencia, busca, situacao],
   );
   const filtradas = resultadoBusca.itens;
+  // Sem busca a função não indexa nada: serve para saber se havia o que buscar neste filtro
+  const temIdeiasNoFiltro = useMemo(
+    () => filtrarIdeias(ideias, { tipo: filtroTipo, agencia: filtroAgencia, busca: "", situacao }).itens.length > 0,
+    [ideias, filtroTipo, filtroAgencia, situacao],
+  );
 
   const totalConcluidas = useMemo(() => ideias.filter((i) => i.concluida_em).length, [ideias]);
 
@@ -227,7 +232,7 @@ function IdeiasPage() {
       {filtradas.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
           <div className="bg-muted rounded-full p-4"><Lightbulb size={36} className="text-muted-foreground" /></div>
-          {resultadoBusca.modo === "nenhum" ? (
+          {resultadoBusca.modo === "nenhum" && temIdeiasNoFiltro ? (
             <MensagemBusca resultado={resultadoBusca} className="text-lg font-medium text-foreground" />
           ) : (
             <>

@@ -487,3 +487,10 @@ test("busca sem palavras não chama a função de campos", () => {
   assert.equal(r.itens.length, 2);
   assert.equal(chamadas, 0);
 });
+
+test("número só bate exato (sem erro de digitação)", () => {
+  const itens = [{ titulo: "Planejamento 2026" }, { titulo: "Relatório 2025" }, { titulo: "NF 12345699" }];
+  assert.deepEqual(titulos(achar("2026", itens).itens), ["Planejamento 2026"]);
+  assert.equal(achar("12345678", itens).modo, "nenhum");
+  assert.deepEqual(titulos(achar("202", itens).itens), ["Planejamento 2026", "Relatório 2025"]);
+});

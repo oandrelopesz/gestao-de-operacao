@@ -269,7 +269,8 @@ export function buscarNoIndice<T>(
   const n = palavras.length;
   if (n === 0) return { itens: itens.slice(), modo: "todos", mensagem: null };
 
-  const limites = palavras.map((p) => errosPermitidos(p.length));
+  // Número não aceita erro de digitação ("2026" não acha "2025"): só trecho exato
+  const limites = palavras.map((p) => (/^\d+$/.test(p) ? 0 : errosPermitidos(p.length)));
   const mascaras = palavras.map(mascaraDeLetras);
   const pontuacoes: Pontuacao[] = [];
   let maisBatidas = 0;

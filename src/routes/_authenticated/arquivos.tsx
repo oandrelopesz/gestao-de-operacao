@@ -712,7 +712,7 @@ function PdfsPage() {
               {resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} />}
               {resultadosBusca.length > 0 ? (
                 <Card><div className="divide-y">{resultadosBusca.map((f) => linhaPdf(f, true))}</div></Card>
-              ) : resultadoBusca.modo === "nenhum" ? (
+              ) : resultadoBusca.modo === "nenhum" && bib.pdfs.length > 0 ? (
                 <MensagemBusca resultado={resultadoBusca} className="py-10 text-center" />
               ) : (
                 <p className="py-10 text-center text-sm text-muted-foreground">Nenhum arquivo com esse nome.</p>
