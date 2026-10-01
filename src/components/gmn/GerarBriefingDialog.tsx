@@ -62,11 +62,11 @@ export function GerarBriefingDialog({ perfil, aberto, onFechar, onGerado }: {
     <Dialog open={aberto} onOpenChange={(v) => !v && !gerando && onFechar()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Gerar briefing com IA</DialogTitle>
+          <DialogTitle>Gerar dados com IA</DialogTitle>
           <DialogDescription>
-            A IA usa os dados salvos do perfil (cliente, saúde, contexto e briefing), o nicho do cliente ligado e, se você escolher, as
-            respostas de um briefing de Dados internos. O resultado substitui os campos do formulário do briefing, e nada é
-            salvo até você clicar em Salvar contexto.
+            A IA usa os dados salvos do perfil (cliente, saúde, contexto e dados extraídos), o nicho do cliente ligado e, se você
+            escolher, as respostas de um briefing de Dados internos. O resultado substitui os dados extraídos do formulário, e
+            nada é salvo até você clicar em Salvar contexto.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">

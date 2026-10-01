@@ -255,7 +255,7 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
         else toast.success("Prévia pronta.");
       } else if (p.status === "pulado") toast.warning(`Prévia pulada: ${p.erro ?? "motivo não informado"}`);
       else toast.error(`Não foi possível gerar a prévia: ${p.erro ?? "motivo não informado"}`);
-      if (mesma()) setPostsVersao((v) => v + 1);
+      setPostsVersao((v) => v + 1); // sempre: reabrir o mesmo perfil no meio da geração também precisa da lista nova
     } catch (e) {
       toast.error(traduzErroGmn(e));
     } finally {
@@ -474,7 +474,7 @@ export function PerfilGaveta({ perfil, clientes, aberto, onFechar, onMudou }: {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir {perfil.nome}?</AlertDialogTitle>
-              <AlertDialogDescription>O contexto, o briefing e o histórico de posts deste perfil somem do sistema. Nada muda no Google.</AlertDialogDescription>
+              <AlertDialogDescription>O contexto, os dados extraídos e o histórico de posts deste perfil somem do sistema. Nada muda no Google.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={excluindo}>Cancelar</AlertDialogCancel>

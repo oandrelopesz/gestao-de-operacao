@@ -68,7 +68,7 @@ async function acaoBriefing(sb: any, body: any, total: AbortSignal): Promise<Res
 
 async function acaoPrevia(sb: any, body: any, total: AbortSignal, prazoFinal: number): Promise<Response> {
   const perfil = await carregarPerfil(sb, body);
-  if (!perfil.briefing_salvo_em) return json({ error: "Salve o briefing antes de gerar a prévia." }, 400);
+  if (!perfil.briefing_salvo_em) return json({ error: "Salve o contexto antes de gerar a prévia." }, 400);
   // Confere a configuração antes de inserir a linha e de gastar com a OpenAI.
   if (!openaiConfigurada()) throw new ErroHttp(503, SEM_OPENAI);
   const comImagem = typeof body.com_imagem === "boolean" ? body.com_imagem : true;

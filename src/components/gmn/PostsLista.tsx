@@ -45,18 +45,23 @@ export function PostsLista({ perfil, gerando, versao, onGerar }: {
 
   useEffect(() => { carregar(); }, [carregar, versao]);
 
+  // Prévia começada em outra abertura da gaveta (ainda no prazo de ~2 min): não deixa pedir outra, paga, por cima.
+  const outraGerando = !!posts?.some((p) => p.status === "gerando" && Date.now() - new Date(p.created_at).getTime() < 3 * 60_000);
+  const bloqueado = gerando !== null || outraGerando || !perfil.briefing_salvo_em;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => onGerar(true)} disabled={gerando !== null || !perfil.briefing_salvo_em}>
+        <Button onClick={() => onGerar(true)} disabled={bloqueado}>
           {gerando === "com" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
           {gerando === "com" ? "Gerando (até 2 min)…" : "Gerar prévia com imagem"}
         </Button>
-        <Button variant="outline" onClick={() => onGerar(false)} disabled={gerando !== null || !perfil.briefing_salvo_em}>
+        <Button variant="outline" onClick={() => onGerar(false)} disabled={bloqueado}>
           {gerando === "sem" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
           {gerando === "sem" ? "Gerando (até 2 min)…" : "Gerar prévia só texto"}
         </Button>
         {!perfil.briefing_salvo_em && <span className="text-sm text-muted-foreground">Salve o contexto primeiro.</span>}
+        {outraGerando && gerando === null && <span className="text-sm text-muted-foreground">Uma prévia ainda está sendo gerada.</span>}
         <span className="text-xs text-muted-foreground">A prévia não é publicada no Google.</span>
       </div>
       {posts === null && <p className="text-sm text-muted-foreground">Carregando…</p>}
