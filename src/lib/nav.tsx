@@ -25,6 +25,7 @@ import {
   CalendarDays,
   Link2,
   NotebookPen,
+  MapPin,
 } from "lucide-react";
 
 export interface NavLink {
@@ -49,6 +50,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
       { label: "Saldo", icon: <Wallet size={17} />, to: "/saldo", palavras: ["verba", "recarga", "anúncios", "ads", "créditos"] },
       { label: "NPS de Clientes", icon: <MessageSquare size={17} />, to: "/nps", palavras: ["satisfação", "pesquisa", "avaliação"] },
       { label: "Dados internos", icon: <Inbox size={17} />, to: "/dados-internos", palavras: ["briefing", "contrato", "catálogo", "formulários", "respostas", "drive", "e-commerce"] },
+      { label: "Google Meu Negócio", icon: <MapPin size={17} />, to: "/gmn", palavras: ["gmn", "google", "perfil da empresa", "posts", "seo local", "google business"] },
     ],
   },
   {
