@@ -100,6 +100,25 @@ gerar uma prévia (deve sair "Pulado" ou sem superlativo; spec §8) e desmarcar.
 texto passar de ~25 s, enviar `reasoning_effort: "low"` para modelos `gpt-5*`. Mostrar textos e imagens ao usuário e
 anotar ajustes. Não clicar em Publicar no Lovable.
 
+## 6b. Contexto, imagens e logo (01/10/2026)
+
+Pedido do André depois do primeiro teste real (texto genérico). Spec, seção 11. Branch `gmn-contexto` (ledger em
+`.superpowers/sdd/gmn-contexto/progress.md`, ignorado pelo git).
+
+- Colunas novas em `gmn_perfis` (migration `20261001120000_gmn_contexto.sql`, aplicada): `contexto_posts`,
+  `contexto_imagens`, `logo_url`, `permitir_pessoas_ia`. Cada item da `agenda` ganhou `imagem` (falta = verdadeiro).
+- Ações novas da função: `logo` (PNG/JPG até 5 MB, R2 `logos/<perfil>-<carimbo>.<ext>`), `remover_logo`; `briefing` aceita
+  `contexto_posts`; `previa` aceita `com_imagem` e responde 409 se já houver prévia `gerando` do perfil há menos de 3 min.
+- Imagem: Drive preenchido = só Drive (falhou, só texto com aviso); senão IA com a logo como referência (`images/edits`),
+  depois checagem por visão (`gpt-6-luna` aceita imagem): pessoas (fora da marca da logo) ou texto em destaque reprovam;
+  nova tentativa só com 45 s sobrando; falhou, só texto com aviso. `input_fidelity` não é enviado (a OpenAI manda omitir
+  nos gpt-image-2). JPG.
+- Prompts para o André montar os contextos: nota `gmn-prompts` do cofre.
+- **Para a Fase 2:** o processador da agenda precisa ler `imagem` do dia (ou copiar para o post) e chamar
+  `gerarConteudo(…, { comImagem, prazoFinal })` (`prazoFinal` é obrigatório). A checagem manda a logo pela URL pública do
+  R2 (`r2.dev`): se a OpenAI não conseguir baixá-la, a imagem não sai (falha fechada). Logos só são baixadas de
+  `R2_PUBLIC_BASE`; se esse endereço mudar, reenviar as logos ou trocar o começo de `logo_url` no banco.
+
 ## 7. Fase 2 (depois de a API do Google ser aprovada)
 
 Detalhes nas seções 6 e 7.2 da spec. Precisa de um plano próprio (skill `superpowers:writing-plans`).
