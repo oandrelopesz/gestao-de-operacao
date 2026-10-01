@@ -471,3 +471,19 @@ test("troca por letra que não existe na palavra", () => {
 test("valor que não é texto não quebra a normalização", () => {
   assert.equal(normalizarBusca(2026 as unknown as string), "2026");
 });
+
+test("empate: quem começa com a busca vem antes da ordem original", () => {
+  const menu = [{ titulo: "Planilha/CRM" }, { titulo: "CRM" }, { titulo: "NPS de Clientes" }, { titulo: "Clientes Ativos" }];
+  assert.deepEqual(titulos(achar("crm", menu).itens), ["CRM", "Planilha/CRM"]);
+  assert.deepEqual(titulos(achar("clientes", menu).itens), ["Clientes Ativos", "NPS de Clientes"]);
+  // critérios de cima continuam valendo: exato no principal antes de começo
+  assert.equal(titulos(achar("google", [{ titulo: "Googel Meu Negócio" }, { titulo: "Meu Google" }]).itens)[0], "Meu Google");
+});
+
+test("busca sem palavras não chama a função de campos", () => {
+  let chamadas = 0;
+  const r = buscar([{ titulo: "A" }, { titulo: "B" }], " ... ", (i) => { chamadas++; return [i.titulo]; });
+  assert.equal(r.modo, "todos");
+  assert.equal(r.itens.length, 2);
+  assert.equal(chamadas, 0);
+});

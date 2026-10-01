@@ -248,13 +248,16 @@ interface Pontuacao {
   batidas: number;
   aproximadas: number;
   secundarias: number;
+  /** 0 quando o campo principal começa com a 1ª palavra da busca (desempate antes da ordem original), senão 1. */
+  comeco: number;
 }
 
 /**
  * Busca no índice. Cada palavra da consulta precisa aparecer em algum campo do item (como trecho do texto, colada ou
  * com erro de digitação). Devolve os itens que bateram todas as palavras; se não houver nenhum, os que bateram pelo
  * menos metade, com `mensagem`; se também não houver, lista vazia. Ordem: mais palavras batidas, menos aproximadas,
- * menos em campo secundário, ordem original (ou só a ordem original com `manterOrdem`).
+ * menos em campo secundário; no empate, o item cujo campo principal começa com a 1ª palavra da busca vem antes ("crm" põe
+ * "CRM" antes de "Planilha/CRM"); depois, a ordem original (ou só a ordem original com `manterOrdem`).
  */
 export function buscarNoIndice<T>(
   indice: IndiceBusca<T>,
@@ -283,7 +286,9 @@ export function buscarNoIndice<T>(
       if (categoria === EXATO_SECUNDARIO || categoria === APROXIMADO_SECUNDARIO) secundarias++;
     }
     if (batidas === 0) continue;
-    pontuacoes.push({ posicao, batidas, aproximadas, secundarias });
+    const principal = camposDoItem.find((c) => c.principal);
+    const comeco = principal && principal.texto.startsWith(palavras[0]) ? 0 : 1;
+    pontuacoes.push({ posicao, batidas, aproximadas, secundarias, comeco });
     if (batidas > maisBatidas) maisBatidas = batidas;
   }
 
@@ -305,6 +310,7 @@ export function buscarNoIndice<T>(
         y.batidas - x.batidas ||
         x.aproximadas - y.aproximadas ||
         x.secundarias - y.secundarias ||
+        x.comeco - y.comeco ||
         x.posicao - y.posicao,
     );
   }
@@ -322,5 +328,7 @@ export function buscar<T>(
   campos: CamposBusca<T>,
   opcoes?: OpcoesBusca,
 ): ResultadoBusca<T> {
+  // Sem palavras na busca não há o que indexar (os filtros puros rodam a cada mudança de lista, com ou sem busca)
+  if (palavrasDaBusca(consulta).length === 0) return { itens: itens.slice(), modo: "todos", mensagem: null };
   return buscarNoIndice(indexarBusca(itens, campos), consulta, opcoes);
 }

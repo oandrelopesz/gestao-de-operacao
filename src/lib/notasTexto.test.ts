@@ -51,7 +51,7 @@ test("filtrarNotas: o tema vale antes da busca; no empate a mais recente vem pri
   assert.equal(filtrarNotas(notas, "a", "promocao").modo, "nenhum");
   const com = [
     n("v1", "Outra coisa", "a verba do mês", "a", "2026-09-26T10:00:00Z"), // só no texto, mais recente
-    n("v2", "Verba mensal", "x", "a", "2026-09-10T10:00:00Z"), // no título, mais antiga
+    n("v2", "Ajustar verba mensal", "x", "a", "2026-09-10T10:00:00Z"), // no título, mais antiga (nenhum título começa com "verba")
     n("v3", "Planejar verba", "y", "a", "2026-09-20T10:00:00Z"), // no título, mais recente que a v2
   ];
   assert.deepEqual(filtrarNotas(com, TODOS, "verba").itens.map((x) => x.id), ["v3", "v2", "v1"]);
