@@ -312,7 +312,8 @@ async function classificarCandidato(
   } catch (e) {
     console.error("Classificar imagem:", msg(e));
   }
-  return { tipo: pista, descricao: c.descricao };
+  // Sem a IA (formato que ela não lê ou falha), vale a pista; na busca de fotos, candidato com cara de logo não entra.
+  return { tipo: pista === "foto" && c.logo ? "outro" : pista, descricao: c.descricao };
 }
 
 /**
