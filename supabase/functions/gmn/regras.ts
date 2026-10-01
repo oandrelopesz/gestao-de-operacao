@@ -145,6 +145,76 @@ export function escolherImagem(candidatos: string[], usos: Record<string, string
   return [...candidatos].sort((a, b) => Date.parse(usos[a]) - Date.parse(usos[b]))[0];
 }
 
+const LIMITE_FOTO_DIRETA = 5 * 1024 * 1024;
+
+/** Foto do Drive que pode ir como está (JPG ou PNG de até 5 MB). O resto usa a miniatura que o Google gera. */
+export function fotoDiretaDoDrive(mime: string, tamanho: number): boolean {
+  return (mime === "image/jpeg" || mime === "image/png") && tamanho <= LIMITE_FOTO_DIRETA;
+}
+
+/**
+ * Até `max` fotos, na ordem em que serão tentadas: a do rodízio (`escolherImagem`) e, tirando-a, a próxima pela mesma regra,
+ * e assim por diante. Quem falha ao baixar não entra no registro de uso, então a ordem é só esta.
+ */
+export function ordemDeTentativa(ids: string[], usos: Record<string, string>, max = 3): string[] {
+  const ordem: string[] = [];
+  let restantes = ids;
+  while (ordem.length < max) {
+    const id = escolherImagem(restantes, usos);
+    if (id === null) break;
+    ordem.push(id);
+    restantes = restantes.filter((x) => x !== id);
+  }
+  return ordem;
+}
+
+const ASSINATURA_PNG_DRIVE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/** Tipo real da imagem pelos primeiros bytes (JPEG `FF D8 FF`, PNG com os 8 bytes); qualquer outra coisa: `null`. */
+export function tipoPelaAssinatura(bytes: Uint8Array): "image/jpeg" | "image/png" | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length >= 8 && ASSINATURA_PNG_DRIVE.every((v, i) => bytes[i] === v)) return "image/png";
+  return null;
+}
+
+/**
+ * Link de miniatura do Drive no tamanho grande. Só o caminho é tocado (query string e fragmento ficam como estão): um sufixo
+ * de tamanho no fim (`=s220`, `=s220-c`, `=w400-h300`, `=w220-h220-p-k-no-nu`) vira `=s2048`; sem esse sufixo, `=s2048` é acrescentado.
+ */
+export function miniaturaGrande(link: string, lado = 2048): string {
+  const corte = link.search(/[?#]/);
+  const caminho = corte === -1 ? link : link.slice(0, corte);
+  const resto = corte === -1 ? "" : link.slice(corte);
+  return `${caminho.replace(/=[swh]\d+(?:-[a-z0-9]+)*$/i, "")}=s${lado}${resto}`;
+}
+
+/** O link é https e fica em googleusercontent.com ou google.com (ou subdomínio): só para esses o token do Google pode ir. */
+export function linkDoGoogle(link: string): boolean {
+  try {
+    const u = new URL(link);
+    return u.protocol === "https:" && (u.hostname.endsWith(".googleusercontent.com") || u.hostname.endsWith(".google.com"));
+  } catch {
+    return false;
+  }
+}
+
+// Nomes que câmeras, celulares e prints dão ao arquivo (já sem acento, em minúsculas e com _ e - trocados por espaço).
+const RE_NOME_AUTOMATICO = /^(?:(?:img|dscn|dscf|dsc|pxl|mvimg|vid|pano|burst)\s*\d|whatsapp\b|screenshot\b|screen shot\b|captura de tela\b)/;
+
+/**
+ * O que a foto mostra, para o texto do post: a descrição do arquivo no Drive ou, sem ela, o nome sem extensão. Nome que
+ * não descreve nada (de câmera, de print, ou quase só número) devolve vazio.
+ */
+export function descricaoDaFoto(descricao: string | null | undefined, nome: string): string {
+  const d = (descricao ?? "").trim();
+  if (d) return d.slice(0, 300);
+  const limpo = nome.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+  const n = semAcento(limpo);
+  const letras = (n.match(/\p{L}/gu) ?? []).length;
+  const digitos = (n.match(/\d/g) ?? []).length;
+  return RE_NOME_AUTOMATICO.test(n) || letras < 3 || digitos > letras ? "" : limpo;
+}
+
 // ------------------------------------------------------------------ agenda (dias e horários dos posts)
 
 /**
@@ -216,13 +286,49 @@ export function resumoAgenda(agenda: ItemAgenda[]): string {
 }
 
 /**
- * De onde sai a imagem de um post: sem imagem no dia, nada; com pasta do Drive, sempre o Drive (se falhar, o post vai
- * sem imagem: não cai para a IA); sem pasta, a IA, se estiver ligada.
+ * As fontes da imagem de um post, na ordem em que são tentadas: sem imagem no dia, nenhuma; com pasta do Drive, só o Drive
+ * (se falhar, o post vai sem imagem: não cai para outra fonte); sem pasta, as fotos do site (se a chave estiver ligada e
+ * houver foto com descrição) e depois a IA (se estiver ligada). A foto do site só vale se combinar com o texto do post.
  */
-export function decidirImagem(o: { comImagem: boolean; temPasta: boolean; usaIa: boolean }): "drive" | "ia" | null {
-  if (!o.comImagem) return null;
-  if (o.temPasta) return "drive";
-  return o.usaIa ? "ia" : null;
+export function fontesDaImagem(
+  o: { comImagem: boolean; temPasta: boolean; temFotosSite: boolean; usaIa: boolean },
+): ("drive" | "site" | "ia")[] {
+  if (!o.comImagem) return [];
+  if (o.temPasta) return ["drive"];
+  const fontes: ("site" | "ia")[] = [];
+  if (o.temFotosSite) fontes.push("site");
+  if (o.usaIa) fontes.push("ia");
+  return fontes;
+}
+
+// ------------------------------------------------------------------ logo aplicada sobre a imagem da IA
+
+export const POSICOES_LOGO = ["superior_esquerdo", "superior_direito", "inferior_esquerdo", "inferior_direito"] as const;
+export type PosicaoLogo = (typeof POSICOES_LOGO)[number];
+export const TAMANHOS_LOGO = ["pequena", "media", "grande"] as const;
+export type TamanhoLogo = (typeof TAMANHOS_LOGO)[number];
+export const FUNDOS_LOGO = ["nenhum", "claro", "escuro"] as const;
+export type FundoLogo = (typeof FUNDOS_LOGO)[number];
+
+/** Maior lado (largura ou altura, em pixels) de uma logo em PNG: a ação `logo` recusa acima disso e a composição não lê mais que isso. */
+export const LOGO_LADO_MAX = 2048;
+
+export const ROTULO_POSICAO_LOGO: Record<PosicaoLogo, string> = {
+  superior_esquerdo: "Canto superior esquerdo", superior_direito: "Canto superior direito",
+  inferior_esquerdo: "Canto inferior esquerdo", inferior_direito: "Canto inferior direito",
+};
+export const ROTULO_TAMANHO_LOGO: Record<TamanhoLogo, string> = { pequena: "Pequena", media: "Média", grande: "Grande" };
+export const ROTULO_FUNDO_LOGO: Record<FundoLogo, string> = { nenhum: "Sem fundo", claro: "Fundo claro", escuro: "Fundo escuro" };
+
+/** Opções da logo do perfil; valor que não é um dos aceitos vira o padrão (inferior direito, média, sem fundo). */
+export function opcoesDaLogo(p: { logo_posicao?: unknown; logo_tamanho?: unknown; logo_fundo?: unknown }) {
+  const um = <T extends string>(lista: readonly T[], v: unknown, padrao: T): T =>
+    (lista as readonly unknown[]).includes(v) ? (v as T) : padrao;
+  return {
+    posicao: um(POSICOES_LOGO, p.logo_posicao, "inferior_direito"),
+    tamanho: um(TAMANHOS_LOGO, p.logo_tamanho, "media"),
+    fundo: um(FUNDOS_LOGO, p.logo_fundo, "nenhum"),
+  };
 }
 
 export const UTM = { utm_source: "google", utm_medium: "organic", utm_campaign: "gmn-post" };
@@ -273,6 +379,8 @@ export interface EntradaPost {
   motivoReprovacao: string | null;
   /** Contexto completo do cliente (fonte principal dos guardrails, tom de voz e SEO local), se o perfil tiver. */
   contextoPosts: string | null;
+  /** O que a foto do post mostra (a foto do Drive é escolhida antes do texto); null: sem foto ou ainda não escolhida. */
+  descricaoImagem: string | null;
 }
 
 function blocoBriefing(b: Briefing): string {
@@ -318,11 +426,14 @@ export function montarMensagensPost(e: EntradaPost): Mensagens {
         "não use 'antes e depois', não cite preços, valores, descontos, brindes ou promoções, não use superlativos ('o melhor', 'o único', 'número 1', 'mais barato').",
     );
   }
+  // Sem o ponto final da descrição (a da IA costuma terminar com ele): a frase fixa traz o seu.
+  const imagem = (e.descricaoImagem ?? "").trim().replace(/[.\s]+$/, "");
   const partes = [
     `Empresa: ${e.nome}${e.categoria ? ` (${e.categoria})` : ""}`,
     contexto ? `Contexto completo do cliente (fonte principal; siga os guardrails dele):\n${contexto}` : "",
     `Briefing:\n${blocoBriefing(e.briefing)}`,
     `Tema deste post: ${ROTULO_TEMA[e.tema]}`,
+    imagem ? `A imagem do post mostra: ${imagem}. Escreva de forma coerente com ela, sem descrever a foto.` : "",
     e.palavras.length ? `Palavras-chave para este post: ${e.palavras.join("; ")}` : "Palavras-chave: use as do briefing.",
     e.anteriores.length
       ? `Posts anteriores (não repita assunto, abertura nem frases):\n${e.anteriores.map((t, i) => `${i + 1}. ${t}`).join("\n")}`
@@ -387,8 +498,8 @@ export interface EntradaImagem {
   contextoImagens: string | null;
   /** Só o André liga: sem isso a IA nunca gera pessoas. */
   permitirPessoas: boolean;
-  /** A logo do cliente vai junto como imagem de referência. */
-  comLogo: boolean;
+  /** Canto onde a logo será aplicada depois (a IA deixa o canto limpo); null sem logo. A IA nunca desenha a logo. */
+  cantoLivre: PosicaoLogo | null;
   /** Nova tentativa: o que a checagem achou na versão anterior (o prompt pede para não repetir). */
   versaoAnterior?: { tem_pessoas: boolean; tem_texto: boolean } | null;
 }
@@ -404,13 +515,11 @@ export function montarPromptImagem(e: EntradaImagem): string {
     diretrizes ? `Diretrizes de imagem do cliente: ${diretrizes}` : "",
     diretrizes ? "As regras a seguir valem sempre, mesmo que as diretrizes digam o contrário." : "",
     e.permitirPessoas ? "" : "Sem pessoas: nenhum rosto, corpo, mão, silhueta ou reflexo de pessoa.",
-    e.comLogo
-      ? "Sem texto, letras, números, preços ou slogans na arte, exceto a própria logo da marca (imagem de referência), que aparece exatamente como é."
-      : "Sem texto, letras, números, preços ou slogans na arte.",
+    "Sem texto, letras, números, preços ou slogans na arte.",
     "Sem marcas d'água. Sem logos ou marcas de terceiros. Sem placas de carro legíveis.",
     "Aparência de fotografia real e profissional, em formato paisagem.",
-    e.comLogo
-      ? "Use a imagem de referência como a logo da marca: aplique-a pequena e discreta (num canto, parede ou fachada), sem distorcer, sem mudar cores, sem cobrir o assunto principal."
+    e.cantoLivre
+      ? `Deixe o canto ${ROTULO_POSICAO_LOGO[e.cantoLivre].replace(/^Canto /, "").toLowerCase()} da imagem limpo, com fundo simples e sem nenhum objeto importante: esse espaço ficará reservado.`
       : "",
     e.versaoAnterior && (e.versaoAnterior.tem_pessoas || e.versaoAnterior.tem_texto)
       ? `A versão anterior tinha ${
@@ -462,25 +571,18 @@ export const ESQUEMA_CHECAGEM_IMAGEM = {
 
 /**
  * Pedido da checagem da imagem. Pessoas: qualquer uma, até pequena ao fundo. Texto: só escrita legível e em destaque na
- * arte (marcas minúsculas e ilegíveis, como o emblema de um carro, não contam). Com logo, a logo vai como segunda imagem
- * e a escrita dela não conta como texto.
+ * arte (marcas minúsculas e ilegíveis, como o emblema de um carro, não contam). A imagem conferida é a da IA, ainda sem
+ * a logo (a logo é aplicada depois, por cima, e não passa pela checagem).
  */
-export function promptChecagemImagem(comLogo: boolean): string {
-  const base =
-    "Olhe a imagem e responda em JSON. " +
+export function promptChecagemImagem(): string {
+  return "Olhe a imagem e responda em JSON. " +
     "tem_pessoas é true se houver qualquer pessoa, rosto, mão, corpo, silhueta ou reflexo de pessoa, mesmo pequena, parcial ou ao fundo. " +
     "tem_texto é true só se houver escrita legível e em destaque na arte (frases, letras, números, preços, slogans, letreiros, " +
     "placas de carro legíveis, marcas de terceiros); ignore marcas minúsculas e ilegíveis.";
-  return comLogo
-    ? `${base} A segunda imagem é a logo da marca e serve só de referência: as duas marcações valem para a primeira ` +
-      "imagem. Só não conta como texto nem como pessoa o que estiver dentro da própria marca da logo aplicada na arte " +
-      "(o desenho pequeno da logo, num canto, parede ou fachada: escrita, mascote ou rosto dela, como na referência). " +
-      "Qualquer pessoa, rosto, mão ou silhueta fora da marca da logo conta como pessoa, mesmo que lembre o mascote."
-    : base;
 }
 
-/** O pedido da checagem sem logo. */
-export const PROMPT_CHECAGEM_IMAGEM = promptChecagemImagem(false);
+/** O pedido da checagem (a imagem conferida é a da IA, ainda sem a logo). */
+export const PROMPT_CHECAGEM_IMAGEM = promptChecagemImagem();
 
 /** Antes de gerar de novo, a execução precisa ter pelo menos isto sobrando do prazo total. */
 export const MARGEM_NOVA_TENTATIVA_MS = 45_000;
@@ -527,4 +629,115 @@ export function base64ParaBytes(b64: string): Uint8Array {
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
+}
+
+// ------------------------------------------------------------------ imagens do site do cliente
+
+export interface ImagemSite { id: string; url: string; origem_url: string; descricao: string }
+
+/** jsonb `imagens_site` → lista válida (itens com id, url e origem_url em texto; id repetido: o primeiro vence). */
+export function normalizarImagensSite(v: unknown): ImagemSite[] {
+  const out: ImagemSite[] = [];
+  for (const x of Array.isArray(v) ? v : []) {
+    const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    const id = typeof o.id === "string" ? o.id : "";
+    const url = typeof o.url === "string" ? o.url : "";
+    const origem = typeof o.origem_url === "string" ? o.origem_url : "";
+    if (!id || !url || !origem || out.some((i) => i.id === id)) continue;
+    out.push({ id, url, origem_url: origem, descricao: typeof o.descricao === "string" ? o.descricao.slice(0, 300) : "" });
+  }
+  return out;
+}
+
+/**
+ * As fotos do site que podem entrar nos posts: nenhuma com a chave `usa_fotos_site` desligada (só `true` liga); ligada, só as
+ * que têm descrição (sem saber o que a foto mostra, não dá para conferir se combina com o post).
+ */
+export function fotosDoSiteComDescricao(perfil: { usa_fotos_site?: unknown; imagens_site?: unknown }): ImagemSite[] {
+  if (perfil.usa_fotos_site !== true) return [];
+  return normalizarImagensSite(perfil.imagens_site).filter((i) => i.descricao.trim() !== "");
+}
+
+// ------------------------------------------------------------------ fotos do site: classificar e combinar com o post
+
+export const ESQUEMA_FOTOS_QUE_COMBINAM = {
+  type: "object", additionalProperties: false, required: ["ids"],
+  properties: { ids: { type: "array", items: { type: "string" } } },
+} as const;
+
+/** Pede à IA as fotos do site cuja descrição combina com o post (na dúvida, nenhuma). Até 40 fotos. */
+export function montarMensagensFotosQueCombinam(texto: string, fotos: { id: string; descricao: string }[]): Mensagens {
+  const system = [
+    "Você escolhe fotos para um post do Perfil da Empresa no Google (Google Meu Negócio).",
+    "Responda só com os ids das fotos cuja descrição combina claramente com o assunto do post.",
+    "Na dúvida, não inclua. Pode não haver nenhuma: aí responda com a lista vazia.",
+  ].join("\n");
+  const lista = fotos.slice(0, 40).map((f) => `- ${f.id}: ${f.descricao}`).join("\n");
+  return { system, user: `Post:\n${texto}\n\nFotos:\n${lista}` };
+}
+
+export const ESQUEMA_CLASSIFICACAO_IMAGEM = {
+  type: "object", additionalProperties: false, required: ["tipo", "descricao"],
+  properties: { tipo: { type: "string", enum: ["logo", "foto", "outro"] }, descricao: { type: "string" } },
+} as const;
+
+export const PROMPT_CLASSIFICAR_IMAGEM =
+  "Esta imagem saiu do site de um negócio local. Classifique: logo (logotipo, marca ou ícone da empresa), " +
+  "foto (fotografia ou imagem que poderia ilustrar um post: produto, ambiente, fachada, serviço, equipe) ou outro " +
+  "(banner com muito texto, ícone genérico, gráfico, captura de tela, imagem decorativa). Para foto, descreva em " +
+  "uma frase curta, em português do Brasil, o que ela mostra; para logo e outro, descricao vazia.";
+
+/** Extensão (minúscula, sem ponto) do caminho de uma URL; vazia se não houver ou se a URL não der para ler. */
+export function extensaoDaUrl(url: string): string {
+  try {
+    return /\.([a-z0-9]+)(?:[?#]|$)/i.exec(new URL(url).pathname)?.[1]?.toLowerCase() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+const FORMATOS_QUE_A_VISAO_NAO_LE = ["svg", "svgz", "ico", "bmp", "tif", "tiff", "avif", "heic", "heif"];
+
+/**
+ * O modelo de visão lê PNG, JPG, WEBP e GIF; SVG, ICO, BMP, TIFF, AVIF e HEIC ficam só pela pista do HTML. Qualquer outra
+ * extensão (ou nenhuma, ou endereço dinâmico como `.php` e `.aspx`) tenta a visão: se ela falhar, vale a pista.
+ */
+export function visaoLeFormato(url: string): boolean {
+  return !FORMATOS_QUE_A_VISAO_NAO_LE.includes(extensaoDaUrl(url));
+}
+
+/**
+ * Os primeiros bytes são de uma imagem (PNG, JPEG, GIF, WEBP, BMP, ICO, TIFF, AVIF/HEIC ou SVG em texto, com BOM, prólogo
+ * `<?xml`, comentários e `<!DOCTYPE` antes)? Serve para recusar página, JSON e texto quando o servidor não diz o tipo.
+ */
+export function pareceImagem(b: Uint8Array): boolean {
+  const e = (i: number, s: string) => b.length >= i + s.length && [...s].every((c, k) => b[i + k] === c.charCodeAt(0));
+  if (b.length >= 8 && b[0] === 0x89 && e(1, "PNG") && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return true;
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return true;
+  if (e(0, "GIF87a") || e(0, "GIF89a")) return true;
+  if (e(0, "RIFF") && e(8, "WEBP")) return true;
+  if (e(0, "BM") && b.length >= 14 && b[6] === 0 && b[7] === 0 && b[8] === 0 && b[9] === 0) return true; // reservados do cabeçalho BMP
+  if (b.length >= 6 && b[0] === 0 && b[1] === 0 && (b[2] === 1 || b[2] === 2) && b[3] === 0 && (b[4] | b[5]) !== 0) return true; // ICO e CUR
+  if ((e(0, "II") && b[2] === 0x2a && b[3] === 0) || (e(0, "MM") && b[2] === 0 && b[3] === 0x2a)) return true; // TIFF
+  if (e(4, "ftyp") && b.length >= 12) {
+    const marca = String.fromCharCode(b[8], b[9], b[10], b[11]);
+    if (["avif", "avis", "heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "msf1"].includes(marca)) return true;
+  }
+  // SVG: texto que, depois de BOM, espaços, prólogo, comentários e DOCTYPE, abre com <svg
+  const depoisDe = (s: string, marca: string) => { const i = s.indexOf(marca); return i === -1 ? -1 : i + marca.length; };
+  let t = new TextDecoder().decode(b.subarray(0, 4096)).replace(/^﻿/, "");
+  for (let volta = 0; volta < 20; volta++) {
+    t = t.trimStart();
+    let fim: number;
+    if (t.startsWith("<?")) fim = depoisDe(t, "?>");
+    else if (t.startsWith("<!--")) fim = depoisDe(t, "-->");
+    else if (/^<!doctype/i.test(t)) {
+      const abre = t.indexOf("[");
+      const fecha = t.indexOf(">");
+      fim = abre !== -1 && abre < fecha ? depoisDe(t, "]>") : fecha === -1 ? -1 : fecha + 1;
+    } else return /^<svg[\s/>]/i.test(t);
+    if (fim === -1) return false; // construção sem fim dentro dos 4 KB lidos
+    t = t.slice(fim);
+  }
+  return false;
 }

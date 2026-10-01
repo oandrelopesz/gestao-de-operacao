@@ -1,8 +1,11 @@
-// OpenAI: resposta em JSON (Chat Completions + JSON Schema estrito), geração de imagem (com ou sem logo de referência)
-// e checagem da imagem gerada.
+// OpenAI: resposta em JSON (Chat Completions + JSON Schema estrito), geração de imagem (PNG, sem a logo) e checagem da
+// imagem gerada.
 // deno-lint-ignore-file no-explicit-any
 import { foiPrazo, PRAZO, sinal } from "./prazo.ts";
-import { ESQUEMA_CHECAGEM_IMAGEM, promptChecagemImagem } from "./regras.ts";
+import {
+  ESQUEMA_CHECAGEM_IMAGEM, ESQUEMA_CLASSIFICACAO_IMAGEM, ESQUEMA_FOTOS_QUE_COMBINAM, PROMPT_CLASSIFICAR_IMAGEM,
+  montarMensagensFotosQueCombinam, promptChecagemImagem,
+} from "./regras.ts";
 
 const BASE = "https://api.openai.com/v1";
 
@@ -10,11 +13,10 @@ export function openaiConfigurada(): boolean {
   return !!Deno.env.get("OPENAI_API_KEY");
 }
 
-/** `json: false` no envio multipart: o fetch define o Content-Type (com o boundary) sozinho. */
-function cabecalhos(json = true): HeadersInit {
+function cabecalhos(): HeadersInit {
   const chave = Deno.env.get("OPENAI_API_KEY");
   if (!chave) throw new Error("Falta o secret OPENAI_API_KEY.");
-  return json ? { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" } : { Authorization: `Bearer ${chave}` };
+  return { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" };
 }
 
 /** Mensagem fixa em português pelo status; o detalhe da OpenAI (em inglês) vai só para o log. */
@@ -29,19 +31,17 @@ function erroOpenai(status: number, detalhe: { error?: { message?: string } }): 
 }
 
 /**
- * POST na OpenAI com o prazo da chamada (`ms`) e o prazo total; devolve o JSON da resposta.
- * `corpo` que é FormData vai como multipart; qualquer outro valor vai como JSON.
+ * POST na OpenAI com o prazo da chamada (`ms`) e o prazo total; o `corpo` vai como JSON e a resposta volta como JSON.
  */
 async function chamar(
   caminho: string, corpo: unknown, ms: number, total: AbortSignal | undefined, o: "texto" | "imagem",
 ): Promise<any> {
-  const multipart = corpo instanceof FormData;
-  const headers = cabecalhos(!multipart);
+  const headers = cabecalhos();
   let r: Response;
   let d: any;
   try {
     r = await fetch(`${BASE}${caminho}`, {
-      method: "POST", headers, body: multipart ? corpo : JSON.stringify(corpo), signal: sinal(ms, total),
+      method: "POST", headers, body: JSON.stringify(corpo), signal: sinal(ms, total),
     });
     // O sinal vale também para a leitura do corpo; corpo que não é JSON cai nas checagens de resposta vazia abaixo.
     d = await r.json().catch((e) => {
@@ -88,54 +88,35 @@ export async function gerarJson<T>(
   return conteudoJson<T>(d);
 }
 
-/** Logo do cliente: `bytes` vão na edição da imagem; `url` (pública no R2) vai direto à OpenAI na checagem. */
-export interface Logo { bytes: Uint8Array; tipo: string; url: string }
-
 /**
- * JPEG gerado pela OpenAI (paisagem), em base64, como a OpenAI devolveu (quem precisar dos bytes decodifica uma vez, ao
- * gravar; a checagem usa o mesmo texto, sem codificar de novo). Sem `logo`: geração a partir do prompt. Com `logo`:
- * edição de imagem (multipart), com a logo como referência em `image[]`.
+ * PNG gerado pela OpenAI (paisagem), em base64, como a OpenAI devolveu. Sempre sem a logo: ela é aplicada depois, por
+ * cima, pela função (compor.ts), para nunca ser redesenhada. PNG porque a composição lê PNG sem biblioteca.
  */
-export async function gerarImagem(prompt: string, total?: AbortSignal, logo?: Logo): Promise<string> {
+export async function gerarImagem(prompt: string, total?: AbortSignal): Promise<string> {
   const model = Deno.env.get("OPENAI_MODELO_IMAGEM") || "gpt-image-1";
   // quality "medium": o padrão ("auto") pode sair em "high", mais lento e caro.
-  // Sem `input_fidelity`: nos modelos gpt-image-2 o parâmetro deve ser omitido (toda imagem de entrada, a logo, já é
-  // processada em alta fidelidade) e enviá-lo dá 400.
-  const opcoes = { size: "1536x1024", quality: "medium", n: 1, output_format: "jpeg" };
-  let d: any;
-  if (logo) {
-    const f = new FormData();
-    f.append("model", model);
-    f.append("prompt", prompt);
-    for (const [k, v] of Object.entries(opcoes)) f.append(k, String(v));
-    // A cópia dá um Uint8Array sobre ArrayBuffer comum (BlobPart aceita só esse).
-    const arquivo = new File([new Uint8Array(logo.bytes)], logo.tipo === "image/png" ? "logo.png" : "logo.jpg", { type: logo.tipo });
-    f.append("image[]", arquivo);
-    d = await chamar("/images/edits", f, PRAZO.imagem, total, "imagem");
-  } else {
-    d = await chamar("/images/generations", { model, prompt, ...opcoes }, PRAZO.imagem, total, "imagem");
-  }
+  const d = await chamar("/images/generations", {
+    model, prompt, size: "1536x1024", quality: "medium", n: 1, output_format: "png",
+  }, PRAZO.imagem, total, "imagem");
   const b64 = d?.data?.[0]?.b64_json;
   if (!b64 || typeof b64 !== "string") throw new Error("OpenAI não devolveu a imagem.");
   return b64;
 }
 
 /**
- * O modelo de visão olha a imagem gerada (`imagemB64`, o base64 que a OpenAI devolveu): tem pessoas? tem texto legível
- * e em destaque? Com `logo`, ela vai como segunda imagem, pela URL pública (sem recodificar os MB da logo), e o que for
- * da marca dela não conta como texto nem como pessoa. `detail: "high"`: gente pequena ao fundo conta.
+ * O modelo de visão olha a imagem gerada (`imagemB64`, o base64 que a OpenAI devolveu, ainda sem a logo): tem pessoas?
+ * tem texto legível e em destaque? `detail: "high"`: gente pequena ao fundo conta.
  */
 export async function checarImagem(
-  imagemB64: string, tipoMime: string, total?: AbortSignal, logo?: Logo,
+  imagemB64: string, tipoMime: string, total?: AbortSignal,
 ): Promise<{ tem_pessoas: boolean; tem_texto: boolean }> {
   const d = await chamar("/chat/completions", {
     model: modeloVisao(),
     messages: [{
       role: "user",
       content: [
-        { type: "text", text: promptChecagemImagem(!!logo) },
+        { type: "text", text: promptChecagemImagem() },
         { type: "image_url", image_url: { url: `data:${tipoMime};base64,${imagemB64}`, detail: "high" } },
-        ...(logo ? [{ type: "image_url", image_url: { url: logo.url, detail: "high" } }] : []),
       ],
     }],
     response_format: { type: "json_schema", json_schema: { name: "checagem_imagem_gmn", strict: true, schema: ESQUEMA_CHECAGEM_IMAGEM } },
@@ -145,4 +126,61 @@ export async function checarImagem(
     throw new Error("A OpenAI devolveu uma checagem da imagem que não deu para ler.");
   }
   return { tem_pessoas: r.tem_pessoas, tem_texto: r.tem_texto };
+}
+
+/** Uma frase curta, em português, do que a foto mostra (para o texto do post). URL pública da imagem (R2). */
+export async function descreverImagem(url: string, total?: AbortSignal): Promise<string> {
+  const d = await chamar("/chat/completions", {
+    model: modeloVisao(),
+    messages: [{
+      role: "user",
+      content: [
+        { type: "text", text: "Descreva em uma frase curta, em português do Brasil, o que esta foto mostra, para ajudar a escrever um post do Google Meu Negócio. Responda só com a descrição, sem aspas." },
+        { type: "image_url", image_url: { url, detail: "low" } },
+      ],
+    }],
+  }, PRAZO.texto, total, "texto");
+  const t = d?.choices?.[0]?.message?.content;
+  return typeof t === "string" ? t.trim().replace(/^["']|["']$/g, "").slice(0, 300) : "";
+}
+
+/**
+ * O modelo de visão olha uma imagem do site de um negócio (URL pública) e diz se é logo, foto ou outra coisa; para foto,
+ * uma frase curta do que ela mostra. Resposta fora do esquema lança.
+ */
+export async function classificarImagem(
+  url: string, total?: AbortSignal,
+): Promise<{ tipo: "logo" | "foto" | "outro"; descricao: string }> {
+  const d = await chamar("/chat/completions", {
+    model: modeloVisao(),
+    messages: [{
+      role: "user",
+      content: [
+        { type: "text", text: PROMPT_CLASSIFICAR_IMAGEM },
+        { type: "image_url", image_url: { url, detail: "low" } },
+      ],
+    }],
+    response_format: {
+      type: "json_schema", json_schema: { name: "classificacao_imagem_gmn", strict: true, schema: ESQUEMA_CLASSIFICACAO_IMAGEM },
+    },
+  }, PRAZO.texto, total, "imagem");
+  const r = conteudoJson<{ tipo?: unknown; descricao?: unknown }>(d);
+  if ((r.tipo !== "logo" && r.tipo !== "foto" && r.tipo !== "outro") || typeof r.descricao !== "string") {
+    throw new Error("A OpenAI devolveu uma classificação da imagem que não deu para ler.");
+  }
+  return { tipo: r.tipo, descricao: r.descricao.trim().slice(0, 300) };
+}
+
+/**
+ * Dentre as fotos do site (`id` e descrição, até 40), os ids das que combinam com o texto do post; na dúvida, nenhuma. Só
+ * volta id que existe em `fotos` (sem repetição), mesmo que a IA invente outro.
+ */
+export async function fotosQueCombinam(
+  texto: string, fotos: { id: string; descricao: string }[], total?: AbortSignal,
+): Promise<string[]> {
+  const m = montarMensagensFotosQueCombinam(texto, fotos);
+  const r = await gerarJson<{ ids?: unknown }>(m.system, m.user, "fotos_que_combinam_gmn", ESQUEMA_FOTOS_QUE_COMBINAM, total);
+  if (!Array.isArray(r.ids)) throw new Error("A OpenAI devolveu uma escolha de fotos que não deu para ler.");
+  const existentes = new Set(fotos.map((f) => f.id));
+  return [...new Set(r.ids.filter((id): id is string => typeof id === "string" && existentes.has(id)))];
 }

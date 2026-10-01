@@ -332,3 +332,106 @@ Gaveta do perfil com as abas **Contexto** (contexto para os posts, "Extrair do c
 marcação "saúde", cliente), **Imagens** (pasta do Drive, contexto para as imagens, logo com envio PNG/JPG até 5 MB e
 "Remover", "Gerar imagem com IA quando não houver pasta do Drive", "Permitir pessoas nas imagens da IA"), **Agenda**
 (dias, horários, "com imagem / só texto" por dia, botão do post) e **Posts** (as duas prévias).
+
+## 12. Imagens em qualquer formato, logo intocável e imagens do site (emenda de 2026-10-01, tarde)
+
+Pedido do André depois de testar a aba no site: "tentei subir a logo, ela estava em jpg e não subiu; quero que você aceite
+qualquer tipo de formato de IMAGEM independente do tamanho; a logo do cliente NUNCA pode sofrer modificações nos posts ao
+gerar imagens com IA; seria legal puxar imagens do site, com descrição, para ajudar nos posts, e puxar a logo direto do
+site, disponível para seleção com checkbox de usar aquela logo".
+
+**Causa do envio que falhou (reproduzida):** um JPG de verdade sobe; um arquivo com nome `.jpg` que por dentro é WEBP
+(comum em imagem salva da internet) é recusado pela conferência de assinatura ("Envie a logo em PNG ou JPG."). Acima de
+5 MB a tela também recusava. As duas travas somem com 12.1.
+
+### 12.1 Logo em qualquer formato e tamanho
+
+- O navegador abre a imagem escolhida (PNG, JPG/JFIF, WEBP, GIF, AVIF, BMP, ICO, SVG; HEIC e TIFF só onde o navegador
+  abre, como o Safari) e a converte para **PNG com transparência, lado maior até 1.024 px** (nunca amplia; SVG é desenhado
+  com lado maior de 1.024 px). Não há limite de tamanho do arquivo original: só o PNG convertido viaja (bem menor que 5 MB).
+- Arquivo que o navegador não abre: "Não foi possível abrir esta imagem neste navegador. Formatos como HEIC e TIFF só
+  abrem no Safari: salve como PNG ou JPG e envie de novo."
+- A ação `logo` da função passa a aceitar **só PNG** (o que a tela manda) e grava `logos/<perfil>-<carimbo>.png`.
+- Logos antigas em JPG (só as de teste existem) precisam ser reenviadas: a composição (12.2) lê só PNG.
+
+### 12.2 A logo nunca é modificada pela IA
+
+- A IA gera a imagem **sem a logo** (`images/generations`, `output_format: "png"`), com o pedido de deixar o canto
+  escolhido limpo (fundo simples, sem objeto importante). A checagem de pessoas e texto roda nessa imagem (sem exceção de
+  logo, porque ela ainda não está lá).
+- Aprovada a imagem, a função **aplica a logo original por cima** (composição própria, sem biblioteca: leitura e gravação
+  de PNG com a compressão nativa do Deno, redução proporcional por média de área e mistura pelo alfa). Os pixels opacos da
+  logo reduzida saem idênticos; nada fora da caixa da logo muda. Protótipo: 1536x1024, 17 ms para aplicar, cerca de
+  0,4 s para gravar o PNG (cerca de 2 MB).
+- Opções no perfil: **posição** (`superior_esquerdo`, `superior_direito`, `inferior_esquerdo`, `inferior_direito`; padrão
+  inferior direito), **tamanho** (`pequena` 16% x 14%, `media` 22% x 18%, `grande` 30% x 24% da largura x altura da
+  imagem; padrão média) e **fundo atrás da logo** (`nenhum`, `claro`, `escuro`: retângulo arredondado com 88% de
+  opacidade; padrão nenhum). Margem de 3% da largura até a borda.
+- A imagem final é PNG (`<perfil>/<post>.png`). Falha ao aplicar a logo: o post sai só com texto e com o aviso "Não foi
+  possível aplicar a logo na imagem." (a logo é obrigatória quando existe).
+- Continua valendo: a logo só entra nas imagens da IA; fotos do Drive e do site vão como estão.
+
+### 12.3 Fotos do Drive em qualquer formato e tamanho
+
+- A pasta lista **toda imagem** (`mimeType contains 'image/'`), sem filtro de tamanho.
+- JPG ou PNG de até 5 MB: baixa como hoje. Outro formato (HEIC, WEBP, TIFF…) ou arquivo maior: usa a **miniatura que o
+  próprio Google gera** (`thumbnailLink` trocando o tamanho para `=s2048`, baixada com o token), que sai em JPG ou PNG.
+  Sem miniatura ou falha: tenta a próxima foto do rodízio (até 3) e, se nenhuma servir, o aviso de pasta sem foto aceita.
+- A descrição da foto no Drive (campo "descrição" do arquivo) ou, sem ela, o nome do arquivo vai para o texto do post
+  (12.5).
+
+### 12.4 Imagens e logo puxadas do site
+
+- Na aba Imagens, o botão **"Buscar imagens e logo no site"** (usa o site do perfil) chama a ação `site` da função, que
+  lê o HTML da página (até 3 MB, 15 s) e, em site montado por JavaScript, até 3 arquivos `.js` do próprio site. Ela
+  devolve candidatos com URL e descrição (alt, título, legenda, og:image:alt ou o nome no JSON-LD), marcando os que têm
+  cara de logo (ícones, `og:logo`, `logo` do JSON-LD, imagem com "logo/marca/brand" no alt, classe ou nome). Nada é
+  gravado nessa busca.
+- **Logos encontradas:** cada uma com a caixa **"Usar esta logo"**. Marcar uma: a função baixa o arquivo (ação
+  `baixar_imagem`, até 20 MB, só http/https e hosts públicos), o navegador converte como em 12.1 e envia como a logo do
+  perfil; o perfil guarda a URL de origem (`logo_origem_url`) para a caixa aparecer marcada. Marcar outra troca a logo.
+- **Imagens do site:** cada uma com a descrição e a caixa **"Usar nos posts"**. Marcar: a função baixa, o navegador
+  converte para **JPG (lado maior até 2.048 px, até 5 MB)** e envia (ação `imagem_site`), a função guarda no R2
+  (`site/<perfil>/<id>.jpg`) e, se não houver descrição útil (menos de 15 caracteres), pede uma descrição curta ao modelo
+  de visão. A imagem entra em `gmn_perfis.imagens_site` (`[{id, url, origem_url, descricao}]`). Desmarcar tira da lista
+  (o arquivo fica no R2).
+- Limites conhecidos: imagem que o site só carrega depois (por API, ao rolar a página) e site que bloqueia robôs podem
+  não aparecer; sites montados por JavaScript não trazem descrição (o modelo de visão descreve ao marcar).
+
+### 12.5 De onde sai a imagem do post e como o texto a usa
+
+- Ordem: **Drive** (se a pasta estiver preenchida; obrigatória) → **imagens do site marcadas** (se houver alguma; rodízio
+  como o do Drive, em `gmn_imagens_uso` com origem `site`) → **IA** (se ligada) → sem imagem. "Só texto" (agenda ou
+  prévia) continua pulando tudo.
+- Foto do Drive ou do site é **escolhida antes do texto**, e a descrição dela vai para o prompt: "A imagem do post mostra:
+  … Escreva de forma coerente com ela, sem descrever a foto." A imagem da IA continua sendo gerada depois do texto.
+- `gmn_posts.imagem_origem` e `gmn_imagens_uso.origem` passam a aceitar `site`.
+
+### 12.6 Dados novos (migration `20261001170000_gmn_imagens.sql`)
+
+`gmn_perfis`: `logo_posicao` text padrão `inferior_direito`, `logo_tamanho` text padrão `media`, `logo_fundo` text padrão
+`nenhum` (com CHECK dos valores), `logo_origem_url` text, `imagens_site` jsonb padrão `[]` (CHECK de array). Os CHECKs de
+`gmn_posts.imagem_origem` e `gmn_imagens_uso.origem` são refeitos com `site`.
+
+### 12.7 Emenda (2026-10-01, noite): busca de logo e de fotos separadas, chave das fotos do site e foto só com contexto
+
+Pedido do André: "toda foto puxada do site deve ter contexto com o post pra ser usada; deixe a opção de puxar fotos do
+site para ativar ou desativar no painel; essa função puxa fotos e a outra função puxa somente logos; tem que reconhecer
+o que é logo e o que é foto". Substitui o que 12.4 e 12.5 dizem sobre as imagens do site.
+
+- **Duas buscas:** "Buscar logo no site" (ação `site` com `tipo: "logos"`) e "Buscar fotos no site" (`tipo: "fotos"`).
+  As pistas do HTML separam os candidatos (ícones, `og:logo`, `logo` do JSON-LD, "logo/marca/brand" no alt, classe ou
+  nome → logo; o resto → foto). Depois, cada candidato em formato que o modelo de visão lê (PNG, JPG, WEBP, GIF) é
+  **classificado pela IA** (`logo`, `foto` ou `outro`, com uma descrição curta da foto), em paralelo (até 6 ao mesmo
+  tempo; até 16 candidatos na busca de logos e 24 na de fotos). SVG e ICO ficam pela pista (são logo ou ícone). Se a IA
+  não conseguir abrir um candidato, vale a pista. A busca de logos devolve só o que é logo; a de fotos, só o que é foto
+  e tem descrição.
+- **Chave "Usar fotos do site nos posts"** (`gmn_perfis.usa_fotos_site`, padrão **desligada**), na aba Imagens, gravada
+  pelo "Salvar imagens". A busca de fotos e a lista de fotos marcadas só aparecem com ela ligada. Desligada, nenhuma foto
+  do site entra num post (as marcadas continuam guardadas).
+- **Foto só com contexto:** a foto do site é escolhida **depois** do texto. A IA de texto recebe o texto do post e as
+  descrições das fotos marcadas e devolve só as que combinam claramente com o assunto (na dúvida, nenhuma). Entre as que
+  combinam, entra a menos usada (`gmn_imagens_uso`, origem `site`). Foto sem descrição nunca entra.
+- **Ordem da imagem do post:** Drive (preenchido = só Drive, como antes; foto escolhida antes do texto) → com a chave
+  ligada e fotos marcadas, a foto do site que combina → IA (se ligada) → sem imagem.
+- Migration `20261001190000_gmn_fotos_site.sql`: `usa_fotos_site BOOLEAN NOT NULL DEFAULT false`.

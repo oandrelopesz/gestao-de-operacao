@@ -2,7 +2,14 @@
 // O types.ts gerado ainda não conhece as tabelas novas: por isso `as any` nos `.from(...)`.
 import { supabase } from "@/integrations/supabase/client";
 import { cabecalhosDeAcesso } from "@/lib/googleDrive";
-import { normalizarAgenda, normalizarBriefing, type Briefing, type ItemAgenda } from "../../supabase/functions/gmn/regras.ts";
+import { blobParaBase64, normalizarFoto, normalizarLogo } from "@/lib/gmnImagem";
+import {
+  normalizarAgenda, normalizarBriefing, normalizarImagensSite, opcoesDaLogo,
+  type Briefing, type FundoLogo, type ImagemSite, type ItemAgenda, type PosicaoLogo, type TamanhoLogo,
+} from "../../supabase/functions/gmn/regras.ts";
+import type { CandidatoSite } from "../../supabase/functions/gmn/site.ts";
+
+export type { CandidatoSite };
 
 /** Fase 1: nada é publicado no Google; o liga/desliga fica desabilitado até a API ser aprovada. */
 export const PUBLICACAO_LIBERADA = false;
@@ -31,12 +38,21 @@ export interface PerfilGmn {
   cta_url: string | null;
   drive_pasta_url: string | null;
   usa_ia_imagem: boolean;
+  /** Fotos do site nos posts: desligado (padrão), as marcadas em `imagens_site` ficam guardadas mas nunca entram num post. */
+  usa_fotos_site: boolean;
   /** Contexto completo do cliente, colado pelo André; vai inteiro para o prompt de cada post. */
   contexto_posts: string | null;
   /** Diretrizes de imagem do cliente; entram no prompt de toda imagem gerada pela IA. */
   contexto_imagens: string | null;
   /** URL pública da logo do cliente (R2). */
   logo_url: string | null;
+  logo_posicao: PosicaoLogo;
+  logo_tamanho: TamanhoLogo;
+  logo_fundo: FundoLogo;
+  /** URL do site de onde a logo veio (a caixa "Usar esta logo" aparece marcada nela); null se foi enviada do computador. */
+  logo_origem_url: string | null;
+  /** Imagens do site marcadas para os posts (gravadas na hora, fora do "Salvar imagens"). */
+  imagens_site: ImagemSite[];
   /** Só o André liga: com isso desligado a IA nunca gera pessoas nas imagens. */
   permitir_pessoas_ia: boolean;
   saude: boolean;
@@ -53,7 +69,7 @@ export interface PostGmn {
   tema: string | null;
   palavras_chave: string[];
   texto: string | null;
-  imagem_origem: "drive" | "google" | "ia" | null;
+  imagem_origem: "drive" | "google" | "ia" | "site" | null;
   imagem_url: string | null;
   google_url: string | null;
   erro: string | null;
@@ -69,11 +85,21 @@ const FUNCAO = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmn`;
 const CAMPOS_PERFIL =
   "id, location_name, nome, endereco, categoria, site, telefone, cliente_id, ativo, sem_acesso, agenda, " +
   "cta_tipo, cta_url, drive_pasta_url, usa_ia_imagem, contexto_posts, contexto_imagens, logo_url, permitir_pessoas_ia, " +
+  "logo_posicao, logo_tamanho, logo_fundo, logo_origem_url, imagens_site, usa_fotos_site, " +
   "saude, briefing, briefing_salvo_em, created_at";
 const CAMPOS_POST = "id, perfil_id, origem, status, tema, palavras_chave, texto, imagem_origem, imagem_url, google_url, erro, created_at";
 
 function comBriefing(p: any): PerfilGmn {
-  return { ...p, briefing: normalizarBriefing(p.briefing), agenda: normalizarAgenda(p.agenda) } as PerfilGmn;
+  const logo = opcoesDaLogo(p);
+  return {
+    ...p, briefing: normalizarBriefing(p.briefing), agenda: normalizarAgenda(p.agenda),
+    logo_posicao: logo.posicao, logo_tamanho: logo.tamanho, logo_fundo: logo.fundo,
+    // Linha sem a chave (mock, consulta antiga) vale como "logo enviada do computador".
+    logo_origem_url: typeof p.logo_origem_url === "string" ? p.logo_origem_url : null,
+    imagens_site: normalizarImagensSite(p.imagens_site),
+    // Só `true` liga as fotos do site (linha sem a chave ou antiga vale como desligado).
+    usa_fotos_site: p.usa_fotos_site === true,
+  } as PerfilGmn;
 }
 
 /** Tabela ou coluna ainda não criada no banco (migration pendente) e falha de rede viram uma mensagem clara. */
@@ -83,6 +109,14 @@ export function traduzErroGmn(e: unknown): string {
   // As colunas do contexto, da logo e das pessoas nas imagens vieram numa migration própria.
   if (faltaNoBanco && /contexto_posts|contexto_imagens|logo_url|permitir_pessoas_ia/i.test(msg)) {
     return "As colunas novas do Google Meu Negócio (contexto, logo e pessoas nas imagens) ainda não existem no banco (migration 20261001120000_gmn_contexto.sql).";
+  }
+  // As opções da logo e as imagens do site vieram na migration das imagens.
+  if (faltaNoBanco && /logo_posicao|logo_tamanho|logo_fundo|logo_origem_url|imagens_site/i.test(msg)) {
+    return "As colunas novas das imagens do Google Meu Negócio (opções da logo e imagens do site) ainda não existem no banco (migration 20261001170000_gmn_imagens.sql).";
+  }
+  // A chave das fotos do site veio numa migration própria.
+  if (faltaNoBanco && /usa_fotos_site/i.test(msg)) {
+    return "A coluna das fotos do site do Google Meu Negócio ainda não existe no banco (migration 20261001190000_gmn_fotos_site.sql).";
   }
   if (/gmn_/i.test(msg) && faltaNoBanco) {
     return "As tabelas do Google Meu Negócio ainda não existem no banco (migration 20260929120000_gmn.sql).";
@@ -171,32 +205,81 @@ export async function gerarPrevia(perfilId: string, comImagem = true): Promise<P
   return d.post;
 }
 
-export const LOGO_TIPOS = ["image/png", "image/jpeg"];
-export const LOGO_MAX_BYTES = 5 * 1024 * 1024;
-
-/** Conteúdo do arquivo em base64, sem o prefixo `data:...;base64,`. */
-function lerBase64(arquivo: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const leitor = new FileReader();
-    leitor.onload = () => {
-      const r = String(leitor.result ?? "");
-      resolve(r.slice(r.indexOf(",") + 1));
-    };
-    leitor.onerror = () => reject(new Error("Não foi possível ler o arquivo da logo."));
-    leitor.readAsDataURL(arquivo);
-  });
-}
-
-/** Envia a logo do cliente (PNG ou JPG até 5 MB) e devolve a URL pública gravada no perfil. */
-export async function enviarLogo(perfilId: string, arquivo: File): Promise<string> {
-  if (!LOGO_TIPOS.includes(arquivo.type)) throw new Error("Envie a logo em PNG ou JPG.");
-  if (arquivo.size > LOGO_MAX_BYTES) throw new Error("A logo pode ter até 5 MB.");
-  const base64 = await lerBase64(arquivo);
-  const d = await chamar<{ logo_url: string }>({ acao: "logo", perfil_id: perfilId, tipo: arquivo.type, base64 });
+/** Converte a imagem (qualquer formato que o navegador abre) para PNG e grava como a logo do perfil. */
+export async function enviarLogo(perfilId: string, arquivo: Blob, origemUrl: string | null = null): Promise<string> {
+  const png = await normalizarLogo(arquivo);
+  const base64 = await blobParaBase64(png);
+  const d = await chamar<{ logo_url: string }>({ acao: "logo", perfil_id: perfilId, tipo: "image/png", base64, origem_url: origemUrl });
   return d.logo_url;
 }
 
 /** Tira a logo do perfil (o arquivo antigo pode ficar no armazenamento). */
 export async function removerLogo(perfilId: string): Promise<void> {
   await chamar<{ ok: boolean }>({ acao: "remover_logo", perfil_id: perfilId });
+}
+
+/** Logos que a função acha no site salvo do perfil (a IA confere cada uma). Não grava nada. */
+export async function buscarLogosNoSite(perfilId: string): Promise<CandidatoSite[]> {
+  const d = await chamar<{ logos?: CandidatoSite[] }>({ acao: "site", perfil_id: perfilId, tipo: "logos" });
+  return Array.isArray(d.logos) ? d.logos : [];
+}
+
+/** Fotos que a função acha no site salvo do perfil (a IA confere e descreve cada uma). Não grava nada. */
+export async function buscarFotosNoSite(perfilId: string): Promise<CandidatoSite[]> {
+  const d = await chamar<{ fotos?: CandidatoSite[] }>({ acao: "site", perfil_id: perfilId, tipo: "fotos" });
+  return Array.isArray(d.fotos) ? d.fotos : [];
+}
+
+/** A imagem de outro site, baixada pela função (o navegador não pode baixar direto por causa do CORS). */
+export async function baixarImagemExterna(url: string): Promise<Blob> {
+  const headers = await cabecalhosDeAcesso();
+  const r = await fetch(FUNCAO, { method: "POST", headers, body: JSON.stringify({ acao: "baixar_imagem", url }) });
+  if (!r.ok) {
+    // Erro volta como JSON { error }; a imagem em si volta como bytes.
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `A função gmn respondeu ${r.status}`);
+  }
+  return await r.blob();
+}
+
+/** Usa uma logo encontrada no site: baixa, converte para PNG e grava (guardando de onde veio). */
+export async function usarLogoDoSite(perfilId: string, url: string): Promise<string> {
+  return await enviarLogo(perfilId, await baixarImagemExterna(url), url);
+}
+
+/** O Google só aceita foto de post com pelo menos 250 px no menor lado: foto menor não é marcada. */
+const FOTO_LADO_MINIMO = 250;
+
+/** Menor lado, em pixels, de uma imagem já convertida. Se o navegador não conseguir ler, não barra (a função confere o JPG). */
+async function menorLadoDaImagem(b: Blob): Promise<number> {
+  try {
+    const bmp = await createImageBitmap(b);
+    try {
+      return Math.min(bmp.width, bmp.height);
+    } finally {
+      bmp.close();
+    }
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
+/** Marca uma foto do site para os posts: baixa, converte para JPG e manda guardar (a função descreve se a descrição vier curta). */
+export async function adicionarImagemSite(perfilId: string, c: CandidatoSite): Promise<ImagemSite[]> {
+  const jpg = await normalizarFoto(await baixarImagemExterna(c.url));
+  if ((await menorLadoDaImagem(jpg)) < FOTO_LADO_MINIMO) throw new Error("A foto é pequena demais para o Google (mínimo 250 px).");
+  const d = await chamar<{ imagens_site: unknown }>({
+    acao: "imagem_site", perfil_id: perfilId, origem_url: c.url, descricao: c.descricao, base64: await blobParaBase64(jpg),
+  });
+  return normalizarImagensSite(d.imagens_site);
+}
+
+/** Desmarca uma foto do site (o arquivo fica no R2). Devolve a lista nova, já gravada. */
+export async function removerImagemSite(perfilId: string, _lista: ImagemSite[], id: string): Promise<ImagemSite[]> {
+  // Relê a lista do banco antes de gravar: uma marcação que o servidor gravou, mas cuja resposta se perdeu, não some aqui.
+  const { data, error } = await perfis().select("imagens_site").eq("id", perfilId).single();
+  if (error) throw error;
+  const nova = normalizarImagensSite((data as { imagens_site?: unknown } | null)?.imagens_site).filter((i) => i.id !== id);
+  await salvarPerfil(perfilId, { imagens_site: nova });
+  return nova;
 }

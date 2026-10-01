@@ -11,13 +11,15 @@ import { ROTULO_TEMA, type Tema } from "../../../supabase/functions/gmn/regras.t
 const STATUS: Record<PostGmn["status"], string> = {
   agendado: "Agendado", gerando: "Gerando", gerado: "Prévia pronta", publicado: "Publicado", erro: "Erro", pulado: "Pulado",
 };
-const ORIGEM_IMAGEM: Record<string, string> = { drive: "Foto do Drive", google: "Foto do Google", ia: "Imagem de IA" };
+const ORIGEM_IMAGEM: Record<string, string> = {
+  drive: "Foto do Drive", google: "Foto do Google", ia: "Imagem de IA", site: "Imagem do site",
+};
 
 /** Imagem do post; se o arquivo não carregar, não deixa uma miniatura quebrada: avisa em texto. */
 function ImagemPost({ url }: { url: string }) {
   const [quebrou, setQuebrou] = useState(false);
   if (quebrou) return <p className="text-xs text-muted-foreground">Imagem indisponível.</p>;
-  return <img src={url} alt="Imagem do post" className="max-h-72 w-full rounded-md object-cover" onError={() => setQuebrou(true)} />;
+  return <img src={url} alt="Imagem do post" loading="lazy" decoding="async" className="max-h-72 w-full rounded-md object-cover" onError={() => setQuebrou(true)} />;
 }
 
 export type PreviaGerando = "com" | "sem" | null;
