@@ -1,6 +1,7 @@
 /**
  * Regras puras da aba Ideias (sem Supabase nem alias "@/"), para rodar em `node --test`.
  */
+import { buscar, type ResultadoBusca } from "./search.ts";
 
 /** Id de uma categoria de ideia (tabela ideia_categorias, editável). */
 export type TipoIdeia = string;
@@ -63,23 +64,23 @@ export interface IdeiaFiltravel {
 
 export type SituacaoIdeia = "abertas" | "concluidas";
 
-/** Filtros da aba: situação (padrão abertas), tipo ("todos" = qualquer), agência ("todas" = qualquer) e busca livre */
+/**
+ * Filtros da aba: situação (padrão abertas), tipo ("todos" = qualquer), agência ("todas" = qualquer) e busca livre.
+ * Situação, tipo e agência valem antes; a busca é tolerante (sem acento, com erro de digitação) no título e depois na
+ * descrição e nos links, e o resultado diz se foi exato, parecido ou se nada foi achado.
+ */
 export function filtrarIdeias<T extends IdeiaFiltravel>(
   ideias: T[],
   f: { tipo: string; agencia: string; busca: string; situacao?: SituacaoIdeia },
-): T[] {
-  const q = f.busca.trim().toLowerCase();
+): ResultadoBusca<T> {
   const concluidas = f.situacao === "concluidas";
-  return ideias.filter(
+  const base = ideias.filter(
     (i) =>
       !!i.concluida_em === concluidas &&
       (f.tipo === "todos" || i.tipo === f.tipo) &&
-      (f.agencia === "todas" || i.agencia === f.agencia) &&
-      (!q ||
-        i.titulo.toLowerCase().includes(q) ||
-        (i.descricao || "").toLowerCase().includes(q) ||
-        i.links.some((l) => l.toLowerCase().includes(q))),
+      (f.agencia === "todas" || i.agencia === f.agencia),
   );
+  return buscar(base, f.busca, (i) => [i.titulo, i.descricao, ...(i.links ?? [])]);
 }
 
 /** Coluna pré-selecionada ao enviar para demandas: o mesmo padrão do DemandaForm */

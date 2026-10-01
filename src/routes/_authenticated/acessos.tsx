@@ -48,6 +48,8 @@ import { CACHE_KEYS, loadAcessos } from "@/lib/data";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAgencias, agenciaBorderStyle } from "@/lib/agencias";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 export const Route = createFileRoute("/_authenticated/acessos")({
   component: AcessosPage,
@@ -250,14 +252,13 @@ function AcessosPage() {
     }, {});
   }, [acessos]);
 
-  const filteredAcessos = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return acessos.filter((a) => {
-      const matchesAgencia = agenciaFilter === "todos" || a.agencia === agenciaFilter;
-      const matchesSearch = !q || a.nome.toLowerCase().includes(q) || (a.login || "").toLowerCase().includes(q);
-      return matchesAgencia && matchesSearch;
-    });
-  }, [acessos, agenciaFilter, searchQuery]);
+  const acessosDaAgencia = useMemo(
+    () => acessos.filter((a) => agenciaFilter === "todos" || a.agencia === agenciaFilter),
+    [acessos, agenciaFilter],
+  );
+  // Busca tolerante (sem acento, com erro de digitação) no nome e no login, dentro da agência escolhida
+  const resultadoBusca = useBusca(acessosDaAgencia, searchQuery, (a) => [a.nome, a.login]);
+  const filteredAcessos = resultadoBusca.itens;
 
   const isCrm = form.tipo === "crm";
 
@@ -309,21 +310,30 @@ function AcessosPage() {
         </Card>
       ) : filteredAcessos.length === 0 ? (
         <Card className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-2 border-dashed">
-          <span>Nenhum acesso cadastrado{agenciaFilter !== "todos" ? " nesta agência" : ""}.</span>
-          <Button variant="ghost" size="sm" className="gap-2" onClick={openCreate}>
-            <Plus size={14} /> Adicionar o primeiro
-          </Button>
+          {resultadoBusca.modo === "nenhum" && acessosDaAgencia.length > 0 ? (
+            <MensagemBusca resultado={resultadoBusca} />
+          ) : (
+            <>
+              <span>Nenhum acesso cadastrado{agenciaFilter !== "todos" ? " nesta agência" : ""}.</span>
+              <Button variant="ghost" size="sm" className="gap-2" onClick={openCreate}>
+                <Plus size={14} /> Adicionar o primeiro
+              </Button>
+            </>
+          )}
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredAcessos.map((acesso) => (
-            <AcessoCard
-              key={acesso.id}
-              acesso={acesso}
-              onEdit={() => openEdit(acesso)}
-              onDelete={() => setDeleteTarget(acesso)}
-            />
-          ))}
+        <div className="space-y-3">
+          <MensagemBusca resultado={resultadoBusca} />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredAcessos.map((acesso) => (
+              <AcessoCard
+                key={acesso.id}
+                acesso={acesso}
+                onEdit={() => openEdit(acesso)}
+                onDelete={() => setDeleteTarget(acesso)}
+              />
+            ))}
+          </div>
         </div>
       )}
 

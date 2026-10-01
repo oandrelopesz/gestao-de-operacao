@@ -24,6 +24,8 @@ import {
   type SwipeItem, type SwipeNicho, type SwipeConfig, type SwipeCategoria, type SwipeJob,
 } from "@/lib/swipe";
 import { podeTentarDeNovo } from "@/lib/swipeFila";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 import { FilaDownloads } from "@/components/swipe/FilaDownloads";
 import { statusDoDrive } from "@/lib/googleDrive";
 import { loginSilencioso } from "@/lib/googleAuth";
@@ -145,19 +147,25 @@ function SwipePage() {
   const subnichosDe = (id: string) => nichos.filter((n) => n.pai_id === id);
   const nomeNicho = (id: string | null | undefined) => nichos.find((n) => n.id === id)?.nome || "";
 
-  const filtrados = useMemo(() => {
-    const q = busca.trim().toLowerCase();
+  const doFiltro = useMemo(() => {
     return itens.filter((i) => {
       if (selecao.nicho_id && i.nicho_id !== selecao.nicho_id) return false;
       if (selecao.subnicho_id && i.subnicho_id !== selecao.subnicho_id) return false;
       if (selecao.categoria && i.categoria !== selecao.categoria) return false;
       if (filtroRede !== "todas" && i.rede !== filtroRede) return false;
       if (filtroStatus !== "todos" && i.status !== filtroStatus) return false;
-      if (!q) return true;
-      const texto = [i.player, i.nota || "", i.tags.join(" "), nomeNicho(i.nicho_id), nomeNicho(i.subnicho_id), categoriaMeta(i.categoria).singular, i.link || ""].join(" ").toLowerCase();
-      return texto.includes(q);
+      return true;
     });
-  }, [itens, busca, selecao, filtroRede, filtroStatus, nichos]);
+  }, [itens, selecao, filtroRede, filtroStatus]);
+  // Busca tolerante (sem acento, com erro de digitação) no player, no nicho, nas tags, na nota, na categoria e no link.
+  // Os nomes dos nichos vêm de `nichos`, que pode chegar depois dos itens: por isso o `deps`.
+  const resultadoBusca = useBusca(
+    doFiltro,
+    busca,
+    (i) => [i.player, nomeNicho(i.nicho_id), nomeNicho(i.subnicho_id), i.tags.join(" "), i.nota, categoriaMeta(i.categoria).singular, i.link],
+    { deps: [nichos] },
+  );
+  const filtrados = resultadoBusca.itens;
 
   const contagem = (pred: (i: SwipeItem) => boolean) => itens.filter(pred).length;
   const pendentes = itens.filter((i) => i.status === "pendente" || i.status === "baixando").length;
@@ -335,12 +343,19 @@ function SwipePage() {
             })}
           </div>
 
+          {!loading && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} />}
           {filtrados.length === 0 && !loading ? (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
               <div className="bg-muted rounded-full p-4"><FolderOpen size={36} className="text-muted-foreground" /></div>
-              <h3 className="text-lg font-medium">{itens.length === 0 ? "Swipe file vazio" : "Nada nesse filtro"}</h3>
-              <p className="text-muted-foreground max-w-sm text-sm">Adicione um link ou arraste um arquivo: ele vai para a pasta certa no Drive e aparece aqui.</p>
-              <Button onClick={() => setDialog({ preset: selecao })} disabled={!pronto}>Adicionar referência</Button>
+              {resultadoBusca.modo === "nenhum" && doFiltro.length > 0 ? (
+                <MensagemBusca resultado={resultadoBusca} className="text-lg font-medium text-foreground" />
+              ) : (
+                <>
+                  <h3 className="text-lg font-medium">{itens.length === 0 ? "Swipe file vazio" : "Nada nesse filtro"}</h3>
+                  <p className="text-muted-foreground max-w-sm text-sm">Adicione um link ou arraste um arquivo: ele vai para a pasta certa no Drive e aparece aqui.</p>
+                  <Button onClick={() => setDialog({ preset: selecao })} disabled={!pronto}>Adicionar referência</Button>
+                </>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

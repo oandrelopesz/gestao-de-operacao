@@ -16,6 +16,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ClientePicker } from "@/components/demandas/ClientePicker";
+import { MensagemBusca } from "@/components/MensagemBusca";
+import { useBusca } from "@/lib/useBusca";
 import { cn } from "@/lib/utils";
 import { progresso } from "@/lib/processos";
 import { criarProcesso, fetchProcessos, fetchTemplates, type Processo, type Template } from "@/lib/processosService";
@@ -94,21 +96,23 @@ export function EnviarParaRoadmapDialog({ demanda, clientes, onClose, onDefinirR
     return clientes.find((c) => c.id === d.cliente_id)?.nome ?? nomeEmbed ?? "Cliente";
   };
 
-  const filtrados = useMemo(() => {
+  // Roadmaps do dono escolhido (ou todos), em ordem alfabética, sem o texto da busca (a busca tolerante vem depois)
+  const doDono = useMemo(() => {
     if (!roadmaps || !demanda) return [];
-    const q = busca.trim().toLowerCase();
     const temDono = !!demanda.pessoal || !!demanda.cliente_id;
     return roadmaps
       .filter((r) => {
         if (!mostrarTodos && temDono) {
           if (demanda.pessoal ? !r.pessoal : r.cliente_id !== demanda.cliente_id) return false;
         }
-        if (!q) return true;
-        const donoTxt = r.pessoal ? "pessoal" : (r.cliente?.nome ?? "");
-        return r.nome.toLowerCase().includes(q) || donoTxt.toLowerCase().includes(q);
+        return true;
       })
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-  }, [roadmaps, demanda, busca, mostrarTodos]);
+  }, [roadmaps, demanda, mostrarTodos]);
+
+  // Busca tolerante (sem acento, com erro de digitação) no nome do roadmap e no dono ("Pessoal" ou o cliente)
+  const resultadoBusca = useBusca(doDono, busca, (r) => [r.nome, r.pessoal ? "Pessoal" : r.cliente?.nome]);
+  const filtrados = resultadoBusca.itens;
 
   const abrirRoadmap = (id: string) => navigate({ to: "/roadmap", search: { id } });
 
@@ -254,6 +258,8 @@ export function EnviarParaRoadmapDialog({ demanda, clientes, onClose, onDefinirR
               )}
             </div>
 
+            {roadmaps && !erroRoadmaps && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} />}
+
             {erroRoadmaps ? (
               <p className="text-sm text-destructive">{erroRoadmaps}</p>
             ) : !roadmaps ? (
@@ -261,13 +267,13 @@ export function EnviarParaRoadmapDialog({ demanda, clientes, onClose, onDefinirR
                 <Loader2 size={20} className="animate-spin text-muted-foreground" />
               </div>
             ) : filtrados.length === 0 ? (
-              <p className="rounded-lg border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
-                {busca.trim()
-                  ? "Nenhum roadmap encontrado."
+              <div className="rounded-lg border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+                {resultadoBusca.modo === "nenhum" && doDono.length > 0
+                  ? <MensagemBusca resultado={resultadoBusca} className="text-xs" />
                   : !mostrarTodos && temDonoDemanda
                     ? "Nenhum roadmap ativo deste cliente — use \"Mostrar todos\" ou crie um novo."
                     : "Nenhum roadmap ativo."}
-              </p>
+              </div>
             ) : (
               <ol className="-mx-1 max-h-64 space-y-1.5 overflow-y-auto px-1">
                 {filtrados.map((r) => (

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizarUrl, dominio, filtrarLinks, contarPorTema, SEM_TEMA, TODOS } from "./linksTexto.ts";
+import { MENSAGEM_NENHUM, MENSAGEM_PARECIDOS } from "./search.ts";
 
 const links = [
   { id: "1", nome: "Meta Ads Library", url: "https://www.facebook.com/ads/library", tema_id: "a" },
@@ -25,11 +26,43 @@ test("dominio tira o www", () => {
 });
 
 test("filtrarLinks por tema, sem tema e busca (nome ou link), em ordem alfabética", () => {
-  assert.deepEqual(filtrarLinks(links, TODOS, "").map((l) => l.id), ["3", "4", "2", "1"]);
-  assert.deepEqual(filtrarLinks(links, "a", "").map((l) => l.id), ["4", "1"]);
-  assert.deepEqual(filtrarLinks(links, SEM_TEMA, "").map((l) => l.id), ["3"]);
-  assert.deepEqual(filtrarLinks(links, TODOS, "openai").map((l) => l.id), ["2"]);
-  assert.deepEqual(filtrarLinks(links, TODOS, "ANOTACOES").map((l) => l.id), ["3"]);
+  const ids = (filtro: string, busca: string) => filtrarLinks(links, filtro, busca).itens.map((l) => l.id);
+  assert.deepEqual(ids(TODOS, ""), ["3", "4", "2", "1"]);
+  assert.deepEqual(ids("a", ""), ["4", "1"]);
+  assert.deepEqual(ids(SEM_TEMA, ""), ["3"]);
+  assert.deepEqual(ids(TODOS, "openai"), ["2"]);
+  assert.deepEqual(ids(TODOS, "ANOTACOES"), ["3"]);
+  const semBusca = filtrarLinks(links, TODOS, "");
+  assert.equal(semBusca.modo, "todos");
+  assert.equal(semBusca.mensagem, null);
+});
+
+test("filtrarLinks: acha sem acento e com erro de digitação", () => {
+  const ids = (busca: string) => filtrarLinks(links, TODOS, busca).itens.map((l) => l.id);
+  assert.deepEqual(ids("anotacoes"), ["3"]);
+  assert.deepEqual(ids("anotações"), ["3"]);
+  assert.deepEqual(ids("chatgtp"), ["2"]); // letras vizinhas trocadas
+  assert.deepEqual(ids("cnva"), ["4"]); // letra a menos
+  assert.deepEqual(ids("meta adds library"), ["1"]); // letra a mais, várias palavras
+  assert.equal(filtrarLinks(links, TODOS, "chatgtp").modo, "exato");
+});
+
+test("filtrarLinks: parecidos e nenhum trazem a mensagem", () => {
+  const parecidos = filtrarLinks(links, TODOS, "canva zebra");
+  assert.equal(parecidos.modo, "parecidos");
+  assert.equal(parecidos.mensagem, MENSAGEM_PARECIDOS);
+  assert.deepEqual(parecidos.itens.map((l) => l.id), ["4"]);
+  const nenhum = filtrarLinks(links, TODOS, "zebra");
+  assert.equal(nenhum.modo, "nenhum");
+  assert.equal(nenhum.mensagem, MENSAGEM_NENHUM);
+  assert.deepEqual(nenhum.itens, []);
+});
+
+test("filtrarLinks: o tema vale antes da busca e, no empate, a ordem alfabética continua", () => {
+  assert.equal(filtrarLinks(links, "a", "chatgpt").modo, "nenhum");
+  assert.deepEqual(filtrarLinks(links, "b", "chatgpt").itens.map((l) => l.id), ["2"]);
+  // "com" está no link de três itens (campo secundário, mesma relevância): vêm em ordem alfabética
+  assert.deepEqual(filtrarLinks(links, TODOS, "com").itens.map((l) => l.id), ["4", "2", "1"]);
 });
 
 test("contarPorTema", () => {

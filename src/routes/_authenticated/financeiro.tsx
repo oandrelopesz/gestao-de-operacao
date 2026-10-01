@@ -57,7 +57,7 @@ import { useCachedState, hasCached } from "@/lib/pageCache";
 import { CACHE_KEYS, loadFinanceiroCompleto } from "@/lib/data";
 import { formatBRL } from "@/lib/clientes";
 import { hojeBrasilia } from "@/lib/entrega";
-import { descreverDias, agruparHistorico, ehFracionado, nomeDoMes, parcelasDaFonte } from "@/lib/financeiro";
+import { descreverDias, agruparHistorico, ehFracionado, nomeDoMes, parcelasDaFonte, tipoDaFonte } from "@/lib/financeiro";
 import {
   atrasadoDe,
   calendarioDaFonte,
@@ -92,6 +92,9 @@ import { CalendarioCobranca } from "@/components/financeiro/CalendarioCobranca";
 import { FonteDialog, type FinanceiroView } from "@/components/financeiro/FonteDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useAgencias } from "@/lib/agencias";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 // ?mes=AAAA-MM: o mês mostrado na aba. Sem ele (o link de sempre, /financeiro) ou inválido, vale o mês atual.
 export const Route = createFileRoute("/_authenticated/financeiro")({
@@ -219,6 +222,7 @@ function BotaoAtrasado({ total, ocupado, onAbrir }: { total: number; ocupado: bo
 function FinanceiroPage() {
   const navigate = useNavigate();
   const busca = Route.useSearch();
+  const { label: agenciaLabelOf } = useAgencias();
   const [data, setData] = useCachedState<FinanceiroView[]>(CACHE_KEYS.financeiro, []);
   const [registros, setRegistros] = useCachedState<RegistroRecebimento[]>(CACHE_KEYS.financeiroRegistros, []);
   const [loading, setLoading] = useState(!(hasCached(CACHE_KEYS.financeiro) && hasCached(CACHE_KEYS.financeiroRegistros)));
@@ -318,14 +322,22 @@ function FinanceiroPage() {
   );
   const resumoDe = (fonteId: string) => porFonte.get(fonteId) ?? SEM_COBRANCA;
 
-  const filteredData = useMemo(() => {
+  const baseData = useMemo(() => {
     return data.filter(item => {
       const matchesTipo = filterTipo === "all" || item.tipo === filterTipo;
       const matchesStatus = filterStatus === "all" || porFonte.get(item.fonte_id)?.situacao === filterStatus;
-      const matchesSearch = item.nome.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesTipo && matchesStatus && matchesSearch;
+      return matchesTipo && matchesStatus;
     });
-  }, [data, porFonte, filterTipo, filterStatus, searchQuery]);
+  }, [data, porFonte, filterTipo, filterStatus]);
+
+  // Busca tolerante no nome da fonte, no tipo ("Agência", "Pessoal", "Freelancer") e na agência do freelancer
+  const resultadoBusca = useBusca(
+    baseData,
+    searchQuery,
+    (item) => [item.nome, tipoDaFonte(item.tipo).label, item.tipo === "freelancer" && item.agencia_id ? agenciaLabelOf(item.agencia_id) : null],
+    { deps: [agenciaLabelOf] },
+  );
+  const filteredData = resultadoBusca.itens;
 
   // Cartões do topo: os do mês escolhido somam as parcelas desse mês; o Atrasado é o acumulado até hoje
   const metrics = useMemo(() => {
@@ -676,6 +688,7 @@ function FinanceiroPage() {
         </div>
       </div>
 
+      {!loading && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} className="-mb-3" />}
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -685,7 +698,11 @@ function FinanceiroPage() {
       ) : filteredData.length === 0 ? (
         <div className="text-center py-20 border-2 border-dashed rounded-xl bg-muted/30">
           <DollarSign size={48} className="mx-auto mb-4 opacity-20" />
-          <p className="text-muted-foreground font-medium">Nenhuma fonte financeira encontrada.</p>
+          {resultadoBusca.modo === "nenhum" && baseData.length > 0 ? (
+            <MensagemBusca resultado={resultadoBusca} className="font-medium" />
+          ) : (
+            <p className="text-muted-foreground font-medium">Nenhuma fonte financeira encontrada.</p>
+          )}
           <Button variant="link" onClick={() => { setSearchQuery(""); setFilterTipo("all"); setFilterStatus("all"); }}>
             Limpar filtros
           </Button>

@@ -1,4 +1,5 @@
 // Regras puras da aba Links (sem dependências: roda no navegador e no `node --test`).
+import { buscar, type ResultadoBusca } from "./search.ts";
 
 export interface LinkBase { id: string; nome: string; url: string; tema_id: string | null }
 
@@ -28,15 +29,16 @@ export function dominio(url: string): string {
   }
 }
 
-const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
-/** Links do filtro (tema, Sem tema ou Todos) que batem com a busca, em ordem alfabética. */
-export function filtrarLinks<T extends LinkBase>(links: T[], filtro: string, busca: string): T[] {
-  const q = semAcento(busca.trim());
-  return links
+/**
+ * Links do filtro (tema, Sem tema ou Todos) que batem com a busca. O tema vale antes e a ordem alfabética também: sem
+ * busca a lista sai em ordem alfabética e, com busca, os mais parecidos primeiro (no empate, a ordem alfabética).
+ * A busca é tolerante (sem acento, com erro de digitação) no nome e depois no link.
+ */
+export function filtrarLinks<T extends LinkBase>(links: T[], filtro: string, busca: string): ResultadoBusca<T> {
+  const base = links
     .filter((l) => filtro === TODOS || (filtro === SEM_TEMA ? !l.tema_id : l.tema_id === filtro))
-    .filter((l) => !q || semAcento(l.nome).includes(q) || semAcento(l.url).includes(q))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+  return buscar(base, busca, (l) => [l.nome, l.url]);
 }
 
 /** Quantos links por tema (e em Sem tema / Todos), para os filtros. */

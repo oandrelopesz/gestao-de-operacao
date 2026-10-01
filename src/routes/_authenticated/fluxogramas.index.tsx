@@ -19,7 +19,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useCachedState } from "@/lib/pageCache";
-import { normalizar } from "@/lib/buscaAbas";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 import {
   EVENTO_FLUXO_SALVO, EVENTO_TEMAS_FLUXOS, criarFluxo, duplicarFluxo, excluirFluxo, fetchTemasFluxo, listarFluxos, moverFluxo, renomearFluxo,
   traduzErroFluxos, type FluxoResumo,
@@ -100,13 +101,14 @@ function FluxogramasPage() {
     }
     return c;
   }, [lista, temaDe]);
-  const visiveis = useMemo(() => {
-    const q = normalizar(busca);
-    return lista.filter((f) => {
-      const temaOk = filtro === TODOS || (filtro === SEM_TEMA ? !f.tema_id || !temaDe.has(f.tema_id) : f.tema_id === filtro);
-      return temaOk && (!q || normalizar(`${f.titulo} ${f.textos}`).includes(q));
-    });
-  }, [lista, filtro, busca, temaDe]);
+  const doTema = useMemo(() => {
+    return lista.filter((f) => filtro === TODOS || (filtro === SEM_TEMA ? !f.tema_id || !temaDe.has(f.tema_id) : f.tema_id === filtro));
+  }, [lista, filtro, temaDe]);
+  // Busca tolerante (sem acento, com erro de digitação) no título e nos textos dentro do quadro
+  const resultadoBusca = useBusca(doTema, busca, (f) => [f.titulo, f.textos]);
+  const visiveis = resultadoBusca.itens;
+  // "Nenhum resultado" só vale quando há quadros para buscar; sem nenhum, fica o texto de "nenhum quadro aqui ainda"
+  const semResultadoDaBusca = resultadoBusca.modo === "nenhum" && doTema.length > 0;
   const temaDoFiltro = filtro !== TODOS && filtro !== SEM_TEMA ? filtro : null;
 
   const criar = async () => {
@@ -224,6 +226,7 @@ function FluxogramasPage() {
         ))}
       </div>
 
+      {fluxos !== null && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} className="-mb-2" />}
       {fluxos === null ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="aspect-[4/3] rounded-xl" />)}
@@ -232,8 +235,10 @@ function FluxogramasPage() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 px-6 py-14 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Workflow size={26} /></span>
-            <p className="text-base font-semibold">{busca ? "Nenhum quadro encontrado" : "Nenhum quadro aqui ainda"}</p>
-            {!busca && <Button className="mt-1 gap-2" onClick={abrirNovo}><Plus size={16} /> Novo quadro</Button>}
+            {semResultadoDaBusca
+              ? <MensagemBusca resultado={resultadoBusca} className="text-base font-semibold text-foreground" />
+              : <p className="text-base font-semibold">Nenhum quadro aqui ainda</p>}
+            {!semResultadoDaBusca && <Button className="mt-1 gap-2" onClick={abrirNovo}><Plus size={16} /> Novo quadro</Button>}
           </CardContent>
         </Card>
       ) : (

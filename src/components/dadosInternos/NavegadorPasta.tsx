@@ -15,10 +15,12 @@ import { IconeArquivo } from "@/components/pdfs/IconeArquivo";
 import { GaleriaFotos } from "@/components/dadosInternos/GaleriaFotos";
 import { cn } from "@/lib/utils";
 import {
-  MIME_DOC, MIME_PASTA, MIME_PLANILHA, ehImagem, ehPasta, formatarDataHora, formatosDeDownload, linkNoGoogle, normalizarNome, novosNaLista,
+  MIME_DOC, MIME_PASTA, MIME_PLANILHA, ehImagem, ehPasta, formatarDataHora, formatosDeDownload, linkNoGoogle, novosNaLista,
   ordenarItens, rotuloDoItem, visivel, type AvisoFormulario, type Formulario, type ItemDrive,
 } from "@/lib/dadosInternos";
 import { DriveEscopoError, listarPasta, salvarItem, trilhaAte } from "@/lib/driveLeitura";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 export interface NavegadorPastaProps {
   formulario: Formulario;
@@ -94,11 +96,11 @@ export function NavegadorPasta(p: NavegadorPastaProps) {
   }, [p.avisos, carregar]);
 
   const novos = useMemo(() => novosNaLista(itens ?? [], p.avisos), [itens, p.avisos]);
-  const visiveis = useMemo(() => {
-    const q = normalizarNome(busca);
-    if (!q) return itens ?? [];
-    return (itens ?? []).filter((i) => normalizarNome(rotuloDoItem(i, p.formulario.id).titulo).includes(q));
-  }, [itens, busca, p.formulario.id]);
+  // Lista estável enquanto ainda não chegou (null): o hook só reindexa quando a lista muda
+  const daPasta = useMemo(() => itens ?? [], [itens]);
+  // Busca tolerante (sem acento, com erro de digitação) no título mostrado do item
+  const resultadoBusca = useBusca(daPasta, busca, (i) => [rotuloDoItem(i, p.formulario.id).titulo], { deps: [p.formulario.id] });
+  const visiveis = resultadoBusca.itens;
 
   // Pasta só de fotos e subpastas (a pasta "Fotos" do Catálogo e as de cada produto): vira galeria
   const galeria = !!itens && itens.some(ehImagem) && itens.every((i) => ehImagem(i) || ehPasta(i));
@@ -163,6 +165,8 @@ export function NavegadorPasta(p: NavegadorPastaProps) {
         )}
       </div>
 
+      {!erro && itens !== null && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} />}
+
       {erro ? (
         <Card className="flex flex-col items-center gap-3 px-6 py-10 text-center text-sm">
           <p className="text-destructive">{erro}</p>
@@ -176,7 +180,7 @@ export function NavegadorPasta(p: NavegadorPastaProps) {
         <GaleriaFotos key={p.pastaId} itens={itens} onBaixarZip={p.onBaixarZip} onAbrirPasta={(item) => abrir(item)} />
       ) : visiveis.length === 0 ? (
         <Card className="px-6 py-12 text-center text-sm text-muted-foreground">
-          {busca ? "Nada com esse nome." : "Nenhuma resposta ainda."}
+          {resultadoBusca.modo === "nenhum" && daPasta.length > 0 ? <MensagemBusca resultado={resultadoBusca} /> : "Nenhuma resposta ainda."}
         </Card>
       ) : (
         <Card className="divide-y overflow-hidden">

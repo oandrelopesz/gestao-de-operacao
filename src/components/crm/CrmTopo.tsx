@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MensagemBusca } from "@/components/MensagemBusca";
 import { ATALHOS_PERIODO, type AtalhoPeriodo, type CriterioPeriodo, type FiltroCrm, type FiltroPeriodo } from "@/lib/crmPeriodo";
 
 export type VisaoCrm = "fila" | "kanban" | "planilha" | "dashboard";
@@ -24,6 +25,7 @@ export function CrmTopo({
   filtro,
   onFiltro,
   qtd,
+  resultadoBusca,
   onNovoLead,
   onColunas,
   onExportar,
@@ -33,6 +35,8 @@ export function CrmTopo({
   filtro: FiltroCrm;
   onFiltro: (f: FiltroCrm) => void;
   qtd: number;
+  /** Resultado da busca tolerante: a mensagem de "parecidos"/"nenhum" aparece logo abaixo da barra de busca */
+  resultadoBusca?: { mensagem: string | null };
   onNovoLead: () => void;
   onColunas: () => void;
   onExportar?: () => void;
@@ -157,6 +161,7 @@ export function CrmTopo({
           {qtd} {qtd === 1 ? "lead" : "leads"}
         </span>
       </div>
+      {resultadoBusca && <MensagemBusca resultado={resultadoBusca} />}
     </div>
   );
 }

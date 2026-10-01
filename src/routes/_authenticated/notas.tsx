@@ -21,12 +21,14 @@ import {
   EVENTO_TEMAS_NOTAS, atualizarNota, criarNota, excluirNotas, fetchNotas, fetchTemasNotas, moverNotas, removerImagensNotas, traduzErroNotas,
   type Nota,
 } from "@/lib/notas";
-import { SEM_TEMA, TODOS, contarPorTema, filtrarNotas, previaSemTitulo, tituloOuPrimeiraLinha } from "@/lib/notasTexto";
+import { SEM_TEMA, TODOS, camposNota, contarPorTema, notasDoFiltro, previaSemTitulo, tituloOuPrimeiraLinha } from "@/lib/notasTexto";
+import { useBusca } from "@/lib/useBusca";
 import { imagensRemovidas, primeiraImagem, type NoDoc } from "@/lib/notasDoc";
 import type { EditorNota as EditorNotaTipo } from "@/components/notas/EditorNota";
 import { esperarOcioso } from "@/lib/aquecimento";
 import type { Tema } from "@/components/temas/TemasLista";
 import { TemasNotasDialog } from "@/components/notas/TemasNotas";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 export const Route = createFileRoute("/_authenticated/notas")({ component: NotasPage });
 
@@ -109,7 +111,11 @@ function NotasPage() {
   const lista = useMemo(() => notas ?? [], [notas]);
   const temaDe = useMemo(() => new Map(temas.map((t) => [t.id, t])), [temas]);
   const contagem = useMemo(() => contarPorTema(lista), [lista]);
-  const visiveis = useMemo(() => filtrarNotas(lista, filtro, busca), [lista, filtro, busca]);
+  // Busca tolerante (sem acento, com erro de digitação): o tema e "editadas por último primeiro" valem antes. O texto das
+  // notas é indexado só quando a lista ou o tema mudam, não a cada letra digitada.
+  const baseNotas = useMemo(() => notasDoFiltro(lista, filtro), [lista, filtro]);
+  const resultadoBusca = useBusca(baseNotas, busca, camposNota);
+  const visiveis = resultadoBusca.itens;
   const temaDoFiltro = filtro !== TODOS && filtro !== SEM_TEMA ? filtro : null;
 
   const selecaoAtiva = modoSelecao || selecionados.size > 0;
@@ -308,6 +314,7 @@ function NotasPage() {
         ))}
       </div>
 
+      {notas !== null && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} className="-mb-2.5" />}
       {notas === null ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
@@ -316,7 +323,11 @@ function NotasPage() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 px-6 py-14 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><StickyNote size={26} /></span>
-            <p className="text-base font-semibold">{busca ? "Nenhuma nota encontrada" : "Nenhuma nota aqui ainda"}</p>
+            {resultadoBusca.modo === "nenhum" && baseNotas.length > 0 ? (
+              <MensagemBusca resultado={resultadoBusca} className="text-base font-semibold text-foreground" />
+            ) : (
+              <p className="text-base font-semibold">{busca ? "Nenhuma nota encontrada" : "Nenhuma nota aqui ainda"}</p>
+            )}
             {!busca && <Button className="mt-1 gap-2" onClick={novo}><Plus size={16} /> Nova nota</Button>}
           </CardContent>
         </Card>

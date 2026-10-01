@@ -11,6 +11,8 @@ import { hojeBrasilia } from "@/lib/entrega";
 import { duracaoDias, type TipoProcesso } from "@/lib/processos";
 import { fetchProcessos, fetchRoadmapsLigados, type Processo, type RoadmapLigado } from "@/lib/processosService";
 import { Trilha } from "./Trilha";
+import { useBusca } from "@/lib/useBusca";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 interface HistoricoViewProps {
   tipo: TipoProcesso;
@@ -61,16 +63,18 @@ export function HistoricoView({ tipo }: HistoricoViewProps) {
     return () => { cancelado = true; };
   }, [selecionado, tipo]);
 
-  const filtrados = useMemo(() => {
-    const buscaNorm = busca.trim().toLowerCase();
+  const doPeriodo = useMemo(() => {
     const hoje = hojeBrasilia();
     return processos.filter((p) => {
-      if (buscaNorm && !(p.pessoal ? "pessoal" : p.cliente?.nome?.toLowerCase() ?? "").includes(buscaNorm)) return false;
       const dataRef = p.concluido_em ?? p.iniciado_em;
       if (!naJanela(dataRef, periodo, hoje)) return false;
       return true;
     });
-  }, [processos, busca, periodo]);
+  }, [processos, periodo]);
+
+  // Busca tolerante (sem acento, com erro de digitação) no cliente ("Pessoal" nos processos pessoais) e no nome do processo
+  const resultadoBusca = useBusca(doPeriodo, busca, (p) => [p.pessoal ? "Pessoal" : p.cliente?.nome, p.nome]);
+  const filtrados = resultadoBusca.itens;
 
   return (
     <div className="space-y-4">
@@ -91,6 +95,8 @@ export function HistoricoView({ tipo }: HistoricoViewProps) {
 
       {erro && <p className="text-sm text-destructive">{erro}</p>}
 
+      {!loading && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} />}
+
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={24} className="animate-spin text-muted-foreground" />
@@ -98,14 +104,20 @@ export function HistoricoView({ tipo }: HistoricoViewProps) {
       ) : filtrados.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
           <div className="bg-muted rounded-full p-4"><History size={32} className="text-muted-foreground" /></div>
-          <h3 className="text-base font-medium">
-            {processos.length === 0 ? "Nenhum processo no histórico ainda" : "Nenhum processo nesse filtro"}
-          </h3>
-          <p className="text-muted-foreground max-w-xs text-sm">
-            {processos.length === 0
-              ? "Processos concluídos ou encerrados aparecem aqui."
-              : "Ajuste a busca ou o período para ver mais resultados."}
-          </p>
+          {resultadoBusca.modo === "nenhum" && doPeriodo.length > 0 ? (
+            <MensagemBusca resultado={resultadoBusca} className="text-base font-medium text-foreground" />
+          ) : (
+            <>
+              <h3 className="text-base font-medium">
+                {processos.length === 0 ? "Nenhum processo no histórico ainda" : "Nenhum processo nesse filtro"}
+              </h3>
+              <p className="text-muted-foreground max-w-xs text-sm">
+                {processos.length === 0
+                  ? "Processos concluídos ou encerrados aparecem aqui."
+                  : "Ajuste a busca ou o período para ver mais resultados."}
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div className="rounded-md border">

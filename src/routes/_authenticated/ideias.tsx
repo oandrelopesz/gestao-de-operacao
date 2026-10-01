@@ -23,6 +23,7 @@ import { useAgencias, agenciaBadgeStyle } from "@/lib/agencias";
 import { CACHE_KEYS, loadClientesLite } from "@/lib/data";
 import { useCachedState, hasCached } from "@/lib/pageCache";
 import { toast } from "sonner";
+import { MensagemBusca } from "@/components/MensagemBusca";
 
 export const Route = createFileRoute("/_authenticated/ideias")({
   component: IdeiasPage,
@@ -74,9 +75,16 @@ function IdeiasPage() {
     loadClientesLite().then(setClientes).catch((e) => console.error("Erro ao buscar clientes:", e));
   }, []);
 
-  const filtradas = useMemo(
+  // Busca tolerante (sem acento, com erro de digitação): situação, tipo e agência valem antes
+  const resultadoBusca = useMemo(
     () => filtrarIdeias(ideias, { tipo: filtroTipo, agencia: filtroAgencia, busca, situacao }),
     [ideias, filtroTipo, filtroAgencia, busca, situacao],
+  );
+  const filtradas = resultadoBusca.itens;
+  // Sem busca a função não indexa nada: serve para saber se havia o que buscar neste filtro
+  const temIdeiasNoFiltro = useMemo(
+    () => filtrarIdeias(ideias, { tipo: filtroTipo, agencia: filtroAgencia, busca: "", situacao }).itens.length > 0,
+    [ideias, filtroTipo, filtroAgencia, situacao],
   );
 
   const totalConcluidas = useMemo(() => ideias.filter((i) => i.concluida_em).length, [ideias]);
@@ -220,18 +228,25 @@ function IdeiasPage() {
         </div>
       </div>
 
+      {!loading && resultadoBusca.modo === "parecidos" && <MensagemBusca resultado={resultadoBusca} className="-mb-3" />}
       {filtradas.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
           <div className="bg-muted rounded-full p-4"><Lightbulb size={36} className="text-muted-foreground" /></div>
-          <h3 className="text-lg font-medium">
-            {situacao === "concluidas" ? "Nenhuma ideia concluída ainda" : ideias.length === 0 ? "Nenhuma ideia ainda" : "Nenhuma ideia nesse filtro"}
-          </h3>
-          <p className="text-muted-foreground max-w-xs text-sm">
-            {situacao === "concluidas"
-              ? "Conclua pelo botão ✓ no card, ou movendo para Feito a demanda criada a partir da ideia."
-              : "Anote a ideia agora; quando for a hora, ela vira demanda com um clique."}
-          </p>
-          {situacao === "abertas" && <Button onClick={() => setDialog({})}>Adicionar a primeira ideia</Button>}
+          {resultadoBusca.modo === "nenhum" && temIdeiasNoFiltro ? (
+            <MensagemBusca resultado={resultadoBusca} className="text-lg font-medium text-foreground" />
+          ) : (
+            <>
+              <h3 className="text-lg font-medium">
+                {situacao === "concluidas" ? "Nenhuma ideia concluída ainda" : ideias.length === 0 ? "Nenhuma ideia ainda" : "Nenhuma ideia nesse filtro"}
+              </h3>
+              <p className="text-muted-foreground max-w-xs text-sm">
+                {situacao === "concluidas"
+                  ? "Conclua pelo botão ✓ no card, ou movendo para Feito a demanda criada a partir da ideia."
+                  : "Anote a ideia agora; quando for a hora, ela vira demanda com um clique."}
+              </p>
+              {situacao === "abertas" && <Button onClick={() => setDialog({})}>Adicionar a primeira ideia</Button>}
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

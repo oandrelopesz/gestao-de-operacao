@@ -2,6 +2,7 @@
  * Regras puras da aba PDFs (árvore de pastas, nomes e busca), sem Supabase nem alias "@/",
  * para rodar em `node --test`.
  */
+import { buscar, type ResultadoBusca } from "./search.ts";
 
 export interface PdfPasta {
   id: string;
@@ -197,13 +198,12 @@ export function formatarTamanho(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
 }
 
-const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
-/** Busca pelo nome dado, pelo nome original do arquivo ou pelo player. */
-export function filtrarPdfs<T extends { nome: string; arquivo_nome: string; player?: string | null }>(pdfs: T[], busca: string): T[] {
-  const termo = semAcento(busca.trim());
-  if (!termo) return pdfs;
-  return pdfs.filter((f) => [f.nome, f.arquivo_nome, f.player || ""].some((c) => semAcento(c).includes(termo)));
+/**
+ * Busca tolerante (sem acento, com erro de digitação) pelo nome dado e depois pelo nome original do arquivo e pelo
+ * player; os mais parecidos primeiro e, no empate, a ordem da lista.
+ */
+export function filtrarPdfs<T extends { nome: string; arquivo_nome: string; player?: string | null }>(pdfs: T[], busca: string): ResultadoBusca<T> {
+  return buscar(pdfs, busca, (f) => [f.nome, f.arquivo_nome, f.player]);
 }
 
 /** Cor da pasta: a própria ou a do ancestral mais próximo que tiver uma (subpastas herdam do tema). */
