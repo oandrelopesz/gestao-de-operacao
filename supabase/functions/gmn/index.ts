@@ -222,6 +222,8 @@ const REDIRECIONAMENTOS_MAX = 5;
 const SITE_HTML_MAX_BYTES = 3 * 1024 * 1024;
 const SITE_SCRIPT_MAX_BYTES = 5 * 1024 * 1024;
 const IMAGEM_EXTERNA_MAX = 20 * 1024 * 1024;
+// Tipos genéricos que alguns servidores (S3, CDNs) mandam para qualquer arquivo: aí quem decide é o conteúdo (pareceImagem).
+const TIPOS_GENERICOS = ["application/octet-stream", "binary/octet-stream"];
 const IMAGEM_SITE_MAX_BYTES = 5 * 1024 * 1024;
 const CLASSIFICAR_EM_PARALELO = 6;
 const CLASSIFICAR_PRAZO_MS = 20_000;
@@ -387,7 +389,7 @@ async function acaoBaixarImagem(body: any, total: AbortSignal): Promise<Response
   const tipo = (r.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   const recusa = !r.ok ? new ErroHttp(502, SEM_BAIXAR)
     : Number(r.headers.get("content-length")) > IMAGEM_EXTERNA_MAX ? new ErroHttp(400, GRANDE)
-    : tipo && !tipo.startsWith("image/") && tipo !== "application/octet-stream" ? new ErroHttp(400, "O endereço não é de uma imagem.")
+    : tipo && !tipo.startsWith("image/") && !TIPOS_GENERICOS.includes(tipo) ? new ErroHttp(400, "O endereço não é de uma imagem.")
     : null;
   if (recusa) {
     await r.body?.cancel().catch(() => {});

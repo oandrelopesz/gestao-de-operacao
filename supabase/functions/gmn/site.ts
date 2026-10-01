@@ -157,7 +157,7 @@ function logosDe(lista: CandidatoSite[], max: number): CandidatoSite[] {
 }
 
 // SVG e ICO são logo ou ícone, nunca foto: ficam só pela pista de logo (o alt deles não os faz virar foto).
-const EXTENSOES_QUE_NAO_SAO_FOTO = ["svg", "ico"];
+const EXTENSOES_QUE_NAO_SAO_FOTO = ["svg", "svgz", "ico"];
 
 function fotosDe(lista: CandidatoSite[], max: number): CandidatoSite[] {
   return semRastreio(lista).filter((c) => !temCaraDeLogo(c) && !EXTENSOES_QUE_NAO_SAO_FOTO.includes(extensaoDaUrl(c.url))).sort((a, b) => Number(!a.descricao) - Number(!b.descricao)).slice(0, max);

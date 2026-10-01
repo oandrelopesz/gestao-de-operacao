@@ -696,7 +696,7 @@ export function extensaoDaUrl(url: string): string {
   }
 }
 
-const FORMATOS_QUE_A_VISAO_NAO_LE = ["svg", "ico", "bmp", "tif", "tiff", "avif", "heic", "heif"];
+const FORMATOS_QUE_A_VISAO_NAO_LE = ["svg", "svgz", "ico", "bmp", "tif", "tiff", "avif", "heic", "heif"];
 
 /**
  * O modelo de visão lê PNG, JPG, WEBP e GIF; SVG, ICO, BMP, TIFF, AVIF e HEIC ficam só pela pista do HTML. Qualquer outra
