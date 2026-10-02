@@ -23,3 +23,8 @@ Ponte entre a planilha de leads e o sistema (spec `docs/superpowers/specs/2026-1
 - Propriedades: `chave` (script, senha da ponte, nunca exibida); `preparo`, `abas_assinatura`, `abas_conhecidas`,
   `crm_etapas`, `crm_fp`, `crm_pendentes` (documento).
 - A URL do Web App fica em `planilha_config.webapp_url` (gravada pelo editor SQL).
+
+## Voltar atrás
+
+`antigo/Codigo.gs` é o script que a planilha usava até 02/10/2026 (CRM próprio da planilha, sem ponte). Há também a cópia
+"Planilha CRM Mestra - backup 01-10-2026" no Drive da contato@ e a aba oculta "CRM antigo (backup)" na planilha.
