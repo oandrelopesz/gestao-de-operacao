@@ -52,6 +52,11 @@ test("a coluna única do passo de onboarding fica nula", () => {
   assert.equal(copia.processo_passo_id, null);
 });
 
+test("a duplicata da cópia de uma recorrente não fica ligada à recorrente", () => {
+  const copia = montarCopiaDemanda({ ...original, recorrente_pai_id: "m1" }, 0);
+  assert.equal(copia.recorrente_pai_id, null);
+});
+
 test("fora de Feito a cópia fica na mesma coluna e com a mesma entrega", () => {
   const copia = montarCopiaDemanda(original, 0);
   assert.equal(copia.status, "fazer_amanha");

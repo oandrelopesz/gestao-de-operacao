@@ -13,11 +13,13 @@ const CAMPOS_DO_REGISTRO = ["id", "created_at", "updated_at"];
 const RELACOES_CONHECIDAS = ["clientes"];
 
 /**
- * Colunas de `demandas` com restrição UNIQUE: a cópia não pode repetir o valor do original.
- * Hoje só `processo_passo_id` (migration 20260924100000_processos.sql). `roadmap_id` e as demais
- * não são únicas e acompanham a cópia.
+ * Colunas que a cópia não herda (ficam nulas):
+ * - `processo_passo_id` tem restrição UNIQUE (migration 20260924100000_processos.sql);
+ * - `recorrente_pai_id`: concluir a cópia de uma recorrente conta execução (migration 20261002120000),
+ *   e a duplicata não deve contar de novo.
+ * `roadmap_id` e as demais acompanham a cópia.
  */
-const COLUNAS_UNICAS = ["processo_passo_id"];
+const COLUNAS_UNICAS = ["processo_passo_id", "recorrente_pai_id"];
 
 export type LinhaDemanda = Record<string, any> & { titulo: string; status: string; ordem: number };
 

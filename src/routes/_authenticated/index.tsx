@@ -444,7 +444,27 @@ function DemandasPage() {
     }
   };
 
+  const moverParaFeito = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("demandas")
+        .update({ status: "feito" as any })
+        .eq("id", id);
+      if (error) throw error;
+      fetchDemandas();
+    } catch (err) {
+      toast.error("Erro ao mover para concluído");
+    }
+  };
+
   const handleCompleteExecution = async (id: string) => {
+    // A recorrente já tem cópia aberta (em Fazer hoje ou onde ela estiver): conclui a cópia, e o banco
+    // registra a execução da recorrente (gatilho demandas_50_recorrente_concluida)
+    const copiaAberta = demandas.find((d) => d.recorrente_pai_id === id && d.status !== "feito");
+    if (copiaAberta) {
+      await moverParaFeito(copiaAberta.id);
+      return;
+    }
     try {
       // Dia de Brasília: depois das 21h o UTC já está no dia seguinte
       const today = hojeBrasilia();
@@ -536,6 +556,8 @@ function DemandasPage() {
       if (failed?.error) throw failed.error;
       const atualizados = new Map(results.map((r) => [r.data!.id, r.data!]));
       setDemandas((prev: any[]) => prev.map((d) => (atualizados.has(d.id) ? { ...d, ...atualizados.get(d.id) } : d)));
+      // Cópia de recorrente que entrou em Feito: o banco recalculou a próxima data da recorrente
+      if (afetados.has("feito") && lista.some((d) => d.recorrente_pai_id && d.status === "feito")) fetchDemandas();
     } catch (erro) {
       // Aba aberta numa versão anterior do site depois de mudança no banco: recarrega sozinha
       if (ehEsquemaDesatualizado(erro) && recarregarUmaVez()) return;
@@ -885,18 +907,7 @@ function DemandasPage() {
                       }
                     }}
                     onComplete={handleCompleteExecution}
-                    onMoveToDone={async (id) => {
-                      try {
-                        const { error } = await supabase
-                          .from("demandas")
-                          .update({ status: "feito" as any })
-                          .eq("id", id);
-                        if (error) throw error;
-                        fetchDemandas();
-                      } catch (err) {
-                        toast.error("Erro ao mover para concluído");
-                      }
-                    }}
+                    onMoveToDone={moverParaFeito}
                   />
                   );
                 })}
