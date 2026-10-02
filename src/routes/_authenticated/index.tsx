@@ -58,6 +58,8 @@ import { cn } from "@/lib/utils";
 import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId, RegraData } from "@/lib/demandaColunas";
 import { RegraDataCampos } from "@/components/demandas/RegraDataCampos";
 import { msAteProximaVirada } from "@/lib/viradaDia";
+import { hojeBrasilia, siglaDoDia } from "@/lib/entrega";
+import { somarDias } from "@/lib/recorrencia";
 import {
   mapaDias as montarMapaDias,
   containerIdsDoQuadro,
@@ -444,7 +446,8 @@ function DemandasPage() {
 
   const handleCompleteExecution = async (id: string) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      // Dia de Brasília: depois das 21h o UTC já está no dia seguinte
+      const today = hojeBrasilia();
       
       // Registrar no histórico
       const { error: execError } = await supabase
@@ -758,11 +761,11 @@ function DemandasPage() {
            </div>
            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
               {Array.from({ length: calendarMode === "7days" ? 7 : 30 }).map((_, i) => {
-                const date = new Date();
-                date.setDate(date.getDate() + i);
+                // Dias contados a partir de hoje em Brasília: o servidor (UTC) e o navegador desenham os mesmos dias
+                const dia = somarDias(hojeBrasilia(), i);
                 const isToday = i === 0;
-                const dayName = date.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase().replace('.', '');
-                const dayNum = date.getDate();
+                const dayName = siglaDoDia(dia);
+                const dayNum = Number(dia.slice(8, 10));
                 
                 return (
                   <div 
@@ -777,14 +780,14 @@ function DemandasPage() {
                       <span className={cn("text-xs font-bold", isToday ? "text-primary" : "text-zinc-600 dark:text-zinc-400")}>{dayNum}</span>
                     </div>
                     <div className="flex flex-col gap-1">
-                      {demandas.filter(d => d.recorrente && d.proxima_execucao === date.toISOString().split('T')[0]).slice(0, 3).map(d => (
+                      {demandas.filter(d => d.recorrente && d.proxima_execucao === dia).slice(0, 3).map(d => (
                         <div key={d.id} className="text-[9px] bg-white dark:bg-zinc-900 border rounded px-1 py-0.5 truncate cursor-pointer hover:border-primary transition-colors" onClick={() => handleOpenDrawer(d)}>
                           {d.titulo}
                         </div>
                       ))}
-                      {demandas.filter(d => d.recorrente && d.proxima_execucao === date.toISOString().split('T')[0]).length > 3 && (
+                      {demandas.filter(d => d.recorrente && d.proxima_execucao === dia).length > 3 && (
                         <div className="text-[8px] text-zinc-400 text-center">
-                          + {demandas.filter(d => d.recorrente && d.proxima_execucao === date.toISOString().split('T')[0]).length - 3} mais
+                          + {demandas.filter(d => d.recorrente && d.proxima_execucao === dia).length - 3} mais
                         </div>
                       )}
                     </div>
@@ -1171,13 +1174,13 @@ function DemandasPage() {
                 variant="outline" 
                 className="justify-start h-auto py-2 px-3 text-left"
                 onClick={async () => {
-                  const today = new Date().toISOString().split('T')[0];
+                  // Dia de Brasília: depois das 21h o UTC já está no dia seguinte
+                  const today = hojeBrasilia();
                   
                   // Calcular primeira proxima_execucao baseada no tipo (simplificado para o popover inicial)
                   let proxima = today; 
                   if (opt.value === 'diaria') {
-                    const d = new Date(); d.setDate(d.getDate() + 1);
-                    proxima = d.toISOString().split('T')[0];
+                    proxima = somarDias(today, 1);
                   }
 
                   await supabase.from("demandas").update({
