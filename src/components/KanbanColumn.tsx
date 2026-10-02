@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import type { DonoDemanda } from "@/components/demandas/ClientePicker";
 
 interface Demanda {
   id: string;
@@ -35,6 +36,7 @@ interface Demanda {
   processo_passo_id?: string | null;
   roadmap_id?: string | null;
   pessoal?: boolean;
+  agencia_id?: string | null;
 }
 
 interface KanbanColumnProps {
@@ -55,7 +57,7 @@ interface KanbanColumnProps {
   /** Colunas de sistema (recorrentes, feito) podem ser renomeadas, mas não excluídas */
   isSystem?: boolean;
   onSetDia?: (id: string, dia: number) => void;
-  onAtribuirCliente?: (id: string, valor: { cliente_id: string | null; pessoal: boolean }) => void;
+  onAtribuirCliente?: (id: string, valor: DonoDemanda) => void;
   onEnviarRoadmap?: (demanda: Demanda) => void;
   onDesligarRoadmap?: (id: string) => void;
   onDuplicate?: (demanda: Demanda) => void;

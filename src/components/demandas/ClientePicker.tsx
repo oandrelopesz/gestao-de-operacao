@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { Check, User } from "lucide-react";
+import { Building2, Check, User } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
@@ -12,6 +12,7 @@ import {
 import { MENSAGEM_NENHUM, MENSAGEM_PARECIDOS } from "@/lib/search";
 import { useBusca } from "@/lib/useBusca";
 import { cn } from "@/lib/utils";
+import { useAgencias, type AgenciaDef } from "@/lib/agencias";
 
 interface ClientePickerCliente {
   id: string;
@@ -19,36 +20,56 @@ interface ClientePickerCliente {
   agencia?: string;
 }
 
+/** Dono de uma demanda: um cliente, "Pessoal" ou uma agência (exclusivos; nenhum = "Sem cliente"). */
+export type DonoDemanda = {
+  cliente_id: string | null;
+  pessoal: boolean;
+  agencia_id: string | null;
+};
+
 interface ClientePickerProps {
   clientes: ClientePickerCliente[];
   clienteIdAtual: string | null;
   pessoalAtual?: boolean;
-  onEscolher: (valor: { cliente_id: string | null; pessoal: boolean }) => void;
+  agenciaIdAtual?: string | null;
+  onEscolher: (valor: DonoDemanda) => void;
   children: React.ReactNode;
   align?: "start" | "center" | "end";
   /** false esconde "Sem cliente" (ex.: dono de um roadmap: cliente ou Pessoal). */
   permitirSemCliente?: boolean;
+  /** false esconde as agências (ex.: dono de um roadmap). */
+  comAgencias?: boolean;
 }
 
-/** O que a lista mostra: "Pessoal", "Sem cliente" e os clientes (todos entram na busca pelo rótulo). */
+/** O que a lista mostra: "Pessoal", "Sem cliente", as agências e os clientes (todos entram na busca pelo rótulo). */
 type Entrada =
   | { tipo: "pessoal" }
   | { tipo: "semCliente" }
+  | { tipo: "agencia"; agencia: AgenciaDef }
   | { tipo: "cliente"; cliente: ClientePickerCliente };
 
 const camposDaEntrada = (e: Entrada) =>
-  e.tipo === "pessoal" ? ["Pessoal"] : e.tipo === "semCliente" ? ["Sem cliente"] : [e.cliente.nome];
+  e.tipo === "pessoal"
+    ? ["Pessoal"]
+    : e.tipo === "semCliente"
+      ? ["Sem cliente"]
+      : e.tipo === "agencia"
+        ? [e.agencia.label]
+        : [e.cliente.nome];
 
-/** Popover + Command (busca) para atribuir cliente, "Pessoal" ou "Sem cliente" a uma demanda. */
+/** Popover + Command (busca) para atribuir cliente, "Pessoal", agência ou "Sem cliente" a uma demanda. */
 export function ClientePicker({
   clientes,
   clienteIdAtual,
   pessoalAtual,
+  agenciaIdAtual,
   onEscolher,
   children,
   align = "start",
   permitirSemCliente = true,
+  comAgencias = true,
 }: ClientePickerProps) {
+  const { agencias } = useAgencias();
   const [open, setOpen] = useState(false);
 
   // A lista só aparece com o popover aberto: ordena a partir da primeira abertura (e mantém durante a
@@ -61,7 +82,7 @@ export function ClientePicker({
     [clientes, open]
   );
 
-  const escolher = (valor: { cliente_id: string | null; pessoal: boolean }) => {
+  const escolher = (valor: DonoDemanda) => {
     onEscolher(valor);
     setOpen(false);
   };
@@ -79,9 +100,11 @@ export function ClientePicker({
       >
         <ListaClientes
           clientes={clientesOrdenados}
+          agencias={comAgencias ? agencias : []}
           permitirSemCliente={permitirSemCliente}
           clienteIdAtual={clienteIdAtual}
           pessoalAtual={pessoalAtual}
+          agenciaIdAtual={agenciaIdAtual ?? null}
           escolher={escolher}
         />
       </PopoverContent>
@@ -91,31 +114,34 @@ export function ClientePicker({
 
 interface ListaClientesProps {
   clientes: ClientePickerCliente[];
+  agencias: AgenciaDef[];
   permitirSemCliente: boolean;
   clienteIdAtual: string | null;
   pessoalAtual?: boolean;
-  escolher: (valor: { cliente_id: string | null; pessoal: boolean }) => void;
+  agenciaIdAtual: string | null;
+  escolher: (valor: DonoDemanda) => void;
 }
 
 /** Conteúdo do popover. O texto digitado mora aqui: ao fechar o popover o conteúdo sai da tela e a busca volta vazia. */
-function ListaClientes({ clientes, permitirSemCliente, clienteIdAtual, pessoalAtual, escolher }: ListaClientesProps) {
+function ListaClientes({ clientes, agencias, permitirSemCliente, clienteIdAtual, pessoalAtual, agenciaIdAtual, escolher }: ListaClientesProps) {
   const [texto, setTexto] = useState("");
   const entradas = useMemo<Entrada[]>(
     () => [
       { tipo: "pessoal" as const },
       ...(permitirSemCliente ? [{ tipo: "semCliente" as const }] : []),
+      ...agencias.map((agencia) => ({ tipo: "agencia" as const, agencia })),
       ...clientes.map((cliente) => ({ tipo: "cliente" as const, cliente })),
     ],
-    [permitirSemCliente, clientes]
+    [permitirSemCliente, agencias, clientes]
   );
-  // Sem texto, a lista sai como hoje (Pessoal, Sem cliente, clientes por nome); com texto, na ordem da busca.
+  // Sem texto: Pessoal, Sem cliente, agências (na ordem do cadastro) e clientes por nome; com texto, na ordem da busca.
   const resultado = useBusca(entradas, texto, camposDaEntrada);
 
-  const semCliente = !pessoalAtual && !clienteIdAtual;
+  const semCliente = !pessoalAtual && !clienteIdAtual && !agenciaIdAtual;
   const renderEntrada = (entrada: Entrada) => {
     if (entrada.tipo === "pessoal") {
       return (
-        <CommandItem key="x:pessoal" value="x:pessoal" onSelect={() => escolher({ cliente_id: null, pessoal: true })}>
+        <CommandItem key="x:pessoal" value="x:pessoal" onSelect={() => escolher({ cliente_id: null, pessoal: true, agencia_id: null })}>
           <User size={14} className="text-violet-500" />
           <span className="flex-1">Pessoal</span>
           {pessoalAtual && <Check size={14} />}
@@ -124,22 +150,33 @@ function ListaClientes({ clientes, permitirSemCliente, clienteIdAtual, pessoalAt
     }
     if (entrada.tipo === "semCliente") {
       return (
-        <CommandItem key="__vazio__" value="__vazio__" onSelect={() => escolher({ cliente_id: null, pessoal: false })}>
+        <CommandItem key="__vazio__" value="__vazio__" onSelect={() => escolher({ cliente_id: null, pessoal: false, agencia_id: null })}>
           <span className={cn("flex-1", semCliente ? "" : "text-zinc-500")}>Sem cliente</span>
           {semCliente && <Check size={14} />}
         </CommandItem>
       );
     }
+    if (entrada.tipo === "agencia") {
+      const a = entrada.agencia;
+      return (
+        <CommandItem key={`a:${a.id}`} value={`a:${a.id}`} onSelect={() => escolher({ cliente_id: null, pessoal: false, agencia_id: a.id })}>
+          <Building2 size={14} style={{ color: a.hex }} />
+          <span className="flex-1 truncate">{a.label}</span>
+          {!pessoalAtual && agenciaIdAtual === a.id && <Check size={14} />}
+        </CommandItem>
+      );
+    }
     const c = entrada.cliente;
     return (
-      <CommandItem key={c.id} value={`c:${c.id}`} onSelect={() => escolher({ cliente_id: c.id, pessoal: false })}>
+      <CommandItem key={c.id} value={`c:${c.id}`} onSelect={() => escolher({ cliente_id: c.id, pessoal: false, agencia_id: null })}>
         <span className="flex-1 truncate">{c.nome}</span>
         {!pessoalAtual && clienteIdAtual === c.id && <Check size={14} />}
       </CommandItem>
     );
   };
 
-  const fixos = resultado.itens.filter((e) => e.tipo !== "cliente");
+  const fixos = resultado.itens.filter((e) => e.tipo === "pessoal" || e.tipo === "semCliente");
+  const deAgencias = resultado.itens.filter((e) => e.tipo === "agencia");
   const doResultado = resultado.itens.filter((e) => e.tipo === "cliente");
 
   return (
@@ -153,6 +190,7 @@ function ListaClientes({ clientes, permitirSemCliente, clienteIdAtual, pessoalAt
         ) : (
           <>
             {fixos.length > 0 && <CommandGroup>{fixos.map(renderEntrada)}</CommandGroup>}
+            {deAgencias.length > 0 && <CommandGroup heading="Agências">{deAgencias.map(renderEntrada)}</CommandGroup>}
             {doResultado.length > 0 && <CommandGroup heading="Clientes">{doResultado.map(renderEntrada)}</CommandGroup>}
           </>
         )}

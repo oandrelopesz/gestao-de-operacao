@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, CheckCircle2, Users, User, CalendarRange, ChevronRight, X, Inbox } from "lucide-react";
+import { BarChart3, CheckCircle2, Users, User, CalendarRange, ChevronRight, X, Inbox, Building2, AlertTriangle } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,7 +12,19 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { hojeBrasilia } from "@/lib/entrega";
-import { agregar, dataLocalBrasilia, intervaloDoPeriodo, type Conclusao, type PeriodoId } from "@/lib/dashboard";
+import {
+  agenciaDaConclusao,
+  agregar,
+  agregarPorAgencia,
+  chaveDaConclusao,
+  dataLocalBrasilia,
+  entreguesComAtraso,
+  intervaloDoPeriodo,
+  PREFIXO_AGENCIA,
+  type Conclusao,
+  type PeriodoId,
+} from "@/lib/dashboard";
+import { useAgencias } from "@/lib/agencias";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -76,7 +88,8 @@ const formatarDataHora = (iso: string) =>
     minute: "2-digit",
   }).format(new Date(iso));
 
-const chaveDaConclusao = (c: Conclusao) => (c.pessoal ? "pessoal" : c.cliente_id ?? "sem_cliente");
+/** Linhas do bloco "Por agência" são selecionadas com este prefixo (as da tabela por cliente usam a chave do grupo) */
+const PREFIXO_SEL_AGENCIA = "ag:";
 
 const formatarPct = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
@@ -89,8 +102,9 @@ function DashboardPage() {
   const [ate, setAte] = useState<string>(() => lerStorage(CHAVE_ATE) ?? "");
   const [hoje, setHoje] = useState(() => hojeBrasilia());
   const [conclusoes, setConclusoes] = useState<ConclusaoRow[]>([]);
-  const [clientes, setClientes] = useState<{ id: string; nome: string }[]>([]);
-  const [clientesArquivados, setClientesArquivados] = useState<{ id: string; nome: string }[]>([]);
+  const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: string | null }[]>([]);
+  const [clientesArquivados, setClientesArquivados] = useState<{ id: string; nome: string; agencia: string | null }[]>([]);
+  const { agencias, todasAgencias, meta: metaAgencia } = useAgencias();
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [selecionado, setSelecionado] = useState<string | null>(null);
@@ -118,7 +132,7 @@ function DashboardPage() {
       for (let inicio = 0; ; inicio += PAGINA) {
         let q = supabase
           .from("demanda_conclusoes")
-          .select("id, cliente_id, pessoal, titulo, concluida_em")
+          .select("id, cliente_id, pessoal, agencia_id, prazo, titulo, concluida_em")
           .order("concluida_em", { ascending: false })
           .range(inicio, inicio + PAGINA - 1);
         // Folga de um dia em UTC; o recorte exato por data de Brasília é feito abaixo
@@ -132,7 +146,7 @@ function DashboardPage() {
 
       const { data: cli, error: errCli } = await supabase
         .from("clientes")
-        .select("id, nome")
+        .select("id, nome, agencia")
         .eq("arquivado", false)
         .order("nome");
       if (errCli) throw errCli;
@@ -148,11 +162,11 @@ function DashboardPage() {
       const idsFaltantes = [
         ...new Set(noPeriodo.map((c) => c.cliente_id).filter((id): id is string => !!id && !idsAtivos.has(id))),
       ];
-      let arquivados: { id: string; nome: string }[] = [];
+      let arquivados: { id: string; nome: string; agencia: string | null }[] = [];
       if (idsFaltantes.length > 0) {
-        const { data: arq, error: errArq } = await supabase.from("clientes").select("id, nome").in("id", idsFaltantes);
+        const { data: arq, error: errArq } = await supabase.from("clientes").select("id, nome, agencia").in("id", idsFaltantes);
         if (errArq) throw errArq;
-        arquivados = (arq ?? []).map((c) => ({ id: c.id, nome: `${c.nome} (arquivado)` }));
+        arquivados = (arq ?? []).map((c) => ({ id: c.id, nome: `${c.nome} (arquivado)`, agencia: c.agencia }));
       }
 
       if (minha !== seq.current) return;
@@ -194,9 +208,35 @@ function DashboardPage() {
   }, []);
 
   const { total, linhas } = useMemo(
-    () => agregar(conclusoes, [...clientes, ...clientesArquivados]),
-    [conclusoes, clientes, clientesArquivados],
+    () => agregar(conclusoes, [...clientes, ...clientesArquivados], todasAgencias),
+    [conclusoes, clientes, clientesArquivados, todasAgencias],
   );
+
+  // Por agência: as demandas da própria agência + as dos clientes dela (agência atual do cliente)
+  const agenciaDoCliente = useMemo(
+    () => new Map([...clientes, ...clientesArquivados].map((c) => [c.id, c.agencia] as const)),
+    [clientes, clientesArquivados],
+  );
+  const porAgencia = useMemo(
+    () => agregarPorAgencia(conclusoes, agenciaDoCliente, agencias),
+    [conclusoes, agenciaDoCliente, agencias],
+  );
+  const maxPctAgencia = porAgencia.reduce((m, l) => Math.max(m, l.percentual), 0);
+
+  const atraso = useMemo(() => entreguesComAtraso(conclusoes), [conclusoes]);
+
+  const nomeCliente = useMemo(
+    () => new Map([...clientes, ...clientesArquivados].map((c) => [c.id, c.nome] as const)),
+    [clientes, clientesArquivados],
+  );
+  const nomeDono = (c: Conclusao) =>
+    c.pessoal
+      ? "Pessoal"
+      : c.agencia_id
+        ? `${metaAgencia(c.agencia_id)?.label ?? c.agencia_id} (agência)`
+        : c.cliente_id
+          ? nomeCliente.get(c.cliente_id) ?? "Cliente removido"
+          : "Sem cliente";
 
   const idsClientes = useMemo(() => new Set(clientes.map((c) => c.id)), [clientes]);
   const clientesAtendidos = linhas.filter((l) => l.total > 0 && idsClientes.has(l.chave)).length;
@@ -207,16 +247,24 @@ function DashboardPage() {
   const top10 = useMemo(() => linhas.filter((l) => l.total > 0).slice(0, 10), [linhas]);
   const maxPct = linhas.reduce((m, l) => Math.max(m, l.percentual), 0);
 
-  const linhaSelecionada = linhas.find((l) => l.chave === selecionado) ?? null;
-  const detalhe = useMemo(
-    () => (selecionado ? conclusoes.filter((c) => chaveDaConclusao(c) === selecionado) : []),
-    [conclusoes, selecionado],
-  );
+  // A seleção vem da tabela por cliente (chave do grupo) ou do bloco Por agência ("ag:" + id da agência)
+  const agenciaSelecionada = selecionado?.startsWith(PREFIXO_SEL_AGENCIA) ? selecionado.slice(PREFIXO_SEL_AGENCIA.length) : null;
+  const linhaSelecionada =
+    (agenciaSelecionada
+      ? porAgencia.find((l) => l.chave === agenciaSelecionada)
+      : linhas.find((l) => l.chave === selecionado)) ?? null;
+  const detalhe = useMemo(() => {
+    if (!selecionado) return [];
+    if (agenciaSelecionada) {
+      return conclusoes.filter((c) => (agenciaDaConclusao(c, agenciaDoCliente) ?? "sem_agencia") === agenciaSelecionada);
+    }
+    return conclusoes.filter((c) => chaveDaConclusao(c) === selecionado);
+  }, [conclusoes, selecionado, agenciaSelecionada, agenciaDoCliente]);
 
   // Linha selecionada sumiu (ex.: período mudou e o grupo não existe mais): fecha o detalhe
   useEffect(() => {
-    if (selecionado && !loading && !linhas.some((l) => l.chave === selecionado)) setSelecionado(null);
-  }, [linhas, selecionado, loading]);
+    if (selecionado && !loading && !linhaSelecionada) setSelecionado(null);
+  }, [linhaSelecionada, selecionado, loading]);
 
   const selecionar = (chave: string) => {
     setSelecionado((atual) => (atual === chave ? null : chave));
@@ -288,7 +336,7 @@ function DashboardPage() {
       )}
 
       {/* Cartões de resumo */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <ResumoCard
           titulo="Concluídas no período"
           valor={total}
@@ -310,6 +358,13 @@ function DashboardPage() {
           detalhe={total > 0 ? `${formatarPct(linhaPessoal?.percentual ?? 0)} do total` : "Demandas marcadas como Pessoal"}
           loading={loading}
         />
+        <ResumoCard
+          titulo="Entregues com atraso"
+          valor={atraso.atrasadas.length}
+          icone={<AlertTriangle size={18} className="text-red-500" />}
+          detalhe={total > 0 ? `${formatarPct(atraso.percentual)} das ${total} concluídas` : "Concluídas depois da data de entrega"}
+          loading={loading}
+        />
       </div>
 
       {loading ? (
@@ -324,6 +379,7 @@ function DashboardPage() {
           <p className="text-muted-foreground max-w-sm text-sm">As demandas passam a contar quando vão para Feito.</p>
         </div>
       ) : (
+        <>
         <div className="grid gap-4 lg:grid-cols-5 items-start">
           {/* Gráfico: 10 maiores */}
           <Card className="lg:col-span-2">
@@ -367,7 +423,15 @@ function DashboardPage() {
                     {top10.map((l) => (
                       <Cell
                         key={l.chave}
-                        fill={l.chave === "pessoal" ? "#8b5cf6" : l.chave === "sem_cliente" ? "#94a3b8" : "var(--primary)"}
+                        fill={
+                          l.chave === "pessoal"
+                            ? "#8b5cf6"
+                            : l.chave === "sem_cliente"
+                              ? "#94a3b8"
+                              : l.chave.startsWith(PREFIXO_AGENCIA)
+                                ? metaAgencia(l.chave.slice(PREFIXO_AGENCIA.length))?.hex ?? "#94a3b8"
+                                : "var(--primary)"
+                        }
                         fillOpacity={selecionado && selecionado !== l.chave ? 0.35 : 1}
                       />
                     ))}
@@ -409,6 +473,9 @@ function DashboardPage() {
                             />
                             {l.nome}
                             {l.chave === "pessoal" && <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">Pessoal</Badge>}
+                            {l.chave.startsWith(PREFIXO_AGENCIA) && (
+                              <Building2 size={13} style={{ color: metaAgencia(l.chave.slice(PREFIXO_AGENCIA.length))?.hex }} />
+                            )}
                           </span>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{l.total}</TableCell>
@@ -432,6 +499,97 @@ function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        <div className="grid gap-4 lg:grid-cols-5 items-start">
+          {/* Por agência: demandas da agência + dos clientes dela */}
+          <Card className="lg:col-span-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2"><Building2 size={16} /> Por agência</CardTitle>
+              <CardDescription>Demandas atribuídas à agência mais as dos clientes dela. Clique para ver as demandas.</CardDescription>
+            </CardHeader>
+            <CardContent className="px-0 pb-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="pl-6">Agência</TableHead>
+                    <TableHead className="text-right w-[90px]">Demandas</TableHead>
+                    <TableHead className="w-[38%] pr-6">% do total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {porAgencia.map((l) => {
+                    const chave = PREFIXO_SEL_AGENCIA + l.chave;
+                    const hex = metaAgencia(l.chave)?.hex;
+                    return (
+                      <TableRow
+                        key={l.chave}
+                        onClick={() => selecionar(chave)}
+                        data-state={selecionado === chave ? "selected" : undefined}
+                        className={cn("cursor-pointer", l.total === 0 && "text-muted-foreground")}
+                      >
+                        <TableCell className="pl-6 font-medium">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-slate-400" style={hex ? { backgroundColor: hex } : undefined} />
+                            {l.nome}
+                            {l.diretas > 0 && (
+                              <span className="text-[11px] font-normal text-muted-foreground" title="Demandas atribuídas à própria agência">
+                                ({l.diretas} da agência)
+                              </span>
+                            )}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{l.total}</TableCell>
+                        <TableCell className="pr-6">
+                          <div className="flex items-center gap-2">
+                            <Progress
+                              value={maxPctAgencia > 0 ? (l.percentual / maxPctAgencia) * 100 : 0}
+                              className="h-1.5 bg-muted"
+                              indicatorClassName={l.chave === "sem_agencia" ? "bg-slate-400" : "bg-primary"}
+                            />
+                            <span className="w-12 text-right text-xs tabular-nums">{formatarPct(l.percentual)}</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Entregues com atraso: concluídas depois da data de entrega */}
+          <Card className="lg:col-span-3">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2"><AlertTriangle size={16} className="text-red-500" /> Entregues com atraso</CardTitle>
+              <CardDescription>
+                {atraso.atrasadas.length} de {total} concluída{total === 1 ? "" : "s"} ({formatarPct(atraso.percentual)}) foram entregues depois da data de entrega
+                {atraso.semEntrega > 0 ? ` · ${atraso.semEntrega} sem data de entrega` : ""}.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {atraso.atrasadas.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">Nenhuma demanda entregue com atraso neste período.</p>
+              ) : (
+                <ul className="divide-y max-h-[420px] overflow-y-auto">
+                  {atraso.atrasadas.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <p className="truncate">{c.titulo || "(sem título)"}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {nomeDono(c)} · entrega {formatarData(c.prazo!)} · concluída {formatarDataHora(c.concluida_em)}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="shrink-0 border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400 tabular-nums">
+                        {c.diasAtraso} {c.diasAtraso === 1 ? "dia" : "dias"}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        </>
       )}
 
       {/* Detalhe do cliente selecionado */}
@@ -459,6 +617,7 @@ function DashboardPage() {
                       <span className="inline-flex items-center gap-2 min-w-0">
                         <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
                         <span className="truncate">{c.titulo || "(sem título)"}</span>
+                        {agenciaSelecionada && <span className="text-xs text-muted-foreground shrink-0">· {nomeDono(c)}</span>}
                       </span>
                       <span className="text-xs text-muted-foreground tabular-nums shrink-0">{formatarDataHora(c.concluida_em)}</span>
                     </li>

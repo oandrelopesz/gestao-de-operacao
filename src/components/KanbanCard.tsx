@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ClientePicker } from "@/components/demandas/ClientePicker";
+import { ClientePicker, type DonoDemanda } from "@/components/demandas/ClientePicker";
 import { cn } from "@/lib/utils";
 import { useAgencias } from "@/lib/agencias";
 import { NOMES_DIA, rotuloFazerNoDia } from "@/lib/colunasDias";
@@ -38,6 +38,7 @@ interface Demanda {
   processo_passo_id?: string | null;
   roadmap_id?: string | null;
   pessoal?: boolean;
+  agencia_id?: string | null;
 }
 
 interface KanbanCardProps {
@@ -47,7 +48,7 @@ interface KanbanCardProps {
   onComplete?: (id: string) => void;
   onMoveToDone?: (id: string) => void;
   onSetDia?: (id: string, dia: number) => void;
-  onAtribuirCliente?: (id: string, valor: { cliente_id: string | null; pessoal: boolean }) => void;
+  onAtribuirCliente?: (id: string, valor: DonoDemanda) => void;
   onEnviarRoadmap?: (demanda: Demanda) => void;
   onDesligarRoadmap?: (id: string) => void;
   /** Item "Duplicar" do menu: só aparece quando há quem duplique (o card do DragOverlay não passa) */
@@ -98,8 +99,8 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
   const atraso = !isDone && !isRecorrenteMae ? diasDeAtraso(demanda.prazo, hojeBrasilia()) : 0;
   // Demanda de passo de onboarding: o roadmap vem do passo, não se envia/desliga à mão
   const podeRoadmap = !demanda.processo_passo_id && !isRecorrenteMae;
-  // Faixa da agência do cliente no topo do card (a cor vem do cadastro de agências)
-  const agenciaId = !demanda.pessoal ? demanda.clientes?.agencia : undefined;
+  // Faixa da agência no topo do card: a demanda da própria agência ou a agência do cliente (cor do cadastro)
+  const agenciaId = !demanda.pessoal ? demanda.agencia_id || demanda.clientes?.agencia : undefined;
   const agenciaHex = agenciaId ? metaAgencia(agenciaId)?.hex : undefined;
 
   // Get preview of description (first 2 lines)
@@ -211,6 +212,7 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                     clientes={clientes ?? []}
                     clienteIdAtual={demanda.cliente_id}
                     pessoalAtual={demanda.pessoal}
+                    agenciaIdAtual={demanda.agencia_id}
                     onEscolher={(valor) => onAtribuirCliente(demanda.id, valor)}
                   >
                     <Button
@@ -221,7 +223,7 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                       onPointerDown={(e) => e.stopPropagation()}
                       className={cn(
                         "h-6 w-6 transition-opacity",
-                        demanda.cliente_id || demanda.pessoal
+                        demanda.cliente_id || demanda.pessoal || demanda.agencia_id
                           ? "opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100"
                           : "opacity-100"
                       )}

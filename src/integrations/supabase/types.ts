@@ -529,27 +529,33 @@ export type Database = {
       }
       demanda_conclusoes: {
         Row: {
+          agencia_id: string | null
           cliente_id: string | null
           concluida_em: string
           demanda_id: string | null
           id: string
           pessoal: boolean
+          prazo: string | null
           titulo: string | null
         }
         Insert: {
+          agencia_id?: string | null
           cliente_id?: string | null
           concluida_em?: string
           demanda_id?: string | null
           id?: string
           pessoal?: boolean
+          prazo?: string | null
           titulo?: string | null
         }
         Update: {
+          agencia_id?: string | null
           cliente_id?: string | null
           concluida_em?: string
           demanda_id?: string | null
           id?: string
           pessoal?: boolean
+          prazo?: string | null
           titulo?: string | null
         }
         Relationships: [
@@ -610,6 +616,7 @@ export type Database = {
       }
       demandas: {
         Row: {
+          agencia_id: string | null
           cliente_id: string | null
           created_at: string
           descricao: string | null
@@ -639,6 +646,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          agencia_id?: string | null
           cliente_id?: string | null
           created_at?: string
           descricao?: string | null
@@ -668,6 +676,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          agencia_id?: string | null
           cliente_id?: string | null
           created_at?: string
           descricao?: string | null

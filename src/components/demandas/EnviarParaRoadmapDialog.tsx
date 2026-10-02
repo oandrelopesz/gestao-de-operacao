@@ -202,7 +202,8 @@ export function EnviarParaRoadmapDialog({ demanda, clientes, onClose, onDefinirR
                   clienteIdAtual={dono?.cliente_id ?? null}
                   pessoalAtual={dono?.pessoal}
                   permitirSemCliente={false}
-                  onEscolher={(valor) => setDono(valor.pessoal || valor.cliente_id ? valor : null)}
+                  comAgencias={false}
+                  onEscolher={(valor) => setDono(valor.pessoal || valor.cliente_id ? { cliente_id: valor.cliente_id, pessoal: valor.pessoal } : null)}
                 >
                   <Button variant="outline" className={cn("w-full justify-between font-normal", !dono && "text-muted-foreground")}>
                     <span className="inline-flex min-w-0 items-center gap-2 truncate">

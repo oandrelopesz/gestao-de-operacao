@@ -76,6 +76,7 @@ import {
 import { ehEsquemaDesatualizado, recarregarUmaVez } from "@/lib/recuperacaoErro";
 import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
 import { SelecaoBarra } from "@/components/demandas/SelecaoBarra";
+import type { DonoDemanda } from "@/components/demandas/ClientePicker";
 import { montarCopiaDemanda, colunaDaCopia, proximaOrdem } from "@/lib/demandaCopia";
 import { useBusca } from "@/lib/useBusca";
 import { MensagemBusca } from "@/components/MensagemBusca";
@@ -516,7 +517,11 @@ function DemandasPage() {
   const resultadoBusca = useBusca(
     demandas,
     searchQuery,
-    (d) => [d.titulo, d.clientes?.nome, d.pessoal ? "Pessoal" : null],
+    // A agência (da demanda ou do cliente) também entra: buscar "Effect" acha as demandas da Effect
+    (d) => {
+      const agencia = d.pessoal ? null : d.agencia_id || d.clientes?.agencia;
+      return [d.titulo, d.clientes?.nome, d.pessoal ? "Pessoal" : null, agencia ? agenciaLabelOf(agencia) : null];
+    },
     { manterOrdem: true },
   );
   const filteredDemandas = resultadoBusca.itens;
@@ -696,7 +701,7 @@ function DemandasPage() {
     }
   };
 
-  const clienteSelecionadas = async (valor: { cliente_id: string | null; pessoal: boolean }) => {
+  const clienteSelecionadas = async (valor: DonoDemanda) => {
     // Cards de passo de onboarding ficam com o cliente do onboarding
     const total = idsSelecionados().length;
     const n = await atualizarSelecionadas(valor, (d) => !d?.processo_passo_id);
@@ -704,7 +709,11 @@ function DemandasPage() {
       if (total) toast.info("As selecionadas são de onboarding: o cliente vem do passo");
       return;
     }
-    const nome = valor.pessoal ? "Pessoal" : valor.cliente_id ? clientes.find((c) => c.id === valor.cliente_id)?.nome ?? "cliente" : "sem cliente";
+    const nome = valor.pessoal
+      ? "Pessoal"
+      : valor.agencia_id
+        ? `${agenciaLabelOf(valor.agencia_id)} (agência)`
+        : valor.cliente_id ? clientes.find((c) => c.id === valor.cliente_id)?.nome ?? "cliente" : "sem cliente";
     toast.success(`${n} ${n === 1 ? "demanda" : "demandas"} → ${nome}${total > n ? ` (${total - n} de onboarding mantidas)` : ""}`);
   };
 
@@ -980,7 +989,11 @@ function DemandasPage() {
                                         {d.titulo}
                                     </h4>
                                     <p className="text-xs text-muted-foreground">
-                                        {d.clientes?.nome} — {agenciaLabelOf(d.clientes?.agencia)} • {columns.find(c => c.id === d.status)?.title}
+                                        {d.pessoal
+                                          ? "Pessoal"
+                                          : d.agencia_id
+                                            ? `${agenciaLabelOf(d.agencia_id)} (agência)`
+                                            : `${d.clientes?.nome ?? "Sem cliente"} — ${agenciaLabelOf(d.clientes?.agencia)}`} • {columns.find(c => c.id === d.status)?.title}
                                     </p>
                                 </div>
                             </div>

@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ClientePicker } from "@/components/demandas/ClientePicker";
+import { ClientePicker, type DonoDemanda } from "@/components/demandas/ClientePicker";
 import { NOMES_DIA, secaoId } from "@/lib/colunasDias";
 
 interface ColunaDestino { id: string; title: string; hex: string; dias: number[] }
@@ -27,7 +27,7 @@ interface SelecaoBarraProps {
   ocupado: boolean;
   onMover: (destino: string, rotulo: string) => void;
   onConcluir: () => void;
-  onCliente: (valor: { cliente_id: string | null; pessoal: boolean }) => void;
+  onCliente: (valor: DonoDemanda) => void;
   onEntrega: (prazo: string | null) => void;
   onSelecionarTodas: () => void;
   onLimpar: () => void;
