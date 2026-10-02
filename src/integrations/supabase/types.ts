@@ -1938,6 +1938,7 @@ export type Database = {
           created_at: string
           id: string
           nome: string
+          observacoes: string | null
           pasta_id: string
           player: string | null
           storage_path: string
@@ -1949,6 +1950,7 @@ export type Database = {
           created_at?: string
           id?: string
           nome: string
+          observacoes?: string | null
           pasta_id: string
           player?: string | null
           storage_path: string
@@ -1960,6 +1962,7 @@ export type Database = {
           created_at?: string
           id?: string
           nome?: string
+          observacoes?: string | null
           pasta_id?: string
           player?: string | null
           storage_path?: string

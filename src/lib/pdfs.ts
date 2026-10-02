@@ -15,6 +15,8 @@ export interface PdfArquivo {
   arquivo_nome: string;
   /** Autor, empresa ou fonte do PDF */
   player: string | null;
+  /** Texto livre sobre o arquivo (popup de adicionar e de editar) */
+  observacoes: string | null;
   storage_path: string;
   tamanho: number;
   created_at: string;
@@ -56,7 +58,7 @@ export async function fetchPdfBiblioteca(): Promise<PdfBiblioteca> {
     supabase.from("pdf_pastas").select("id, nome, parent_id, cor, ordem"),
     supabase
       .from("pdfs")
-      .select("id, pasta_id, nome, arquivo_nome, player, storage_path, tamanho, created_at")
+      .select("id, pasta_id, nome, arquivo_nome, player, observacoes, storage_path, tamanho, created_at")
       .order("created_at", { ascending: false }),
   ]);
   if (pastasRes.error) throw pastasRes.error;
@@ -139,7 +141,7 @@ async function subirObjeto(arquivo: File, caminho: string, onProgresso?: (fracao
 export async function enviarPdf(
   arquivo: File,
   pastaId: string,
-  meta: { nome?: string; player?: string },
+  meta: { nome?: string; player?: string; observacoes?: string },
   onProgresso?: (fracao: number) => void,
   limiteMb: number = PDF_TAMANHO_MAX_PADRAO_MB,
 ): Promise<PdfArquivo> {
@@ -154,11 +156,12 @@ export async function enviarPdf(
       // Sem nome informado, fica o nome do documento original
       nome: meta.nome?.trim() || nomeSemExtensao(arquivo.name).trim() || "Sem nome",
       player: meta.player?.trim() || null,
+      observacoes: meta.observacoes?.trim() || null,
       arquivo_nome: arquivo.name,
       storage_path: caminho,
       tamanho: arquivo.size,
     }])
-    .select("id, pasta_id, nome, arquivo_nome, player, storage_path, tamanho, created_at")
+    .select("id, pasta_id, nome, arquivo_nome, player, observacoes, storage_path, tamanho, created_at")
     .single();
   if (error) {
     await apagarNosDois("arquivos", [caminho]).catch(() => {});
@@ -191,7 +194,7 @@ export async function trocarArquivo(
     .from("pdfs")
     .update(patch)
     .eq("id", atual.id)
-    .select("id, pasta_id, nome, arquivo_nome, player, storage_path, tamanho, created_at")
+    .select("id, pasta_id, nome, arquivo_nome, player, observacoes, storage_path, tamanho, created_at")
     .single();
   if (error) {
     await apagarNosDois("arquivos", [caminho]).catch(() => {});
@@ -202,7 +205,7 @@ export async function trocarArquivo(
   return data as PdfArquivo;
 }
 
-export async function atualizarPdf(id: string, patch: Partial<Pick<PdfArquivo, "nome" | "pasta_id" | "player">>): Promise<void> {
+export async function atualizarPdf(id: string, patch: Partial<Pick<PdfArquivo, "nome" | "pasta_id" | "player" | "observacoes">>): Promise<void> {
   const { error } = await supabase
     .from("pdfs")
     .update(patch.nome !== undefined ? { ...patch, nome: patch.nome.trim() } : patch)

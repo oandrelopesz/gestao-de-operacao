@@ -189,7 +189,7 @@ function PdfsPage() {
     let ok = 0;
     for (const { item, envio } of fila) {
       try {
-        const novo = await enviarPdf(item.arquivo, pastaId, { nome: item.nome, player: item.player }, (fracao) =>
+        const novo = await enviarPdf(item.arquivo, pastaId, { nome: item.nome, player: item.player, observacoes: item.observacoes }, (fracao) =>
           atualizar(envio.id, { progresso: Math.round(fracao * 100) }),
           limiteMb,
         );
@@ -996,6 +996,11 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
           <span>·</span>
           <span className="shrink-0">{format(new Date(pdf.created_at), "dd/MM/yyyy")}</span>
         </span>
+        {pdf.observacoes && (
+          <span title={pdf.observacoes} className="mt-0.5 block line-clamp-2 whitespace-pre-line text-[11px] text-muted-foreground">
+            {pdf.observacoes}
+          </span>
+        )}
       </button>
       <div className="flex shrink-0 items-center gap-1">
         <Button size="sm" variant="outline" className="h-8 gap-1.5 px-2.5" onClick={onVer} title="Visualizar">
@@ -1009,7 +1014,7 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
             <Button variant="ghost" size="icon" className="h-8 w-8" title="Mais opções"><MoreVertical size={15} /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onEditar}><Pencil size={14} className="mr-2" /> Editar (nome, player, pasta)</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onEditar}><Pencil size={14} className="mr-2" /> Editar (nome, player, pasta, observações)</DropdownMenuItem>
             <DropdownMenuItem onSelect={onTrocar}><Replace size={14} className="mr-2" /> Trocar arquivo…</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onExcluir}>
