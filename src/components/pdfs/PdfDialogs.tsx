@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -276,6 +278,9 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
   const [criando, setCriando] = useState<{ parentId: string | null } | null>(null);
   const [novoNome, setNovoNome] = useState("");
   const [salvandoPasta, setSalvandoPasta] = useState(false);
+  // "Pastinha": os arquivos entram juntos numa pasta nova dentro do tema/subpasta escolhido
+  const [pastinha, setPastinha] = useState(false);
+  const [nomePastinha, setNomePastinha] = useState("");
 
   useEffect(() => {
     if (!arquivos) return;
@@ -283,6 +288,8 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
     setPastaId(pastaInicial ?? "");
     setCriando(null);
     setNovoNome("");
+    setPastinha(false);
+    setNomePastinha("");
   }, [arquivos, pastaInicial]);
 
   const pastaEscolhida = pastas.find((p) => p.id === pastaId);
@@ -321,10 +328,32 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
     }
   };
 
-  const confirmar = () => {
+  const confirmar = async () => {
     if (!arquivos) return;
     if (criando) { criarPastaAqui(); return; }
     if (!pastaId) { toast.error("Escolha o tema ou a pasta do arquivo"); return; }
+    let destino = pastaId;
+    if (pastinha) {
+      const nome = nomePastinha.trim();
+      if (!nome) { toast.error("Dê um nome para a pastinha"); return; }
+      // Pastinha com o mesmo nome no mesmo lugar: os arquivos entram nela em vez de duplicar
+      const existente = pastas.find((p) => p.parent_id === pastaId && p.nome.toLowerCase() === nome.toLowerCase());
+      if (existente) {
+        destino = existente.id;
+      } else {
+        setSalvandoPasta(true);
+        try {
+          const nova = await criarPasta(pastas, { nome, parent_id: pastaId, cor: null });
+          onPastaCriada(nova);
+          destino = nova.id;
+        } catch (e) {
+          toast.error(mensagemErroPdf(e));
+          return;
+        } finally {
+          setSalvandoPasta(false);
+        }
+      }
+    }
     onConfirmar(
       arquivos.map((arquivo, i) => ({
         arquivo,
@@ -332,7 +361,7 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
         player: campos[i]?.player ?? "",
         observacoes: campos[i]?.observacoes ?? "",
       })),
-      pastaId,
+      destino,
     );
   };
 
@@ -375,7 +404,7 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor={`pdf-observacoes-${i}`} className="text-xs">Observações</Label>
+                  <Label htmlFor={`pdf-observacoes-${i}`} className="text-xs">Descrição / observações</Label>
                   <Textarea
                     id={`pdf-observacoes-${i}`}
                     rows={3}
@@ -438,10 +467,35 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
             )}
           </div>
 
+          {/* Pastinha: junta os arquivos numa pasta nova dentro do tema/subpasta escolhido, cada um com sua descrição */}
+          <div className={cn("space-y-2 rounded-lg border p-3", pastinha && "border-primary/40 bg-primary/5")}>
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <Checkbox checked={pastinha} onCheckedChange={(v) => setPastinha(!!v)} />
+              <FolderPlus size={14} className="text-primary" />
+              {n === 1 ? "Colocar numa pastinha" : `Juntar os ${n} arquivos numa pastinha`}
+            </label>
+            {pastinha && (
+              <>
+                <Input
+                  className="h-8"
+                  placeholder="Nome da pastinha (ex.: Módulo 1, Proposta Cliente X)"
+                  value={nomePastinha}
+                  onChange={(e) => setNomePastinha(e.target.value)}
+                  aria-label="Nome da pastinha"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {pastaEscolhida
+                    ? `A pastinha fica dentro de "${pastaEscolhida.nome}", com os arquivos e a descrição de cada um.`
+                    : "Escolha acima o tema ou a subpasta onde a pastinha vai ficar."}
+                </p>
+              </>
+            )}
+          </div>
+
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" disabled={!pastaId || !!criando}>
-              {n === 1 ? "Guardar arquivo" : `Guardar ${n} arquivos`}
+            <Button type="submit" disabled={!pastaId || !!criando || salvandoPasta}>
+              {pastinha ? "Guardar na pastinha" : n === 1 ? "Guardar arquivo" : `Guardar ${n} arquivos`}
             </Button>
           </DialogFooter>
         </form>
