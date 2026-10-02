@@ -952,9 +952,15 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
     if (modoSelecao || e.ctrlKey || e.metaKey) onAlternar();
     else onVer();
   };
+  // Descrição em gaveta: fechada mostra só uma linha; aberta mostra o texto todo
+  const [descricaoAberta, setDescricaoAberta] = useState(false);
   return (
     <div
-      className={cn("group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40", selecionado && "bg-primary/5 hover:bg-primary/10")}
+      className={cn(
+        "group flex gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40",
+        descricaoAberta ? "items-start" : "items-center",
+        selecionado && "bg-primary/5 hover:bg-primary/10",
+      )}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(MIME_PDF_INTERNO, pdf.id);
@@ -976,7 +982,8 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
         {selecionado && <Check size={10} />}
       </button>
       <IconeArquivo nome={pdf.arquivo_nome} />
-      <button type="button" onClick={clicarNome} className="min-w-0 flex-1 text-left">
+      <div className="min-w-0 flex-1">
+      <button type="button" onClick={clicarNome} className="block w-full min-w-0 text-left">
         <span className="block truncate text-sm font-medium group-hover:underline underline-offset-2">{pdf.nome}</span>
         <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           {pdf.player && (
@@ -996,12 +1003,31 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
           <span>·</span>
           <span className="shrink-0">{format(new Date(pdf.created_at), "dd/MM/yyyy")}</span>
         </span>
-        {pdf.observacoes && (
-          <span title={pdf.observacoes} className="mt-0.5 block line-clamp-2 whitespace-pre-line text-[11px] text-muted-foreground">
-            {pdf.observacoes}
-          </span>
-        )}
       </button>
+      {pdf.observacoes && (
+        <>
+          <button
+            type="button"
+            onClick={() => setDescricaoAberta((v) => !v)}
+            aria-expanded={descricaoAberta}
+            className="mt-0.5 flex w-full min-w-0 items-center gap-1 text-left text-[11px] text-muted-foreground hover:text-foreground"
+            title={descricaoAberta ? "Recolher a descrição" : "Ver a descrição"}
+          >
+            <ChevronRight size={12} className={cn("shrink-0 transition-transform", descricaoAberta && "rotate-90")} />
+            {descricaoAberta ? (
+              <span className="font-medium">Recolher descrição</span>
+            ) : (
+              <span className="truncate">{pdf.observacoes.split("\n").find((l) => l.trim()) ?? pdf.observacoes}</span>
+            )}
+          </button>
+          {descricaoAberta && (
+            <div className="mt-1 max-h-96 overflow-y-auto whitespace-pre-line break-words rounded-md border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+              {pdf.observacoes}
+            </div>
+          )}
+        </>
+      )}
+      </div>
       <div className="flex shrink-0 items-center gap-1">
         <Button size="sm" variant="outline" className="h-8 gap-1.5 px-2.5" onClick={onVer} title="Visualizar">
           <Eye size={14} /> <span className="hidden sm:inline">Visualizar</span>
