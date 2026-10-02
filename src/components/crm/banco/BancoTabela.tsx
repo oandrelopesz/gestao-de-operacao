@@ -186,8 +186,9 @@ export function BancoTabela({
 
   const ordenados = useMemo(() => {
     if (!ordem.chave) {
-      if (aba) return [...leads].sort((a, b) => a.posicao - b.posicao);
-      return leads;
+      // Ordem da planilha: abas na ordem delas e, dentro de cada uma, pela linha
+      const ordemAba = (l: LeadBanco) => abasPorId.get(l.aba_id)?.ordem ?? 0;
+      return [...leads].sort((a, b) => ordemAba(a) - ordemAba(b) || a.posicao - b.posicao);
     }
     const col = ordem.chave === "_nome" ? null : colunas.find((c) => c.chave === ordem.chave);
     const valor = (l: LeadBanco) => (col ? col.valor(l) : nomeDoLead(l, abasPorId.get(l.aba_id)));

@@ -167,6 +167,8 @@ function colunaId_(sh) {
   if (i > -1) return i + 1;
   var c = t.length + 1;
   if (c > sh.getMaxColumns()) sh.insertColumnAfter(sh.getMaxColumns());
+  // A coluna pode ter herdado validação (ex.: Sim/Não) de uma coluna que existia ali: o ID não passaria
+  sh.getRange(1, c, sh.getMaxRows(), 1).clearDataValidations().setNumberFormat('@');
   sh.getRange(1, c).setValue(CFG.TIT_ID);
   sh.hideColumns(c);
   return c;
@@ -241,7 +243,7 @@ function garantirIds_(info, vistos) {
     }
     vistos[l.id] = info.aba_id;
   });
-  if (novos) faixa.setValues(vals);
+  if (novos) faixa.clearDataValidations().setValues(vals);
   return novos;
 }
 

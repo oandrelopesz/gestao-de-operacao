@@ -1540,6 +1540,9 @@ git commit -m "Banco de leads: libs puras do CRM copiadas para a edge function, 
 -- Banco de leads: a "Planilha CRM Mestra" sincronizada com o sistema
 -- (spec docs/superpowers/specs/2026-10-01-banco-de-leads-design.md). Idempotente: pode rodar mais de uma vez.
 
+-- 0. pg_net (aviso do banco ao Apps Script). Não vinha instalado no Lovable Cloud: habilitado em 02/10/2026.
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
 -- 1. Configuração da ponte. Só a edge function lê (service role): RLS sem política.
 CREATE TABLE IF NOT EXISTS public.planilha_config (
   id text PRIMARY KEY DEFAULT 'principal' CHECK (id = 'principal'),
@@ -3378,6 +3381,8 @@ function colunaId_(sh) {
   if (i > -1) return i + 1;
   var c = t.length + 1;
   if (c > sh.getMaxColumns()) sh.insertColumnAfter(sh.getMaxColumns());
+  // A coluna pode ter herdado validação (ex.: Sim/Não) de uma coluna que existia ali: o ID não passaria
+  sh.getRange(1, c, sh.getMaxRows(), 1).clearDataValidations().setNumberFormat('@');
   sh.getRange(1, c).setValue(CFG.TIT_ID);
   sh.hideColumns(c);
   return c;
@@ -3452,7 +3457,7 @@ function garantirIds_(info, vistos) {
     }
     vistos[l.id] = info.aba_id;
   });
-  if (novos) faixa.setValues(vals);
+  if (novos) faixa.clearDataValidations().setValues(vals);
   return novos;
 }
 
@@ -4558,8 +4563,9 @@ export function BancoTabela({
 
   const ordenados = useMemo(() => {
     if (!ordem.chave) {
-      if (aba) return [...leads].sort((a, b) => a.posicao - b.posicao);
-      return leads;
+      // Ordem da planilha: abas na ordem delas e, dentro de cada uma, pela linha
+      const ordemAba = (l: LeadBanco) => abasPorId.get(l.aba_id)?.ordem ?? 0;
+      return [...leads].sort((a, b) => ordemAba(a) - ordemAba(b) || a.posicao - b.posicao);
     }
     const col = ordem.chave === "_nome" ? null : colunas.find((c) => c.chave === ordem.chave);
     const valor = (l: LeadBanco) => (col ? col.valor(l) : nomeDoLead(l, abasPorId.get(l.aba_id)));

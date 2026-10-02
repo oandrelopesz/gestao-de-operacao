@@ -1,6 +1,9 @@
 -- Banco de leads: a "Planilha CRM Mestra" sincronizada com o sistema
 -- (spec docs/superpowers/specs/2026-10-01-banco-de-leads-design.md). Idempotente: pode rodar mais de uma vez.
 
+-- 0. pg_net (aviso do banco ao Apps Script). Não vinha instalado no Lovable Cloud: habilitado em 02/10/2026.
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
 -- 1. Configuração da ponte. Só a edge function lê (service role): RLS sem política.
 CREATE TABLE IF NOT EXISTS public.planilha_config (
   id text PRIMARY KEY DEFAULT 'principal' CHECK (id = 'principal'),
