@@ -10,7 +10,8 @@ export type { PdfPasta } from "@/lib/pdfsArvore";
 
 export interface PdfArquivo {
   id: string;
-  pasta_id: string;
+  /** Nulo = fora das pastas (na raiz da aba) */
+  pasta_id: string | null;
   nome: string;
   arquivo_nome: string;
   /** Autor, empresa ou fonte do PDF */
@@ -107,7 +108,7 @@ export async function reordenarPastas(irmas: PdfPasta[]): Promise<void> {
  */
 export async function excluirPasta(id: string, biblioteca: PdfBiblioteca): Promise<void> {
   const ids = idsDescendentes(biblioteca.pastas, id);
-  const caminhos = biblioteca.pdfs.filter((f) => ids.has(f.pasta_id)).map((f) => f.storage_path);
+  const caminhos = biblioteca.pdfs.filter((f) => !!f.pasta_id && ids.has(f.pasta_id)).map((f) => f.storage_path);
   await removerDoStorage(caminhos);
   const { error } = await supabase.from("pdf_pastas").delete().eq("id", id);
   if (error) throw error;

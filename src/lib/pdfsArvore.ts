@@ -69,13 +69,13 @@ export function idsDescendentes(pastas: PdfPasta[], id: string): Set<string> {
   return ids;
 }
 
-/** Quantidade de PDFs por pasta: `direto` só nela, `total` incluindo as subpastas. */
+/** Quantidade de PDFs por pasta: `direto` só nela, `total` incluindo as subpastas. Arquivos fora das pastas não contam. */
 export function contarPdfsPorPasta(
   pastas: PdfPasta[],
-  pdfs: { pasta_id: string }[],
+  pdfs: { pasta_id: string | null }[],
 ): Map<string, { direto: number; total: number }> {
   const direto = new Map<string, number>();
-  pdfs.forEach((f) => direto.set(f.pasta_id, (direto.get(f.pasta_id) || 0) + 1));
+  pdfs.forEach((f) => { if (f.pasta_id) direto.set(f.pasta_id, (direto.get(f.pasta_id) || 0) + 1); });
   const resultado = new Map<string, { direto: number; total: number }>();
   for (const p of pastas) {
     let total = 0;
@@ -88,6 +88,30 @@ export function contarPdfsPorPasta(
 /** Uma pasta não pode ser movida para dentro dela mesma nem de uma subpasta sua. */
 export function podeMoverPasta(pastas: PdfPasta[], id: string, novoPai: string | null): boolean {
   return novoPai === null || !idsDescendentes(pastas, id).has(novoPai);
+}
+
+/**
+ * Mover uma pasta (arrastando) para dentro de outra ou para a raiz (`novoPai` null, vira tema).
+ * Recusa: para dentro dela mesma ou de uma subpasta sua, ou se já existe uma irmã com o mesmo nome no destino.
+ * Só temas guardam cor: virar tema mantém a cor que tinha (ou ganha a próxima da paleta); virar subpasta perde a cor
+ * (herda a do tema). Entra no fim das irmãs. `null` = nada a fazer (já está lá).
+ */
+export function planoMoverPasta(
+  pastas: PdfPasta[],
+  id: string,
+  novoPai: string | null,
+): { ok: true; patch: { parent_id: string | null; cor: string | null; ordem: number } } | { ok: false; motivo: string } | null {
+  const pasta = pastas.find((p) => p.id === id);
+  if (!pasta) return { ok: false, motivo: "Pasta não encontrada" };
+  if ((pasta.parent_id ?? null) === novoPai) return null;
+  if (!podeMoverPasta(pastas, id, novoPai)) return { ok: false, motivo: "Não dá para colocar uma pasta dentro dela mesma" };
+  const irmas = pastas.filter((p) => (p.parent_id ?? null) === novoPai && p.id !== id);
+  if (irmas.some((p) => p.nome.trim().toLowerCase() === pasta.nome.trim().toLowerCase())) {
+    return { ok: false, motivo: `Já existe uma pasta "${pasta.nome}" ali` };
+  }
+  const temas = pastas.filter((p) => !p.parent_id).length;
+  const cor = novoPai ? null : pasta.cor && pasta.cor.startsWith("#") ? pasta.cor : PASTA_CORES[temas % PASTA_CORES.length];
+  return { ok: true, patch: { parent_id: novoPai, cor, ordem: proximaOrdem(irmas, novoPai) } };
 }
 
 export interface OpcaoPasta {

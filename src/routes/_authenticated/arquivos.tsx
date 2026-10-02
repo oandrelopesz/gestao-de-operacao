@@ -22,12 +22,12 @@ import { useCachedState } from "@/lib/pageCache";
 import { useConfig } from "@/lib/appConfig";
 import { CACHE_KEYS } from "@/lib/data";
 import {
-  fetchPdfBiblioteca, enviarPdf, atualizarPdf, excluirPdf, salvarNoComputador, mensagemErroPdf, trocarArquivo,
+  fetchPdfBiblioteca, enviarPdf, atualizarPdf, atualizarPasta, excluirPdf, salvarNoComputador, mensagemErroPdf, trocarArquivo,
   PDF_TAMANHO_MAX_PADRAO_MB, mbParaBytes, type PdfArquivo, type PdfBiblioteca,
 } from "@/lib/pdfs";
 import {
   montarArvore, caminhoDaPasta, contarPdfsPorPasta, corDaPasta, filtrarPdfs, arquivoAceito, formatarTamanho, nomeSemExtensao,
-  type PastaNo, type PdfPasta,
+  planoMoverPasta, type PastaNo, type PdfPasta,
 } from "@/lib/pdfsArvore";
 import { PastaDialog, ExcluirPastaDialog, type PastaDialogState } from "@/components/pdfs/PastaDialogs";
 import { PdfViewer, PdfEditDialog, EnviarPdfsDialog, type PdfParaEnviar } from "@/components/pdfs/PdfDialogs";
@@ -44,6 +44,10 @@ export const Route = createFileRoute("/_authenticated/arquivos")({
 
 /** Tipo usado no arrastar-e-soltar interno (mover arquivo entre pastas), para não confundir com arquivos do computador */
 const MIME_PDF_INTERNO = "application/x-gestor-pdf-id";
+/** Arrastar uma pasta (da árvore ou dos cards) para dentro de outra ou para a raiz */
+const MIME_PASTA_INTERNA = "application/x-gestor-pasta-id";
+/** Alvo de soltar que representa a raiz da aba ("fora das pastas") */
+const ALVO_RAIZ = "__raiz__";
 
 interface Envio {
   id: string;
@@ -53,11 +57,12 @@ interface Envio {
   erro?: string;
 }
 
-type TipoArrasto = "arquivos" | "pdf" | null;
+type TipoArrasto = "arquivos" | "pdf" | "pasta" | null;
 
 function tipoDoArrasto(e: DragEvent): TipoArrasto {
   const tipos = Array.from(e.dataTransfer.types);
   if (tipos.includes(MIME_PDF_INTERNO)) return "pdf";
+  if (tipos.includes(MIME_PASTA_INTERNA)) return "pasta";
   if (tipos.includes("Files")) return "arquivos";
   return null;
 }
@@ -77,6 +82,8 @@ function PdfsPage() {
   /** Arquivos aguardando o popup de envio (nome, player e pasta) */
   const [pendentes, setPendentes] = useState<{ arquivos: File[]; pastaId: string | null } | null>(null);
   const [arrastandoArquivos, setArrastandoArquivos] = useState(false);
+  // Arrastando um arquivo ou uma pasta de dentro da aba (mostra onde soltar para tirar das pastas)
+  const [arrastandoInterno, setArrastandoInterno] = useState(false);
   const [alvo, setAlvo] = useState<string | null>(null);
   const [visualizando, setVisualizando] = useState<PdfArquivo | null>(null);
   const [editando, setEditando] = useState<PdfArquivo | null>(null);
@@ -132,7 +139,8 @@ function PdfsPage() {
   const caminho = useMemo(() => caminhoDaPasta(bib.pastas, pastaAtual?.id ?? null), [bib.pastas, pastaAtual]);
   const arvore = useMemo(() => montarArvore(bib.pastas), [bib.pastas]);
   const contagem = useMemo(() => contarPdfsPorPasta(bib.pastas, bib.pdfs), [bib]);
-  const nomeDoLocal = (pastaId: string) => caminhoDaPasta(bib.pastas, pastaId).map((p) => p.nome).join(" / ");
+  const nomeDoLocal = (pastaId: string | null) =>
+    pastaId ? caminhoDaPasta(bib.pastas, pastaId).map((p) => p.nome).join(" / ") : "Fora das pastas";
 
   // Ao entrar numa pasta, a árvore lateral se abre até ela
   useEffect(() => {
@@ -161,6 +169,8 @@ function PdfsPage() {
   );
   const resultadosBusca = resultadoBusca.itens;
   const recentes = useMemo(() => bib.pdfs.slice(0, 8), [bib.pdfs]);
+  // Arquivos tirados das pastas: ficam na raiz da aba
+  const soltos = useMemo(() => bib.pdfs.filter((f) => !f.pasta_id), [bib.pdfs]);
 
   const abrirPasta = (id: string | null) => {
     setBusca("");
@@ -222,28 +232,50 @@ function PdfsPage() {
 
   // ------------------------------------------------------------ Arrastar e soltar
 
-  const propsDeAlvo = (pastaId: string) => ({
-    onDragOver: (e: DragEvent) => {
-      const tipo = tipoDoArrasto(e);
-      if (!tipo) return;
-      e.preventDefault();
+  /** Alvo de soltar: uma pasta, ou a raiz (`null`, "fora das pastas"). Aceita arquivos do computador, arquivos e pastas da aba. */
+  const propsDeAlvo = (pastaId: string | null) => {
+    const chave = pastaId ?? ALVO_RAIZ;
+    return {
+      onDragOver: (e: DragEvent) => {
+        const tipo = tipoDoArrasto(e);
+        if (!tipo) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = tipo === "arquivos" ? "copy" : "move";
+        if (alvo !== chave) setAlvo(chave);
+      },
+      onDragLeave: (e: DragEvent) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setAlvo((a) => (a === chave ? null : a));
+      },
+      onDrop: (e: DragEvent) => {
+        const tipo = tipoDoArrasto(e);
+        if (!tipo) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setAlvo(null);
+        setArrastandoArquivos(false);
+        setArrastandoInterno(false);
+        contadorArrasto.current = 0;
+        if (tipo === "arquivos") receberArquivos(e.dataTransfer.files, pastaId);
+        else if (tipo === "pasta") moverPasta(e.dataTransfer.getData(MIME_PASTA_INTERNA), pastaId);
+        else moverPdf(e.dataTransfer.getData(MIME_PDF_INTERNO), pastaId);
+      },
+    };
+  };
+
+  /** Começo do arrasto de uma pasta (árvore ou card): leva o id e mostra os alvos. */
+  const arrastarPasta = (id: string) => ({
+    draggable: true,
+    onDragStart: (e: DragEvent) => {
       e.stopPropagation();
-      e.dataTransfer.dropEffect = tipo === "pdf" ? "move" : "copy";
-      if (alvo !== pastaId) setAlvo(pastaId);
+      e.dataTransfer.setData(MIME_PASTA_INTERNA, id);
+      e.dataTransfer.effectAllowed = "move";
+      // Mexer na tela dentro do próprio dragstart pode fazer o Chrome cancelar o arrasto: mostra a barra logo depois
+      window.setTimeout(() => setArrastandoInterno(true), 0);
     },
-    onDragLeave: (e: DragEvent) => {
-      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setAlvo((a) => (a === pastaId ? null : a));
-    },
-    onDrop: (e: DragEvent) => {
-      const tipo = tipoDoArrasto(e);
-      if (!tipo) return;
-      e.preventDefault();
-      e.stopPropagation();
+    onDragEnd: () => {
+      setArrastandoInterno(false);
       setAlvo(null);
-      setArrastandoArquivos(false);
-      contadorArrasto.current = 0;
-      if (tipo === "arquivos") receberArquivos(e.dataTransfer.files, pastaId);
-      else moverPdf(e.dataTransfer.getData(MIME_PDF_INTERNO), pastaId);
     },
   });
 
@@ -302,14 +334,16 @@ function PdfsPage() {
     return () => window.removeEventListener("keydown", aoTeclar);
   }, [selecaoAtiva]);
 
-  const moverSelecionados = async (pastaId: string) => {
-    const ids = pdfsSelecionados.filter((f) => f.pasta_id !== pastaId).map((f) => f.id);
-    const destino = bib.pastas.find((p) => p.id === pastaId);
-    if (!ids.length) { toast.info(`Já estão em "${destino?.nome}"`); return; }
+  /** Nome do destino nos avisos: a pasta ou "fora das pastas" */
+  const nomeDestino = (pastaId: string | null) => (pastaId ? `"${bib.pastas.find((p) => p.id === pastaId)?.nome ?? "pasta"}"` : "fora das pastas");
+
+  const moverSelecionados = async (pastaId: string | null) => {
+    const ids = pdfsSelecionados.filter((f) => (f.pasta_id ?? null) !== pastaId).map((f) => f.id);
+    if (!ids.length) { toast.info(`Já estão em ${nomeDestino(pastaId)}`); return; }
     setBiblioteca((prev) => prev && { ...prev, pdfs: prev.pdfs.map((f) => (ids.includes(f.id) ? { ...f, pasta_id: pastaId } : f)) });
     try {
       await Promise.all(ids.map((id) => atualizarPdf(id, { pasta_id: pastaId })));
-      toast.success(`${ids.length} ${ids.length === 1 ? "arquivo movido" : "arquivos movidos"} para "${destino?.nome}"`);
+      toast.success(`${ids.length} ${ids.length === 1 ? "arquivo movido" : "arquivos movidos"} para ${nomeDestino(pastaId)}`);
       limparSelecao();
     } catch (e) {
       toast.error(mensagemErroPdf(e));
@@ -335,16 +369,33 @@ function PdfsPage() {
     }
   };
 
-  const moverPdf = async (pdfId: string, pastaId: string) => {
+  /** Move um arquivo para uma pasta ou para fora das pastas (`null`). */
+  const moverPdf = async (pdfId: string, pastaId: string | null) => {
     // Arrastou um arquivo selecionado: vão todos os selecionados
     if (selecionados.has(pdfId) && selecionados.size > 1) { await moverSelecionados(pastaId); return; }
     const pdf = bib.pdfs.find((f) => f.id === pdfId);
-    if (!pdf || pdf.pasta_id === pastaId) return;
-    const destino = bib.pastas.find((p) => p.id === pastaId);
+    if (!pdf || (pdf.pasta_id ?? null) === pastaId) return;
     setBiblioteca((prev) => prev && { ...prev, pdfs: prev.pdfs.map((f) => (f.id === pdfId ? { ...f, pasta_id: pastaId } : f)) });
     try {
       await atualizarPdf(pdfId, { pasta_id: pastaId });
-      toast.success(`"${pdf.nome}" movido para "${destino?.nome}"`);
+      toast.success(`"${pdf.nome}" movido para ${nomeDestino(pastaId)}`);
+    } catch (e) {
+      toast.error(mensagemErroPdf(e));
+      await load();
+    }
+  };
+
+  /** Move uma pasta (com tudo dentro) para outra pasta ou para a raiz (`null`, vira tema). */
+  const moverPasta = async (id: string, novoPai: string | null) => {
+    const plano = planoMoverPasta(bib.pastas, id, novoPai);
+    if (!plano) return;
+    if (!plano.ok) { toast.error(plano.motivo); return; }
+    const pasta = bib.pastas.find((p) => p.id === id);
+    setBiblioteca((prev) => prev && { ...prev, pastas: prev.pastas.map((p) => (p.id === id ? { ...p, ...plano.patch } : p)) });
+    if (novoPai) setAbertas((prev) => new Set(prev).add(novoPai));
+    try {
+      await atualizarPasta(id, plano.patch);
+      toast.success(novoPai ? `Pasta "${pasta?.nome}" movida para ${nomeDestino(novoPai)}` : `"${pasta?.nome}" agora é um tema (fora das pastas)`);
     } catch (e) {
       toast.error(mensagemErroPdf(e));
       await load();
@@ -418,6 +469,11 @@ function PdfsPage() {
       selecaoAtiva={selecaoAtiva}
       modoSelecao={modoSelecao}
       onAlternar={() => alternarSelecao(pdf.id)}
+      onArrastando={(v) => {
+        // Mexer na tela dentro do próprio dragstart pode fazer o Chrome cancelar o arrasto: mostra a barra logo depois
+        if (v) window.setTimeout(() => setArrastandoInterno(true), 0);
+        else { setArrastandoInterno(false); setAlvo(null); }
+      }}
     />
   );
 
@@ -449,6 +505,9 @@ function PdfsPage() {
                 <DropdownMenuContent align="end" side="top" className="max-h-80 w-72 overflow-y-auto">
                   <DropdownMenuLabel className="text-xs">Mover {pdfsSelecionados.length} para</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem className="gap-2 text-xs" onClick={() => moverSelecionados(null)}>
+                    <Home size={13} className="shrink-0 text-muted-foreground" /> <span className="truncate">Fora das pastas</span>
+                  </DropdownMenuItem>
                   {pastasOrdenadas.map((p) => (
                     <DropdownMenuItem key={p.id} className="gap-2 text-xs" onClick={() => moverSelecionados(p.id)}>
                       <Folder size={13} className="shrink-0" style={{ color: p.cor }} /> <span className="truncate">{p.rotulo}</span>
@@ -565,7 +624,10 @@ function PdfsPage() {
               className={cn(
                 "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
                 !pastaAtual && "bg-primary/10 text-foreground font-medium",
+                alvo === ALVO_RAIZ && "bg-primary/15 ring-1 ring-primary/50",
               )}
+              title="Solte aqui um arquivo ou uma pasta para tirar das pastas"
+              {...propsDeAlvo(null)}
             >
               <Library size={15} className="text-muted-foreground" />
               <span className="flex-1 text-left">Todas as pastas</span>
@@ -585,6 +647,7 @@ function PdfsPage() {
                   onToggle={toggle}
                   onAbrir={abrirPasta}
                   propsDeAlvo={propsDeAlvo}
+                  arrastarPasta={arrastarPasta}
                 />
               ))}
             </div>
@@ -609,9 +672,31 @@ function PdfsPage() {
             </div>
           )}
 
-          {/* Caminho */}
+          {/* Arrastando um arquivo ou uma pasta: barra flutuante (não empurra a tela) para soltar fora das pastas */}
+          {arrastandoInterno && (
+            <div
+              className={cn(
+                "fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-xl border-2 border-dashed bg-popover px-5 py-3 text-sm shadow-xl transition-colors",
+                alvo === ALVO_RAIZ ? "border-primary bg-primary/10 text-foreground" : "border-muted-foreground/40 text-muted-foreground",
+              )}
+              {...propsDeAlvo(null)}
+            >
+              <Home size={15} /> Solte aqui para tirar das pastas
+              <span className="hidden text-xs md:inline">· ou numa pasta (cards, lista da esquerda ou caminho) para mover</span>
+            </div>
+          )}
+
+          {/* Caminho (cada pasta do caminho também recebe o que for solto nela) */}
           <nav className="flex flex-wrap items-center gap-1 text-sm">
-            <button type="button" onClick={() => abrirPasta(null)} className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <button
+              type="button"
+              onClick={() => abrirPasta(null)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-muted-foreground hover:bg-muted hover:text-foreground",
+                alvo === ALVO_RAIZ && "bg-primary/15 ring-1 ring-primary/50",
+              )}
+              {...propsDeAlvo(null)}
+            >
               <Home size={14} /> Arquivos
             </button>
             {caminho.map((p, i) => (
@@ -623,6 +708,7 @@ function PdfsPage() {
                   className={cn(
                     "rounded-md px-1.5 py-0.5 hover:bg-muted",
                     i === caminho.length - 1 ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground",
+                    alvo === p.id && "bg-primary/15 ring-1 ring-primary/50",
                   )}
                   {...propsDeAlvo(p.id)}
                 >
@@ -737,7 +823,9 @@ function PdfsPage() {
                             "group relative flex items-center gap-3 rounded-xl border bg-card p-3 text-left transition-all hover:-translate-y-px hover:border-foreground/20 hover:shadow-md",
                             alvo === no.id && "border-primary ring-2 ring-primary/40",
                           )}
+                          title="Clique para abrir · arraste para mover a pasta"
                           {...propsDeAlvo(no.id)}
+                          {...arrastarPasta(no.id)}
                         >
                           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: `${cor}22`, color: cor }}>
                             {alvo === no.id ? <FolderOpen size={20} /> : <Folder size={20} />}
@@ -784,12 +872,22 @@ function PdfsPage() {
                   </button>
                 </section>
               ) : (
-                recentes.length > 0 && (
-                  <section className="space-y-2">
-                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Adicionados recentemente</h3>
-                    <Card><div className="divide-y">{recentes.map((f) => linhaPdf(f, true))}</div></Card>
-                  </section>
-                )
+                <>
+                  {soltos.length > 0 && (
+                    <section className="space-y-2" {...propsDeAlvo(null)}>
+                      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Fora das pastas</h3>
+                      <Card className={cn(alvo === ALVO_RAIZ && "border-primary ring-2 ring-primary/40")}>
+                        <div className="divide-y">{soltos.map((f) => linhaPdf(f, false))}</div>
+                      </Card>
+                    </section>
+                  )}
+                  {recentes.length > 0 && (
+                    <section className="space-y-2">
+                      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Adicionados recentemente</h3>
+                      <Card><div className="divide-y">{recentes.map((f) => linhaPdf(f, true))}</div></Card>
+                    </section>
+                  )}
+                </>
               )}
 
               {!pastaAtual && !loading && bib.pastas.length > 0 && bib.pdfs.length === 0 && (
@@ -890,11 +988,12 @@ interface ArvoreItemProps {
   contagem: Map<string, { direto: number; total: number }>;
   onToggle: (id: string) => void;
   onAbrir: (id: string) => void;
-  propsDeAlvo: (id: string) => Record<string, (e: DragEvent) => void>;
+  propsDeAlvo: (id: string | null) => Record<string, (e: DragEvent) => void>;
+  arrastarPasta: (id: string) => { draggable: boolean; onDragStart: (e: DragEvent) => void; onDragEnd: () => void };
 }
 
 function ArvoreItem(props: ArvoreItemProps) {
-  const { no, nivel, pastas, atual, abertas, alvo, contagem, onToggle, onAbrir, propsDeAlvo } = props;
+  const { no, nivel, pastas, atual, abertas, alvo, contagem, onToggle, onAbrir, propsDeAlvo, arrastarPasta } = props;
   const aberta = abertas.has(no.id);
   const cor = corDaPasta(pastas, no.id);
   return (
@@ -906,7 +1005,9 @@ function ArvoreItem(props: ArvoreItemProps) {
           alvo === no.id && "bg-primary/15 ring-1 ring-primary/50",
         )}
         style={{ paddingLeft: 4 + nivel * 14 }}
+        title="Arraste para mover a pasta"
         {...propsDeAlvo(no.id)}
+        {...arrastarPasta(no.id)}
       >
         <button
           type="button"
@@ -944,9 +1045,11 @@ interface PdfLinhaProps {
   selecaoAtiva: boolean;
   modoSelecao: boolean;
   onAlternar: () => void;
+  /** Começou (true) ou terminou (false) de arrastar este arquivo */
+  onArrastando?: (arrastando: boolean) => void;
 }
 
-function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcluir, selecionado, selecaoAtiva, modoSelecao, onAlternar }: PdfLinhaProps) {
+function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcluir, selecionado, selecaoAtiva, modoSelecao, onAlternar, onArrastando }: PdfLinhaProps) {
   // No modo "Selecionar" (ou com Ctrl/Cmd) o clique no nome marca em vez de abrir
   const clicarNome = (e: { ctrlKey: boolean; metaKey: boolean }) => {
     if (modoSelecao || e.ctrlKey || e.metaKey) onAlternar();
@@ -965,8 +1068,10 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
       onDragStart={(e) => {
         e.dataTransfer.setData(MIME_PDF_INTERNO, pdf.id);
         e.dataTransfer.effectAllowed = "move";
+        onArrastando?.(true);
       }}
-      title="Arraste para uma pasta para mover"
+      onDragEnd={() => onArrastando?.(false)}
+      title="Arraste para uma pasta (ou para fora das pastas) para mover"
     >
       <button
         type="button"

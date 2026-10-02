@@ -1939,7 +1939,7 @@ export type Database = {
           id: string
           nome: string
           observacoes: string | null
-          pasta_id: string
+          pasta_id: string | null
           player: string | null
           storage_path: string
           tamanho: number
@@ -1951,7 +1951,7 @@ export type Database = {
           id?: string
           nome: string
           observacoes?: string | null
-          pasta_id: string
+          pasta_id?: string | null
           player?: string | null
           storage_path: string
           tamanho?: number
@@ -1963,7 +1963,7 @@ export type Database = {
           id?: string
           nome?: string
           observacoes?: string | null
-          pasta_id?: string
+          pasta_id?: string | null
           player?: string | null
           storage_path?: string
           tamanho?: number

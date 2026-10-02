@@ -169,7 +169,7 @@ export function ExcluirPastaDialog({ pasta, biblioteca, onClose, onDeleted }: Ex
   const resumo = useMemo(() => {
     if (!pasta) return { subpastas: 0, pdfs: 0 };
     const ids = idsDescendentes(biblioteca.pastas, pasta.id);
-    return { subpastas: ids.size - 1, pdfs: biblioteca.pdfs.filter((f) => ids.has(f.pasta_id)).length };
+    return { subpastas: ids.size - 1, pdfs: biblioteca.pdfs.filter((f) => !!f.pasta_id && ids.has(f.pasta_id)).length };
   }, [pasta, biblioteca]);
 
   const excluir = async () => {

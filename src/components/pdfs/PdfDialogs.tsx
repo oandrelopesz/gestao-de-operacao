@@ -23,7 +23,10 @@ function modoDe(arquivoNome: string): ModoVisualizacao {
 }
 const LIMITE_TEXTO = 2 * 1024 * 1024; // texto maior que isso: só baixando
 
-function SelectPasta({ pastas, value, onChange, id }: { pastas: PdfPasta[]; value: string; onChange: (v: string) => void; id?: string }) {
+/** Valor do select para "fora das pastas" (arquivo na raiz da aba) */
+const FORA_DAS_PASTAS = "__raiz__";
+
+function SelectPasta({ pastas, value, onChange, id, comRaiz = false }: { pastas: PdfPasta[]; value: string; onChange: (v: string) => void; id?: string; comRaiz?: boolean }) {
   const opcoes = useMemo(() => opcoesDePasta(pastas), [pastas]);
   return (
     // O Radix dispara onValueChange("") quando o valor aponta para uma opção que acabou de ser criada
@@ -31,6 +34,7 @@ function SelectPasta({ pastas, value, onChange, id }: { pastas: PdfPasta[]; valu
     <Select value={value || undefined} onValueChange={(v) => { if (v) onChange(v); }}>
       <SelectTrigger id={id}><SelectValue placeholder="Escolher pasta" /></SelectTrigger>
       <SelectContent>
+        {comRaiz && <SelectItem value={FORA_DAS_PASTAS}>Fora das pastas</SelectItem>}
         {opcoes.map((o) => (
           <SelectItem key={o.id} value={o.id}>
             <span style={{ paddingLeft: o.nivel * 14 }}>{o.nome}</span>
@@ -172,7 +176,7 @@ interface PdfEditDialogProps {
   pdf: PdfArquivo | null;
   pastas: PdfPasta[];
   onClose: () => void;
-  onSaved: (patch: { nome: string; pasta_id: string; player: string | null; observacoes: string | null }) => void;
+  onSaved: (patch: { nome: string; pasta_id: string | null; player: string | null; observacoes: string | null }) => void;
 }
 
 export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogProps) {
@@ -187,7 +191,7 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
     setNome(pdf.nome);
     setPlayer(pdf.player || "");
     setObservacoes(pdf.observacoes || "");
-    setPastaId(pdf.pasta_id);
+    setPastaId(pdf.pasta_id ?? FORA_DAS_PASTAS);
   }, [pdf]);
 
   const save = async () => {
@@ -196,7 +200,7 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
     if (!pastaId) { toast.error("Escolha a pasta"); return; }
     setSaving(true);
     try {
-      const patch = { nome: nome.trim(), pasta_id: pastaId, player: player.trim() || null, observacoes: observacoes.trim() || null };
+      const patch = { nome: nome.trim(), pasta_id: pastaId === FORA_DAS_PASTAS ? null : pastaId, player: player.trim() || null, observacoes: observacoes.trim() || null };
       await atualizarPdf(pdf.id, patch);
       onSaved(patch);
       toast.success("Arquivo atualizado");
@@ -226,7 +230,7 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
           </div>
           <div className="space-y-2">
             <Label htmlFor="pdf-pasta">Pasta</Label>
-            <SelectPasta id="pdf-pasta" pastas={pastas} value={pastaId} onChange={setPastaId} />
+            <SelectPasta id="pdf-pasta" pastas={pastas} value={pastaId} onChange={setPastaId} comRaiz />
           </div>
           <div className="space-y-2">
             <Label htmlFor="pdf-observacoes">Observações</Label>

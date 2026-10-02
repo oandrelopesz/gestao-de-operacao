@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  montarArvore, caminhoDaPasta, idsDescendentes, contarPdfsPorPasta, podeMoverPasta, opcoesDePasta,
+  montarArvore, caminhoDaPasta, idsDescendentes, contarPdfsPorPasta, podeMoverPasta, planoMoverPasta, opcoesDePasta,
   ehPdf, arquivoAceito, tipoDoArquivo, extensaoDe, contentTypeDe, nomeSemExtensao, nomeParaDownload, formatarTamanho, filtrarPdfs, proximaOrdem, corDaPasta, PASTA_CORES,
   type PdfPasta,
 } from "./pdfsArvore.ts";
@@ -197,4 +197,32 @@ test("filtrarPdfs: também encontra pelo player", () => {
   ];
   assert.deepEqual(filtrarPdfs(pdfs, "sobral").itens.map((f) => f.nome), ["Guia"]);
   assert.deepEqual(filtrarPdfs(pdfs, "sobrla").itens.map((f) => f.nome), ["Guia"]);
+});
+
+test("planoMoverPasta: subpasta para outro tema perde a cor e entra no fim das irmãs", () => {
+  const pastas = PASTAS.map((x) => (x.id === "tr" ? { ...x, cor: "#3b82f6" } : x));
+  const r = planoMoverPasta(pastas, "meta", "ia");
+  assert.deepEqual(r, { ok: true, patch: { parent_id: "ia", cor: null, ordem: 1 } });
+});
+
+test("planoMoverPasta: subpasta para a raiz vira tema com cor; tema mantém a cor que tinha", () => {
+  const r = planoMoverPasta(PASTAS, "claude", null);
+  assert.ok(r && r.ok && r.patch.parent_id === null && r.patch.cor?.startsWith("#") && r.patch.ordem === 2);
+  const comCor = PASTAS.map((x) => (x.id === "meta-cbo" ? { ...x, cor: "#10b981" } : x));
+  const r2 = planoMoverPasta(comCor, "meta-cbo", null);
+  assert.ok(r2 && r2.ok && r2.patch.cor === "#10b981");
+});
+
+test("planoMoverPasta: recusa para dentro dela mesma, de uma subpasta sua ou com nome repetido; mesmo lugar não faz nada", () => {
+  assert.deepEqual(planoMoverPasta(PASTAS, "tr", "meta-cbo"), { ok: false, motivo: "Não dá para colocar uma pasta dentro dela mesma" });
+  assert.deepEqual(planoMoverPasta(PASTAS, "tr", "tr"), { ok: false, motivo: "Não dá para colocar uma pasta dentro dela mesma" });
+  const repetida = [...PASTAS, p("x", "Claude", "tr")];
+  assert.deepEqual(planoMoverPasta(repetida, "x", "ia"), { ok: false, motivo: 'Já existe uma pasta "Claude" ali' });
+  assert.equal(planoMoverPasta(PASTAS, "meta", "tr"), null);
+});
+
+test("contarPdfsPorPasta: arquivo fora das pastas não conta em nenhuma", () => {
+  const c = contarPdfsPorPasta(PASTAS, [{ pasta_id: null }, { pasta_id: "meta" }]);
+  assert.equal(c.get("tr")?.total, 1);
+  assert.equal(c.get("meta")?.direto, 1);
 });
