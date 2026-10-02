@@ -1,5 +1,5 @@
 // Topo do CRM: título, botões (Colunas, Novo lead), seletor de visão e filtros (período, critério, etiqueta, busca).
-import { BarChart3, CalendarRange, Columns3, Download, KanbanSquare, ListChecks, Plus, Search, Table2, Tag, type LucideIcon } from "lucide-react";
+import { BarChart3, CalendarRange, Columns3, Database, Download, KanbanSquare, ListChecks, Plus, Search, Table2, Tag, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,13 +7,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MensagemBusca } from "@/components/MensagemBusca";
 import { ATALHOS_PERIODO, type AtalhoPeriodo, type CriterioPeriodo, type FiltroCrm, type FiltroPeriodo } from "@/lib/crmPeriodo";
 
-export type VisaoCrm = "fila" | "kanban" | "planilha" | "dashboard";
+export type VisaoCrm = "fila" | "kanban" | "planilha" | "dashboard" | "banco";
 
 const VISOES: { id: VisaoCrm; rotulo: string; Icone: LucideIcon }[] = [
   { id: "fila", rotulo: "Fila do dia", Icone: ListChecks },
   { id: "kanban", rotulo: "Kanban", Icone: KanbanSquare },
   { id: "planilha", rotulo: "Planilha", Icone: Table2 },
   { id: "dashboard", rotulo: "Dashboard", Icone: BarChart3 },
+  { id: "banco", rotulo: "Banco de leads", Icone: Database },
 ];
 
 /** Select com ícone à esquerda: valor logo depois do ícone e a seta no fim */
@@ -44,6 +45,8 @@ export function CrmTopo({
   const mudar = (parcial: Partial<FiltroCrm>) => onFiltro({ ...filtro, ...parcial });
   const mudarPeriodo = (parcial: Partial<FiltroPeriodo>) => mudar({ periodo: { ...filtro.periodo, ...parcial } });
   const { periodo } = filtro;
+  // No Banco de leads, os controles do topo que são só do funil somem (ele tem a barra própria)
+  const banco = visao === "banco";
 
   return (
     <div className="flex flex-col gap-3 shrink-0">
@@ -52,7 +55,7 @@ export function CrmTopo({
           <h1 className="text-xl font-bold tracking-tight">CRM</h1>
           <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wider">Funil de vendas</p>
         </div>
-        <div className="flex items-center gap-2">
+        {!banco && (<div className="flex items-center gap-2">
           {onExportar && (
             <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={onExportar}>
               <Download size={14} /> Exportar
@@ -64,12 +67,12 @@ export function CrmTopo({
           <Button size="sm" className="gap-1.5 text-xs h-8" onClick={onNovoLead}>
             <Plus size={14} /> Novo lead
           </Button>
-        </div>
+        </div>)}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <Tabs value={visao} onValueChange={(v) => onVisao(v as VisaoCrm)} className="w-full sm:w-auto">
-          <TabsList aria-label="Visão do CRM" className="grid w-full grid-cols-4 h-auto sm:inline-flex sm:w-auto sm:h-9">
+          <TabsList aria-label="Visão do CRM" className="grid w-full grid-cols-5 h-auto sm:inline-flex sm:w-auto sm:h-9">
             {VISOES.map(({ id, rotulo, Icone }) => (
               <TabsTrigger
                 key={id}
@@ -83,6 +86,7 @@ export function CrmTopo({
           </TabsList>
         </Tabs>
 
+        {!banco && (<>
         <Select value={periodo.atalho} onValueChange={(v) => mudarPeriodo({ atalho: v as AtalhoPeriodo })}>
           <SelectTrigger aria-label="Período" className={`h-9 text-xs flex-1 min-w-[140px] sm:flex-none sm:w-[165px] ${SELECT_COM_ICONE}`}>
             <CalendarRange className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
@@ -160,8 +164,9 @@ export function CrmTopo({
         <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap tabular-nums">
           {qtd} {qtd === 1 ? "lead" : "leads"}
         </span>
+        </>)}
       </div>
-      {resultadoBusca && <MensagemBusca resultado={resultadoBusca} />}
+      {!banco && resultadoBusca && <MensagemBusca resultado={resultadoBusca} />}
     </div>
   );
 }
