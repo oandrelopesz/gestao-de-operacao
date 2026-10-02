@@ -146,6 +146,84 @@ export type Database = {
         }
         Relationships: []
       }
+      banco_leads: {
+        Row: {
+          aba_id: string
+          created_at: string
+          dados: Json
+          hash: string | null
+          id: string
+          lead_crm_id: string | null
+          na_planilha: boolean
+          posicao: number
+          updated_at: string
+        }
+        Insert: {
+          aba_id: string
+          created_at?: string
+          dados?: Json
+          hash?: string | null
+          id?: string
+          lead_crm_id?: string | null
+          na_planilha?: boolean
+          posicao?: number
+          updated_at?: string
+        }
+        Update: {
+          aba_id?: string
+          created_at?: string
+          dados?: Json
+          hash?: string | null
+          id?: string
+          lead_crm_id?: string | null
+          na_planilha?: boolean
+          posicao?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banco_leads_aba_id_fkey"
+            columns: ["aba_id"]
+            isOneToOne: false
+            referencedRelation: "banco_leads_abas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banco_leads_lead_crm_id_fkey"
+            columns: ["lead_crm_id"]
+            isOneToOne: false
+            referencedRelation: "prospeccao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      banco_leads_abas: {
+        Row: {
+          ativa: boolean
+          colunas: Json
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          colunas?: Json
+          id: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          colunas?: Json
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           agencia: string
@@ -1925,6 +2003,101 @@ export type Database = {
           },
         ]
       }
+      planilha_config: {
+        Row: {
+          chave: string | null
+          id: string
+          planilha_id: string
+          ultima_conferencia_em: string | null
+          ultima_conferencia_erro: string | null
+          ultima_conferencia_ok: boolean | null
+          ultimo_aviso_em: string | null
+          updated_at: string
+          webapp_url: string | null
+        }
+        Insert: {
+          chave?: string | null
+          id?: string
+          planilha_id: string
+          ultima_conferencia_em?: string | null
+          ultima_conferencia_erro?: string | null
+          ultima_conferencia_ok?: boolean | null
+          ultimo_aviso_em?: string | null
+          updated_at?: string
+          webapp_url?: string | null
+        }
+        Update: {
+          chave?: string | null
+          id?: string
+          planilha_id?: string
+          ultima_conferencia_em?: string | null
+          ultima_conferencia_erro?: string | null
+          ultima_conferencia_ok?: boolean | null
+          ultimo_aviso_em?: string | null
+          updated_at?: string
+          webapp_url?: string | null
+        }
+        Relationships: []
+      }
+      planilha_fila: {
+        Row: {
+          campos: string[] | null
+          criado_em: string
+          dados: Json | null
+          entidade: string
+          id: number
+          op: string
+          registro_id: string
+        }
+        Insert: {
+          campos?: string[] | null
+          criado_em?: string
+          dados?: Json | null
+          entidade: string
+          id?: number
+          op: string
+          registro_id: string
+        }
+        Update: {
+          campos?: string[] | null
+          criado_em?: string
+          dados?: Json | null
+          entidade?: string
+          id?: number
+          op?: string
+          registro_id?: string
+        }
+        Relationships: []
+      }
+      planilha_pendencias: {
+        Row: {
+          criado_em: string
+          etapa_desejada: string
+          falta: string
+          lead_id: string
+        }
+        Insert: {
+          criado_em?: string
+          etapa_desejada: string
+          falta: string
+          lead_id: string
+        }
+        Update: {
+          criado_em?: string
+          etapa_desejada?: string
+          falta?: string
+          lead_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planilha_pendencias_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "prospeccao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plataformas_ads: {
         Row: {
           ativa: boolean
@@ -3175,6 +3348,14 @@ export type Database = {
         Args: { p_processo: string }
         Returns: undefined
       }
+      banco_leads_definir: {
+        Args: { p_chave: string; p_id: string; p_valor: string }
+        Returns: undefined
+      }
+      banco_leads_ligar: {
+        Args: { p_chave: string; p_crm: string; p_id: string; p_valor: string }
+        Returns: undefined
+      }
       calcular_proxima_execucao: {
         Args: {
           p_data_referencia?: string
@@ -3204,6 +3385,15 @@ export type Database = {
         Args: { o: Database["public"]["Tables"]["operacoes"]["Row"] }
         Returns: number
       }
+      planilha_avisar: { Args: never; Returns: undefined }
+      planilha_canonico: { Args: { d: Json }; Returns: string }
+      planilha_chave_papel: {
+        Args: { p_aba: string; p_papel: string }
+        Returns: string
+      }
+      planilha_origem: { Args: never; Returns: string }
+      planilha_resumo: { Args: never; Returns: Json }
+      planilha_status: { Args: never; Returns: Json }
       proximo_dia_semana: { Args: { p_dia: number }; Returns: string }
       registrar_envio_formulario: {
         Args: {
