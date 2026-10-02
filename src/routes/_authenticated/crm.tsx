@@ -13,6 +13,8 @@ import { NovoLeadDialog } from "@/components/crm/NovoLeadDialog";
 import { ConfigurarColunas } from "@/components/crm/ConfigurarColunas";
 import { CadastrarCliente } from "@/components/crm/CadastrarCliente";
 import { ExportarDialog } from "@/components/crm/ExportarDialog";
+import { BancoLeads } from "@/components/crm/banco/BancoLeads";
+import { useCrmTempoReal } from "@/components/crm/useCrmTempoReal";
 import { agruparEventos, filtrarLeads, FILTRO_CRM_PADRAO, type FiltroCrm } from "@/lib/crmPeriodo";
 
 export const Route = createFileRoute("/_authenticated/crm")({
@@ -55,7 +57,8 @@ function useAgora(intervaloMs: number) {
 }
 
 function CrmTela() {
-  const { leads, eventos, carregando, erro, abrirExportacao } = useCrm();
+  const { leads, eventos, carregando, erro, abrirExportacao, abrirFicha } = useCrm();
+  useCrmTempoReal();
   const [visao, setVisao] = useState<VisaoCrm>(() => lerLocal("crm-visao", { v: "kanban" as VisaoCrm }).v);
   const [filtro, setFiltro] = useState<FiltroCrm>(() => lerLocal("crm-filtro", FILTRO_CRM_PADRAO));
   const [novoLead, setNovoLead] = useState(false);
@@ -106,6 +109,14 @@ function CrmTela() {
           {visao === "kanban" && <KanbanCrm leads={filtrados} />}
           {visao === "planilha" && <PlanilhaCrm leads={filtrados} />}
           {visao === "dashboard" && <DashboardCrm leads={filtrados} eventos={eventosFiltrados} />}
+          {visao === "banco" && (
+            <BancoLeads
+              onAbrirNoCrm={(id) => {
+                setVisao("kanban");
+                abrirFicha(id);
+              }}
+            />
+          )}
         </div>
       )}
       <FichaLead />
