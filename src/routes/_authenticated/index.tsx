@@ -513,6 +513,8 @@ function DemandasPage() {
     }
   };
 
+  const nomeDoCliente = useMemo(() => new Map(clientes.map((c) => [c.id, c.nome] as const)), [clientes]);
+
   // Busca tolerante (sem acento, com erro de digitação): só filtra, os cards seguem a ordem das colunas
   const resultadoBusca = useBusca(
     demandas,
@@ -520,7 +522,14 @@ function DemandasPage() {
     // A agência (da demanda ou do cliente) também entra: buscar "Effect" acha as demandas da Effect
     (d) => {
       const agencia = d.pessoal ? null : d.agencia_id || d.clientes?.agencia;
-      return [d.titulo, d.clientes?.nome, d.pessoal ? "Pessoal" : null, agencia ? agenciaLabelOf(agencia) : null];
+      return [
+        d.titulo,
+        d.clientes?.nome,
+        // Clientes a mais da demanda também acham o card
+        ...(d.pessoal || !d.cliente_id ? [] : (d.clientes_extras ?? []).map((id: string) => nomeDoCliente.get(id) ?? null)),
+        d.pessoal ? "Pessoal" : null,
+        agencia ? agenciaLabelOf(agencia) : null,
+      ];
     },
     { manterOrdem: true },
   );
@@ -993,7 +1002,7 @@ function DemandasPage() {
                                           ? "Pessoal"
                                           : d.agencia_id
                                             ? `${agenciaLabelOf(d.agencia_id)} (agência)`
-                                            : `${d.clientes?.nome ?? "Sem cliente"} — ${agenciaLabelOf(d.clientes?.agencia)}`} • {columns.find(c => c.id === d.status)?.title}
+                                            : `${[d.clientes?.nome ?? "Sem cliente", ...(d.cliente_id ? (d.clientes_extras ?? []).map((id: string) => nomeDoCliente.get(id)).filter(Boolean) : [])].join(" + ")} — ${agenciaLabelOf(d.clientes?.agencia)}`} • {columns.find(c => c.id === d.status)?.title}
                                     </p>
                                 </div>
                             </div>

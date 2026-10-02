@@ -37,6 +37,7 @@ interface Demanda {
   roadmap_id?: string | null;
   pessoal?: boolean;
   agencia_id?: string | null;
+  clientes_extras?: string[] | null;
 }
 
 interface KanbanColumnProps {

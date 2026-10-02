@@ -39,6 +39,8 @@ interface Demanda {
   roadmap_id?: string | null;
   pessoal?: boolean;
   agencia_id?: string | null;
+  /** Clientes além do principal (`cliente_id`) */
+  clientes_extras?: string[] | null;
 }
 
 interface KanbanCardProps {
@@ -213,6 +215,8 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                     clienteIdAtual={demanda.cliente_id}
                     pessoalAtual={demanda.pessoal}
                     agenciaIdAtual={demanda.agencia_id}
+                    clientesExtrasAtuais={demanda.clientes_extras}
+                    variosClientes
                     onEscolher={(valor) => onAtribuirCliente(demanda.id, valor)}
                   >
                     <Button
@@ -334,6 +338,21 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                   <User size={10} className="shrink-0" /> <span className="truncate">{demanda.clientes.nome}</span>
                 </span>
               )}
+
+              {/* Demanda de mais de um cliente: um selo para cada cliente a mais */}
+              {!demanda.pessoal && demanda.cliente_id && (demanda.clientes_extras ?? []).map((id) => {
+                const nome = clientes?.find((c) => c.id === id)?.nome;
+                if (!nome) return null;
+                return (
+                  <span
+                    key={id}
+                    title={`Cliente: ${nome}`}
+                    className="inline-flex items-center gap-1 max-w-full truncate text-[10px] font-medium px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                  >
+                    <User size={10} className="shrink-0" /> <span className="truncate">{nome}</span>
+                  </span>
+                );
+              })}
 
               {demanda.descricao && (
                 <span

@@ -531,6 +531,7 @@ export type Database = {
         Row: {
           agencia_id: string | null
           cliente_id: string | null
+          clientes_extras: string[]
           concluida_em: string
           demanda_id: string | null
           id: string
@@ -541,6 +542,7 @@ export type Database = {
         Insert: {
           agencia_id?: string | null
           cliente_id?: string | null
+          clientes_extras?: string[]
           concluida_em?: string
           demanda_id?: string | null
           id?: string
@@ -551,6 +553,7 @@ export type Database = {
         Update: {
           agencia_id?: string | null
           cliente_id?: string | null
+          clientes_extras?: string[]
           concluida_em?: string
           demanda_id?: string | null
           id?: string
@@ -618,6 +621,7 @@ export type Database = {
         Row: {
           agencia_id: string | null
           cliente_id: string | null
+          clientes_extras: string[]
           created_at: string
           descricao: string | null
           dia_fim_de_semana: string | null
@@ -648,6 +652,7 @@ export type Database = {
         Insert: {
           agencia_id?: string | null
           cliente_id?: string | null
+          clientes_extras?: string[]
           created_at?: string
           descricao?: string | null
           dia_fim_de_semana?: string | null
@@ -678,6 +683,7 @@ export type Database = {
         Update: {
           agencia_id?: string | null
           cliente_id?: string | null
+          clientes_extras?: string[]
           created_at?: string
           descricao?: string | null
           dia_fim_de_semana?: string | null

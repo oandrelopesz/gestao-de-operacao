@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, CheckCircle2, Users, User, CalendarRange, ChevronRight, X, Inbox, Building2, AlertTriangle } from "lucide-react";
+import { BarChart3, CheckCircle2, Users, User, CalendarRange, ChevronRight, X, Inbox, Building2, AlertTriangle, MoreVertical, Undo2, Trash2, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,6 +11,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ClientePicker, type DonoDemanda } from "@/components/demandas/ClientePicker";
 import { cn } from "@/lib/utils";
 import { hojeBrasilia } from "@/lib/entrega";
 import {
@@ -25,6 +38,7 @@ import {
   type PeriodoId,
 } from "@/lib/dashboard";
 import { useAgencias } from "@/lib/agencias";
+import { expandirPorCliente } from "@/lib/clientesDaDemanda";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -32,8 +46,19 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 interface ConclusaoRow extends Conclusao {
   id: string;
+  /** Nulo quando a demanda já foi excluída da aba Demandas (o registro da conclusão fica) */
+  demanda_id: string | null;
   titulo: string | null;
+  clientes_extras?: string[] | null;
+  /** Cliente principal da demanda: numa demanda de vários clientes, cada entrada tem um `cliente_id` diferente */
+  cliente_principal?: string | null;
 }
+
+/** Chave única de uma entrada (a mesma conclusão aparece uma vez por cliente) */
+const chaveItem = (c: ConclusaoRow) => `${c.id}:${c.cliente_id ?? ""}`;
+
+/** Seleção que lista todas as concluídas do período (clique no cartão "Concluídas no período") */
+const SEL_TODAS = "todas";
 
 const PERIODOS: { id: PeriodoId; label: string }[] = [
   { id: "7", label: "7 dias" },
@@ -132,7 +157,7 @@ function DashboardPage() {
       for (let inicio = 0; ; inicio += PAGINA) {
         let q = supabase
           .from("demanda_conclusoes")
-          .select("id, cliente_id, pessoal, agencia_id, prazo, titulo, concluida_em")
+          .select("id, demanda_id, cliente_id, clientes_extras, pessoal, agencia_id, prazo, titulo, concluida_em")
           .order("concluida_em", { ascending: false })
           .range(inicio, inicio + PAGINA - 1);
         // Folga de um dia em UTC; o recorte exato por data de Brasília é feito abaixo
@@ -151,10 +176,13 @@ function DashboardPage() {
         .order("nome");
       if (errCli) throw errCli;
 
-      const noPeriodo = linhas.filter((c) => {
-        const d = dataLocalBrasilia(c.concluida_em);
-        return (!intervalo.de || d >= intervalo.de) && (!intervalo.ate || d <= intervalo.ate);
-      });
+      // Demanda de mais de um cliente conta uma vez para cada cliente (uma entrada por cliente)
+      const noPeriodo = expandirPorCliente(
+        linhas.filter((c) => {
+          const d = dataLocalBrasilia(c.concluida_em);
+          return (!intervalo.de || d >= intervalo.de) && (!intervalo.ate || d <= intervalo.ate);
+        }),
+      );
 
       // Clientes arquivados com conclusões no período também ganham linha (e barra/detalhe)
       const ativos = cli ?? [];
@@ -221,8 +249,6 @@ function DashboardPage() {
     () => agregarPorAgencia(conclusoes, agenciaDoCliente, agencias),
     [conclusoes, agenciaDoCliente, agencias],
   );
-  const maxPctAgencia = porAgencia.reduce((m, l) => Math.max(m, l.percentual), 0);
-
   const atraso = useMemo(() => entreguesComAtraso(conclusoes), [conclusoes]);
 
   const nomeCliente = useMemo(
@@ -247,14 +273,21 @@ function DashboardPage() {
   const top10 = useMemo(() => linhas.filter((l) => l.total > 0).slice(0, 10), [linhas]);
   const maxPct = linhas.reduce((m, l) => Math.max(m, l.percentual), 0);
 
-  // A seleção vem da tabela por cliente (chave do grupo) ou do bloco Por agência ("ag:" + id da agência)
+  // A seleção vem da tabela por cliente (chave do grupo), do bloco Por agência ("ag:" + id da agência) ou do cartão
+  // "Concluídas no período" (todas)
   const agenciaSelecionada = selecionado?.startsWith(PREFIXO_SEL_AGENCIA) ? selecionado.slice(PREFIXO_SEL_AGENCIA.length) : null;
+  const todasSelecionadas = selecionado === SEL_TODAS;
   const linhaSelecionada =
-    (agenciaSelecionada
-      ? porAgencia.find((l) => l.chave === agenciaSelecionada)
-      : linhas.find((l) => l.chave === selecionado)) ?? null;
+    (todasSelecionadas
+      ? total > 0
+        ? { chave: SEL_TODAS, nome: "Todas as concluídas", total, percentual: 100 }
+        : null
+      : agenciaSelecionada
+        ? porAgencia.find((l) => l.chave === agenciaSelecionada)
+        : linhas.find((l) => l.chave === selecionado)) ?? null;
   const detalhe = useMemo(() => {
     if (!selecionado) return [];
+    if (selecionado === SEL_TODAS) return conclusoes;
     if (agenciaSelecionada) {
       return conclusoes.filter((c) => (agenciaDaConclusao(c, agenciaDoCliente) ?? "sem_agencia") === agenciaSelecionada);
     }
@@ -270,6 +303,106 @@ function DashboardPage() {
     setSelecionado((atual) => (atual === chave ? null : chave));
     requestAnimationFrame(() => detalheRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
   };
+
+  // ---------------------------------------------------------------- Ações numa demanda concluída
+  const [excluindo, setExcluindo] = useState<ConclusaoRow | null>(null);
+  const clientesDoSeletor = useMemo(() => clientes.map((c) => ({ id: c.id, nome: c.nome })), [clientes]);
+
+  /** Desfazer: a demanda sai de Feito e volta para o fim de Fazer hoje (o banco apaga a conclusão do log). */
+  const desfazer = async (c: ConclusaoRow) => {
+    if (!c.demanda_id) return;
+    try {
+      const { data: ultima, error: e1 } = await supabase
+        .from("demandas")
+        .select("ordem")
+        .eq("status", "fazer_hoje")
+        .order("ordem", { ascending: false })
+        .limit(1);
+      if (e1) throw e1;
+      const { error } = await supabase
+        .from("demandas")
+        .update({ status: "fazer_hoje", ordem: (ultima?.[0]?.ordem ?? -1) + 1 })
+        .eq("id", c.demanda_id);
+      if (error) throw error;
+      toast.success("Conclusão desfeita: a demanda voltou para Fazer hoje.");
+      carregar();
+    } catch (e) {
+      console.error("Erro ao desfazer a conclusão:", e);
+      toast.error("Não foi possível desfazer a conclusão.");
+    }
+  };
+
+  /** Trocar cliente, Pessoal ou agência: muda a demanda, e o banco acompanha no log. */
+  const trocarDono = async (c: ConclusaoRow, valor: DonoDemanda) => {
+    if (!c.demanda_id) return;
+    const { error } = await supabase.from("demandas").update(valor).eq("id", c.demanda_id);
+    if (error) {
+      console.error("Erro ao trocar o dono da demanda:", error);
+      toast.error("Não foi possível trocar o cliente.");
+      return;
+    }
+    toast.success("Demanda atualizada.");
+    carregar();
+  };
+
+  /**
+   * Excluir: apaga a demanda (aba Demandas) e o registro da conclusão, como se nunca tivesse sido feita.
+   * A demanda sai primeiro: se o segundo passo falhar, sobra só o registro, que dá para remover de novo.
+   */
+  const excluir = async (c: ConclusaoRow) => {
+    try {
+      if (c.demanda_id) {
+        const { error } = await supabase.from("demandas").delete().eq("id", c.demanda_id);
+        if (error) throw error;
+      }
+      const { error } = await supabase.from("demanda_conclusoes").delete().eq("id", c.id);
+      if (error) throw error;
+      toast.success(c.demanda_id ? "Demanda excluída." : "Removida do histórico.");
+      carregar();
+    } catch (e) {
+      console.error("Erro ao excluir a demanda:", e);
+      toast.error("Não foi possível excluir.");
+      carregar();
+    }
+  };
+
+  const acoesDaConclusao = (c: ConclusaoRow) => (
+    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity">
+      {c.demanda_id && (
+        <ClientePicker
+          clientes={clientesDoSeletor}
+          clienteIdAtual={c.cliente_principal ?? c.cliente_id}
+          pessoalAtual={c.pessoal}
+          agenciaIdAtual={c.agencia_id}
+          clientesExtrasAtuais={c.clientes_extras}
+          variosClientes
+          onEscolher={(valor) => trocarDono(c, valor)}
+          align="end"
+        >
+          <Button variant="ghost" size="icon" className="h-7 w-7" title="Trocar cliente ou agência">
+            <UserPlus size={14} />
+          </Button>
+        </ClientePicker>
+      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-7 w-7" title="Mais ações">
+            <MoreVertical size={14} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-[200px] text-xs">
+          {c.demanda_id && (
+            <DropdownMenuItem onClick={() => desfazer(c)} className="gap-2 py-1.5">
+              <Undo2 size={12} /> Desfazer conclusão
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={() => setExcluindo(c)} className="gap-2 py-1.5 text-destructive focus:text-destructive">
+            <Trash2 size={12} /> {c.demanda_id ? "Excluir demanda" : "Remover do histórico"}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 
   const descricaoPeriodo = (() => {
     if (!intervalo.de && !intervalo.ate) return "Todo o histórico";
@@ -343,6 +476,8 @@ function DashboardPage() {
           icone={<CheckCircle2 size={18} className="text-emerald-500" />}
           detalhe={lider ? `Mais concluídas: ${lider.nome} (${formatarPct(lider.percentual)})` : "Nenhuma ainda"}
           loading={loading}
+          onClick={total > 0 ? () => selecionar(SEL_TODAS) : undefined}
+          titulo_acao="Ver todas as concluídas (e excluir ou desfazer)"
         />
         <ResumoCard
           titulo="Clientes atendidos"
@@ -380,6 +515,58 @@ function DashboardPage() {
         </div>
       ) : (
         <>
+        {/* Por agência: % das concluídas do período (demandas da agência + dos clientes dela) */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2"><Building2 size={16} /> Por agência</CardTitle>
+            <CardDescription>
+              Quanto cada agência representa das {total} demandas concluídas: as atribuídas à agência mais as dos clientes dela. Clique para ver as demandas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+              {porAgencia
+                .filter((l) => l.total > 0)
+                .map((l) => (
+                  <div
+                    key={l.chave}
+                    className="h-full bg-slate-400 first:rounded-l-full last:rounded-r-full"
+                    style={{ width: `${(l.total / total) * 100}%`, backgroundColor: metaAgencia(l.chave)?.hex }}
+                    title={`${l.nome}: ${formatarPct(l.percentual)}`}
+                  />
+                ))}
+            </div>
+            <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
+              {porAgencia.map((l) => {
+                const chave = PREFIXO_SEL_AGENCIA + l.chave;
+                const hex = metaAgencia(l.chave)?.hex;
+                return (
+                  <button
+                    key={l.chave}
+                    type="button"
+                    onClick={() => selecionar(chave)}
+                    className={cn(
+                      "rounded-lg border p-3 text-left transition-colors hover:bg-muted/50",
+                      selecionado === chave && "border-primary bg-primary/5",
+                      l.total === 0 && "opacity-60",
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-slate-400" style={hex ? { backgroundColor: hex } : undefined} />
+                      <span className="truncate">{l.nome}</span>
+                    </span>
+                    <span className="mt-1 block text-2xl font-bold tabular-nums">{formatarPct(l.percentual)}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {l.total} demanda{l.total === 1 ? "" : "s"}
+                      {l.diretas > 0 ? ` · ${l.diretas} da agência` : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 lg:grid-cols-5 items-start">
           {/* Gráfico: 10 maiores */}
           <Card className="lg:col-span-2">
@@ -500,65 +687,9 @@ function DashboardPage() {
           </Card>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-5 items-start">
-          {/* Por agência: demandas da agência + dos clientes dela */}
-          <Card className="lg:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2"><Building2 size={16} /> Por agência</CardTitle>
-              <CardDescription>Demandas atribuídas à agência mais as dos clientes dela. Clique para ver as demandas.</CardDescription>
-            </CardHeader>
-            <CardContent className="px-0 pb-2">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="pl-6">Agência</TableHead>
-                    <TableHead className="text-right w-[90px]">Demandas</TableHead>
-                    <TableHead className="w-[38%] pr-6">% do total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {porAgencia.map((l) => {
-                    const chave = PREFIXO_SEL_AGENCIA + l.chave;
-                    const hex = metaAgencia(l.chave)?.hex;
-                    return (
-                      <TableRow
-                        key={l.chave}
-                        onClick={() => selecionar(chave)}
-                        data-state={selecionado === chave ? "selected" : undefined}
-                        className={cn("cursor-pointer", l.total === 0 && "text-muted-foreground")}
-                      >
-                        <TableCell className="pl-6 font-medium">
-                          <span className="inline-flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-slate-400" style={hex ? { backgroundColor: hex } : undefined} />
-                            {l.nome}
-                            {l.diretas > 0 && (
-                              <span className="text-[11px] font-normal text-muted-foreground" title="Demandas atribuídas à própria agência">
-                                ({l.diretas} da agência)
-                              </span>
-                            )}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{l.total}</TableCell>
-                        <TableCell className="pr-6">
-                          <div className="flex items-center gap-2">
-                            <Progress
-                              value={maxPctAgencia > 0 ? (l.percentual / maxPctAgencia) * 100 : 0}
-                              className="h-1.5 bg-muted"
-                              indicatorClassName={l.chave === "sem_agencia" ? "bg-slate-400" : "bg-primary"}
-                            />
-                            <span className="w-12 text-right text-xs tabular-nums">{formatarPct(l.percentual)}</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
+        <div>
           {/* Entregues com atraso: concluídas depois da data de entrega */}
-          <Card className="lg:col-span-3">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2"><AlertTriangle size={16} className="text-red-500" /> Entregues com atraso</CardTitle>
               <CardDescription>
@@ -572,13 +703,14 @@ function DashboardPage() {
               ) : (
                 <ul className="divide-y max-h-[420px] overflow-y-auto">
                   {atraso.atrasadas.map((c) => (
-                    <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                      <div className="min-w-0">
+                    <li key={chaveItem(c)} className="group flex items-center justify-between gap-3 py-2 text-sm">
+                      <div className="min-w-0 flex-1">
                         <p className="truncate">{c.titulo || "(sem título)"}</p>
                         <p className="text-xs text-muted-foreground truncate">
                           {nomeDono(c)} · entrega {formatarData(c.prazo!)} · concluída {formatarDataHora(c.concluida_em)}
                         </p>
                       </div>
+                      {acoesDaConclusao(c)}
                       <Badge variant="outline" className="shrink-0 border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400 tabular-nums">
                         {c.diasAtraso} {c.diasAtraso === 1 ? "dia" : "dias"}
                       </Badge>
@@ -611,14 +743,17 @@ function DashboardPage() {
               {detalhe.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4">Nenhuma demanda concluída para este cliente no período.</p>
               ) : (
-                <ul className="divide-y">
+                <ul className="divide-y max-h-[560px] overflow-y-auto">
                   {detalhe.map((c) => (
-                    <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                      <span className="inline-flex items-center gap-2 min-w-0">
+                    <li key={chaveItem(c)} className="group flex items-center justify-between gap-3 py-2 text-sm">
+                      <span className="inline-flex items-center gap-2 min-w-0 flex-1">
                         <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
                         <span className="truncate">{c.titulo || "(sem título)"}</span>
-                        {agenciaSelecionada && <span className="text-xs text-muted-foreground shrink-0">· {nomeDono(c)}</span>}
+                        {(agenciaSelecionada || todasSelecionadas) && (
+                          <span className="text-xs text-muted-foreground shrink-0">· {nomeDono(c)}</span>
+                        )}
                       </span>
+                      {acoesDaConclusao(c)}
                       <span className="text-xs text-muted-foreground tabular-nums shrink-0">{formatarDataHora(c.concluida_em)}</span>
                     </li>
                   ))}
@@ -628,6 +763,34 @@ function DashboardPage() {
           </Card>
         )}
       </div>
+
+      <AlertDialog open={!!excluindo} onOpenChange={(aberto) => { if (!aberto) setExcluindo(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{excluindo?.demanda_id ? "Excluir esta demanda?" : "Remover do histórico?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{excluindo?.titulo || "(sem título)"}"{" "}
+              {excluindo?.demanda_id
+                ? "será apagada da aba Demandas e deixa de contar no Dashboard (para todos os clientes dela), como se nunca tivesse sido feita."
+                : "deixa de contar no Dashboard (a demanda já tinha sido apagada da aba Demandas)."}{" "}
+              Não dá para desfazer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const alvo = excluindo;
+                setExcluindo(null);
+                if (alvo) excluir(alvo);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -638,15 +801,23 @@ function ResumoCard({
   icone,
   detalhe,
   loading,
+  onClick,
+  titulo_acao,
 }: {
   titulo: string;
   valor: number;
   icone: React.ReactNode;
   detalhe: string;
   loading: boolean;
+  onClick?: () => void;
+  titulo_acao?: string;
 }) {
   return (
-    <Card>
+    <Card
+      onClick={onClick}
+      title={onClick ? titulo_acao : undefined}
+      className={cn(onClick && "cursor-pointer transition-colors hover:border-primary/40 hover:bg-muted/30")}
+    >
       <CardContent className="p-5">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">{titulo}</p>

@@ -41,6 +41,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ClientePicker } from "@/components/demandas/ClientePicker";
 import { useAgencias } from "@/lib/agencias";
+import { clientesDaDemanda } from "@/lib/clientesDaDemanda";
 import { hojeBrasilia, diasDeAtraso, formatarDataCurta } from "@/lib/entrega";
 import { NOMES_DIA } from "@/lib/colunasDias";
 
@@ -70,6 +71,7 @@ interface Demanda {
   clientes?: { nome: string; agencia?: string };
   pessoal?: boolean;
   agencia_id?: string | null;
+  clientes_extras?: string[] | null;
   processo_passo_id?: string | null;
   roadmap_id?: string | null;
 }
@@ -296,6 +298,8 @@ export function DemandaDrawer({
                     clienteIdAtual={demanda.cliente_id}
                     pessoalAtual={demanda.pessoal}
                     agenciaIdAtual={demanda.agencia_id}
+                    clientesExtrasAtuais={demanda.clientes_extras}
+                    variosClientes
                     onEscolher={(valor) => saveUpdate(valor)}
                   >
                     <button className="text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 px-1.5 py-0.5 rounded transition-colors text-left truncate max-w-full">
@@ -303,7 +307,12 @@ export function DemandaDrawer({
                         ? "Pessoal"
                         : demanda.agencia_id
                           ? `${labelAgencia(demanda.agencia_id)} (agência)`
-                          : clientes.find((c) => c.id === demanda.cliente_id)?.nome || demanda.clientes?.nome || "Adicionar cliente"}
+                          : demanda.cliente_id
+                            ? clientesDaDemanda(demanda)
+                                .map((id) => clientes.find((c) => c.id === id)?.nome || (id === demanda.cliente_id ? demanda.clientes?.nome : null))
+                                .filter(Boolean)
+                                .join(" + ") || "Cliente"
+                            : "Adicionar cliente"}
                     </button>
                   </ClientePicker>
                 </div>

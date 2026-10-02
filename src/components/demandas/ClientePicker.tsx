@@ -13,6 +13,7 @@ import { MENSAGEM_NENHUM, MENSAGEM_PARECIDOS } from "@/lib/search";
 import { useBusca } from "@/lib/useBusca";
 import { cn } from "@/lib/utils";
 import { useAgencias, type AgenciaDef } from "@/lib/agencias";
+import { alternarCliente, clientesDaDemanda } from "@/lib/clientesDaDemanda";
 
 interface ClientePickerCliente {
   id: string;
@@ -20,11 +21,15 @@ interface ClientePickerCliente {
   agencia?: string;
 }
 
-/** Dono de uma demanda: um cliente, "Pessoal" ou uma agência (exclusivos; nenhum = "Sem cliente"). */
+/**
+ * Dono de uma demanda: cliente(s), "Pessoal" ou uma agência (exclusivos; nenhum = "Sem cliente").
+ * Com mais de um cliente, `cliente_id` é o principal e `clientes_extras` os demais.
+ */
 export type DonoDemanda = {
   cliente_id: string | null;
   pessoal: boolean;
   agencia_id: string | null;
+  clientes_extras: string[];
 };
 
 interface ClientePickerProps {
@@ -32,6 +37,7 @@ interface ClientePickerProps {
   clienteIdAtual: string | null;
   pessoalAtual?: boolean;
   agenciaIdAtual?: string | null;
+  clientesExtrasAtuais?: string[] | null;
   onEscolher: (valor: DonoDemanda) => void;
   children: React.ReactNode;
   align?: "start" | "center" | "end";
@@ -39,6 +45,11 @@ interface ClientePickerProps {
   permitirSemCliente?: boolean;
   /** false esconde as agências (ex.: dono de um roadmap). */
   comAgencias?: boolean;
+  /**
+   * true mostra uma caixa em cada cliente para juntar mais de um (a lista fica aberta). Clicar no nome continua
+   * escolhendo só aquele cliente.
+   */
+  variosClientes?: boolean;
 }
 
 /** O que a lista mostra: "Pessoal", "Sem cliente", as agências e os clientes (todos entram na busca pelo rótulo). */
@@ -63,11 +74,13 @@ export function ClientePicker({
   clienteIdAtual,
   pessoalAtual,
   agenciaIdAtual,
+  clientesExtrasAtuais,
   onEscolher,
   children,
   align = "start",
   permitirSemCliente = true,
   comAgencias = true,
+  variosClientes = false,
 }: ClientePickerProps) {
   const { agencias } = useAgencias();
   const [open, setOpen] = useState(false);
@@ -105,7 +118,10 @@ export function ClientePicker({
           clienteIdAtual={clienteIdAtual}
           pessoalAtual={pessoalAtual}
           agenciaIdAtual={agenciaIdAtual ?? null}
+          clientesExtrasAtuais={clientesExtrasAtuais ?? []}
+          variosClientes={variosClientes}
           escolher={escolher}
+          alternar={onEscolher}
         />
       </PopoverContent>
     </Popover>
@@ -119,38 +135,72 @@ interface ListaClientesProps {
   clienteIdAtual: string | null;
   pessoalAtual?: boolean;
   agenciaIdAtual: string | null;
+  clientesExtrasAtuais: string[];
+  variosClientes: boolean;
+  /** Escolhe e fecha */
   escolher: (valor: DonoDemanda) => void;
+  /** Marca/desmarca um cliente a mais e deixa a lista aberta */
+  alternar: (valor: DonoDemanda) => void;
 }
 
 /** Conteúdo do popover. O texto digitado mora aqui: ao fechar o popover o conteúdo sai da tela e a busca volta vazia. */
-function ListaClientes({ clientes, agencias, permitirSemCliente, clienteIdAtual, pessoalAtual, agenciaIdAtual, escolher }: ListaClientesProps) {
+function ListaClientes({
+  clientes,
+  agencias,
+  permitirSemCliente,
+  clienteIdAtual,
+  pessoalAtual,
+  agenciaIdAtual,
+  clientesExtrasAtuais,
+  variosClientes,
+  escolher,
+  alternar,
+}: ListaClientesProps) {
   const [texto, setTexto] = useState("");
-  const entradas = useMemo<Entrada[]>(
-    () => [
+  // Clientes marcados nesta abertura: a marcação é salva a cada clique, mas a lista não espera o banco responder
+  const [marcados, setMarcados] = useState<string[]>(() =>
+    pessoalAtual ? [] : clientesDaDemanda({ cliente_id: clienteIdAtual, clientes_extras: clientesExtrasAtuais })
+  );
+  // Os marcados ao abrir vêm primeiro na lista (sem pular de lugar enquanto marca e desmarca)
+  const [marcadosAoAbrir] = useState(marcados);
+  const entradas = useMemo<Entrada[]>(() => {
+    const lista = variosClientes && marcadosAoAbrir.length
+      ? [
+          ...marcadosAoAbrir.map((id) => clientes.find((c) => c.id === id)).filter((c): c is ClientePickerCliente => !!c),
+          ...clientes.filter((c) => !marcadosAoAbrir.includes(c.id)),
+        ]
+      : clientes;
+    return [
       { tipo: "pessoal" as const },
       ...(permitirSemCliente ? [{ tipo: "semCliente" as const }] : []),
       ...agencias.map((agencia) => ({ tipo: "agencia" as const, agencia })),
-      ...clientes.map((cliente) => ({ tipo: "cliente" as const, cliente })),
-    ],
-    [permitirSemCliente, agencias, clientes]
-  );
+      ...lista.map((cliente) => ({ tipo: "cliente" as const, cliente })),
+    ];
+  }, [permitirSemCliente, agencias, clientes, variosClientes, marcadosAoAbrir]);
   // Sem texto: Pessoal, Sem cliente, agências (na ordem do cadastro) e clientes por nome; com texto, na ordem da busca.
   const resultado = useBusca(entradas, texto, camposDaEntrada);
 
-  const semCliente = !pessoalAtual && !clienteIdAtual && !agenciaIdAtual;
+  const alternarCliente_ = (id: string) => {
+    const novo = alternarCliente({ cliente_id: marcados[0] ?? null, clientes_extras: marcados.slice(1) }, id);
+    setMarcados(clientesDaDemanda(novo));
+    alternar({ ...novo, pessoal: false, agencia_id: null });
+  };
+
+  const temCliente = marcados.length > 0;
+  const semCliente = !pessoalAtual && !temCliente && !agenciaIdAtual;
   const renderEntrada = (entrada: Entrada) => {
     if (entrada.tipo === "pessoal") {
       return (
-        <CommandItem key="x:pessoal" value="x:pessoal" onSelect={() => escolher({ cliente_id: null, pessoal: true, agencia_id: null })}>
+        <CommandItem key="x:pessoal" value="x:pessoal" onSelect={() => escolher({ cliente_id: null, pessoal: true, agencia_id: null, clientes_extras: [] })}>
           <User size={14} className="text-violet-500" />
           <span className="flex-1">Pessoal</span>
-          {pessoalAtual && <Check size={14} />}
+          {pessoalAtual && !temCliente && <Check size={14} />}
         </CommandItem>
       );
     }
     if (entrada.tipo === "semCliente") {
       return (
-        <CommandItem key="__vazio__" value="__vazio__" onSelect={() => escolher({ cliente_id: null, pessoal: false, agencia_id: null })}>
+        <CommandItem key="__vazio__" value="__vazio__" onSelect={() => escolher({ cliente_id: null, pessoal: false, agencia_id: null, clientes_extras: [] })}>
           <span className={cn("flex-1", semCliente ? "" : "text-zinc-500")}>Sem cliente</span>
           {semCliente && <Check size={14} />}
         </CommandItem>
@@ -159,18 +209,43 @@ function ListaClientes({ clientes, agencias, permitirSemCliente, clienteIdAtual,
     if (entrada.tipo === "agencia") {
       const a = entrada.agencia;
       return (
-        <CommandItem key={`a:${a.id}`} value={`a:${a.id}`} onSelect={() => escolher({ cliente_id: null, pessoal: false, agencia_id: a.id })}>
+        <CommandItem key={`a:${a.id}`} value={`a:${a.id}`} onSelect={() => escolher({ cliente_id: null, pessoal: false, agencia_id: a.id, clientes_extras: [] })}>
           <Building2 size={14} style={{ color: a.hex }} />
           <span className="flex-1 truncate">{a.label}</span>
-          {!pessoalAtual && agenciaIdAtual === a.id && <Check size={14} />}
+          {!pessoalAtual && !temCliente && agenciaIdAtual === a.id && <Check size={14} />}
         </CommandItem>
       );
     }
     const c = entrada.cliente;
+    const marcado = marcados.includes(c.id);
     return (
-      <CommandItem key={c.id} value={`c:${c.id}`} onSelect={() => escolher({ cliente_id: c.id, pessoal: false, agencia_id: null })}>
+      <CommandItem key={c.id} value={`c:${c.id}`} onSelect={() => escolher({ cliente_id: c.id, pessoal: false, agencia_id: null, clientes_extras: [] })}>
+        {variosClientes && (
+          // Caixa: junta (ou tira) este cliente sem fechar a lista; clicar no nome escolhe só ele
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={marcado}
+            aria-label={marcado ? `Tirar ${c.nome}` : `Juntar ${c.nome}`}
+            title={marcado ? "Tirar este cliente" : "Juntar este cliente (mais de um)"}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              alternarCliente_(c.id);
+            }}
+            className={cn(
+              "h-4 w-4 shrink-0 rounded-sm border flex items-center justify-center transition-colors",
+              marcado
+                ? "bg-primary border-primary text-primary-foreground"
+                : "border-zinc-300 dark:border-zinc-600 hover:border-primary"
+            )}
+          >
+            {marcado && <Check size={10} />}
+          </button>
+        )}
         <span className="flex-1 truncate">{c.nome}</span>
-        {!pessoalAtual && clienteIdAtual === c.id && <Check size={14} />}
+        {!variosClientes && !pessoalAtual && clienteIdAtual === c.id && <Check size={14} />}
       </CommandItem>
     );
   };
@@ -191,7 +266,11 @@ function ListaClientes({ clientes, agencias, permitirSemCliente, clienteIdAtual,
           <>
             {fixos.length > 0 && <CommandGroup>{fixos.map(renderEntrada)}</CommandGroup>}
             {deAgencias.length > 0 && <CommandGroup heading="Agências">{deAgencias.map(renderEntrada)}</CommandGroup>}
-            {doResultado.length > 0 && <CommandGroup heading="Clientes">{doResultado.map(renderEntrada)}</CommandGroup>}
+            {doResultado.length > 0 && (
+              <CommandGroup heading={variosClientes ? "Clientes · marque a caixa para juntar mais de um" : "Clientes"}>
+                {doResultado.map(renderEntrada)}
+              </CommandGroup>
+            )}
           </>
         )}
       </CommandList>
