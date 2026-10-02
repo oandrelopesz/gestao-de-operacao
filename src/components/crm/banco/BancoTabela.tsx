@@ -1,6 +1,6 @@
 // Tabela do Banco de leads: colunas visíveis da aba (ou as comuns em "Todas"), nome fixo à esquerda, edição na
 // célula, cores da planilha (verde = no CRM, vermelho = inválido) e seleção em massa. Spec §8.2.
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +22,7 @@ import {
   type Papel,
 } from "@/lib/bancoLeads";
 import { linkWhatsapp } from "@/lib/crmWhatsapp";
+import { useAlturaAteOFimDaTela } from "@/lib/useAlturaAteOFimDaTela";
 import { cn } from "@/lib/utils";
 
 const POR_VEZ = 200;
@@ -177,6 +178,9 @@ export function BancoTabela({
   onEditar: (l: LeadBanco, chave: string, v: string) => void;
 }) {
   const colunas = useMemo(() => colunasDaTabela(aba, abasPorId), [aba, abasPorId]);
+  // A caixa termina no fim da tela: a barra de rolagem lateral fica à vista sem rolar a página até embaixo
+  const caixa = useRef<HTMLDivElement>(null);
+  const alturaMaxima = useAlturaAteOFimDaTela(caixa);
   const [ordem, setOrdem] = useState<{ chave: string | null; direcao: "asc" | "desc" }>({ chave: null, direcao: "asc" });
   const [limite, setLimite] = useState(POR_VEZ);
   useEffect(() => {
@@ -243,8 +247,12 @@ export function BancoTabela({
   };
 
   return (
-    <div className="min-w-0 space-y-2">
-      <div className="max-h-[max(20rem,calc(100dvh-19rem))] w-full overflow-auto rounded-md border bg-card">
+    <div className="min-w-0">
+      <div
+        ref={caixa}
+        style={alturaMaxima ? { maxHeight: alturaMaxima } : undefined}
+        className="max-h-[max(20rem,calc(100dvh-19rem))] w-full overflow-auto rounded-md border bg-card"
+      >
         <table className="w-full caption-bottom text-sm">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -294,14 +302,15 @@ export function BancoTabela({
             )}
           </TableBody>
         </table>
+        {ordenados.length > limite && (
+          // Dentro da caixa, no fim das linhas, preso à esquerda para não sumir com a rolagem lateral
+          <div className="sticky left-0 flex w-full justify-center border-t p-2">
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setLimite((n) => n + POR_VEZ)}>
+              Mostrar mais ({ordenados.length - limite} restantes)
+            </Button>
+          </div>
+        )}
       </div>
-      {ordenados.length > limite && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setLimite((n) => n + POR_VEZ)}>
-            Mostrar mais ({ordenados.length - limite} restantes)
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
