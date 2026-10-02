@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
-import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, UserPlus, AlertTriangle, Rocket, Map as MapIcon, Unlink } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, UserPlus, AlertTriangle, Rocket, Map as MapIcon, Unlink, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ClientePicker } from "@/components/demandas/ClientePicker";
 import { cn } from "@/lib/utils";
+import { useAgencias } from "@/lib/agencias";
 import { NOMES_DIA, rotuloFazerNoDia } from "@/lib/colunasDias";
 import { hojeBrasilia, diasDeAtraso, formatarDataCurta } from "@/lib/entrega";
 
@@ -86,6 +87,7 @@ export function KanbanCard(props: KanbanCardProps) {
 /** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
 export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, onAtribuirCliente, onEnviarRoadmap, onDesligarRoadmap, onDuplicate, diasDaColuna, clientes, selecionada, modoSelecao, onAlternarSelecao, qtdNoArrasto, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
   const navigate = useNavigate();
+  const { label: labelAgencia, meta: metaAgencia } = useAgencias();
   const isRecorrenteMae = demanda.status === "recorrentes";
   const isDragging = sortable?.isDragging ?? false;
 
@@ -96,6 +98,9 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
   const atraso = !isDone && !isRecorrenteMae ? diasDeAtraso(demanda.prazo, hojeBrasilia()) : 0;
   // Demanda de passo de onboarding: o roadmap vem do passo, não se envia/desliga à mão
   const podeRoadmap = !demanda.processo_passo_id && !isRecorrenteMae;
+  // Faixa da agência do cliente no topo do card (a cor vem do cadastro de agências)
+  const agenciaId = !demanda.pessoal ? demanda.clientes?.agencia : undefined;
+  const agenciaHex = agenciaId ? metaAgencia(agenciaId)?.hex : undefined;
 
   // Get preview of description (first 2 lines)
   const descriptionPreview = demanda.descricao ? demanda.descricao.split('\n').slice(0, 2).join('\n') : "";
@@ -157,6 +162,16 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
           onEdit(demanda);
         }}
       >
+        {agenciaId && (
+          <div
+            title={`Agência: ${labelAgencia(agenciaId)}`}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider border-b border-border/50 bg-muted/40 text-muted-foreground"
+            style={agenciaHex ? { color: agenciaHex, backgroundColor: `${agenciaHex}14`, borderBottomColor: `${agenciaHex}33` } : undefined}
+          >
+            <Building2 size={11} className="shrink-0" />
+            <span className="truncate">{labelAgencia(agenciaId)}</span>
+          </div>
+        )}
         <div className="p-2.5 space-y-1.5 relative">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-2 flex-1 min-w-0">
