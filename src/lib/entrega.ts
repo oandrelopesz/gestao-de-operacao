@@ -16,6 +16,13 @@ export function diasDeAtraso(prazo: string | null | undefined, hoje: string): nu
   return d > 0 ? d : 0;
 }
 
+const SIGLAS_DIA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+
+/** Sigla do dia da semana de uma data AAAA-MM-DD ("QUI"). Igual no servidor (UTC) e no navegador: não usa o fuso de quem roda. */
+export function siglaDoDia(iso: string): string {
+  return SIGLAS_DIA[new Date(utc(iso)).getUTCDay()];
+}
+
 export function formatarDataCurta(iso: string): string {
   return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 }
