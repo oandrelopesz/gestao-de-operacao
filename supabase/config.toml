@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.gmn]
 verify_jwt = false
+
+[functions.planilha]
+verify_jwt = false
