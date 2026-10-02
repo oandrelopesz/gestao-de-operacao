@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   NOMES_DIA, rotuloFazerNoDia, secaoId, parseSecao, mapaDias, containerIdsDoQuadro, diaEfetivo,
   containerDe, aplicarContainer, moverParaDia, camposParaSalvar, moverVariosPara, ordenarPeloQuadro,
+  porOrdem, alternarPrioridade, prioridadeAoSoltar,
 } from "./colunasDias.ts";
+import type { ItemDia } from "./colunasDias.ts";
 
 const colunas = [
   { id: "fazer_hoje", dias: [] },
@@ -65,8 +67,59 @@ test("moverParaDia: já no dia pedido devolve a mesma lista; id desconhecido tam
 });
 
 test("camposParaSalvar: dia só em coluna com dias", () => {
-  assert.deepEqual(camposParaSalvar({ id: "a", status: "standby", ordem: 2, dia_semana: 6 }, mapa), { status: "standby", ordem: 2, dia_semana: null });
-  assert.deepEqual(camposParaSalvar({ id: "a", status: "fazer_fim_de_semana", ordem: null, dia_semana: null }, mapa), { status: "fazer_fim_de_semana", ordem: 0, dia_semana: 6 });
+  assert.deepEqual(camposParaSalvar({ id: "a", status: "standby", ordem: 2, dia_semana: 6 }, mapa), { status: "standby", ordem: 2, dia_semana: null, prioritaria: false, prioridade_pos: null });
+  assert.deepEqual(camposParaSalvar({ id: "a", status: "fazer_fim_de_semana", ordem: null, dia_semana: null }, mapa), { status: "fazer_fim_de_semana", ordem: 0, dia_semana: 6, prioritaria: false, prioridade_pos: null });
+  assert.deepEqual(
+    camposParaSalvar({ id: "a", status: "standby", ordem: 0, prioritaria: true, prioridade_pos: 3 }, mapa),
+    { status: "standby", ordem: 0, dia_semana: null, prioritaria: true, prioridade_pos: 3 },
+  );
+});
+
+// ---------------------------------------------------------------- Coroa (prioridade)
+const card = (id: string, ordem: number, prioritaria = false): ItemDia => ({ id, status: "fazer_hoje", ordem, prioritaria });
+const ordemDoQuadro = (lista: { id: string; status: string; ordem?: number | null; prioritaria?: boolean | null }[]) =>
+  [...lista].sort(porOrdem).map((d) => (d.prioritaria ? `${d.id}*` : d.id)).join(" ");
+
+test("porOrdem: prioritárias primeiro, depois pela ordem", () => {
+  assert.equal(ordemDoQuadro([card("a", 0), card("b", 1), card("c", 5, true), card("d", 2, true)]), "d* c* a b");
+});
+
+test("alternarPrioridade: ligar sobe para o fim das prioritárias; desligar volta à posição de antes", () => {
+  const lista = [card("p", 0, true), card("a", 1), card("b", 2), card("c", 3), card("d", 4)];
+  const ligada = alternarPrioridade(lista, ["c"], true, mapa);
+  assert.equal(ordemDoQuadro(ligada), "p* c* a b d");
+  assert.equal(ligada.find((d) => d.id === "c")?.prioridade_pos, 2);
+  const desligada = alternarPrioridade(ligada, ["c"], false, mapa);
+  assert.equal(ordemDoQuadro(desligada), "p* a b c d");
+  assert.equal(desligada.find((d) => d.id === "c")?.prioridade_pos, null);
+});
+
+test("alternarPrioridade: em massa mantém a ordem; a coluna encolheu → volta para o fim (proporcional)", () => {
+  const lista = [card("a", 0), card("b", 1), card("c", 2), card("d", 3)];
+  const ligadas = alternarPrioridade(lista, ["d", "b"], true, mapa);
+  assert.equal(ordemDoQuadro(ligadas), "b* d* a c");
+  const encolheu = ligadas.filter((d) => d.id !== "a" && d.id !== "c");
+  assert.equal(ordemDoQuadro(alternarPrioridade(encolheu, ["b", "d"], false, mapa)), "b d");
+  // só os que mudam: ligar uma que já é prioritária não mexe em nada
+  assert.equal(alternarPrioridade(ligadas, ["b"], true, mapa), ligadas);
+});
+
+test("prioridadeAoSoltar: prioritária abaixo de normal perde a coroa; normal acima de prioritária ganha", () => {
+  // ordem = onde cada card caiu depois do arrasto
+  const perde = prioridadeAoSoltar([card("p", 0, true), card("a", 1), card("q", 2, true), card("b", 3)], "q", "fazer_hoje", "fazer_hoje", mapa);
+  assert.equal(perde.find((d) => d.id === "q")?.prioritaria, false);
+  const fica = prioridadeAoSoltar([card("q", 0, true), card("p", 1, true), card("a", 2)], "q", "fazer_hoje", "fazer_hoje", mapa);
+  assert.equal(fica.find((d) => d.id === "q")?.prioritaria, true);
+  const ganha = prioridadeAoSoltar([card("p", 0, true), card("a", 1), card("q", 2, true)].map((d, i) => ({ ...d, ordem: [0, 1, 2][i] })), "a", "fazer_hoje", "fazer_hoje", mapa);
+  assert.equal(ganha.find((d) => d.id === "a")?.prioritaria, true);
+  const normalNoTopoSemPrioritarias = prioridadeAoSoltar([card("a", 0), card("b", 1)], "a", "fazer_hoje", "fazer_hoje", mapa);
+  assert.equal(normalNoTopoSemPrioritarias.find((d) => d.id === "a")?.prioritaria, false);
+});
+
+test("prioridadeAoSoltar: em outra coluna (outro dia) a coroa continua", () => {
+  const lista = [card("a", 0), { ...card("q", 1, true), status: "fazer_amanha" }];
+  assert.equal(prioridadeAoSoltar(lista, "q", "fazer_hoje", "fazer_amanha", mapa), lista);
+  assert.equal(ordemDoQuadro([card("a", 0), card("q", 1, true)]), "q* a");
 });
 
 test("moverVariosPara: leva o grupo para o fim do destino e renumera as origens", () => {

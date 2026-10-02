@@ -38,6 +38,7 @@ interface Demanda {
   pessoal?: boolean;
   agencia_id?: string | null;
   clientes_extras?: string[] | null;
+  prioritaria?: boolean | null;
 }
 
 interface KanbanColumnProps {
@@ -59,6 +60,7 @@ interface KanbanColumnProps {
   isSystem?: boolean;
   onSetDia?: (id: string, dia: number) => void;
   onAtribuirCliente?: (id: string, valor: DonoDemanda) => void;
+  onAlternarPrioridade?: (id: string, ligar: boolean) => void;
   onEnviarRoadmap?: (demanda: Demanda) => void;
   onDesligarRoadmap?: (id: string) => void;
   onDuplicate?: (demanda: Demanda) => void;
@@ -101,6 +103,7 @@ export function KanbanColumn({
   isSystem,
   onSetDia,
   onAtribuirCliente,
+  onAlternarPrioridade,
   onEnviarRoadmap,
   onDesligarRoadmap,
   onDuplicate,
@@ -163,6 +166,7 @@ export function KanbanColumn({
       onMoveToDone={onMoveToDone}
       onSetDia={onSetDia}
       onAtribuirCliente={onAtribuirCliente}
+      onAlternarPrioridade={onAlternarPrioridade}
       onEnviarRoadmap={onEnviarRoadmap}
       onDesligarRoadmap={onDesligarRoadmap}
       onDuplicate={onDuplicate}

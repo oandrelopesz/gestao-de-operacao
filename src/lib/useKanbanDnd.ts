@@ -12,6 +12,7 @@ import {
   type UniqueIdentifier,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
+import { porOrdem } from "./colunasDias";
 
 /**
  * Drag-and-drop de Kanban com várias colunas (padrão "MultipleContainers" do dnd-kit).
@@ -26,6 +27,8 @@ import { arrayMove } from "@dnd-kit/sortable";
 export interface KanbanItem {
   id: string;
   ordem?: number | null;
+  /** Coroa: fica no topo da coluna (mesma ordem da tela, ver `porOrdem`) */
+  prioritaria?: boolean | null;
 }
 
 interface Options<T extends KanbanItem> {
@@ -44,7 +47,8 @@ interface Options<T extends KanbanItem> {
   onDrop: (finalItems: T[], activeId: string, originContainer: string, targetContainer: string) => void;
 }
 
-const byOrdem = <T extends KanbanItem>(a: T, b: T) => (a.ordem ?? 0) - (b.ordem ?? 0);
+// A mesma ordem da tela (prioritárias primeiro): os índices do arrasto precisam bater com o que se vê
+const byOrdem = porOrdem;
 
 // Rolagem automática ao segurar o card perto da borda. O padrão do dnd-kit (aceleração 10) passava uma coluna a
 // cada ~300 ms no site publicado e o card ia além da coluna desejada antes de dar tempo de soltar; com 3, colado

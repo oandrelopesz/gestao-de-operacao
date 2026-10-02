@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
-import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, UserPlus, AlertTriangle, Rocket, Map as MapIcon, Unlink, Building2 } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, UserPlus, AlertTriangle, Rocket, Map as MapIcon, Unlink, Building2, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -41,6 +41,8 @@ interface Demanda {
   agencia_id?: string | null;
   /** Clientes além do principal (`cliente_id`) */
   clientes_extras?: string[] | null;
+  /** Coroa: prioridade (borda dourada e topo da coluna) */
+  prioritaria?: boolean | null;
 }
 
 interface KanbanCardProps {
@@ -51,6 +53,8 @@ interface KanbanCardProps {
   onMoveToDone?: (id: string) => void;
   onSetDia?: (id: string, dia: number) => void;
   onAtribuirCliente?: (id: string, valor: DonoDemanda) => void;
+  /** Botão da coroa (prioridade); `ligar` false tira */
+  onAlternarPrioridade?: (id: string, ligar: boolean) => void;
   onEnviarRoadmap?: (demanda: Demanda) => void;
   onDesligarRoadmap?: (id: string) => void;
   /** Item "Duplicar" do menu: só aparece quando há quem duplique (o card do DragOverlay não passa) */
@@ -88,7 +92,7 @@ export function KanbanCard(props: KanbanCardProps) {
 }
 
 /** Card sem drag-and-drop: usado no DragOverlay (clone que segue o ponteiro). */
-export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, onAtribuirCliente, onEnviarRoadmap, onDesligarRoadmap, onDuplicate, diasDaColuna, clientes, selecionada, modoSelecao, onAlternarSelecao, qtdNoArrasto, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
+export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveToDone, onSetDia, onAtribuirCliente, onAlternarPrioridade, onEnviarRoadmap, onDesligarRoadmap, onDuplicate, diasDaColuna, clientes, selecionada, modoSelecao, onAlternarSelecao, qtdNoArrasto, sortable }: KanbanCardProps & { sortable?: SortableBindings }) {
   const navigate = useNavigate();
   const { label: labelAgencia, meta: metaAgencia } = useAgencias();
   const isRecorrenteMae = demanda.status === "recorrentes";
@@ -116,6 +120,9 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
   // Recorrentes (mãe) ficam fora da seleção em massa: já são travados no arrasto
   const podeSelecionar = !!onAlternarSelecao && !isRecorrenteMae;
   const mostrarConcluir = !isDone && !isDoneForNow && !!(onMoveToDone || onComplete);
+  // Coroa (prioridade): não vale para recorrentes (travadas) nem para concluídas
+  const podeCoroa = !!onAlternarPrioridade && !isRecorrenteMae && !isDone;
+  const prioritaria = !!demanda.prioritaria && !isDone && !isRecorrenteMae;
 
   const formatProxima = (iso?: string) => {
     if (!iso) return "";
@@ -148,6 +155,8 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
           isRecorrenteMae && isDueToday && "border-primary/50 shadow-primary/10 ring-1 ring-primary/20",
           isDoneForNow && "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50",
           atraso > 0 && "border-red-500/70 bg-red-500/5 ring-1 ring-red-500/30",
+          // Coroa: borda dourada (se também está atrasada, a borda fica vermelha e o anel dourado)
+          prioritaria && (atraso > 0 ? "ring-2 ring-amber-400/80" : "border-amber-400 ring-1 ring-amber-400/60 shadow-amber-500/10"),
           selecionada && "border-primary ring-2 ring-primary/60 bg-primary/5"
         )}
         onClick={(e) => {
@@ -208,6 +217,29 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
             </div>
 
             <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+              {podeCoroa && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title={prioritaria ? "Tirar prioridade" : "Marcar como prioridade (vai para o topo)"}
+                  aria-label={prioritaria ? "Tirar prioridade" : "Marcar como prioridade"}
+                  aria-pressed={prioritaria}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAlternarPrioridade?.(demanda.id, !prioritaria);
+                  }}
+                  className={cn(
+                    "h-6 w-6 transition-opacity",
+                    prioritaria
+                      ? "opacity-100 text-amber-500 hover:text-amber-600"
+                      : "opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 text-zinc-400 hover:text-amber-500"
+                  )}
+                >
+                  <Crown size={14} className={cn(prioritaria && "fill-amber-400")} />
+                </Button>
+              )}
               {onAtribuirCliente && !demanda.processo_passo_id && (
                 <div onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                   <ClientePicker

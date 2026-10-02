@@ -16,6 +16,10 @@ export interface ItemDia {
   status: string;
   ordem?: number | null;
   dia_semana?: number | null;
+  /** Coroa: as prioritárias ficam no topo da coluna (ou da seção do dia), sem ranking entre si além da ordem */
+  prioritaria?: boolean | null;
+  /** Posição entre as normais quando ganhou a coroa: tirar a coroa devolve o card para lá */
+  prioridade_pos?: number | null;
 }
 
 export const secaoId = (coluna: string, dia: number) => `${coluna}:${dia}`;
@@ -52,7 +56,13 @@ export function aplicarContainer<T extends ItemDia>(d: T, container: string): T 
   return { ...d, status: container, dia_semana: null };
 }
 
-const porOrdem = (a: ItemDia, b: ItemDia) => (a.ordem ?? 0) - (b.ordem ?? 0);
+/**
+ * Ordem do quadro: as prioritárias (coroa) primeiro, depois pela `ordem`. Usada na tela, no arrasto e nos
+ * movimentos em massa, então qualquer card que chega a uma coluna (virada, "Mover para", arrasto de outra coluna)
+ * já aparece no lugar certo sem renumerar no banco.
+ */
+export const porOrdem = (a: { ordem?: number | null; prioritaria?: boolean | null }, b: { ordem?: number | null; prioritaria?: boolean | null }) =>
+  Number(!!b.prioritaria) - Number(!!a.prioritaria) || (a.ordem ?? 0) - (b.ordem ?? 0);
 
 /** Leva o card para o fim do `dia` (na coluna dele) e renumera as duas seções. */
 export function moverParaDia<T extends ItemDia>(lista: T[], id: string, dia: number, mapa: MapaDias): T[] {
@@ -73,7 +83,65 @@ export function moverParaDia<T extends ItemDia>(lista: T[], id: string, dia: num
 }
 
 export function camposParaSalvar(d: ItemDia, mapa: MapaDias) {
-  return { status: d.status, ordem: d.ordem ?? 0, dia_semana: diaEfetivo(d, mapa) };
+  return {
+    status: d.status,
+    ordem: d.ordem ?? 0,
+    dia_semana: diaEfetivo(d, mapa),
+    prioritaria: !!d.prioritaria,
+    prioridade_pos: d.prioritaria ? d.prioridade_pos ?? null : null,
+  };
+}
+
+/**
+ * Depois de soltar um card na MESMA coluna, a coroa segue a posição: prioritária solta abaixo de uma normal perde a
+ * coroa; normal solta acima de uma prioritária ganha. Entre colunas (outro dia) a marca não muda: a prioritária
+ * continua prioritária e aparece no topo do destino. `lista` vem com a `ordem` do arrasto (onde o card caiu).
+ */
+export function prioridadeAoSoltar<T extends ItemDia>(lista: T[], id: string, origem: string, destino: string, mapa: MapaDias): T[] {
+  if (origem !== destino) return lista;
+  const coluna = lista.filter((d) => containerDe(d, mapa) === destino).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+  const i = coluna.findIndex((d) => d.id === id);
+  if (i < 0) return lista;
+  const card = coluna[i];
+  const acima = coluna[i - 1];
+  const abaixo = coluna[i + 1];
+  let prioritaria = !!card.prioritaria;
+  if (prioritaria && acima && !acima.prioritaria) prioritaria = false;
+  else if (!prioritaria && abaixo?.prioritaria) prioritaria = true;
+  if (prioritaria === !!card.prioritaria) return lista;
+  return lista.map((d) => (d.id === id ? { ...d, prioritaria, prioridade_pos: null } : d));
+}
+
+/**
+ * Coroa em um ou vários cards (`ligar`) ou tirar. Ligar leva o card para o fim das prioritárias do container e
+ * guarda a posição dele entre as normais; tirar devolve o card para essa posição (ou para a última, se o container
+ * encolheu). Renumera os containers mexidos.
+ */
+export function alternarPrioridade<T extends ItemDia>(lista: T[], ids: string[], ligar: boolean, mapa: MapaDias): T[] {
+  const alvo = new Set(ids);
+  const containers = new Set(lista.filter((d) => alvo.has(d.id) && !!d.prioritaria !== ligar).map((d) => containerDe(d, mapa)));
+  if (!containers.size) return lista;
+  const novos = new Map<string, T>();
+  for (const c of containers) {
+    const coluna = lista.filter((d) => containerDe(d, mapa) === c).sort(porOrdem);
+    let prios = coluna.filter((d) => d.prioritaria);
+    let normais = coluna.filter((d) => !d.prioritaria);
+    if (ligar) {
+      const sobem = normais.filter((d) => alvo.has(d.id));
+      const pos = new Map(normais.map((d, i) => [d.id, i]));
+      normais = normais.filter((d) => !alvo.has(d.id));
+      prios = [...prios, ...sobem.map((d) => ({ ...d, prioritaria: true, prioridade_pos: pos.get(d.id) ?? 0 }))];
+    } else {
+      const descem = prios.filter((d) => alvo.has(d.id)).sort((a, b) => (a.prioridade_pos ?? 0) - (b.prioridade_pos ?? 0));
+      prios = prios.filter((d) => !alvo.has(d.id));
+      for (const d of descem) {
+        const at = Math.min(Math.max(d.prioridade_pos ?? 0, 0), normais.length);
+        normais = [...normais.slice(0, at), { ...d, prioritaria: false, prioridade_pos: null }, ...normais.slice(at)];
+      }
+    }
+    [...prios, ...normais].forEach((d, i) => novos.set(d.id, { ...d, ordem: i }));
+  }
+  return lista.map((d) => novos.get(d.id) ?? d);
 }
 
 /**

@@ -637,6 +637,8 @@ export type Database = {
           pessoal: boolean
           prazo: string | null
           prioridade: Database["public"]["Enums"]["demanda_prioridade"]
+          prioridade_pos: number | null
+          prioritaria: boolean
           processo_passo_id: string | null
           prospeccao_id: string | null
           proxima_execucao: string | null
@@ -668,6 +670,8 @@ export type Database = {
           pessoal?: boolean
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          prioridade_pos?: number | null
+          prioritaria?: boolean
           processo_passo_id?: string | null
           prospeccao_id?: string | null
           proxima_execucao?: string | null
@@ -699,6 +703,8 @@ export type Database = {
           pessoal?: boolean
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          prioridade_pos?: number | null
+          prioritaria?: boolean
           processo_passo_id?: string | null
           prospeccao_id?: string | null
           proxima_execucao?: string | null

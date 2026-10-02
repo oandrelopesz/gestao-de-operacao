@@ -72,6 +72,9 @@ import {
   NOMES_DIA,
   moverVariosPara,
   ordenarPeloQuadro,
+  porOrdem,
+  alternarPrioridade,
+  prioridadeAoSoltar,
 } from "@/lib/colunasDias";
 import { ehEsquemaDesatualizado, recarregarUmaVez } from "@/lib/recuperacaoErro";
 import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
@@ -536,7 +539,8 @@ function DemandasPage() {
   const filteredDemandas = resultadoBusca.itens;
 
   // Drag and Drop Logic
-  const byOrdem = (a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0);
+  // Prioritárias (coroa) no topo de cada coluna, depois pela ordem
+  const byOrdem = porOrdem;
 
   // Estado do quadro antes do arrasto: se o popup de dia for cancelado, volta para ele
   const antesDoArrastoRef = useRef<any[]>([]);
@@ -562,7 +566,7 @@ function DemandasPage() {
               .from("demandas")
               .update(camposParaSalvar(d, mapa) as any)
               .eq("id", d.id)
-              .select("id, prazo, dia_semana")
+              .select("id, prazo, dia_semana, prioritaria, prioridade_pos")
               .single()
           )
       );
@@ -613,9 +617,22 @@ function DemandasPage() {
         setEscolhaDia({ id: activeId, origem: origin, coluna: alvo.coluna, sugerido: alvo.dia });
         return;
       }
-      await salvarContainers(finalList, [origin, target]);
+      // Coroa na mesma coluna segue a posição (no meio das normais perde; acima de uma prioritária ganha)
+      const ajustada = prioridadeAoSoltar(finalList, activeId, origin, target, mapa);
+      if (ajustada !== finalList) setDemandas(ajustada);
+      await salvarContainers(ajustada, [origin, target]);
     },
   });
+
+  /** Coroa (prioridade) em um ou vários cards; `ligar` false tira e devolve o card para onde estava. */
+  const marcarPrioridade = async (ids: string[], ligar: boolean) => {
+    const lista = alternarPrioridade(demandas, ids, ligar, mapa);
+    if (lista === demandas) return;
+    const porId = new Map(demandas.map((d) => [d.id, d]));
+    const containers = [...new Set(ids.map((id) => porId.get(id)).filter(Boolean).map((d) => getContainer(d)))];
+    setDemandas(lista);
+    await salvarContainers(lista, containers);
+  };
 
   const escolherDia = async (dia: number) => {
     if (!escolhaDia) return;
@@ -901,6 +918,7 @@ function DemandasPage() {
                     diasDaColuna={col.dias}
                     onSetDia={mudarDia}
                     onAtribuirCliente={(id, valor) => handleUpdateDemanda(id, valor)}
+                    onAlternarPrioridade={(id, ligar) => marcarPrioridade([id], ligar)}
                     onEnviarRoadmap={setEnviarRoadmap}
                     onDesligarRoadmap={handleDesligarRoadmap}
                     onDuplicate={handleDuplicateDemanda}
@@ -974,6 +992,13 @@ function DemandasPage() {
                 onConcluir={concluirSelecionadas}
                 onCliente={clienteSelecionadas}
                 onEntrega={entregaSelecionadas}
+                todasPrioritarias={idsSelecionados().every((id) => demandas.find((d) => d.id === id)?.prioritaria)}
+                onPrioridade={async (ligar) => {
+                  const ids = idsSelecionados();
+                  if (!ids.length) return;
+                  await marcarPrioridade(ids, ligar);
+                  toast.success(`${ids.length} ${ids.length === 1 ? "demanda" : "demandas"} ${ligar ? "com" : "sem"} prioridade`);
+                }}
                 onSelecionarTodas={() => setSelecionadas(new Set(selecionaveis.map((d) => d.id)))}
                 onLimpar={limparSelecao}
               />

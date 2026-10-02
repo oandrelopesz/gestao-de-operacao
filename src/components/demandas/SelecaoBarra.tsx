@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowRightLeft, CalendarDays, Check, CheckSquare, Loader2, User, X } from "lucide-react";
+import { ArrowRightLeft, CalendarDays, Check, CheckSquare, Crown, Loader2, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -29,13 +29,16 @@ interface SelecaoBarraProps {
   onConcluir: () => void;
   onCliente: (valor: DonoDemanda) => void;
   onEntrega: (prazo: string | null) => void;
+  /** Todas as selecionadas já têm a coroa: o botão tira em vez de pôr */
+  todasPrioritarias?: boolean;
+  onPrioridade?: (ligar: boolean) => void;
   onSelecionarTodas: () => void;
   onLimpar: () => void;
 }
 
 /** Barra flutuante das ações em massa das Demandas (aparece no modo "Selecionar" ou com cards marcados). */
 export function SelecaoBarra({
-  qtd, qtdSelecionaveis, colunas, clientes, ocupado, onMover, onConcluir, onCliente, onEntrega, onSelecionarTodas, onLimpar,
+  qtd, qtdSelecionaveis, colunas, clientes, ocupado, onMover, onConcluir, onCliente, onEntrega, todasPrioritarias, onPrioridade, onSelecionarTodas, onLimpar,
 }: SelecaoBarraProps) {
   const [calendarioAberto, setCalendarioAberto] = useState(false);
   const semSelecao = qtd === 0;
@@ -80,6 +83,20 @@ export function SelecaoBarra({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {onPrioridade && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs"
+              disabled={semSelecao || ocupado}
+              onClick={() => onPrioridade(!todasPrioritarias)}
+              title={todasPrioritarias ? "Tirar a prioridade das selecionadas" : "Marcar as selecionadas como prioridade"}
+            >
+              <Crown size={13} className={todasPrioritarias && !semSelecao ? "fill-amber-400 text-amber-500" : "text-amber-500"} />
+              {todasPrioritarias && !semSelecao ? "Tirar prioridade" : "Prioridade"}
+            </Button>
+          )}
 
           <ClientePicker clientes={clientes} clienteIdAtual={null} onEscolher={onCliente} align="end">
             <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" disabled={semSelecao || ocupado}>
