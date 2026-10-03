@@ -38,6 +38,7 @@ export const PERMISSOES_NECESSARIAS: { permissao: string; para: string }[] = [
   { permissao: "pages_read_engagement", para: "ler as páginas e os lugares" },
   { permissao: "pages_manage_posts", para: "publicar e excluir no Facebook" },
   { permissao: "pages_manage_engagement", para: "primeiro comentário no Facebook" },
+  { permissao: "pages_read_user_content", para: "primeiro comentário no Facebook (a Meta exige junto com a de cima)" },
   { permissao: "business_management", para: "contas dos parceiros da BM" },
 ];
 

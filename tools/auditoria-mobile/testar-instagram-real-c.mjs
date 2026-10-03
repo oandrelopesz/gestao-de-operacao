@@ -86,14 +86,18 @@ if (modo === "editar") {
   ok("removido da lista", true);
 }
 
-if (modo === "facebook") {
-  // Uma foto no Instagram e no Facebook ao mesmo tempo, com primeiro comentário e comentários desativados (Instagram)
+if (modo === "facebook" || modo === "so-facebook") {
+  // Uma foto no Instagram e no Facebook (ou só no Facebook), com primeiro comentário; no Instagram, comentários desativados
+  const so = modo === "so-facebook";
   const d = await abrirPostar();
   await d.getByRole("checkbox").nth(1).click(); // Facebook
-  await d.locator('input[type="file"][multiple]').setInputFiles(`${pasta}/carrossel-3.png`);
+  if (so) await d.getByRole("checkbox").nth(0).click(); // tira o Instagram
+  await d.locator('input[type="file"][multiple]').setInputFiles(`${pasta}/${so ? "carrossel-4.png" : "carrossel-3.png"}`);
   await d.getByLabel("Primeiro comentário (opcional)").fill("Teste do sistema (será apagado)");
-  await d.getByRole("button", { name: /Opções avançadas/ }).click();
-  await d.getByRole("switch", { name: /Desativar comentários/ }).click();
+  if (!so) {
+    await d.getByRole("button", { name: /Opções avançadas/ }).click();
+    await d.getByRole("switch", { name: /Desativar comentários/ }).click();
+  }
   await esperarBotao(d, "Publicar agora");
   await p.screenshot({ path: `${SP}/ig-real-facebook-antes.png` });
   await d.getByRole("button", { name: "Publicar agora", exact: true }).click();
@@ -102,8 +106,9 @@ if (modo === "facebook") {
   const limite = Date.now() + 4 * 60 * 1000;
   let linhas = [];
   while (Date.now() < limite) {
-    linhas = (await p.locator("div.divide-y > div").allInnerTexts()).slice(0, 2).map((t) => t.replace(/\s+/g, " "));
-    if (linhas.length === 2 && linhas.every((l) => /Publicado|Erro/.test(l))) break;
+    const n = so ? 1 : 2;
+    linhas = (await p.locator("div.divide-y > div").allInnerTexts()).slice(0, n).map((t) => t.replace(/\s+/g, " "));
+    if (linhas.length === n && linhas.every((l) => /Publicado|Erro/.test(l))) break;
     await p.waitForTimeout(8000);
   }
   linhas.forEach((l) => console.log("linha:", l));
