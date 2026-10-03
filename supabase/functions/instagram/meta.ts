@@ -41,13 +41,89 @@ export function contasDasPaginas(paginas: PaginaMeta[]): ContaIg[] {
   return saida;
 }
 
+// ------------------------------------------------------------------ posts
+
+export type Midia = { chave: string; tipo: "imagem" | "video"; largura: number; altura: number; duracao?: number };
+
+export interface PostIg {
+  tipo: "foto" | "carrossel" | "reels";
+  midias: Midia[];
+  legenda: string;
+  local_id: string | null;
+  reels_no_feed: boolean;
+  capa_ms: number | null;
+}
+
+export interface StatusContainer { status_code?: string; status?: string }
+
+const comuns = (p: PostIg) => ({ ...(p.legenda ? { caption: p.legenda } : {}), ...(p.local_id ? { location_id: p.local_id } : {}) });
+
+/** Contêiner de um item do carrossel. */
+export const paramsFilho = (m: Midia, url: string): Record<string, string> =>
+  m.tipo === "video" ? { media_type: "VIDEO", video_url: url, is_carousel_item: "true" } : { image_url: url, is_carousel_item: "true" };
+
+/** Contêiner de foto ou reels (legenda e localização vão nele). */
+export function paramsUnico(p: PostIg, url: string): Record<string, string> {
+  if (p.tipo !== "reels") return { ...comuns(p), image_url: url };
+  return {
+    ...comuns(p), media_type: "REELS", video_url: url, share_to_feed: String(p.reels_no_feed),
+    ...(p.capa_ms != null ? { thumb_offset: String(p.capa_ms) } : {}),
+  };
+}
+
+/** Contêiner principal do carrossel, criado depois que os filhos ficaram prontos. */
+export const paramsCarrossel = (p: PostIg, filhos: string[]): Record<string, string> =>
+  ({ ...comuns(p), media_type: "CAROUSEL", children: filhos.join(",") });
+
+/** Subcódigos de erro da publicação de conteúdo, em português. */
+const SUBCODIGOS: Record<number, string> = {
+  2207001: "O Instagram teve um erro temporário. Clique em Tentar de novo.",
+  2207003: "A Meta demorou demais para baixar o arquivo. Clique em Tentar de novo.",
+  2207004: "A imagem passou de 8 MB.",
+  2207005: "Formato de imagem não aceito: o Instagram só aceita JPG.",
+  2207009: "Proporção não aceita: o feed aceita de 4:5 (em pé) a 1,91:1 (deitada).",
+  2207026: "Vídeo em formato não aceito: use MP4 ou MOV (H.264 e AAC).",
+  2207042: "Esta conta atingiu o limite diário de posts pela API (100 em 24 horas).",
+  2207052: "A Meta não conseguiu baixar o arquivo do sistema. Clique em Tentar de novo.",
+};
+
+export function erroDoContainer(s: StatusContainer): string {
+  if (s.status_code === "EXPIRED") return "O envio expirou na Meta (24 h sem publicar). Clique em Tentar de novo.";
+  const codigo = Number(/(\d{7})/.exec(s.status ?? "")?.[1]);
+  return SUBCODIGOS[codigo] ?? `A Meta recusou a mídia: ${s.status ?? "sem detalhe"}`;
+}
+
+/** Próximo passo de um post em processamento, pelo status dos contêineres na Meta. */
+export function decidir(filhos: StatusContainer[], principal: StatusContainer | null) {
+  const ruim = [...filhos, ...(principal ? [principal] : [])].find((s) => s.status_code === "ERROR" || s.status_code === "EXPIRED");
+  if (ruim) return { acao: "erro" as const, erro: erroDoContainer(ruim) };
+  if (filhos.some((s) => s.status_code !== "FINISHED")) return { acao: "esperar" as const };
+  if (!principal) return { acao: "criar_carrossel" as const };
+  return principal.status_code === "FINISHED" ? { acao: "publicar" as const } : { acao: "esperar" as const };
+}
+
+// ------------------------------------------------------------------ chamadas
+
 /** Mensagem em português para uma resposta de erro da Graph API. */
 export function erroMeta(corpo: any, status: number): string {
   const e = corpo?.error;
   if (!e) return `A Meta respondeu ${status}.`;
   if (e.code === 190) return "O token da Meta (META_TOKEN) é inválido ou expirou. Gere outro no usuário do sistema e troque o segredo no Lovable.";
+  if (SUBCODIGOS[e.error_subcode]) return SUBCODIGOS[e.error_subcode];
   if (e.code === 10 || e.code === 200) return `Sem permissão na Meta: ${e.message}`;
-  return `Meta: ${e.message ?? "erro"} (código ${e.code ?? "?"})`;
+  if (e.code === 4 || e.code === 32 || e.code === 613) return "Muitas chamadas à Meta agora. Clique em Tentar de novo daqui a alguns minutos.";
+  return `Meta: ${e.error_user_msg || e.message || "erro"} (código ${e.code ?? "?"})`;
+}
+
+/** Uma chamada à Graph API (GET com parâmetros na URL, POST com corpo de formulário). Erro vira mensagem em português. */
+export async function graph(metodo: "GET" | "POST", caminho: string, token: string, params: Record<string, string> = {}): Promise<any> {
+  const corpo = new URLSearchParams({ ...params, access_token: token });
+  const r = metodo === "GET"
+    ? await fetch(`${GRAPH}/${caminho}?${corpo}`, { signal: AbortSignal.timeout(30_000) })
+    : await fetch(`${GRAPH}/${caminho}`, { method: "POST", body: corpo, signal: AbortSignal.timeout(60_000) });
+  const j = await r.json().catch(() => null);
+  if (!r.ok || j?.error) throw new Error(erroMeta(j, r.status));
+  return j;
 }
 
 /** GET na Graph API juntando todas as páginas de resultado (`paging.next`). Prazo de 20 s por chamada. */
