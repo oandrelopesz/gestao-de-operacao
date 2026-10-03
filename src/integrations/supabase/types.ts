@@ -563,6 +563,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "demanda_conclusoes_agencia_id_fkey"
+            columns: ["agencia_id"]
+            isOneToOne: false
+            referencedRelation: "agencias"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "demanda_conclusoes_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -718,6 +725,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "demandas_agencia_id_fkey"
+            columns: ["agencia_id"]
+            isOneToOne: false
+            referencedRelation: "agencias"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "demandas_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -1594,7 +1608,22 @@ export type Database = {
           sincronizada_em?: string
           usuario?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ig_contas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ig_contas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       link_temas: {
         Row: {
@@ -3443,6 +3472,7 @@ export type Database = {
       get_nps_categoria: { Args: { score: number }; Returns: string }
       hoje_brt: { Args: never; Returns: string }
       limpar_transcricoes_vencidas: { Args: never; Returns: number }
+      materializar_recorrentes: { Args: { p_mae?: string }; Returns: number }
       onboarding_janela: { Args: never; Returns: number }
       operacao_verba_mensal: {
         Args: { o: Database["public"]["Tables"]["operacoes"]["Row"] }
