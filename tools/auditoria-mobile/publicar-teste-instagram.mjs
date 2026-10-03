@@ -36,12 +36,15 @@ await p.waitForFunction(([rotulo, n]) => {
 }, [rotulo, arquivos.length], { timeout: 180000 });
 console.log("mídias enviadas:", arquivos.length);
 await p.screenshot({ path: `${SP}/ig-real-${modo}-antes.png` });
+const linhas = p.locator("div.divide-y > div");
 await botao.click();
 await p.getByRole("tab", { name: /Posts/ }).waitFor();
+// A lista de posts chega pelo realtime: espera a linha do post novo (na fila, ela fica no topo)
+await p.getByText(/Agendado|Enviando|Publicando/).first().waitFor({ timeout: 60000 }).catch(() => {});
 const limite = Date.now() + (modo === "carrossel" ? 4 : 9) * 60 * 1000;
 let situacao = "";
 while (Date.now() < limite) {
-  const linha = p.locator("div.divide-y > div").first();
+  const linha = linhas.first();
   situacao = (await linha.innerText().catch(() => "")).replace(/\s+/g, " ");
   if (/Publicado|Erro/.test(situacao)) break;
   await p.waitForTimeout(10000);

@@ -80,6 +80,8 @@ Migration `ig_contas` e `ig_posts`, RLS aberta como o resto do sistema (`FOR ALL
 
 ## 5. Tela `/instagram`
 
+> **Mudanças do André em 03/10/2026 (valem sobre o texto abaixo):** a aba abre numa **lista das contas com o botão "Postar" em cada uma** (a tela de postagem já abre na conta, sem seletor de conta); **não há atribuição de cliente** por conta; **chaves para ocultar e mostrar contas**, na aba ("Contas visíveis") e em **Admin → Instagram** (coluna `ig_contas.oculta`). Ficaram para depois: editar post agendado (hoje: cancelar e criar de novo), colar o id de outro lugar como localização, uso do limite diário e filtro por conta na lista de posts.
+
 - **Item no menu** Operação, acima de "Google Meu Negócio".
 - **Cabeçalho:** "Sincronizar contas" e, por conta, cliente ligado (seletor de cliente com busca que já existe) e o uso do limite diário.
 - **Lista de posts:** agendados (próximos primeiro), publicados e com erro, com filtro por cliente/conta; cada linha com miniatura, tipo, legenda resumida, quando e a situação. Agendado: editar ou cancelar. Erro: mensagem e "Tentar de novo". Publicado: "Ver no Instagram" (permalink). Atualiza sozinha (realtime).
