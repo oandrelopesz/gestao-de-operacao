@@ -41,7 +41,20 @@ export const PERMISSOES_NECESSARIAS: { permissao: string; para: string }[] = [
   { permissao: "business_management", para: "contas dos parceiros da BM" },
 ];
 
-export const conferirPermissoes = () => chamar<{ valido: boolean; permissoes: string[] }>({ acao: "permissoes" });
+/** O que o usuário do sistema pode fazer numa página (nomes do gerenciador de negócios). */
+export const TAREFAS_PAGINA: Record<string, string> = {
+  MANAGE: "Controle total",
+  CREATE_CONTENT: "Conteúdo",
+  MODERATE: "Atividade da comunidade",
+  MESSAGING: "Mensagens",
+  ADVERTISE: "Anúncios",
+  ANALYZE: "Insights",
+};
+
+export type PaginaTarefas = { id: string; nome: string; tarefas: string[] };
+
+export const conferirPermissoes = () =>
+  chamar<{ valido: boolean; permissoes: string[]; paginas?: PaginaTarefas[] }>({ acao: "permissoes" });
 
 export async function alternarOculta(contaId: string, oculta: boolean): Promise<void> {
   const { error } = await supabase.from("ig_contas").update({ oculta }).eq("id", contaId);

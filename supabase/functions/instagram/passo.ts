@@ -6,7 +6,7 @@
 // Depois de publicar: primeiro comentário e, no Instagram, comentários desativados; falha nisso vira `aviso` (o post fica).
 // deno-lint-ignore-file no-explicit-any
 import {
-  decidir, fbAlbum, fbFoto, fbFotoSolta, fbVideo, graph, linkFacebook, paramsCarrossel, paramsFilho, paramsUnico,
+  GRAPH, decidir, fbAlbum, fbFoto, fbFotoSolta, fbVideo, graph, linkFacebook, listarTudo, paramsCarrossel, paramsFilho, paramsUnico,
 } from "./meta.ts";
 
 export const ATIVOS = ["agendado", "enviando", "processando", "publicando"];
@@ -209,10 +209,15 @@ export async function excluir(sb: any, token: string, id: string) {
   return { ok: true };
 }
 
-/** Permissões que o META_TOKEN tem (o token não sai da função). */
+/**
+ * Permissões que o META_TOKEN tem e o que o usuário do sistema pode fazer em cada página (`tasks`: CREATE_CONTENT,
+ * MODERATE, MANAGE...). O token não sai da função.
+ */
 export async function permissoes(token: string) {
   const j = await graph("GET", "debug_token", token, { input_token: token });
-  return { valido: !!j.data?.is_valid, permissoes: (j.data?.scopes ?? []) as string[] };
+  const paginas = await listarTudo(`${GRAPH}/me/accounts?fields=id,name,tasks&limit=100&access_token=${encodeURIComponent(token)}`)
+    .then((ps) => ps.map((p: any) => ({ id: String(p.id), nome: p.name ?? String(p.id), tarefas: (p.tasks ?? []) as string[] })), () => []);
+  return { valido: !!j.data?.is_valid, permissoes: (j.data?.scopes ?? []) as string[], paginas };
 }
 
 type Lugar = { id: string; nome: string; endereco: string | null; tem_local: boolean };

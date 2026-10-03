@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { PERMISSOES_NECESSARIAS, alternarOculta, conferirPermissoes, fetchContas, type ContaInstagram } from "@/lib/instagram";
+import {
+  PERMISSOES_NECESSARIAS, TAREFAS_PAGINA, alternarOculta, conferirPermissoes, fetchContas, type ContaInstagram, type PaginaTarefas,
+} from "@/lib/instagram";
 
 /** Foto da conta; o link da Meta expira com o tempo, e aí aparece o ícone. */
 export function FotoConta({ conta, className }: { conta: Pick<ContaInstagram, "foto_url">; className?: string }) {
@@ -56,7 +58,10 @@ export async function alternarNaLista(
 
 /** Quadro do Admin: o que o META_TOKEN pode fazer (✓) e o que falta pedir na Meta (✗). */
 function PermissoesToken() {
-  const [r, setR] = useState<{ valido: boolean; permissoes: string[] } | null>(null);
+  const [r, setR] = useState<{ valido: boolean; permissoes: string[]; paginas?: PaginaTarefas[] } | null>(null);
+  const pode = (p: PaginaTarefas, t: string) => p.tarefas.includes("MANAGE") || p.tarefas.includes(t);
+  const semComunidade = (r?.paginas ?? []).filter((p) => !pode(p, "MODERATE"));
+  const semConteudo = (r?.paginas ?? []).filter((p) => !pode(p, "CREATE_CONTENT"));
   const [carregando, setCarregando] = useState(false);
   const conferir = () => {
     setCarregando(true);
@@ -85,6 +90,30 @@ function PermissoesToken() {
               </p>
             );
           })}
+          {r.paginas && (
+            <div className="space-y-2 border-t pt-3">
+              <p className="font-medium">Páginas do Facebook ({r.paginas.length})</p>
+              {semConteudo.length === 0 && semComunidade.length === 0 && (
+                <p className="flex items-center gap-2"><Check size={15} className="text-emerald-600" /> O usuário do sistema pode publicar e comentar em todas.</p>
+              )}
+              {[
+                { lista: semConteudo, falta: "Conteúdo", para: "publicar no Facebook" },
+                { lista: semComunidade, falta: "Atividade da comunidade", para: "o primeiro comentário no Facebook" },
+              ].filter((g) => g.lista.length).map((g) => (
+                <div key={g.falta} className="space-y-1 text-destructive">
+                  <p className="flex items-start gap-2">
+                    <X size={15} className="mt-0.5 shrink-0" />
+                    Sem "{g.falta}" ({g.lista.length}), necessária para {g.para}. Dê essa permissão ao usuário do sistema nestas páginas, no gerenciador de negócios:
+                  </p>
+                  <ul className="ml-6 list-disc text-xs text-muted-foreground">
+                    {g.lista.map((p) => (
+                      <li key={p.id}>{p.nome} <span className="opacity-70">(tem: {p.tarefas.map((t) => TAREFAS_PAGINA[t] ?? t).join(", ") || "nada"})</span></li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       )}
     </Card>
