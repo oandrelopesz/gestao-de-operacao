@@ -183,7 +183,7 @@ export function erroMeta(corpo: any, status: number): string {
   if (!e) return `A Meta respondeu ${status}.`;
   if (e.code === 190) return "O token da Meta (META_TOKEN) é inválido ou expirou. Gere outro no usuário do sistema e troque o segredo no Lovable.";
   if (SUBCODIGOS[e.error_subcode]) return SUBCODIGOS[e.error_subcode];
-  if (e.code === 10 || e.code === 200) return `Sem permissão na Meta: ${e.message}`;
+  if (e.code === 10 || e.code === 200) return `Sem permissão na Meta: ${e.message}${e.error_subcode ? ` (subcódigo ${e.error_subcode})` : ""}`;
   if (e.code === 4 || e.code === 32 || e.code === 613) return "Muitas chamadas à Meta agora. Clique em Tentar de novo daqui a alguns minutos.";
   return `Meta: ${e.error_user_msg || e.message || "erro"} (código ${e.code ?? "?"})`;
 }

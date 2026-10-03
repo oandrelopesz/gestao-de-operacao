@@ -1,7 +1,7 @@
 // Posts da aba Instagram: a linha de um post (com as ações de cada situação) e a lista com filtro por conta.
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ExternalLink, Facebook, Film, Images, Instagram, Loader2, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { ExternalLink, Facebook, Film, Images, Instagram, Loader2, MessageCircle, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,7 +10,7 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  cancelarPost, excluirPost, removerPost, tentarDeNovo, urlDaMidia, type ContaInstagram, type PostInstagram,
+  cancelarPost, comentarDeNovo, excluirPost, removerPost, tentarDeNovo, urlDaMidia, type ContaInstagram, type PostInstagram,
 } from "@/lib/instagram";
 
 export const NA_FILA = ["agendado", "enviando", "processando", "publicando"];
@@ -102,6 +102,8 @@ export function LinhaPost({ post: p, conta, onEditar }: {
             </a>
           </Button>
         )}
+        {p.status === "publicado" && p.primeiro_comentario && /primeiro comentário/.test(p.aviso ?? "") &&
+          botao("Comentar de novo", <MessageCircle size={13} />, () => agir(() => comentarDeNovo(p.id), "Comentário publicado."), "outline")}
         {p.status === "publicado" && botao("Excluir", <Trash2 size={13} />, () => setConfirmar(true))}
         {["cancelado", "erro", "excluido"].includes(p.status) && botao("Remover", <Trash2 size={13} />, () => agir(() => removerPost(p.id), "Removido da lista."))}
       </div>

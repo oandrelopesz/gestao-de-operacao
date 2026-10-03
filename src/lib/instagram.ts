@@ -109,6 +109,9 @@ export async function tentarDeNovo(post: PostInstagram): Promise<void> {
   if (naHora(quando)) avancarFila();
 }
 
+/** Tenta de novo o primeiro comentário que não saiu (o aviso some se der certo). */
+export const comentarDeNovo = (id: string) => chamar<{ ok: boolean }>({ acao: "comentar", id });
+
 /** Apaga na rede (Instagram ou Facebook) um post publicado pelo sistema. */
 export const excluirPost = (id: string) => chamar<{ ok: boolean }>({ acao: "excluir", id });
 

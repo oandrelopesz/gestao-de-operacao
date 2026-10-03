@@ -50,15 +50,33 @@ async function tokenDaPagina(sb: any, token: string, contaId: string): Promise<{
   return { pagina: data.pagina_id, tokenPagina: j.access_token };
 }
 
+/**
+ * Comenta em `alvos` (o primeiro que aceitar). No Facebook vale tentar o post e o objeto da foto, que são ids diferentes.
+ * Devolve null se deu certo ou a mensagem do último erro.
+ */
+async function comentarEm(token: string, alvos: string[], texto: string, instagram: boolean): Promise<string | null> {
+  let erro: any = null;
+  for (const alvo of alvos) {
+    try {
+      await graph("POST", `${alvo}/comments`, token, { message: texto });
+      return null;
+    } catch (e) {
+      erro = e;
+    }
+  }
+  return instagram ? comPermissao(erro, "instagram_manage_comments")
+    : /Sem permissão/.test(msg(erro))
+      ? `${msg(erro)}. Confira em Admin → Instagram as permissões do token e o que o usuário do sistema pode fazer nesta página.`
+      : msg(erro);
+}
+
 /** Primeiro comentário e (Instagram) comentários desativados, nessa ordem. Devolve o aviso ou null. */
-async function depoisDePublicar(token: string, alvo: string, p: any, instagram: boolean): Promise<string | null> {
+async function depoisDePublicar(token: string, alvos: string[], p: any, instagram: boolean): Promise<string | null> {
   const avisos: string[] = [];
+  const alvo = alvos[0];
   if (p.primeiro_comentario?.trim()) {
-    await graph("POST", `${alvo}/comments`, token, { message: p.primeiro_comentario.trim() })
-      .catch((e) => avisos.push(`O primeiro comentário não saiu: ${instagram ? comPermissao(e, "instagram_manage_comments")
-        : /Sem permissão/.test(msg(e))
-          ? `${msg(e)}. Confira em Admin → Instagram se o token tem pages_manage_engagement; se tiver, dê ao usuário do sistema a permissão "Atividade da comunidade" (ou Controle total) nesta página, no gerenciador de negócios.`
-          : msg(e)}`));
+    const erro = await comentarEm(token, alvos, p.primeiro_comentario.trim(), instagram);
+    if (erro) avisos.push(`O primeiro comentário não saiu: ${erro}`);
   }
   if (instagram && p.opcoes?.comentarios_desativados) {
     await graph("POST", alvo, token, { comment_enabled: "false" })
@@ -70,6 +88,7 @@ async function depoisDePublicar(token: string, alvo: string, p: any, instagram: 
 /** Facebook: publica de uma vez (foto, álbum só de fotos ou vídeo) a partir do post já em `enviando`. */
 async function publicarFacebook(sb: any, token: string, p: any): Promise<any> {
   let postId: string;
+  let fotoId: string | null = null; // na foto, o objeto da foto é outro id além do post
   let tokenPagina: string;
   try {
     const pg = await tokenDaPagina(sb, token, p.conta_id);
@@ -80,6 +99,7 @@ async function publicarFacebook(sb: any, token: string, p: any): Promise<any> {
     } else if (p.tipo === "foto") {
       const j = await graph("POST", `${pg.pagina}/photos`, tokenPagina, fbFoto(p, urls[0]));
       postId = String(j.post_id ?? j.id);
+      fotoId = j.post_id && j.id ? String(j.id) : null;
     } else {
       const ids: string[] = [];
       for (const u of urls) ids.push(String((await graph("POST", `${pg.pagina}/photos`, tokenPagina, fbFotoSolta(u))).id));
@@ -88,9 +108,12 @@ async function publicarFacebook(sb: any, token: string, p: any): Promise<any> {
   } catch (e) {
     return mudar(sb, p.id, "enviando", { status: "erro", erro: comPermissao(e, "pages_manage_posts") });
   }
-  const salvo = await mudar(sb, p.id, "enviando", { status: "publicado", media_id: postId, publicado_em: new Date().toISOString(), erro: null });
+  const salvo = await mudar(sb, p.id, "enviando", {
+    status: "publicado", media_id: postId, publicado_em: new Date().toISOString(), erro: null,
+    ...(fotoId ? { containers: { foto_id: fotoId } } : {}),
+  });
   const permalink = await graph("GET", postId, tokenPagina, { fields: "permalink_url" }).then((j) => linkFacebook(j.permalink_url), () => null);
-  const aviso = await depoisDePublicar(tokenPagina, postId, p, false);
+  const aviso = await depoisDePublicar(tokenPagina, [postId, ...(fotoId ? [fotoId] : [])], p, false);
   await sb.from("ig_posts").update({ permalink, aviso }).eq("id", p.id);
   return salvo ? { ...salvo, permalink, aviso } : salvo;
 }
@@ -155,7 +178,7 @@ export async function avancar(sb: any, token: string, post: any): Promise<any> {
     }
     const salvo = await mudar(sb, id, "publicando", { status: "publicado", media_id: mediaId, publicado_em: new Date().toISOString(), erro: null });
     const permalink = await graph("GET", mediaId, token, { fields: "permalink" }).then((j) => j.permalink ?? null, () => null);
-    const aviso = p.tipo === "story" ? null : await depoisDePublicar(token, mediaId, p, true);
+    const aviso = p.tipo === "story" ? null : await depoisDePublicar(token, [mediaId], p, true);
     if (permalink || aviso) await sb.from("ig_posts").update({ permalink, aviso }).eq("id", id);
     return salvo ? { ...salvo, permalink, aviso } : salvo;
   }
@@ -206,6 +229,20 @@ export async function excluir(sb: any, token: string, id: string) {
     if (!/does not exist/i.test(msg(e))) throw new Error(comPermissao(e, p.rede === "facebook" ? "pages_manage_posts" : "instagram_manage_contents"));
   }
   await mudar(sb, id, "publicado", { status: "excluido", excluido_em: new Date().toISOString() });
+  return { ok: true };
+}
+
+/** Tenta de novo o primeiro comentário de um post publicado; dando certo, o aviso some. */
+export async function comentar(sb: any, token: string, id: string) {
+  const { data: p, error } = await sb.from("ig_posts").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!p || p.status !== "publicado" || !p.media_id) throw new Error("Só dá para comentar em post publicado.");
+  if (!p.primeiro_comentario?.trim()) throw new Error("Este post não tem primeiro comentário.");
+  const facebook = p.rede === "facebook";
+  const tk = facebook ? (await tokenDaPagina(sb, token, p.conta_id)).tokenPagina : token;
+  const erro = await comentarEm(tk, [p.media_id, ...(facebook && p.containers?.foto_id ? [p.containers.foto_id] : [])], p.primeiro_comentario.trim(), !facebook);
+  if (erro) throw new Error(erro);
+  await sb.from("ig_posts").update({ aviso: null }).eq("id", id);
   return { ok: true };
 }
 
