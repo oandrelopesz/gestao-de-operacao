@@ -1,11 +1,12 @@
 // Contas de Instagram com uma chave "visível" cada (aba Instagram e Admin → Instagram).
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Instagram } from "lucide-react";
+import { Check, Instagram, KeyRound, Loader2, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { alternarOculta, fetchContas, type ContaInstagram } from "@/lib/instagram";
+import { PERMISSOES_NECESSARIAS, alternarOculta, conferirPermissoes, fetchContas, type ContaInstagram } from "@/lib/instagram";
 
 /** Foto da conta; o link da Meta expira com o tempo, e aí aparece o ícone. */
 export function FotoConta({ conta, className }: { conta: Pick<ContaInstagram, "foto_url">; className?: string }) {
@@ -53,11 +54,50 @@ export async function alternarNaLista(
   }
 }
 
+/** Quadro do Admin: o que o META_TOKEN pode fazer (✓) e o que falta pedir na Meta (✗). */
+function PermissoesToken() {
+  const [r, setR] = useState<{ valido: boolean; permissoes: string[] } | null>(null);
+  const [carregando, setCarregando] = useState(false);
+  const conferir = () => {
+    setCarregando(true);
+    conferirPermissoes().then(setR).catch((e) => toast.error(e.message)).finally(() => setCarregando(false));
+  };
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <div>
+          <CardTitle className="flex items-center gap-2"><KeyRound size={18} /> Permissões do token da Meta</CardTitle>
+          <CardDescription>O que o META_TOKEN deixa o sistema fazer. O que estiver com ✗ precisa ser marcado ao gerar o token no usuário do sistema.</CardDescription>
+        </div>
+        <Button size="sm" variant="outline" className="shrink-0 gap-2" onClick={conferir} disabled={carregando}>
+          {carregando && <Loader2 size={14} className="animate-spin" />} Conferir
+        </Button>
+      </CardHeader>
+      {r && (
+        <CardContent className="space-y-1 text-sm">
+          {!r.valido && <p className="text-destructive">O token não é válido: gere outro no usuário do sistema.</p>}
+          {PERMISSOES_NECESSARIAS.map((x) => {
+            const tem = r.permissoes.includes(x.permissao);
+            return (
+              <p key={x.permissao} className={cn("flex items-start gap-2", !tem && "text-destructive")}>
+                {tem ? <Check size={15} className="mt-0.5 shrink-0 text-emerald-600" /> : <X size={15} className="mt-0.5 shrink-0" />}
+                <span><code className="text-xs">{x.permissao}</code> · {x.para}</span>
+              </p>
+            );
+          })}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 /** Card da seção Instagram do Admin. */
 export function ContasInstagramCard() {
   const [contas, setContas] = useState<ContaInstagram[] | null>(null);
   useEffect(() => { fetchContas().then(setContas).catch((e) => toast.error(e.message)); }, []);
   return (
+    <>
+    <PermissoesToken />
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Instagram size={18} /> Contas visíveis</CardTitle>
@@ -68,5 +108,6 @@ export function ContasInstagramCard() {
           : <ContasVisiveis contas={contas} onAlternar={(c, v) => alternarNaLista(c, v, setContas)} />}
       </CardContent>
     </Card>
+    </>
   );
 }

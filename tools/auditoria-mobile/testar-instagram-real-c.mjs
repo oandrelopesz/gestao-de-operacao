@@ -86,6 +86,29 @@ if (modo === "editar") {
   ok("removido da lista", true);
 }
 
+if (modo === "facebook") {
+  // Uma foto no Instagram e no Facebook ao mesmo tempo, com primeiro comentário e comentários desativados (Instagram)
+  const d = await abrirPostar();
+  await d.getByRole("checkbox").nth(1).click(); // Facebook
+  await d.locator('input[type="file"][multiple]').setInputFiles(`${pasta}/carrossel-3.png`);
+  await d.getByLabel("Primeiro comentário (opcional)").fill("Teste do sistema (será apagado)");
+  await d.getByRole("button", { name: /Opções avançadas/ }).click();
+  await d.getByRole("switch", { name: /Desativar comentários/ }).click();
+  await esperarBotao(d, "Publicar agora");
+  await p.screenshot({ path: `${SP}/ig-real-facebook-antes.png` });
+  await d.getByRole("button", { name: "Publicar agora", exact: true }).click();
+  await d.waitFor({ state: "detached", timeout: 30000 });
+  await p.getByRole("tab", { name: /Posts/ }).click();
+  const limite = Date.now() + 4 * 60 * 1000;
+  let linhas = [];
+  while (Date.now() < limite) {
+    linhas = (await p.locator("div.divide-y > div").allInnerTexts()).slice(0, 2).map((t) => t.replace(/\s+/g, " "));
+    if (linhas.length === 2 && linhas.every((l) => /Publicado|Erro/.test(l))) break;
+    await p.waitForTimeout(8000);
+  }
+  linhas.forEach((l) => console.log("linha:", l));
+}
+
 if (modo === "excluir") {
   await p.getByRole("tab", { name: /Posts/ }).click();
   const linha = p.locator("div.divide-y > div").filter({ has: p.locator(`a[href*="${link}"]`) }).first();
@@ -93,8 +116,9 @@ if (modo === "excluir") {
   await linha.getByRole("button", { name: "Excluir" }).click();
   await p.getByText(/Excluir do Instagram\?/).waitFor();
   await p.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();
-  await p.waitForTimeout(6000);
+  await p.locator("[data-sonner-toast]").first().waitFor({ timeout: 60000 }).catch(() => {});
   console.log("avisos:", await avisos());
+  await p.waitForTimeout(3000);
   console.log("linha:", (await linha.innerText().catch(() => "(saiu)")).replace(/\s+/g, " "));
 }
 await p.screenshot({ path: `${SP}/ig-real-${modo}.png` });

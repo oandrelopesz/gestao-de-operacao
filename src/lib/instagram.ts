@@ -28,6 +28,21 @@ export async function fetchContas(): Promise<ContaInstagram[]> {
 
 export const sincronizarContas = () => chamar<{ contas: number; paginas: number }>({ acao: "sincronizar" });
 
+/** Permissões que cada recurso da aba precisa no META_TOKEN. */
+export const PERMISSOES_NECESSARIAS: { permissao: string; para: string }[] = [
+  { permissao: "instagram_basic", para: "ler as contas do Instagram" },
+  { permissao: "instagram_content_publish", para: "publicar no Instagram" },
+  { permissao: "instagram_manage_comments", para: "primeiro comentário e desativar comentários (Instagram)" },
+  { permissao: "instagram_manage_contents", para: "excluir post do Instagram" },
+  { permissao: "pages_show_list", para: "ler as páginas" },
+  { permissao: "pages_read_engagement", para: "ler as páginas e os lugares" },
+  { permissao: "pages_manage_posts", para: "publicar e excluir no Facebook" },
+  { permissao: "pages_manage_engagement", para: "primeiro comentário no Facebook" },
+  { permissao: "business_management", para: "contas dos parceiros da BM" },
+];
+
+export const conferirPermissoes = () => chamar<{ valido: boolean; permissoes: string[] }>({ acao: "permissoes" });
+
 export async function alternarOculta(contaId: string, oculta: boolean): Promise<void> {
   const { error } = await supabase.from("ig_contas").update({ oculta }).eq("id", contaId);
   if (error) throw error;

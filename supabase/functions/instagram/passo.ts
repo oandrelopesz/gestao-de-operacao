@@ -206,6 +206,12 @@ export async function excluir(sb: any, token: string, id: string) {
   return { ok: true };
 }
 
+/** Permissões que o META_TOKEN tem (o token não sai da função). */
+export async function permissoes(token: string) {
+  const j = await graph("GET", "debug_token", token, { input_token: token });
+  return { valido: !!j.data?.is_valid, permissoes: (j.data?.scopes ?? []) as string[] };
+}
+
 type Lugar = { id: string; nome: string; endereco: string | null; tem_local: boolean };
 const lugar = (pg: any): Lugar => ({
   id: String(pg.id),
