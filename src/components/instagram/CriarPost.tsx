@@ -64,6 +64,7 @@ export function CriarPost({ conta, onFechar }: { conta: ContaInstagram; onFechar
   const [quando, setQuando] = useState(daquiUmaHora);
   const [salvando, setSalvando] = useState(false);
   const [arrastando, setArrastando] = useState<string | null>(null);
+  const [preparando, setPreparando] = useState(0); // arquivos ainda sendo abertos/convertidos
   const entrada = useRef<HTMLInputElement>(null);
   const urls = useRef<string[]>([]);
 
@@ -72,6 +73,7 @@ export function CriarPost({ conta, onFechar }: { conta: ContaInstagram; onFechar
   const mudarItem = (id: string, campos: Partial<Item>) => setItens((prev) => prev.map((i) => (i.id === id ? { ...i, ...campos } : i)));
 
   async function adicionar(arquivos: File[]) {
+    setPreparando((n) => n + arquivos.length);
     for (const f of arquivos) {
       const id = crypto.randomUUID();
       try {
@@ -99,6 +101,8 @@ export function CriarPost({ conta, onFechar }: { conta: ContaInstagram; onFechar
           .catch((e) => mudarItem(id, { erro: e?.message || "Falha no envio" }));
       } catch (e: any) {
         toast.error(`${f.name}: ${e?.message || "não foi possível abrir"}`);
+      } finally {
+        setPreparando((n) => n - 1);
       }
     }
   }
@@ -124,7 +128,7 @@ export function CriarPost({ conta, onFechar }: { conta: ContaInstagram; onFechar
   const agendarPara = modo === "agendar" && quando ? new Date(quando) : null;
   const { erros, avisos } = conferirPost(midias, legenda, agendarPara);
   if (modo === "agendar" && !quando) erros.push("Escolha a data e a hora.");
-  const enviando = itens.some((i) => !i.chave && !i.erro);
+  const enviando = preparando > 0 || itens.some((i) => !i.chave && !i.erro);
   const falhou = itens.some((i) => i.erro);
   const reels = tipo === "reels" ? itens[0] : null;
 
@@ -190,6 +194,11 @@ export function CriarPost({ conta, onFechar }: { conta: ContaInstagram; onFechar
                     {i.erro && <span className="absolute inset-0 flex items-center justify-center bg-destructive/80 p-1 text-center text-[10px] text-white" title={i.erro}>Falhou</span>}
                   </div>
                 ))}
+                {preparando > 0 && (
+                  <span className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-md border bg-muted/50 text-[11px] text-muted-foreground">
+                    <Loader2 size={16} className="animate-spin" /> Preparando{preparando > 1 ? ` ${preparando}` : ""}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => entrada.current?.click()}
@@ -243,8 +252,8 @@ export function CriarPost({ conta, onFechar }: { conta: ContaInstagram; onFechar
             <div className="space-y-2">
               <Label>Quando</Label>
               <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" size="sm" variant={modo === "agora" ? "default" : "outline"} onClick={() => setModo("agora")}>Publicar agora</Button>
-                <Button type="button" size="sm" variant={modo === "agendar" ? "default" : "outline"} onClick={() => setModo("agendar")}>Agendar</Button>
+                <Button type="button" size="sm" aria-pressed={modo === "agora"} variant={modo === "agora" ? "default" : "outline"} onClick={() => setModo("agora")}>Agora</Button>
+                <Button type="button" size="sm" aria-pressed={modo === "agendar"} variant={modo === "agendar" ? "default" : "outline"} onClick={() => setModo("agendar")}>Agendar</Button>
                 {modo === "agendar" && (
                   <Input type="datetime-local" aria-label="Data e hora (Brasília)" className="w-auto" value={quando} onChange={(e) => setQuando(e.target.value)} />
                 )}
@@ -266,7 +275,7 @@ export function CriarPost({ conta, onFechar }: { conta: ContaInstagram; onFechar
           <Button variant="outline" onClick={() => onFechar(false)} disabled={salvando}>Cancelar</Button>
           <Button onClick={salvar} disabled={salvando || enviando || falhou || erros.length > 0} className="gap-2">
             {(salvando || enviando) && <Loader2 size={14} className="animate-spin" />}
-            {enviando ? "Enviando mídias..." : modo === "agora" ? "Publicar agora" : "Agendar"}
+            {enviando ? "Enviando mídias..." : modo === "agora" ? "Publicar agora" : "Agendar post"}
           </Button>
         </DialogFooter>
       </DialogContent>
