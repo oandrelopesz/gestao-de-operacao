@@ -21,7 +21,7 @@ export async function enviarR2(chave: string, bytes: Uint8Array, tipo: string, t
   });
   const url = `https://${Deno.env.get("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com/${Deno.env.get("R2_BUCKET")}/${chave}`;
   try {
-    const r = await aws.fetch(url, { method: "PUT", body: bytes, headers: { "Content-Type": tipo }, signal: sinal(PRAZO.r2, total) });
+    const r = await aws.fetch(url, { method: "PUT", body: bytes as unknown as BodyInit, headers: { "Content-Type": tipo }, signal: sinal(PRAZO.r2, total) });
     if (!r.ok) {
       // O texto do R2 (XML em inglês) fica só no log da função; o aviso do post é fixo em português
       console.error("R2 PUT", r.status, (await r.text().catch(() => "")).slice(0, 300));
