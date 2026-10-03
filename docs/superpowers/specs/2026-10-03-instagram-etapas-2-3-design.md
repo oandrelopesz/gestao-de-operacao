@@ -41,3 +41,11 @@ O token atual não tem estas permissões: `pages_manage_posts`, `pages_manage_en
 - Automáticos: recorte (centralizado, pela tela, tamanho de saída), conferências com formato e redes, parâmetros de story e do Facebook.
 - Tela local (Playwright): Ajustar, Story, redes, calendário, editar.
 - Reais (autorizados, @kobegrowth e a página dela): excluir os 2 posts de teste de 03/10; story; post com Facebook e primeiro comentário depois do token novo.
+
+## 7. Pedidos do André em 03/10 (aprovados no chat)
+
+- **Editor de foto:** recorte (original, 1:1, 4:5, 1,91:1, 9:16), arrastar, zoom, girar 90°; filtros prontos com intensidade; ajustes (brilho, contraste, saturação, calor, esmaecer, realces, sombras, vinheta); texto por cima (cor, tamanho, arrastar).
+- **Editor de vídeo** (no navegador, Mediabunny/WebCodecs, carregada da CDN só ao abrir): cortar início e fim, recorte de proporção com posição, os mesmos filtros e ajustes, texto por cima, sem som; MP4 H.264/AAC com 1080 px.
+- **Localização livre:** busca pelo nome (`GET /pages/search`; se a Meta exigir a aprovação "Page Public Metadata Access", a tela avisa), páginas da BM com endereço, colar link ou id da página do lugar, lugares já usados (`ig_locais`).
+- **Opções avançadas:** desativar comentários (`POST /{media-id}?comment_enabled=false` depois de publicar), texto alternativo (`alt_text`, imagens), colaboradores (até 3, `collaborators`), marcar pessoas na foto (`user_tags` com x/y), reels com capa por imagem (`cover_url`) e nome do áudio (`audio_name`).
+- **Fora (a API não permite):** ocultar curtidas e visualizações (só no app, depois de publicado), música da biblioteca, figurinhas/enquetes, privacidade (perfil comercial e página são públicos).
