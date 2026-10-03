@@ -1632,8 +1632,8 @@ export type Database = {
         Row: {
           agendado_para: string
           capa_ms: number | null
-          containers: Json | null
           conta_id: string
+          containers: Json | null
           created_at: string
           erro: string | null
           id: string
@@ -1653,8 +1653,8 @@ export type Database = {
         Insert: {
           agendado_para?: string
           capa_ms?: number | null
-          containers?: Json | null
           conta_id: string
+          containers?: Json | null
           created_at?: string
           erro?: string | null
           id?: string
@@ -1674,8 +1674,8 @@ export type Database = {
         Update: {
           agendado_para?: string
           capa_ms?: number | null
-          containers?: Json | null
           conta_id?: string
+          containers?: Json | null
           created_at?: string
           erro?: string | null
           id?: string
