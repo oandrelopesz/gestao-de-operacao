@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, ExternalLink, Film, Images, Loader2, RefreshCw, RotateCcw, Search, Send } from "lucide-react";
+import { Eye, Loader2, RefreshCw, Search, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,24 +10,21 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MensagemBusca } from "@/components/MensagemBusca";
 import { ContasVisiveis, FotoConta, alternarNaLista } from "@/components/instagram/ContasVisiveis";
-import { CriarPost, dataHora } from "@/components/instagram/CriarPost";
+import { CriarPost } from "@/components/instagram/CriarPost";
+import { Calendario } from "@/components/instagram/Calendario";
+import { ListaPosts, NA_FILA } from "@/components/instagram/Posts";
 import { supabase } from "@/integrations/supabase/client";
 import { useBusca } from "@/lib/useBusca";
-import {
-  cancelarPost, fetchContas, fetchPosts, sincronizarContas, tentarDeNovo, urlDaMidia,
-  type ContaInstagram, type PostInstagram,
-} from "@/lib/instagram";
+import { fetchContas, fetchPosts, sincronizarContas, type ContaInstagram, type PostInstagram } from "@/lib/instagram";
 
 export const Route = createFileRoute("/_authenticated/instagram")({ component: InstagramPage });
-
-const NA_FILA = ["agendado", "enviando", "processando", "publicando"];
 
 function InstagramPage() {
   const [contas, setContas] = useState<ContaInstagram[] | null>(null);
   const [posts, setPosts] = useState<PostInstagram[] | null>(null);
   const [aba, setAba] = useState("contas");
   const [busca, setBusca] = useState("");
-  const [postarEm, setPostarEm] = useState<ContaInstagram | null>(null);
+  const [postar, setPostar] = useState<{ conta: ContaInstagram; edicao?: PostInstagram[] } | null>(null);
   const [gerenciar, setGerenciar] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
 
@@ -66,12 +63,20 @@ function InstagramPage() {
   }, [posts]);
   const totalNaFila = [...naFilaPorConta.values()].reduce((a, b) => a + b, 0);
 
+  /** Editar: as linhas ainda agendadas do mesmo grupo (Instagram e Facebook juntos); story edita só a dele. */
+  const editar = (p: PostInstagram) => {
+    const conta = contaPorId.get(p.conta_id);
+    if (!conta) return;
+    const grupo = p.grupo && p.tipo !== "story" ? (posts ?? []).filter((x) => x.grupo === p.grupo && x.status === "agendado") : [p];
+    setPostar({ conta, edicao: grupo.length ? grupo : [p] });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Instagram</h1>
-          <p className="text-sm text-muted-foreground">Escolha a conta e clique em Postar. Publique na hora ou agende.</p>
+          <p className="text-sm text-muted-foreground">Escolha a conta e clique em Postar. Publique na hora ou agende, no Instagram e no Facebook.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="gap-2" onClick={() => setGerenciar(true)}><Eye size={16} /> Contas visíveis</Button>
@@ -85,6 +90,7 @@ function InstagramPage() {
         <TabsList>
           <TabsTrigger value="contas">Contas{contas ? ` (${visiveis.length})` : ""}</TabsTrigger>
           <TabsTrigger value="posts">Posts{totalNaFila ? ` (${totalNaFila} na fila)` : ""}</TabsTrigger>
+          <TabsTrigger value="calendario">Calendário</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contas" className="space-y-3">
@@ -110,7 +116,7 @@ function InstagramPage() {
                         <p className="truncate text-xs text-muted-foreground">@{c.usuario}</p>
                       </div>
                       {n > 0 && <Badge variant="secondary" className="hidden text-[10px] sm:inline-flex">{n} na fila</Badge>}
-                      <Button size="sm" className="gap-2" onClick={() => setPostarEm(c)}><Send size={14} /> Postar</Button>
+                      <Button size="sm" className="gap-2" onClick={() => setPostar({ conta: c })}><Send size={14} /> Postar</Button>
                     </div>
                   );
                 })}
@@ -120,15 +126,21 @@ function InstagramPage() {
         </TabsContent>
 
         <TabsContent value="posts">
-          <ListaPosts posts={posts} contaPorId={contaPorId} />
+          <ListaPosts posts={posts} contaPorId={contaPorId} onEditar={editar} />
+        </TabsContent>
+
+        <TabsContent value="calendario">
+          <Calendario posts={posts} contaPorId={contaPorId} onEditar={editar} />
         </TabsContent>
       </Tabs>
 
-      {postarEm && (
+      {postar && (
         <CriarPost
-          key={postarEm.id}
-          conta={postarEm}
-          onFechar={(criou) => { setPostarEm(null); if (criou) setAba("posts"); }}
+          key={`${postar.conta.id}-${postar.edicao?.[0]?.id ?? "novo"}`}
+          conta={postar.conta}
+          contas={contas ?? []}
+          edicao={postar.edicao}
+          onFechar={(salvou) => { setPostar(null); if (salvou && aba === "contas") setAba("posts"); }}
         />
       )}
 
@@ -142,94 +154,5 @@ function InstagramPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-const SITUACAO: Record<string, { texto: string; classe: string }> = {
-  agendado: { texto: "Agendado", classe: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
-  enviando: { texto: "Enviando…", classe: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-  processando: { texto: "Enviando…", classe: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-  publicando: { texto: "Publicando…", classe: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-  publicado: { texto: "Publicado", classe: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
-  erro: { texto: "Erro", classe: "bg-destructive/15 text-destructive" },
-  cancelado: { texto: "Cancelado", classe: "bg-muted text-muted-foreground" },
-};
-
-const TIPO = { foto: "Foto", carrossel: "Carrossel", reels: "Reels" } as Record<string, string>;
-
-function ListaPosts({ posts, contaPorId }: { posts: PostInstagram[] | null; contaPorId: Map<string, ContaInstagram> }) {
-  const [ocupado, setOcupado] = useState<string | null>(null);
-  // Na fila primeiro (o próximo no topo); depois os outros, do mais novo para o mais velho
-  const ordenados = useMemo(() => {
-    const naFila = (p: PostInstagram) => (NA_FILA.includes(p.status) ? 0 : 1);
-    return [...(posts ?? [])].sort((a, b) => naFila(a) - naFila(b)
-      || (naFila(a) === 0 ? a.agendado_para.localeCompare(b.agendado_para) : b.created_at.localeCompare(a.created_at)));
-  }, [posts]);
-
-  const agir = async (id: string, f: () => Promise<void>, ok: string) => {
-    setOcupado(id);
-    try {
-      await f();
-      toast.success(ok);
-    } catch (e: any) {
-      toast.error(e?.message || "Não deu certo.");
-    } finally {
-      setOcupado(null);
-    }
-  };
-
-  if (posts === null) return <div className="flex items-center gap-2 py-16 text-sm text-muted-foreground"><Loader2 size={16} className="animate-spin" /> Carregando...</div>;
-  if (!posts.length) return <Card><CardContent className="py-14 text-center text-sm text-muted-foreground">Nenhum post ainda. Vá em Contas e clique em Postar.</CardContent></Card>;
-
-  return (
-    <Card>
-      <div className="divide-y">
-        {ordenados.map((p) => {
-          const conta = contaPorId.get(p.conta_id);
-          const m = p.midias[0];
-          const s = SITUACAO[p.status] ?? SITUACAO.erro;
-          return (
-            <div key={p.id} className="flex gap-3 p-3">
-              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
-                {m?.tipo === "imagem" && <img src={urlDaMidia(m.chave)} alt="" loading="lazy" className="h-full w-full object-cover" />}
-                {m?.tipo === "video" && <video src={urlDaMidia(m.chave)} muted preload="metadata" className="h-full w-full object-cover" />}
-                {p.tipo !== "foto" && (
-                  <span className="absolute right-0.5 top-0.5 rounded bg-black/60 p-0.5 text-white">
-                    {p.tipo === "reels" ? <Film size={10} /> : <Images size={10} />}
-                  </span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="font-medium">@{conta?.usuario ?? p.conta_id}</span>
-                  <span className="text-muted-foreground">{TIPO[p.tipo]}{p.tipo === "carrossel" ? ` · ${p.midias.length}` : ""}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${s.classe}`}>{s.texto}</span>
-                  <span className="text-muted-foreground">
-                    {p.status === "publicado" && p.publicado_em ? `em ${dataHora(p.publicado_em)}` : p.status === "cancelado" ? "" : `para ${dataHora(p.agendado_para)}`}
-                  </span>
-                </div>
-                <p className="line-clamp-2 text-sm text-muted-foreground">{p.legenda || "(sem legenda)"}</p>
-                {p.status === "erro" && p.erro && <p className="text-xs text-destructive">{p.erro}</p>}
-              </div>
-              <div className="flex shrink-0 items-start gap-1">
-                {p.status === "agendado" && (
-                  <Button size="sm" variant="ghost" disabled={ocupado === p.id} onClick={() => agir(p.id, () => cancelarPost(p.id), "Post cancelado.")}>Cancelar</Button>
-                )}
-                {p.status === "erro" && (
-                  <Button size="sm" variant="outline" className="gap-1" disabled={ocupado === p.id} onClick={() => agir(p.id, () => tentarDeNovo(p), "De volta para a fila.")}>
-                    <RotateCcw size={13} /> Tentar de novo
-                  </Button>
-                )}
-                {p.status === "publicado" && p.permalink && (
-                  <Button size="sm" variant="ghost" className="gap-1" asChild>
-                    <a href={p.permalink} target="_blank" rel="noreferrer"><ExternalLink size={13} /> Ver no Instagram</a>
-                  </Button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
   );
 }

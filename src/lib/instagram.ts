@@ -1,11 +1,14 @@
-// Aba Instagram: contas (ig_contas), posts (ig_posts), mídias no R2 (módulo instagram) e chamadas à função instagram.
+// Aba Instagram: contas (ig_contas), posts (ig_posts), lugares (ig_locais), mídias no R2 (módulo instagram) e chamadas
+// à função instagram.
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
-import { enviarR2 } from "@/lib/r2";
-import type { Midia } from "@/lib/instagramPost";
+import { enviarR2, baixarComReserva } from "@/lib/r2";
+import type { Midia, OpcoesPost } from "@/lib/instagramPost";
 
 export type ContaInstagram = Tables<"ig_contas">;
-export type PostInstagram = Omit<Tables<"ig_posts">, "midias"> & { midias: Midia[] };
+export type PostInstagram = Omit<Tables<"ig_posts">, "midias" | "opcoes"> & { midias: Midia[]; opcoes: OpcoesPost };
+export type NovoPost = Omit<TablesInsert<"ig_posts">, "midias" | "opcoes"> & { midias: Midia[]; opcoes?: OpcoesPost };
+export type Lugar = { id: string; nome: string; endereco: string | null };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const FUNCAO = `${SUPABASE_URL}/functions/v1/instagram`;
@@ -30,9 +33,9 @@ export async function alternarOculta(contaId: string, oculta: boolean): Promise<
   if (error) throw error;
 }
 
-/** Últimos 200 posts (os mais novos primeiro). */
+/** Últimos 300 posts (os mais novos primeiro). */
 export async function fetchPosts(): Promise<PostInstagram[]> {
-  const { data, error } = await supabase.from("ig_posts").select("*").order("created_at", { ascending: false }).limit(200);
+  const { data, error } = await supabase.from("ig_posts").select("*").order("created_at", { ascending: false }).limit(300);
   if (error) throw error;
   return (data ?? []) as unknown as PostInstagram[];
 }
@@ -40,10 +43,23 @@ export async function fetchPosts(): Promise<PostInstagram[]> {
 /** Pede à função para avançar a fila agora (sem esperar o relógio); erros ficam no próprio post. */
 export const avancarFila = () => { chamar({ acao: "passo" }).catch(() => {}); };
 
-export async function criarPost(novo: Omit<TablesInsert<"ig_posts">, "midias"> & { midias: Midia[] }): Promise<void> {
-  const { error } = await supabase.from("ig_posts").insert(novo as TablesInsert<"ig_posts">);
+const naHora = (iso?: string | null) => !iso || new Date(iso).getTime() <= Date.now() + 60_000;
+
+/** Cria as linhas de um post (uma por rede e, no story, uma por mídia) e chama a fila se for para agora. */
+export async function criarPosts(linhas: NovoPost[]): Promise<void> {
+  const { error } = await supabase.from("ig_posts").insert(linhas as unknown as TablesInsert<"ig_posts">[]);
   if (error) throw error;
-  if (!novo.agendado_para || new Date(novo.agendado_para).getTime() <= Date.now() + 60_000) avancarFila();
+  if (linhas.some((l) => naHora(l.agendado_para))) avancarFila();
+}
+
+/** Salva a edição nas linhas que ainda estão agendadas; devolve quantas mudaram. */
+export async function salvarEdicao(ids: string[], campos: Partial<NovoPost>): Promise<number> {
+  const { data, error } = await supabase.from("ig_posts")
+    .update({ ...campos, updated_at: new Date().toISOString() } as never)
+    .in("id", ids).eq("status", "agendado").select("id");
+  if (error) throw error;
+  if (naHora(campos.agendado_para)) avancarFila();
+  return data?.length ?? 0;
 }
 
 /** Só cancela se ainda não começou a ser enviado. */
@@ -58,19 +74,48 @@ export async function cancelarPost(id: string): Promise<void> {
 export async function tentarDeNovo(post: PostInstagram): Promise<void> {
   const quando = new Date(Math.max(Date.now(), new Date(post.agendado_para).getTime())).toISOString();
   const { data, error } = await supabase.from("ig_posts")
-    .update({ status: "agendado", erro: null, containers: null, agendado_para: quando, updated_at: new Date().toISOString() })
+    .update({ status: "agendado", erro: null, aviso: null, containers: null, agendado_para: quando, updated_at: new Date().toISOString() })
     .eq("id", post.id).eq("status", "erro").select("id");
   if (error) throw error;
   if (!data?.length) throw new Error("Este post não está mais com erro.");
-  if (new Date(quando).getTime() <= Date.now() + 60_000) avancarFila();
+  if (naHora(quando)) avancarFila();
 }
 
-/** Envia a mídia (já em JPG, se for imagem) ao R2 e devolve a chave `instagram/<uuid>.<ext>`. */
+/** Apaga na rede (Instagram ou Facebook) um post publicado pelo sistema. */
+export const excluirPost = (id: string) => chamar<{ ok: boolean }>({ acao: "excluir", id });
+
+/** Tira da lista um post cancelado, com erro ou excluído (não mexe na rede). */
+export async function removerPost(id: string): Promise<void> {
+  const { error } = await supabase.from("ig_posts").delete().eq("id", id).in("status", ["cancelado", "erro", "excluido"]);
+  if (error) throw error;
+}
+
+// ------------------------------------------------------------------ lugares
+
+export const buscarLocais = (q: string) => chamar<{ lugares: Lugar[] }>({ acao: "locais", q }).then((r) => r.lugares);
+export const conferirLocal = (ref: string) => chamar<{ lugar: Lugar; sem_conferir?: boolean }>({ acao: "local", ref });
+
+export async function fetchLocaisUsados(): Promise<Lugar[]> {
+  const { data, error } = await supabase.from("ig_locais").select("id, nome, endereco").order("usado_em", { ascending: false }).limit(20);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function lembrarLocal(l: Lugar): Promise<void> {
+  await supabase.from("ig_locais").upsert({ id: l.id, nome: l.nome, endereco: l.endereco, usado_em: new Date().toISOString() });
+}
+
+// ------------------------------------------------------------------ mídias
+
+/** Envia a mídia ao R2 e devolve a chave `instagram/<uuid>.<ext>`. */
 export async function enviarMidia(arquivo: Blob, ext: string, onProgresso?: (fracao: number) => void): Promise<string> {
   const caminho = `${crypto.randomUUID()}.${ext}`;
   await enviarR2("instagram", caminho, arquivo, arquivo.type || "application/octet-stream", onProgresso);
   return `instagram/${caminho}`;
 }
+
+/** Baixa uma mídia já enviada (para editar de novo um post agendado). */
+export const baixarMidia = (chave: string) => baixarComReserva("instagram", chave.replace(/^instagram\//, ""));
 
 /** Endereço fixo da mídia (a função r2 redireciona para um link assinado novo a cada acesso). */
 export const urlDaMidia = (chave: string) => `${SUPABASE_URL}/functions/v1/r2?c=${encodeURIComponent(chave)}`;

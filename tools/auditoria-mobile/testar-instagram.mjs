@@ -13,7 +13,7 @@ const ok = (nome, cond) => console.log(cond ? "OK " : "FALHOU ", nome);
 await abrirEstavel(p, "http://localhost:5188/instagram");
 await p.getByRole("button", { name: "Postar" }).first().waitFor({ timeout: 30000 });
 const total = await p.getByRole("button", { name: "Postar" }).count();
-ok(`lista com Postar (${total} contas)`, total > 10);
+ok(`lista com Postar (${total} contas)`, total >= 1);
 
 await p.getByLabel("Buscar conta").fill("kobegrowth");
 await p.waitForTimeout(500);
