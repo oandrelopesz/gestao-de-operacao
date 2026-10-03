@@ -46,3 +46,6 @@ dist-ssr
 
 # Saídas da auditoria mobile / regressão de desktop
 .auditoria/
+
+# Prints que o André manda para o Claude (podem ter dados da Meta: nunca vão para o git)
+prints/
