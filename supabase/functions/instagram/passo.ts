@@ -13,6 +13,9 @@ export const ATIVOS = ["agendado", "enviando", "processando", "publicando"];
 const MIN = 60_000;
 const velho = (quando: string, ms: number) => Date.now() - new Date(quando).getTime() > ms;
 const msg = (e: any) => String(e?.message ?? e);
+/** Erro de permissão ganha o nome da permissão que falta no token. */
+const comPermissao = (e: any, permissao: string) =>
+  /Sem permissão/.test(msg(e)) ? `${msg(e)}. O token (META_TOKEN) precisa da permissão ${permissao}.` : msg(e);
 
 /**
  * Muda o post só se o status no banco ainda for `de` (e, com `quando`, se ninguém mexeu nele desde aquela leitura);
@@ -52,11 +55,11 @@ async function depoisDePublicar(token: string, alvo: string, p: any, instagram: 
   const avisos: string[] = [];
   if (p.primeiro_comentario?.trim()) {
     await graph("POST", `${alvo}/comments`, token, { message: p.primeiro_comentario.trim() })
-      .catch((e) => avisos.push(`O primeiro comentário não saiu: ${msg(e)}`));
+      .catch((e) => avisos.push(`O primeiro comentário não saiu: ${comPermissao(e, instagram ? "instagram_manage_comments" : "pages_manage_engagement")}`));
   }
   if (instagram && p.opcoes?.comentarios_desativados) {
     await graph("POST", alvo, token, { comment_enabled: "false" })
-      .catch((e) => avisos.push(`Os comentários não foram desativados: ${msg(e)}`));
+      .catch((e) => avisos.push(`Os comentários não foram desativados: ${comPermissao(e, "instagram_manage_comments")}`));
   }
   return avisos.length ? avisos.join(" ") : null;
 }
@@ -80,7 +83,7 @@ async function publicarFacebook(sb: any, token: string, p: any): Promise<any> {
       postId = String((await graph("POST", `${pg.pagina}/feed`, tokenPagina, fbAlbum(p, ids))).id);
     }
   } catch (e) {
-    return mudar(sb, p.id, "enviando", { status: "erro", erro: msg(e) });
+    return mudar(sb, p.id, "enviando", { status: "erro", erro: comPermissao(e, "pages_manage_posts") });
   }
   const salvo = await mudar(sb, p.id, "enviando", { status: "publicado", media_id: postId, publicado_em: new Date().toISOString(), erro: null });
   const permalink = await graph("GET", postId, tokenPagina, { fields: "permalink_url" }).then((j) => linkFacebook(j.permalink_url), () => null);
@@ -196,7 +199,8 @@ export async function excluir(sb: any, token: string, id: string) {
     const tk = p.rede === "facebook" ? (await tokenDaPagina(sb, token, p.conta_id)).tokenPagina : token;
     await graph("DELETE", p.media_id, tk);
   } catch (e) {
-    if (!/does not exist/i.test(msg(e))) throw e; // apagado antes pelo app: segue
+    // apagado antes pelo app: segue
+    if (!/does not exist/i.test(msg(e))) throw new Error(comPermissao(e, p.rede === "facebook" ? "pages_manage_posts" : "instagram_manage_contents"));
   }
   await mudar(sb, id, "publicado", { status: "excluido", excluido_em: new Date().toISOString() });
   return { ok: true };
