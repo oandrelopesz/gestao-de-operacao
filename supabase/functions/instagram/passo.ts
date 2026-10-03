@@ -55,7 +55,10 @@ async function depoisDePublicar(token: string, alvo: string, p: any, instagram: 
   const avisos: string[] = [];
   if (p.primeiro_comentario?.trim()) {
     await graph("POST", `${alvo}/comments`, token, { message: p.primeiro_comentario.trim() })
-      .catch((e) => avisos.push(`O primeiro comentário não saiu: ${comPermissao(e, instagram ? "instagram_manage_comments" : "pages_manage_engagement")}`));
+      .catch((e) => avisos.push(`O primeiro comentário não saiu: ${instagram ? comPermissao(e, "instagram_manage_comments")
+        : /Sem permissão/.test(msg(e))
+          ? `${msg(e)}. Confira em Admin → Instagram se o token tem pages_manage_engagement; se tiver, dê ao usuário do sistema a permissão "Atividade da comunidade" (ou Controle total) nesta página, no gerenciador de negócios.`
+          : msg(e)}`));
   }
   if (instagram && p.opcoes?.comentarios_desativados) {
     await graph("POST", alvo, token, { comment_enabled: "false" })
