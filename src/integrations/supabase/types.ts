@@ -1579,6 +1579,7 @@ export type Database = {
           foto_url: string | null
           id: string
           nome: string
+          oculta: boolean
           pagina_id: string | null
           pagina_tem_local: boolean
           sincronizada_em: string
@@ -1591,6 +1592,7 @@ export type Database = {
           foto_url?: string | null
           id: string
           nome?: string
+          oculta?: boolean
           pagina_id?: string | null
           pagina_tem_local?: boolean
           sincronizada_em?: string
@@ -1603,6 +1605,7 @@ export type Database = {
           foto_url?: string | null
           id?: string
           nome?: string
+          oculta?: boolean
           pagina_id?: string | null
           pagina_tem_local?: boolean
           sincronizada_em?: string
@@ -1621,6 +1624,80 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ig_posts: {
+        Row: {
+          agendado_para: string
+          capa_ms: number | null
+          containers: Json | null
+          conta_id: string
+          created_at: string
+          erro: string | null
+          id: string
+          legenda: string
+          local_id: string | null
+          local_nome: string | null
+          media_id: string | null
+          midias: Json
+          permalink: string | null
+          publicado_em: string | null
+          reels_no_feed: boolean
+          status: string
+          tentativas: number
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          agendado_para?: string
+          capa_ms?: number | null
+          containers?: Json | null
+          conta_id: string
+          created_at?: string
+          erro?: string | null
+          id?: string
+          legenda?: string
+          local_id?: string | null
+          local_nome?: string | null
+          media_id?: string | null
+          midias?: Json
+          permalink?: string | null
+          publicado_em?: string | null
+          reels_no_feed?: boolean
+          status?: string
+          tentativas?: number
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          agendado_para?: string
+          capa_ms?: number | null
+          containers?: Json | null
+          conta_id?: string
+          created_at?: string
+          erro?: string | null
+          id?: string
+          legenda?: string
+          local_id?: string | null
+          local_nome?: string | null
+          media_id?: string | null
+          midias?: Json
+          permalink?: string | null
+          publicado_em?: string | null
+          reels_no_feed?: boolean
+          status?: string
+          tentativas?: number
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_posts_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "ig_contas"
             referencedColumns: ["id"]
           },
         ]

@@ -3,7 +3,7 @@
 // publicada sozinha e não importa código do app.
 
 /** Módulo do sistema → bucket onde os arquivos dele ficavam no Storage do Supabase. */
-export const MODULOS_R2 = { arquivos: "pdfs", notas: "notas", fluxogramas: "fluxogramas" } as const;
+export const MODULOS_R2 = { arquivos: "pdfs", notas: "notas", fluxogramas: "fluxogramas", instagram: "instagram" } as const;
 export type ModuloR2 = keyof typeof MODULOS_R2;
 
 const TAMANHO_MAX_CHAVE = 512;

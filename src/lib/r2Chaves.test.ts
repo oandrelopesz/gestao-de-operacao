@@ -5,7 +5,7 @@ import { MODULOS_R2, arquivoDaImagemNota, caminhoValido, chaveR2, urlImagemNota 
 const SB = "https://abc.supabase.co";
 
 test("MODULOS_R2 liga cada módulo ao bucket antigo do Supabase", () => {
-  assert.deepEqual(MODULOS_R2, { arquivos: "pdfs", notas: "notas", fluxogramas: "fluxogramas" });
+  assert.deepEqual(MODULOS_R2, { arquivos: "pdfs", notas: "notas", fluxogramas: "fluxogramas", instagram: "instagram" });
 });
 
 test("caminhoValido aceita caminhos normais e recusa os perigosos", () => {
