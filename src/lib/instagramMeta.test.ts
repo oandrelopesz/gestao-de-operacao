@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { contasDasPaginas, decidir, erroDoContainer, erroMeta, paramsCarrossel, paramsFilho, paramsUnico } from "../../supabase/functions/instagram/meta.ts";
+import {
+  contasDasPaginas, decidir, erroDoContainer, erroMeta, fbAlbum, fbFoto, fbFotoSolta, fbVideo, linkFacebook, paramsCarrossel, paramsFilho,
+  paramsUnico, refDaPagina,
+} from "../../supabase/functions/instagram/meta.ts";
 
 test("contasDasPaginas: uma conta por Instagram ligado, sem repetir; página sem Instagram fica de fora", () => {
   const r = contasDasPaginas([
@@ -42,4 +45,47 @@ test("decidir: erro primeiro, espera filhos, cria o carrossel, espera o principa
   assert.match(erroDoContainer({ status_code: "ERROR", status: "Error: Media upload has failed with error code 2207026" }), /MP4 ou MOV/);
   assert.match(erroDoContainer({ status_code: "EXPIRED" }), /expirou/);
   assert.match(erroMeta({ error: { code: 9, error_subcode: 2207042, message: "x" } }, 400), /limite diário/);
+});
+
+const BASE = { midias: [], legenda: "", local_id: null, reels_no_feed: true, capa_ms: null };
+const IMG = { chave: "k", tipo: "imagem" as const, largura: 1080, altura: 1350 };
+
+test("story: STORIES com image_url ou video_url, sem legenda nem local, com marcações", () => {
+  const marc = [{ usuario: "ana", x: 0.5, y: 0.25 }];
+  assert.deepEqual(paramsUnico({ ...BASE, tipo: "story", legenda: "x", local_id: "9", midias: [{ ...IMG, marcacoes: marc }] }, "https://u/1.jpg"),
+    { media_type: "STORIES", image_url: "https://u/1.jpg", user_tags: JSON.stringify([{ username: "ana", x: 0.5, y: 0.25 }]) });
+  assert.deepEqual(paramsUnico({ ...BASE, tipo: "story", midias: [{ ...IMG, tipo: "video" }] }, "https://u/v.mp4"),
+    { media_type: "STORIES", video_url: "https://u/v.mp4" });
+});
+
+test("opções avançadas: texto alternativo, colaboradores, capa e áudio do reels", () => {
+  const opcoes = { colaboradores: ["a", "b"], audio_nome: "Som da Kobe" };
+  assert.deepEqual(paramsUnico({ ...BASE, tipo: "foto", opcoes, midias: [{ ...IMG, alt_text: "Salão" }] }, "https://u/1.jpg"),
+    { image_url: "https://u/1.jpg", alt_text: "Salão", collaborators: JSON.stringify(["a", "b"]) });
+  assert.deepEqual(paramsUnico({ ...BASE, tipo: "reels", capa_ms: 900, opcoes, midias: [{ ...IMG, tipo: "video" }] }, "https://u/v.mp4", "https://u/capa.jpg"),
+    { media_type: "REELS", video_url: "https://u/v.mp4", share_to_feed: "true", cover_url: "https://u/capa.jpg", audio_name: "Som da Kobe", collaborators: JSON.stringify(["a", "b"]) });
+  assert.deepEqual(paramsFilho({ ...IMG, alt_text: "A" }, "https://u/1.jpg"), { image_url: "https://u/1.jpg", is_carousel_item: "true", alt_text: "A" });
+  assert.deepEqual(paramsCarrossel({ ...BASE, tipo: "carrossel", opcoes: { colaboradores: ["c"] } }, ["1", "2"]),
+    { media_type: "CAROUSEL", children: "1,2", collaborators: JSON.stringify(["c"]) });
+});
+
+test("Facebook: foto, foto solta, álbum, vídeo e link", () => {
+  const p = { ...BASE, tipo: "foto" as const, legenda: "Oi" };
+  assert.deepEqual(fbFoto(p, "https://u/1.jpg"), { url: "https://u/1.jpg", message: "Oi" });
+  assert.deepEqual(fbFotoSolta("https://u/1.jpg"), { url: "https://u/1.jpg", published: "false" });
+  assert.deepEqual(fbAlbum(p, ["11", "22"]), { message: "Oi", "attached_media[0]": '{"media_fbid":"11"}', "attached_media[1]": '{"media_fbid":"22"}' });
+  assert.deepEqual(fbVideo({ ...p, legenda: "" }, "https://u/v.mp4"), { file_url: "https://u/v.mp4" });
+  assert.equal(linkFacebook("/kobe/videos/1/"), "https://www.facebook.com/kobe/videos/1/");
+  assert.equal(linkFacebook("https://www.facebook.com/1_2"), "https://www.facebook.com/1_2");
+  assert.equal(linkFacebook(undefined), null);
+});
+
+test("refDaPagina: id, link com nome, profile.php, pages/people e lixo", () => {
+  assert.equal(refDaPagina(" 123456789 "), "123456789");
+  assert.equal(refDaPagina("https://www.facebook.com/kobegrowth/"), "kobegrowth");
+  assert.equal(refDaPagina("facebook.com/profile.php?id=100064"), "100064");
+  assert.equal(refDaPagina("https://m.facebook.com/pages/Salao-X/987654321"), "987654321");
+  assert.equal(refDaPagina("https://www.facebook.com/people/Ana/61550000000000/"), "61550000000000");
+  assert.equal(refDaPagina("https://google.com/maps"), null);
+  assert.equal(refDaPagina(""), null);
 });

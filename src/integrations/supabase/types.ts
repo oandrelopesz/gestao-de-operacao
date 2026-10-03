@@ -1628,22 +1628,49 @@ export type Database = {
           },
         ]
       }
+      ig_locais: {
+        Row: {
+          endereco: string | null
+          id: string
+          nome: string
+          usado_em: string
+        }
+        Insert: {
+          endereco?: string | null
+          id: string
+          nome?: string
+          usado_em?: string
+        }
+        Update: {
+          endereco?: string | null
+          id?: string
+          nome?: string
+          usado_em?: string
+        }
+        Relationships: []
+      }
       ig_posts: {
         Row: {
           agendado_para: string
+          aviso: string | null
           capa_ms: number | null
           conta_id: string
           containers: Json | null
           created_at: string
           erro: string | null
+          excluido_em: string | null
+          grupo: string | null
           id: string
           legenda: string
           local_id: string | null
           local_nome: string | null
           media_id: string | null
           midias: Json
+          opcoes: Json
           permalink: string | null
+          primeiro_comentario: string | null
           publicado_em: string | null
+          rede: string
           reels_no_feed: boolean
           status: string
           tentativas: number
@@ -1652,19 +1679,25 @@ export type Database = {
         }
         Insert: {
           agendado_para?: string
+          aviso?: string | null
           capa_ms?: number | null
           conta_id: string
           containers?: Json | null
           created_at?: string
           erro?: string | null
+          excluido_em?: string | null
+          grupo?: string | null
           id?: string
           legenda?: string
           local_id?: string | null
           local_nome?: string | null
           media_id?: string | null
           midias?: Json
+          opcoes?: Json
           permalink?: string | null
+          primeiro_comentario?: string | null
           publicado_em?: string | null
+          rede?: string
           reels_no_feed?: boolean
           status?: string
           tentativas?: number
@@ -1673,19 +1706,25 @@ export type Database = {
         }
         Update: {
           agendado_para?: string
+          aviso?: string | null
           capa_ms?: number | null
           conta_id?: string
           containers?: Json | null
           created_at?: string
           erro?: string | null
+          excluido_em?: string | null
+          grupo?: string | null
           id?: string
           legenda?: string
           local_id?: string | null
           local_nome?: string | null
           media_id?: string | null
           midias?: Json
+          opcoes?: Json
           permalink?: string | null
+          primeiro_comentario?: string | null
           publicado_em?: string | null
+          rede?: string
           reels_no_feed?: boolean
           status?: string
           tentativas?: number

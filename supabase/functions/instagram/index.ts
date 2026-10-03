@@ -2,11 +2,14 @@
 //   GET                          -> { ok, servico, token }   (token = o segredo META_TOKEN existe)
 //   POST { acao: "sincronizar" } -> { contas, paginas }      lê as páginas do usuário do sistema e grava ig_contas
 //   POST { acao: "passo" }       -> { posts: [{id, status}] } avança os posts da hora (relógio a cada minuto e "Publicar agora")
+//   POST { acao: "excluir", id }  -> { ok }                    apaga na rede um post publicado e marca excluido
+//   POST { acao: "locais", q }    -> { lugares }               busca de lugares pelo nome (pode exigir aprovação da Meta)
+//   POST { acao: "local", ref }   -> { lugar, sem_conferir? }  confere a página colada (id ou nome de usuário)
 // verify_jwt = false (supabase/config.toml); sem chave de acesso, por decisão do André até o projeto de segurança.
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
 import { GRAPH, contasDasPaginas, listarTudo } from "./meta.ts";
-import { passo } from "./passo.ts";
+import { excluir, local, locais, passo } from "./passo.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -47,6 +50,9 @@ Deno.serve(async (req) => {
   try {
     if (corpo?.acao === "sincronizar") return json(await sincronizar(sb, token));
     if (corpo?.acao === "passo") return json(await passo(sb, token));
+    if (corpo?.acao === "excluir") return json(await excluir(sb, token, String(corpo.id ?? "")));
+    if (corpo?.acao === "locais") return json(await locais(token, String(corpo.q ?? "")));
+    if (corpo?.acao === "local") return json(await local(token, String(corpo.ref ?? "")));
     return json({ erro: `Ação desconhecida: ${String(corpo?.acao ?? "")}` }, 400);
   } catch (e: any) {
     console.error(corpo?.acao, e);
