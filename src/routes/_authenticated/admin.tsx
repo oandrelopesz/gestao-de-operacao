@@ -43,6 +43,7 @@ import { PdfsLimiteCard } from "@/components/admin/PdfsLimiteCard";
 import { ColorPicker } from "@/components/admin/ColorPicker";
 import { VerDepoisTiposCard } from "@/components/admin/VerDepoisTiposCard";
 import { IdeiasCategoriasCard } from "@/components/admin/IdeiasCategoriasCard";
+import { ContasInstagramCard } from "@/components/instagram/ContasVisiveis";
 import { LivrosMetaCard } from "@/components/admin/LivrosMetaCard";
 import { LinksTemasCard } from "@/components/links/TemasLinks";
 import { GlossarioCard } from "@/components/transcritor/GlossarioCard";
@@ -64,6 +65,7 @@ const SECOES = [
   { id: "transcritor", label: "Transcritor" },
   { id: "swipe", label: "Swipe file" },
   { id: "habilidades", label: "Habilidades" },
+  { id: "instagram", label: "Instagram" },
 ] as const;
 
 type Secao = (typeof SECOES)[number]["id"];
@@ -943,6 +945,10 @@ function AdminPage() {
 
           <TabsContent value="ver-depois" className="mt-0 space-y-6">
             <VerDepoisTiposCard />
+          </TabsContent>
+
+          <TabsContent value="instagram" className="mt-0 space-y-6">
+            <ContasInstagramCard />
           </TabsContent>
 
           <TabsContent value="livros" className="mt-0 space-y-6">
