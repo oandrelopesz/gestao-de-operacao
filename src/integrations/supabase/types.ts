@@ -1557,6 +1557,45 @@ export type Database = {
           },
         ]
       }
+      ig_contas: {
+        Row: {
+          ativa: boolean
+          cliente_id: string | null
+          created_at: string
+          foto_url: string | null
+          id: string
+          nome: string
+          pagina_id: string | null
+          pagina_tem_local: boolean
+          sincronizada_em: string
+          usuario: string
+        }
+        Insert: {
+          ativa?: boolean
+          cliente_id?: string | null
+          created_at?: string
+          foto_url?: string | null
+          id: string
+          nome?: string
+          pagina_id?: string | null
+          pagina_tem_local?: boolean
+          sincronizada_em?: string
+          usuario?: string
+        }
+        Update: {
+          ativa?: boolean
+          cliente_id?: string | null
+          created_at?: string
+          foto_url?: string | null
+          id?: string
+          nome?: string
+          pagina_id?: string | null
+          pagina_tem_local?: boolean
+          sincronizada_em?: string
+          usuario?: string
+        }
+        Relationships: []
+      }
       link_temas: {
         Row: {
           created_at: string

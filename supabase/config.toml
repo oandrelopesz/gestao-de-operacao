@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.planilha]
 verify_jwt = false
+
+[functions.instagram]
+verify_jwt = false
