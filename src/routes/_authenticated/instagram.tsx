@@ -133,7 +133,7 @@ function InstagramPage() {
       )}
 
       <Dialog open={gerenciar} onOpenChange={setGerenciar}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] grid-cols-1 overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Contas visíveis</DialogTitle>
             <DialogDescription>Desligue as contas que não quer ver na lista. Também dá para mudar em Admin → Instagram.</DialogDescription>

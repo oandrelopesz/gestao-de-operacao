@@ -152,13 +152,13 @@ export function CriarPost({ conta, onFechar }: { conta: ContaInstagram; onFechar
 
   return (
     <Dialog open onOpenChange={(aberto) => !aberto && onFechar(false)}>
-      <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent className="max-h-[92vh] max-w-5xl grid-cols-1 overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><FotoConta conta={conta} className="h-7 w-7" /> Postar em @{conta.usuario}</DialogTitle>
           <DialogDescription>1 imagem vira foto, 1 vídeo vira reels e 2 a 10 mídias viram carrossel.</DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-6 md:grid-cols-[1fr_280px]">
+        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_280px]">
           <div className="min-w-0 space-y-5">
             {/* Mídias */}
             <div className="space-y-2">

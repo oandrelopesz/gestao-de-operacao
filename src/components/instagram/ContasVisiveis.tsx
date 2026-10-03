@@ -22,7 +22,7 @@ export function ContasVisiveis({ contas, onAlternar }: {
 }) {
   if (!contas.length) return <p className="py-6 text-center text-sm text-muted-foreground">Nenhuma conta. Clique em "Sincronizar contas" na aba Instagram.</p>;
   return (
-    <div className="divide-y rounded-md border">
+    <div className="min-w-0 divide-y rounded-md border">
       {contas.map((c) => (
         <label key={c.id} className={cn("flex cursor-pointer items-center gap-3 px-3 py-2", c.oculta && "opacity-60")}>
           <FotoConta conta={c} className="h-8 w-8" />
