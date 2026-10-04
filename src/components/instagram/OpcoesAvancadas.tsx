@@ -12,7 +12,8 @@ import { enviarMidia, urlDaMidia } from "@/lib/instagram";
 
 export function OpcoesAvancadas({ opcoes, onMudar, reels, instagram }: {
   opcoes: OpcoesPost;
-  onMudar: (o: OpcoesPost) => void;
+  /** Muda só os campos passados, sobre a versão mais nova (a capa termina de enviar depois de outros campos mudarem). */
+  onMudar: (parcial: Partial<OpcoesPost>) => void;
   reels: boolean;
   instagram: boolean;
 }) {
@@ -25,7 +26,7 @@ export function OpcoesAvancadas({ opcoes, onMudar, reels, instagram }: {
     setEnviandoCapa(true);
     try {
       const chave = await enviarMidia(await normalizarFoto(f), "jpg");
-      onMudar({ ...opcoes, capa_chave: chave });
+      onMudar({ capa_chave: chave });
     } catch (e: any) {
       toast.error(e?.message || "Não foi possível enviar a capa.");
     } finally {
@@ -43,7 +44,7 @@ export function OpcoesAvancadas({ opcoes, onMudar, reels, instagram }: {
           {instagram && (
             <label className="flex items-center justify-between gap-2 text-sm">
               Desativar comentários (Instagram)
-              <Switch checked={!!opcoes.comentarios_desativados} onCheckedChange={(v) => onMudar({ ...opcoes, comentarios_desativados: v })} />
+              <Switch checked={!!opcoes.comentarios_desativados} onCheckedChange={(v) => onMudar({ comentarios_desativados: v })} />
             </label>
           )}
           {instagram && (
@@ -53,7 +54,7 @@ export function OpcoesAvancadas({ opcoes, onMudar, reels, instagram }: {
                 id="ig-colab"
                 value={colab}
                 placeholder="@conta1, @conta2"
-                onChange={(e) => { setColab(e.target.value); onMudar({ ...opcoes, colaboradores: limparUsuarios(e.target.value) }); }}
+                onChange={(e) => { setColab(e.target.value); onMudar({ colaboradores: limparUsuarios(e.target.value) }); }}
               />
               <p className="text-xs text-muted-foreground">A conta convidada aceita o convite no Instagram para o post aparecer no perfil dela.</p>
             </div>
@@ -66,7 +67,7 @@ export function OpcoesAvancadas({ opcoes, onMudar, reels, instagram }: {
                   {opcoes.capa_chave ? (
                     <span className="relative h-16 w-12 overflow-hidden rounded border">
                       <img src={urlDaMidia(opcoes.capa_chave)} alt="" className="h-full w-full object-cover" />
-                      <button type="button" aria-label="Tirar a capa" onClick={() => onMudar({ ...opcoes, capa_chave: undefined })} className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white"><X size={10} /></button>
+                      <button type="button" aria-label="Tirar a capa" onClick={() => onMudar({ capa_chave: undefined })} className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white"><X size={10} /></button>
                     </span>
                   ) : (
                     <label className="flex h-16 w-12 cursor-pointer items-center justify-center rounded border text-muted-foreground hover:bg-muted">
@@ -79,7 +80,7 @@ export function OpcoesAvancadas({ opcoes, onMudar, reels, instagram }: {
               </div>
               <div className="space-y-1">
                 <Label htmlFor="ig-audio">Nome do áudio original</Label>
-                <Input id="ig-audio" maxLength={100} value={opcoes.audio_nome ?? ""} placeholder="Áudio original" onChange={(e) => onMudar({ ...opcoes, audio_nome: e.target.value || undefined })} />
+                <Input id="ig-audio" maxLength={100} value={opcoes.audio_nome ?? ""} placeholder="Áudio original" onChange={(e) => onMudar({ audio_nome: e.target.value || undefined })} />
               </div>
             </>
           )}

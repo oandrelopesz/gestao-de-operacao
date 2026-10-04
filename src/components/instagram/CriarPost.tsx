@@ -395,7 +395,7 @@ export function CriarPost({ conta, contas, edicao, onFechar }: {
                 </div>
               )}
 
-              {!story && <OpcoesAvancadas opcoes={opcoes} onMudar={setOpcoes} reels={!!reels} instagram={instagram} />}
+              {!story && <OpcoesAvancadas opcoes={opcoes} onMudar={(parcial) => setOpcoes((atual) => ({ ...atual, ...parcial }))} reels={!!reels} instagram={instagram} />}
 
               {/* Quando */}
               <div className="space-y-2">
