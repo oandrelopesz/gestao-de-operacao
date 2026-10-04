@@ -7,7 +7,7 @@ export const GRAPH = "https://graph.facebook.com/v23.0";
 export interface PaginaMeta {
   id: string;
   name?: string;
-  location?: { street?: string; city?: string } | null;
+  location?: { street?: string; city?: string; latitude?: number; longitude?: number } | null;
   instagram_business_account?: { id: string; username?: string; name?: string; profile_picture_url?: string } | null;
 }
 
@@ -17,7 +17,7 @@ export interface ContaIg {
   nome: string;
   foto_url: string | null;
   pagina_id: string;
-  /** A página tem endereço: pode servir de localização dos posts */
+  /** A página tem ponto no mapa (latitude e longitude): só assim o Instagram aceita como localização */
   pagina_tem_local: boolean;
 }
 
@@ -35,7 +35,8 @@ export function contasDasPaginas(paginas: PaginaMeta[]): ContaIg[] {
       nome: ig.name || p.name || ig.username || ig.id,
       foto_url: ig.profile_picture_url ?? null,
       pagina_id: p.id,
-      pagina_tem_local: !!(p.location && (p.location.street || p.location.city)),
+      // Rua ou cidade sem o ponto no mapa não basta (o Instagram recusa o local_id: "identificação de localização inválida")
+      pagina_tem_local: p.location?.latitude != null && p.location?.longitude != null,
     });
   }
   return saida;
@@ -185,7 +186,10 @@ export function erroMeta(corpo: any, status: number): string {
   if (SUBCODIGOS[e.error_subcode]) return SUBCODIGOS[e.error_subcode];
   if (e.code === 10 || e.code === 200) return `Sem permissão na Meta: ${e.message}${e.error_subcode ? ` (subcódigo ${e.error_subcode})` : ""}`;
   if (e.code === 4 || e.code === 32 || e.code === 613) return "Muitas chamadas à Meta agora. Clique em Tentar de novo daqui a alguns minutos.";
-  return `Meta: ${e.error_user_msg || e.message || "erro"} (código ${e.code ?? "?"})`;
+  const texto = `Meta: ${e.error_user_msg || e.message || "erro"} (código ${e.code ?? "?"})`;
+  return /localiza|location/i.test(`${e.error_user_msg} ${e.message}`)
+    ? `${texto}. Escolha outro lugar: o Instagram só aceita página com ponto no mapa (clique em Editar).`
+    : texto;
 }
 
 /** Uma chamada à Graph API (GET/DELETE com parâmetros na URL, POST com corpo de formulário). Erro vira mensagem em português. */

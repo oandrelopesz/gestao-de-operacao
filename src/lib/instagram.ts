@@ -81,11 +81,14 @@ export async function criarPosts(linhas: NovoPost[]): Promise<void> {
   if (linhas.some((l) => naHora(l.agendado_para))) avancarFila();
 }
 
-/** Salva a edição nas linhas que ainda estão agendadas; devolve quantas mudaram. */
+/**
+ * Salva a edição nas linhas agendadas ou com erro (estas voltam para a fila, como um "tentar de novo" já corrigido);
+ * devolve quantas mudaram.
+ */
 export async function salvarEdicao(ids: string[], campos: Partial<NovoPost>): Promise<number> {
   const { data, error } = await supabase.from("ig_posts")
-    .update({ ...campos, updated_at: new Date().toISOString() } as never)
-    .in("id", ids).eq("status", "agendado").select("id");
+    .update({ ...campos, status: "agendado", erro: null, aviso: null, containers: null, updated_at: new Date().toISOString() } as never)
+    .in("id", ids).in("status", ["agendado", "erro"]).select("id");
   if (error) throw error;
   if (naHora(campos.agendado_para)) avancarFila();
   return data?.length ?? 0;

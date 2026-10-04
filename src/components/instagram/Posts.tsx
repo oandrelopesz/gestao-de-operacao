@@ -92,7 +92,7 @@ export function LinhaPost({ post: p, conta, onEditar }: {
       </div>
       <div className="flex shrink-0 flex-wrap items-start justify-end gap-1">
         {ocupado && <Loader2 size={14} className="mt-2 animate-spin text-muted-foreground" />}
-        {p.status === "agendado" && botao("Editar", <Pencil size={13} />, () => onEditar(p))}
+        {(p.status === "agendado" || p.status === "erro") && botao("Editar", <Pencil size={13} />, () => onEditar(p))}
         {p.status === "agendado" && botao("Cancelar", <X size={13} />, () => agir(() => cancelarPost(p.id), "Post cancelado."))}
         {p.status === "erro" && botao("Tentar de novo", <RotateCcw size={13} />, () => agir(() => tentarDeNovo(p), "De volta para a fila."), "outline")}
         {p.status === "publicado" && p.permalink && (

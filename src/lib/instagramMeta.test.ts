@@ -5,12 +5,12 @@ import {
   paramsUnico, refDaPagina,
 } from "../../supabase/functions/instagram/meta.ts";
 
-test("contasDasPaginas: uma conta por Instagram ligado, sem repetir; página sem Instagram fica de fora", () => {
+test("contasDasPaginas: uma conta por Instagram ligado, sem repetir; só página com ponto no mapa vale como lugar", () => {
   const r = contasDasPaginas([
-    { id: "p1", name: "Loja A", location: { street: "Rua 1", city: "Brasília" }, instagram_business_account: { id: "ig1", username: "lojaa", name: "Loja A", profile_picture_url: "https://x/a.jpg" } },
+    { id: "p1", name: "Loja A", location: { street: "Rua 1", city: "Brasília", latitude: -15.8, longitude: -47.9 }, instagram_business_account: { id: "ig1", username: "lojaa", name: "Loja A", profile_picture_url: "https://x/a.jpg" } },
     { id: "p2", name: "Página sem Instagram" },
     { id: "p3", name: "Loja A (outra página)", instagram_business_account: { id: "ig1", username: "lojaa" } },
-    { id: "p4", name: "Clínica B", location: null, instagram_business_account: { id: "ig2", username: "clinicab" } },
+    { id: "p4", name: "Clínica B", location: { street: "Centro", city: "Brasília" }, instagram_business_account: { id: "ig2", username: "clinicab" } },
   ]);
   assert.deepEqual(r, [
     { id: "ig1", usuario: "lojaa", nome: "Loja A", foto_url: "https://x/a.jpg", pagina_id: "p1", pagina_tem_local: true },
@@ -45,6 +45,7 @@ test("decidir: erro primeiro, espera filhos, cria o carrossel, espera o principa
   assert.match(erroDoContainer({ status_code: "ERROR", status: "Error: Media upload has failed with error code 2207026" }), /MP4 ou MOV/);
   assert.match(erroDoContainer({ status_code: "EXPIRED" }), /expirou/);
   assert.match(erroMeta({ error: { code: 9, error_subcode: 2207042, message: "x" } }, 400), /limite diário/);
+  assert.match(erroMeta({ error: { code: 100, error_user_msg: "A identificação de localização a seguir é inválida" } }, 400), /Escolha outro lugar/);
 });
 
 const BASE = { midias: [], legenda: "", local_id: null, reels_no_feed: true, capa_ms: null };

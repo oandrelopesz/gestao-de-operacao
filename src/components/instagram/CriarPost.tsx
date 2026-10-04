@@ -93,8 +93,10 @@ export function CriarPost({ conta, contas, edicao, onFechar }: {
   const [opcoes, setOpcoes] = useState<OpcoesPost>(base?.opcoes ?? {});
   const [reelsNoFeed, setReelsNoFeed] = useState(base?.reels_no_feed ?? true);
   const [capaMs, setCapaMs] = useState(base?.capa_ms ?? 0);
-  const [modo, setModo] = useState<"agora" | "agendar">(base ? "agendar" : "agora");
-  const [quando, setQuando] = useState(() => (base ? paraCampo(new Date(base.agendado_para)) : daquiUmaHora()));
+  // Na edição, horário que já passou (post com erro) volta como "Agora"
+  const futuro = !!base && new Date(base.agendado_para).getTime() > Date.now() + 60_000;
+  const [modo, setModo] = useState<"agora" | "agendar">(futuro ? "agendar" : "agora");
+  const [quando, setQuando] = useState(() => (base && futuro ? paraCampo(new Date(base.agendado_para)) : daquiUmaHora()));
   const [salvando, setSalvando] = useState(false);
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(0);

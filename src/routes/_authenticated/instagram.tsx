@@ -63,11 +63,11 @@ function InstagramPage() {
   }, [posts]);
   const totalNaFila = [...naFilaPorConta.values()].reduce((a, b) => a + b, 0);
 
-  /** Editar: as linhas ainda agendadas do mesmo grupo (Instagram e Facebook juntos); story edita só a dele. */
+  /** Editar: as linhas do mesmo grupo ainda agendadas ou com erro (Instagram e Facebook juntos); story edita só a dele. */
   const editar = (p: PostInstagram) => {
     const conta = contaPorId.get(p.conta_id);
     if (!conta) return;
-    const grupo = p.grupo && p.tipo !== "story" ? (posts ?? []).filter((x) => x.grupo === p.grupo && x.status === "agendado") : [p];
+    const grupo = p.grupo && p.tipo !== "story" ? (posts ?? []).filter((x) => x.grupo === p.grupo && (x.status === "agendado" || x.status === "erro")) : [p];
     setPostar({ conta, edicao: grupo.length ? grupo : [p] });
   };
 
