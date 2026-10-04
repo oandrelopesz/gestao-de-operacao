@@ -285,7 +285,7 @@ export function CriarPost({ conta, contas, edicao, onFechar }: {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_280px]">
             <div className="min-w-0 space-y-5">
               {/* Formato e redes */}
               <div className="flex flex-wrap items-center gap-2">

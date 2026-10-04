@@ -1,0 +1,43 @@
+// Tela de postagem e editor no tamanho de celular (390x844), no site no ar, SEM publicar: abre Postar, adiciona uma
+// imagem, abre o editor; confere rolagem para o lado e se a prévia do editor mantém a proporção.
+// Uso: node testar-instagram-celular.mjs <pasta com post-1.png> <pasta dos prints>
+import { chromium } from "playwright-core";
+import { CHROME, abrirEstavel } from "./rotas.mjs";
+const [pasta, SP] = process.argv.slice(2);
+const ok = (nome, cond) => console.log(cond ? "OK " : "FALHOU ", nome);
+const b = await chromium.launch({ executablePath: CHROME });
+const p = await b.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const erros = [];
+p.on("pageerror", (e) => erros.push(e.message));
+const largo = () => p.evaluate(() => [...document.querySelectorAll('[role="dialog"]')].some((d) => d.scrollWidth > d.clientWidth + 1) || document.documentElement.scrollWidth > window.innerWidth + 1);
+await abrirEstavel(p, `${process.env.BASE ?? "https://gestao.andrelopes.digital"}/instagram`);
+await p.getByLabel("Buscar conta").fill("kobegrowth");
+await p.waitForTimeout(600);
+await p.getByRole("button", { name: "Postar" }).first().click();
+const d = p.getByRole("dialog").first();
+await d.getByText("Postar em @kobegrowth").waitFor();
+await d.locator('input[type="file"][multiple]').setInputFiles(`${pasta}/post-1.png`);
+await d.getByRole("button", { name: "Editar a mídia 1" }).waitFor();
+await p.waitForTimeout(2500);
+await p.screenshot({ path: `${SP}/celular-postar.png`, fullPage: false });
+ok("tela de postagem sem rolar para o lado", !(await largo()));
+await d.getByRole("button", { name: "Editar a mídia 1" }).click();
+const ed = p.getByRole("dialog").filter({ hasText: "Editar foto" });
+await ed.waitFor();
+await p.waitForTimeout(1500);
+const caixa = await ed.locator("canvas").boundingBox();
+const prop = caixa ? caixa.width / caixa.height : 0;
+ok(`prévia do editor com a proporção da imagem (${caixa?.width.toFixed(0)}x${caixa?.height.toFixed(0)}, ${prop.toFixed(2)}; esperado 0,80)`, Math.abs(prop - 0.8) < 0.03);
+ok("editor sem rolar para o lado", !(await largo()));
+await p.screenshot({ path: `${SP}/celular-editor.png` });
+await ed.getByRole("button", { name: "9:16", exact: true }).click();
+await p.waitForTimeout(800);
+const c2 = await ed.locator("canvas").boundingBox();
+ok(`prévia 9:16 (${(c2.width / c2.height).toFixed(2)}; esperado 0,56)`, Math.abs(c2.width / c2.height - 9 / 16) < 0.03);
+await ed.getByRole("button", { name: "Cancelar" }).click();
+await d.getByRole("button", { name: "Cancelar" }).click();
+await p.getByRole("tab", { name: "Calendário" }).click();
+await p.waitForTimeout(800);
+ok("calendário sem rolar para o lado", !(await largo()));
+console.log("erros:", erros.join(" | ") || "nenhum");
+await b.close();

@@ -175,7 +175,8 @@ export function EditorMidia({ midia, onCancelar, onAplicar }: {
     const dx = ev.clientX - arrasto.current.x;
     const dy = ev.clientY - arrasto.current.y;
     arrasto.current = { x: ev.clientX, y: ev.clientY };
-    const novo = recorte(g.w, g.h, r, e.zoom, e.cx - (dx * rect.w) / pw / g.w, e.cy - (dy * rect.h) / ph / g.h);
+    const tela = canvas.current!.getBoundingClientRect();
+    const novo = recorte(g.w, g.h, r, e.zoom, e.cx - (dx * rect.w) / tela.width / g.w, e.cy - (dy * rect.h) / tela.height / g.h);
     mudar({ cx: (novo.x + novo.w / 2) / g.w, cy: (novo.y + novo.h / 2) / g.h });
   };
   const soltar = () => { arrasto.current = null; };
@@ -225,9 +226,9 @@ export function EditorMidia({ midia, onCancelar, onAplicar }: {
     <Dialog open onOpenChange={(v) => !v && progresso === null && onCancelar()}>
       <DialogContent className="max-h-[94vh] max-w-5xl grid-cols-1 overflow-y-auto" onInteractOutside={(ev) => ev.preventDefault()}>
         <DialogHeader><DialogTitle>Editar {video ? "vídeo" : "foto"}</DialogTitle></DialogHeader>
-        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
           <div className="flex flex-col items-center gap-2">
-            <div className="relative" style={{ width: pw, height: ph, maxWidth: "100%" }}>
+            <div className="relative" style={{ width: pw, maxWidth: "100%", aspectRatio: String(r) }}>
               <canvas
                 ref={canvas}
                 className={cn("h-full w-full touch-none rounded-md bg-black", aba === "recorte" && "cursor-grab", (aba === "texto" || aba === "marcar") && "cursor-crosshair")}

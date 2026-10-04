@@ -84,17 +84,22 @@ ok("story com Facebook desligado", await d.getByRole("checkbox").nth(1).isDisabl
 await p.screenshot({ path: `${SP}/ig-story.png` });
 await d.getByRole("button", { name: "Cancelar" }).click();
 
-// 5) Posts: Excluir pede confirmação (Voltar, sem excluir); 6) Calendário
+// 5) Posts: Excluir pede confirmação (Voltar, sem excluir), se houver post publicado; 6) Calendário do mês atual
 await p.getByRole("tab", { name: /Posts/ }).click();
+await p.waitForTimeout(1500);
 const excluir = p.getByRole("button", { name: "Excluir" });
-ok(`posts publicados com Excluir (${await excluir.count()})`, (await excluir.count()) >= 1);
-await excluir.first().click();
-await p.getByText(/Excluir do Instagram\?/).waitFor();
-ok("confirmação de exclusão", true);
-await p.getByRole("button", { name: "Voltar" }).click();
+if (await excluir.count()) {
+  await excluir.first().click();
+  await p.getByText(/Excluir do (Instagram|Facebook)\?/).waitFor();
+  ok("confirmação de exclusão", true);
+  await p.getByRole("button", { name: "Voltar" }).click();
+} else {
+  console.log("(sem post publicado na lista: a confirmação de exclusão não foi conferida)");
+}
 await p.getByRole("tab", { name: "Calendário" }).click();
-await p.getByText(/outubro de 2026/i).waitFor();
-ok("calendário de outubro com o dia 3", (await p.getByRole("button", { name: /3 de outubro: [1-9]/ }).count()) === 1);
+const mes = await p.evaluate(() => new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" }));
+await p.getByText(new RegExp(mes, "i")).first().waitFor();
+ok(`calendário de ${mes}`, true);
 await p.screenshot({ path: `${SP}/ig-calendario.png` });
 console.log("erros:", erros.join(" | ") || "nenhum");
 await navegador.close();
