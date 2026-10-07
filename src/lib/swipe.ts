@@ -4,9 +4,10 @@ import { moverVariosNaFila, novasPosicoes, posicaoNoTopo, podeTentarDeNovo, type
 
 export type SwipeCategoria =
   | "oferta" | "video_organico" | "video_anuncio" | "anuncio_estatico"
-  | "post_estatico" | "carrossel" | "landing_page" | "site";
+  | "post_estatico" | "carrossel" | "landing_page" | "site" | "story";
 
-import type { SwipeRede } from "@/lib/swipeRedes";
+import { redeLabel, type SwipeRede } from "@/lib/swipeRedes";
+import { nomeArquivo, limparNome } from "@/lib/swipeNomes";
 export { REDES, redeLabel, detectarRede, type SwipeRede } from "@/lib/swipeRedes";
 
 export type SwipeStatus = "pendente" | "baixando" | "pronto" | "falhou" | "manual" | "pausado";
@@ -14,13 +15,14 @@ export type SwipeStatus = "pendente" | "baixando" | "pronto" | "falhou" | "manua
 /** Nome da pasta (plural) e prefixo do arquivo (singular) de cada categoria */
 export const CATEGORIAS: { id: SwipeCategoria; pasta: string; singular: string; hex: string }[] = [
   { id: "oferta", pasta: "Ofertas", singular: "Oferta", hex: "#f59e0b" },
-  { id: "video_organico", pasta: "Vídeos orgânicos", singular: "Vídeo orgânico", hex: "#10b981" },
+  { id: "video_organico", pasta: "Vídeos orgânicos e Reels", singular: "Vídeo orgânico/Reel", hex: "#10b981" },
   { id: "video_anuncio", pasta: "Vídeos de anúncio", singular: "Vídeo de anúncio", hex: "#ef4444" },
   { id: "anuncio_estatico", pasta: "Anúncios estáticos", singular: "Anúncio estático", hex: "#f97316" },
   { id: "post_estatico", pasta: "Posts estáticos", singular: "Post estático", hex: "#a855f7" },
   { id: "carrossel", pasta: "Carrosséis", singular: "Carrossel", hex: "#ec4899" },
   { id: "landing_page", pasta: "Landing pages", singular: "Landing page", hex: "#3b82f6" },
   { id: "site", pasta: "Sites", singular: "Site", hex: "#06b6d4" },
+  { id: "story", pasta: "Stories", singular: "Story", hex: "#84cc16" },
 ];
 
 
@@ -102,12 +104,12 @@ function levenshtein(a: string, b: string): number {
  * Procura um nicho igual (ignorando acento/maiúsculas) ou parecido (erro de digitação).
  * Devolve `exato` quando é o mesmo nome, `parecido` quando vale confirmar com o usuário.
  */
-export function encontrarNicho(nome: string, candidatos: SwipeNicho[]): { exato?: SwipeNicho; parecido?: SwipeNicho } {
+export function encontrarNicho<T extends { nome_normalizado: string }>(nome: string, candidatos: T[]): { exato?: T; parecido?: T } {
   const alvo = normalizarNome(nome);
   if (!alvo) return {};
   const exato = candidatos.find((c) => c.nome_normalizado === alvo);
   if (exato) return { exato };
-  let melhor: SwipeNicho | undefined;
+  let melhor: T | undefined;
   let melhorDist = Infinity;
   for (const c of candidatos) {
     const d = levenshtein(alvo, c.nome_normalizado);
@@ -120,10 +122,19 @@ export function encontrarNicho(nome: string, candidatos: SwipeNicho[]): { exato?
   return { parecido: melhor };
 }
 
-/** Nome do arquivo no Drive: "Vídeo de anúncio - Médico - Ortopedia - Dr Fulano" */
-export function nomeArquivo(categoria: SwipeCategoria, nicho: string, subnicho: string | null | undefined, player: string): string {
-  const partes = [categoriaMeta(categoria).singular, nicho.trim(), subnicho?.trim() || "", player.trim()].filter(Boolean);
-  return partes.join(" - ").replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 180);
+/** Nome do arquivo no Drive: "Hook forte - Dr Fulano - Vídeo de anúncio - Instagram" (o nome é opcional) */
+export function nomeDoItem(p: { nome?: string | null; player: string; categoria: SwipeCategoria; rede: SwipeRede }): string {
+  return nomeArquivo({ nome: p.nome, player: p.player, tipo: categoriaMeta(p.categoria).singular, rede: redeLabel(p.rede) });
+}
+
+/** Players já usados (lista do formulário), sem repetir variações de acento e maiúsculas. */
+export function playersDe(itens: Pick<SwipeItem, "player">[]): { nome: string; nome_normalizado: string }[] {
+  const vistos = new Map<string, string>();
+  for (const i of itens) {
+    const nome = i.player?.trim();
+    if (nome && !vistos.has(normalizarNome(nome))) vistos.set(normalizarNome(nome), nome);
+  }
+  return Array.from(vistos, ([nome_normalizado, nome]) => ({ nome, nome_normalizado })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
 export function extensaoDe(file: File): string {
@@ -170,17 +181,19 @@ export async function garantirPastas(opts: {
   rootFolderId: string;
   nicho: { id?: string; nome: string };
   subnicho?: { id?: string; nome: string } | null;
+  player: string;
   categoria: SwipeCategoria;
   nichosAtuais: SwipeNicho[];
-}): Promise<{ nicho: SwipeNicho; subnicho: SwipeNicho | null; categoriaFolder: DriveFile }> {
+}): Promise<{ nicho: SwipeNicho; subnicho: SwipeNicho | null; playerFolder: DriveFile; categoriaFolder: DriveFile }> {
   const nicho = await garantirNicho(opts.nicho, null, opts.rootFolderId, opts.nichosAtuais);
   let subnicho: SwipeNicho | null = null;
   if (opts.subnicho && opts.subnicho.nome.trim()) {
     subnicho = await garantirNicho(opts.subnicho, nicho.id, nicho.drive_folder_id!, opts.nichosAtuais);
   }
-  const paiFolder = (subnicho ?? nicho).drive_folder_id!;
-  const categoriaFolder = await ensureFolder(categoriaMeta(opts.categoria).pasta, paiFolder);
-  return { nicho, subnicho, categoriaFolder };
+  // Swipe File / Nicho / [Subnicho /] Player / Tipo (estrutura combinada em 2026-10-07)
+  const playerFolder = await ensureFolder(limparNome(opts.player), (subnicho ?? nicho).drive_folder_id!);
+  const categoriaFolder = await ensureFolder(categoriaMeta(opts.categoria).pasta, playerFolder.id);
+  return { nicho, subnicho, playerFolder, categoriaFolder };
 }
 
 async function garantirNicho(

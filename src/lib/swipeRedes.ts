@@ -31,6 +31,8 @@ const LABEL_CURTO: Partial<Record<SwipeRede, string>> = {
   google_ads: "Google Ads",
   facebook: "Facebook",
   tiktok: "TikTok",
+  x: "X",
+  internet: "Internet",
 };
 
 /** Nome curto para badges e filtros. */

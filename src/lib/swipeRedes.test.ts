@@ -36,5 +36,7 @@ test("REDES: ids únicos, labels legíveis e redeLabel com fallback", () => {
   const ids = REDES.map((r) => r.id);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(redeLabel("tiktok_ads"), "TikTok Ads");
+  assert.equal(redeLabel("x"), "X"); // vai no nome do arquivo no Drive
+  assert.equal(redeLabel("internet"), "Internet");
   assert.equal(redeLabel("inexistente"), "inexistente");
 });

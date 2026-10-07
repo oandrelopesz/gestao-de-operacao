@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Plus, Search, ExternalLink, Copy, Trash2, Upload, FolderOpen, ChevronDown, ChevronRight, Folder, Image as ImageIcon,
-  Video, LayoutTemplate, Globe, FileText, GalleryHorizontal, Tag, AlertTriangle, RefreshCw, RotateCcw, Pause, Play, Loader2,
+  Video, LayoutTemplate, Globe, FileText, GalleryHorizontal, Tag, AlertTriangle, RefreshCw, RotateCcw, Pause, Play, Loader2, Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import { CACHE_KEYS } from "@/lib/data";
 import { toast } from "sonner";
 import {
   CATEGORIAS, REDES, STATUS_META, categoriaMeta, redeLabel, fetchNichos, fetchItens, fetchSwipeConfig, excluirItem, erroAmigavel, temChave,
-  fetchFila, pausarItem, retomarItem, tentarDeNovo,
+  fetchFila, pausarItem, retomarItem, tentarDeNovo, playersDe,
   type SwipeItem, type SwipeNicho, type SwipeConfig, type SwipeCategoria, type SwipeJob,
 } from "@/lib/swipe";
 import { podeTentarDeNovo } from "@/lib/swipeFila";
@@ -46,6 +46,7 @@ const ICONE_CATEGORIA: Record<SwipeCategoria, React.ReactNode> = {
   carrossel: <GalleryHorizontal size={12} />,
   landing_page: <LayoutTemplate size={12} />,
   site: <Globe size={12} />,
+  story: <Smartphone size={12} />,
 };
 
 interface Selecao {
@@ -144,6 +145,8 @@ function SwipePage() {
   };
 
   const nichosRaiz = useMemo(() => nichos.filter((n) => !n.pai_id), [nichos]);
+  const players = useMemo(() => playersDe(itens), [itens]);
+  const nomesUsados = useMemo(() => new Set(itens.map((i) => i.nome_arquivo).filter((n): n is string => !!n)), [itens]);
   const subnichosDe = (id: string) => nichos.filter((n) => n.pai_id === id);
   const nomeNicho = (id: string | null | undefined) => nichos.find((n) => n.id === id)?.nome || "";
 
@@ -387,6 +390,8 @@ function SwipePage() {
         onSaved={load}
         rootFolderId={config?.root_folder_id ?? null}
         nichos={nichos}
+        players={players}
+        nomesUsados={nomesUsados}
         completar={dialog?.completar ?? null}
         preset={dialog?.preset}
       />
