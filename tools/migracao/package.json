@@ -1,0 +1,12 @@
+{
+  "name": "gestao-migracao",
+  "private": true,
+  "type": "module",
+  "description": "Scripts da migração para fora do Lovable (não fazem parte do site)",
+  "scripts": {
+    "test": "node --test comparar.test.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
