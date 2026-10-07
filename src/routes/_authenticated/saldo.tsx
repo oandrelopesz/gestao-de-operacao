@@ -406,7 +406,7 @@ function SaldoPage() {
 
     let query = supabase.from("recargas").select("*, saldo_ads!inner(plataformas, operacoes(nome, moeda))");
     query = consolidated ? query.eq("saldo_ads.cliente_id", record.cliente_id) : query.eq("saldo_ads_id", record.id);
-    const { data, error } = await query.order("data_recarga", { ascending: false });
+    const { data, error } = await query.order("data_recarga", { ascending: false }).order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar histórico");
     else setHistoryData(data || []);
   };
