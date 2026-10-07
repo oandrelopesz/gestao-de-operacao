@@ -1,0 +1,53 @@
+# .github/workflows/backup-banco.yml
+# Backup diário do banco do sistema (Supabase uajusldnvzgakffofkhl): dump dos dados de public, guardado
+# 30 dias como artefato desta execução, e PROVA do backup: restaura num banco descartável montado com as migrations
+# do repositório e compara os hashes de todas as tabelas com os do instante do dump. Falhou = e-mail do GitHub.
+# Restaurar de verdade: ver tools/migracao/README.md ("Backup diário").
+name: backup-banco
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # 04:00 em Brasília
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Dependências
+        working-directory: tools/migracao
+        run: npm ci
+
+      - name: Dump (mesmo instante dos hashes)
+        env:
+          DB_URL: ${{ secrets.BACKUP_DB_URL }}
+        run: |
+          node tools/migracao/backup.mjs fazer backup
+          echo "DATA=$(date -u +%F)" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backup-banco-${{ env.DATA }}
+          path: backup/
+          retention-days: 30
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Banco descartável com as migrations do repositório
+        run: |
+          printf '\n[db]\nmajor_version = 17\n' >> supabase/config.toml
+          supabase db start
+
+      - name: Restaurar e conferir
+        env:
+          DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: node tools/migracao/backup.mjs conferir backup
