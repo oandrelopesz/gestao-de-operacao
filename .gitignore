@@ -49,3 +49,9 @@ dist-ssr
 
 # Prints que o André manda para o Claude (podem ter dados da Meta: nunca vão para o git)
 prints/
+
+# Variáveis de ambiente. O .env do Lovable Cloud continua versionado de propósito: só tem valores
+# públicos (URL e chave publishable) e o build do Lovable lê dele; o git segue acompanhando arquivo
+# já versionado. A regra impede que qualquer outro .env (com segredo) entre no git.
+.env
+.env.*
