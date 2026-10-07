@@ -2795,6 +2795,7 @@ export type Database = {
       }
       recargas: {
         Row: {
+          ajuste: boolean
           created_at: string
           data_recarga: string
           id: string
@@ -2806,6 +2807,7 @@ export type Database = {
           valor: number
         }
         Insert: {
+          ajuste?: boolean
           created_at?: string
           data_recarga?: string
           id?: string
@@ -2817,6 +2819,7 @@ export type Database = {
           valor?: number
         }
         Update: {
+          ajuste?: boolean
           created_at?: string
           data_recarga?: string
           id?: string
@@ -3496,6 +3499,7 @@ export type Database = {
           saldo_atual_estimado: number | null
           saldo_total_acumulado: number | null
           status_alerta: string | null
+          ultimo_ajuste: boolean | null
           updated_at: string | null
           user_id: string | null
           valor_ultima_recarga: number | null

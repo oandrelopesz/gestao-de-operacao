@@ -42,6 +42,8 @@ export interface RecargaConta {
   verba_diaria?: number | null;
   /** Moeda da operação: a recarga é registrada nela */
   moeda?: string | null;
+  /** Saldo que o sistema estima hoje (mostrado no ajuste, para comparar) */
+  saldo_estimado?: number | null;
 }
 
 interface RecargaFormProps {
@@ -51,17 +53,20 @@ interface RecargaFormProps {
   defaultContaId?: string;
   onSubmit: (values: RecargaFormValues) => void;
   loading?: boolean;
+  /** Ajuste de saldo: o valor informado SUBSTITUI o saldo estimado (pode ser zero; sem forma de pagamento) */
+  ajuste?: boolean;
 }
 
 const METODOS_VALIDOS = ["cartao", "pix", "boleto"];
 
-export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubmit, loading }: RecargaFormProps) {
-  const schema = useMemo(
-    () => (contas.length > 0
+export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubmit, loading, ajuste = false }: RecargaFormProps) {
+  const schema = useMemo(() => {
+    const base = contas.length > 0
       ? recargaSchema.extend({ saldo_ads_id: z.string().min(1, "Selecione a plataforma") })
-      : recargaSchema),
-    [contas.length],
-  );
+      : recargaSchema;
+    // No ajuste o saldo pode ser zero, mas precisa ser digitado (vazio não vira zero sem querer)
+    return ajuste ? base.extend({ valor: z.number({ required_error: "Informe o saldo atual" }).min(0, "Valor inválido") }) : base;
+  }, [contas.length, ajuste]);
   const contaInicial = defaultContaId || (contas.length === 1 ? contas[0].id : "");
   const contaSelecionadaInicial = contas.find((c) => c.id === contaInicial);
   const metodoInicial = contaSelecionadaInicial?.metodo_pagamento || defaultMetodo;
@@ -71,7 +76,7 @@ export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubm
     defaultValues: {
       saldo_ads_id: contaInicial,
       data_recarga: new Date().toISOString().split("T")[0],
-      valor: 0,
+      valor: ajuste ? (undefined as unknown as number) : 0,
       metodo_pagamento: METODOS_VALIDOS.includes(metodoInicial || "") ? (metodoInicial as RecargaFormValues["metodo_pagamento"]) : null,
       observacoes: "",
     },
@@ -131,7 +136,7 @@ export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubm
           name="data_recarga"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Data da Recarga</FormLabel>
+              <FormLabel>{ajuste ? "Data do saldo" : "Data da Recarga"}</FormLabel>
               <FormControl>
                 <Input type="date" {...field} />
               </FormControl>
@@ -145,7 +150,7 @@ export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubm
           name="valor"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Valor ({simbolo})</FormLabel>
+              <FormLabel>{ajuste ? `Saldo atual na plataforma (${simbolo})` : `Valor (${simbolo})`}</FormLabel>
               <FormControl>
                 <Input
                   inputMode="numeric"
@@ -159,14 +164,17 @@ export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubm
                 />
               </FormControl>
               <p className="text-xs text-muted-foreground">
-                {formatMoeda(field.value, moeda)}{moeda !== "BRL" && <span> · recarga registrada em {moeda}</span>}
+                {formatMoeda(field.value, moeda)}{moeda !== "BRL" && <span> · registrado em {moeda}</span>}
               </p>
+              {ajuste && contaSelecionada?.saldo_estimado != null && (
+                <p className="text-xs text-muted-foreground">Estimado pelo sistema hoje: {formatMoeda(contaSelecionada.saldo_estimado, moeda)}. O valor informado substitui o estimado e o consumo diário continua a partir dele.</p>
+              )}
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <FormField
+        {!ajuste && <FormField
           control={form.control}
           name="metodo_pagamento"
           render={({ field }) => (
@@ -187,7 +195,7 @@ export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubm
               <FormMessage />
             </FormItem>
           )}
-        />
+        />}
 
         <FormField
           control={form.control}
@@ -204,7 +212,7 @@ export function RecargaForm({ defaultMetodo, contas = [], defaultContaId, onSubm
         />
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Salvando..." : "Adicionar Recarga"}
+          {loading ? "Salvando..." : ajuste ? "Ajustar saldo" : "Adicionar Recarga"}
         </Button>
       </form>
     </Form>

@@ -20,6 +20,7 @@ import {
   BellOff,
   BellRing,
   CalendarClock,
+  Scale,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -108,6 +109,8 @@ interface SaldoRow {
   qtd_recargas: number;
   data_ultima_recarga: string | null;
   valor_ultima_recarga: number | null;
+  /** O último lançamento é um ajuste de saldo (não uma recarga) */
+  ultimo_ajuste?: boolean | null;
   saldo_atual_estimado: number;
   dias_restantes: number | null;
   data_prevista_fim: string | null;
@@ -152,6 +155,7 @@ const contaDeRecarga = (row: SaldoRow, comOperacao = false): RecargaConta => ({
   metodo_pagamento: row.metodo_pagamento,
   verba_diaria: row.verba_diaria_calc,
   moeda: row.moeda,
+  saldo_estimado: row.saldo_atual_estimado,
 });
 
 const formatDate = (iso?: string | null) => {
@@ -190,8 +194,8 @@ function SaldoPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editing, setEditing] = useState<SaldoRow | null>(null);
   const [editingClient, setEditingClient] = useState<any>(null);
-  /** Recarga em andamento: plataformas do cliente (o usuário escolhe em qual foi) e a sugerida */
-  const [recargaTarget, setRecargaTarget] = useState<{ cliente_nome: string; contas: SaldoRow[]; defaultId?: string } | null>(null);
+  /** Recarga (ou ajuste de saldo) em andamento: plataformas do cliente (o usuário escolhe em qual foi) e a sugerida */
+  const [recargaTarget, setRecargaTarget] = useState<{ cliente_nome: string; contas: SaldoRow[]; defaultId?: string; ajuste?: boolean } | null>(null);
   const [novoRegistroClienteId, setNovoRegistroClienteId] = useState<string | null>(null);
   const [selectedForHistory, setSelectedForHistory] = useState<SaldoRow | null>(null);
   const [historyIsConsolidated, setHistoryIsConsolidated] = useState(false);
@@ -316,13 +320,17 @@ function SaldoPage() {
     }
   };
 
-  /** Abre o modal de recarga: o usuário escolhe a plataforma entre as que o cliente roda (Pix/Boleto) */
-  const openRecarga = (contas: SaldoRow[], sugerida?: SaldoRow, clienteNome?: string) => {
+  /**
+   * Abre o modal de recarga: o usuário escolhe a plataforma entre as que o cliente roda (Pix/Boleto).
+   * Com `ajuste`, o valor informado substitui o saldo estimado (ver 20261007150000_saldo_ajuste.sql).
+   */
+  const openRecarga = (contas: SaldoRow[], sugerida?: SaldoRow, clienteNome?: string, ajuste = false) => {
     const monitoradas = contas.filter((c) => c.metodo_pagamento !== "cartao");
     setRecargaTarget({
       cliente_nome: clienteNome ?? (sugerida?.cliente_nome || monitoradas[0]?.cliente_nome || ""),
       contas: monitoradas.length > 0 ? monitoradas : contas,
       defaultId: sugerida?.id,
+      ajuste,
     });
     setRecargaModalOpen(true);
   };
@@ -333,12 +341,14 @@ function SaldoPage() {
     if (!alvo) return;
     setSaving(true);
     try {
+      const ajuste = !!recargaTarget?.ajuste;
       const { error } = await supabase
         .from("recargas")
-        .insert([{ ...recarga, saldo_ads_id: alvo }]);
+        .insert([{ ...recarga, saldo_ads_id: alvo, ...(ajuste ? { ajuste: true, metodo_pagamento: null } : {}) }]);
       if (error) throw error;
       const plataforma = recargaTarget?.contas.find((c) => c.id === alvo)?.plataformas?.join(", ");
-      toast.success(plataforma ? `Recarga registrada em ${plataforma} — previsão recalculada` : "Recarga registrada — previsão recalculada");
+      const oQue = ajuste ? "Saldo ajustado" : "Recarga registrada";
+      toast.success(plataforma ? `${oQue} em ${plataforma} — previsão recalculada` : `${oQue} — previsão recalculada`);
       setRecargaModalOpen(false);
       setRecargaTarget(null);
       fetchSaldo(true);
@@ -890,6 +900,9 @@ function SaldoPage() {
                                       <DropdownMenuItem onClick={() => openRecarga(group.plataformas, plat)}>
                                         <Plus size={12} className="mr-2" /> Adicionar recarga
                                       </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => openRecarga([plat], plat, group.cliente_nome, true)}>
+                                        <Scale size={12} className="mr-2" /> Ajustar saldo
+                                      </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => fetchHistory(plat)}>
                                         <History size={12} className="mr-2" /> Ver histórico
                                       </DropdownMenuItem>
@@ -927,7 +940,7 @@ function SaldoPage() {
                                 </span>
                                 <span>
                                   {plat.data_ultima_recarga
-                                    ? `Última: ${formatMoeda(plat.valor_ultima_recarga, plat.moeda)} em ${formatDate(plat.data_ultima_recarga)}`
+                                    ? `${plat.ultimo_ajuste ? "Ajustado" : "Última"}: ${formatMoeda(plat.valor_ultima_recarga, plat.moeda)} em ${formatDate(plat.data_ultima_recarga)}`
                                     : "—"}
                                 </span>
                               </div>
@@ -1018,10 +1031,16 @@ function SaldoPage() {
       <Dialog open={recargaModalOpen} onOpenChange={(o) => { setRecargaModalOpen(o); if (!o) setRecargaTarget(null); }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Adicionar recarga</DialogTitle>
+            <DialogTitle>{recargaTarget?.ajuste ? "Ajustar saldo" : "Adicionar recarga"}</DialogTitle>
             <DialogDescription>
-              Novo aporte para <strong>{recargaTarget?.cliente_nome || "o cliente"}</strong>
-              {recargaTarget && recargaTarget.contas.length > 1 ? " — escolha em qual plataforma a recarga foi feita" : ""}.
+              {recargaTarget?.ajuste ? (
+                <>Informe o saldo que está agora na conta de <strong>{recargaTarget.cliente_nome || "o cliente"}</strong>. Não conta como investimento.</>
+              ) : (
+                <>
+                  Novo aporte para <strong>{recargaTarget?.cliente_nome || "o cliente"}</strong>
+                  {recargaTarget && recargaTarget.contas.length > 1 ? " — escolha em qual plataforma a recarga foi feita" : ""}.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           {recargaTarget && (
@@ -1031,6 +1050,7 @@ function SaldoPage() {
               defaultContaId={recargaTarget.defaultId}
               defaultMetodo={recargaTarget.contas.find((c) => c.id === recargaTarget.defaultId)?.metodo_pagamento || undefined}
               onSubmit={handleRecarga}
+              ajuste={!!recargaTarget.ajuste}
             />
           )}
         </DialogContent>
@@ -1080,7 +1100,7 @@ function SaldoPage() {
                   {historyData.map((recarga) => (
                     <div key={recarga.id} className="relative pl-8">
                       <div className="absolute left-0 top-1 h-7 w-7 rounded-full bg-background border flex items-center justify-center">
-                        <TrendingUp size={14} className="text-emerald-500" />
+                        {recarga.ajuste ? <Scale size={14} className="text-sky-500" /> : <TrendingUp size={14} className="text-emerald-500" />}
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
@@ -1092,7 +1112,7 @@ function SaldoPage() {
                           </div>
                           <span className="text-[10px] text-muted-foreground font-mono">{formatDate(recarga.data_recarga)}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground capitalize">{recarga.metodo_pagamento?.replace("_", " ")}</p>
+                        <p className={cn("text-xs text-muted-foreground", !recarga.ajuste && "capitalize")}>{recarga.ajuste ? "Ajuste de saldo (substitui o estimado)" : recarga.metodo_pagamento?.replace("_", " ")}</p>
                         {recarga.observacoes && (
                           <p className="text-[10px] bg-muted/50 p-1.5 rounded italic">"{recarga.observacoes}"</p>
                         )}
