@@ -49,5 +49,6 @@ jobs:
 
       - name: Restaurar e conferir
         env:
-          DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          # superusuário do banco local descartável (só ele pode desligar os gatilhos na conexão)
+          DB_URL: postgresql://supabase_admin:postgres@127.0.0.1:54322/postgres
         run: node tools/migracao/backup.mjs conferir backup
