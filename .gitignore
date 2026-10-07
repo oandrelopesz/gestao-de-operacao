@@ -55,3 +55,6 @@ prints/
 # já versionado. A regra impede que qualquer outro .env (com segredo) entre no git.
 .env
 .env.*
+
+# Arquivos locais do Supabase CLI (link do projeto)
+supabase/.temp/
