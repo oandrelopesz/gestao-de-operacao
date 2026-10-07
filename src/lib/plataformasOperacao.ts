@@ -80,8 +80,8 @@ const METODOS_VALIDOS = ["cartao", "pix", "boleto"];
  * Para o cadastro do cliente não desfazer essa edição ao salvar, o formulário carrega o método da conta
  * ativa da operação que cobre a plataforma; sem conta ativa, vale o da configuração da operação.
  *
- * - Só contas da operação indicada e ativas (`ativo !== false`) entram.
- * - Conta antiga que junta várias plataformas vale para cada uma delas.
+ * - Só contas da operação indicada, ativas (`ativo !== false`) e de UMA plataforma entram: a conta antiga
+ *   que juntava várias tinha um método só e não diz qual é o de cada plataforma.
  * - Método vazio ou desconhecido na conta é ignorado; com duas contas na mesma plataforma vale a primeira.
  * - Troca só o método: a verba (e qualquer outro campo) da configuração fica como está.
  * - Não altera o objeto recebido; devolve um novo.
@@ -91,7 +91,7 @@ export function comMetodoDasContas<C extends { metodo_pagamento: string }>(
   contas: ContaSaldoMetodo[],
   operacaoId: string,
 ): Record<string, C> {
-  const daOperacao = contas.filter((c) => c.ativo !== false && c.operacao_id === operacaoId);
+  const daOperacao = contas.filter((c) => c.ativo !== false && c.operacao_id === operacaoId && c.plataformas?.length === 1);
   const out: Record<string, C> = {};
   Object.entries(config).forEach(([nome, valor]) => {
     const conta = daOperacao.find(
@@ -100,4 +100,31 @@ export function comMetodoDasContas<C extends { metodo_pagamento: string }>(
     out[nome] = conta ? { ...valor, metodo_pagamento: conta.metodo_pagamento as C["metodo_pagamento"] } : valor;
   });
   return out;
+}
+
+/**
+ * Distribui as plataformas de uma operação pelas contas de saldo (saldo_ads) que já existem: UMA
+ * plataforma por conta, para a recarga, a forma de pagamento e o alerta serem de cada plataforma.
+ *
+ * - Contas na ordem recebida (criação); cada uma fica com a primeira plataforma dela ainda não coberta.
+ * - Conta antiga que juntava várias plataformas fica com a primeira (e o histórico de recargas);
+ *   as outras viram contas novas (`novas`).
+ * - Conta inativa da plataforma é reaproveitada (volta com o histórico); conta ativa que sobra é
+ *   desativada (`desativar`), nunca apagada.
+ */
+export function contasPorPlataforma(
+  contas: { id: string; plataformas: string[] | null; ativo?: boolean | null }[],
+  plataformas: string[],
+) {
+  const cobertas = new Set<string>();
+  const manter: { id: string; plataforma: string }[] = [];
+  const desativar: string[] = [];
+  for (const c of contas) {
+    const plataforma = (c.plataformas || []).find((p) => plataformas.includes(p) && !cobertas.has(p));
+    if (plataforma) {
+      cobertas.add(plataforma);
+      manter.push({ id: c.id, plataforma });
+    } else if (c.ativo !== false) desativar.push(c.id);
+  }
+  return { manter, desativar, novas: plataformas.filter((p) => !cobertas.has(p)) };
 }

@@ -4,7 +4,7 @@ import {
   type ClientFormValues, type OperacaoFormValues, type PlataformaConfig,
 } from "@/components/ClientForm";
 import { fetchCotacoes, isMoeda, paraBRL } from "@/lib/moedas";
-import { semPlataforma, comMetodoDasContas } from "@/lib/plataformasOperacao";
+import { semPlataforma, comMetodoDasContas, contasPorPlataforma } from "@/lib/plataformasOperacao";
 
 // Mesmo fallback usado nas outras telas quando não há sessão (preview)
 export const FALLBACK_USER_ID = "b34bdae5-7a67-4b63-a46f-8aad43a06c63";
@@ -301,33 +301,27 @@ export async function saveCliente(values: ClientFormValues, editingId?: string |
     });
     // Registros sem operação (anteriores à migration) contam para a primeira operação
     const candidatos = saldos.filter((r) => r.operacao_id === operacaoId || (i === 0 && !r.operacao_id));
-    const cobertas = new Set<string>();
-    for (const registro of candidatos) {
-      // Registros antigos podem agrupar várias plataformas; mantemos o histórico de recargas deles
-      const mantidas = (registro.plataformas || []).filter((p) => op.plataformas.includes(p) && !cobertas.has(p));
-      if (mantidas.length === 0) {
-        // Plataforma removida da operação: desativa (o histórico de recargas fica preservado)
-        if (registro.ativo !== false) {
-          const { error } = await supabase.from("saldo_ads").update({ ativo: false, operacao_id: operacaoId }).eq("id", registro.id);
-          if (error) throw error;
-        }
-        continue;
-      }
-      mantidas.forEach((p) => cobertas.add(p));
+    // Uma plataforma por conta: a conta antiga que juntava várias fica com a primeira (e o histórico)
+    const { manter, desativar, novas } = contasPorPlataforma(candidatos, op.plataformas);
+    for (const id of desativar) {
+      // Plataforma removida da operação: desativa (o histórico de recargas fica preservado)
+      const { error } = await supabase.from("saldo_ads").update({ ativo: false, operacao_id: operacaoId }).eq("id", id);
+      if (error) throw error;
+    }
+    for (const { id, plataforma } of manter) {
       const { error } = await supabase
         .from("saldo_ads")
         .update({
           operacao_id: operacaoId,
-          plataformas: mantidas,
-          metodo_pagamento: op.plataformas_config[mantidas[0]].metodo_pagamento,
-          verba_diaria: mantidas.reduce((acc, p) => acc + (verbaDiariaPor[p] || 0), 0),
+          plataformas: [plataforma],
+          metodo_pagamento: op.plataformas_config[plataforma].metodo_pagamento,
+          verba_diaria: verbaDiariaPor[plataforma] || 0,
           ativo: true,
         })
-        .eq("id", registro.id);
+        .eq("id", id);
       if (error) throw error;
     }
 
-    const novas = op.plataformas.filter((p) => !cobertas.has(p));
     if (novas.length > 0) {
       const { error } = await supabase.from("saldo_ads").insert(novas.map((p) => ({
         cliente_id: clienteId,

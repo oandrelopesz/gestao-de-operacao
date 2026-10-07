@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { semPlataforma, renomearChavePlataforma, comMetodoDasContas, MSG_ULTIMA_PLATAFORMA } from "./plataformasOperacao.ts";
+import { semPlataforma, renomearChavePlataforma, comMetodoDasContas, contasPorPlataforma, MSG_ULTIMA_PLATAFORMA } from "./plataformasOperacao.ts";
 
 const cfg = (verba: number, metodo_pagamento = "pix") => ({ verba, metodo_pagamento });
 
@@ -180,12 +180,11 @@ test("comMetodoDasContas: contas de outra operação não interferem", () => {
   assert.deepEqual(novo.Meta, cfg(3000, "pix"));
 });
 
-test("comMetodoDasContas: conta antiga com várias plataformas vale para cada uma delas", () => {
-  const config = { Meta: cfg(3000, "pix"), Google: cfg(1500, "pix"), TikTok: cfg(400, "pix") };
+test("comMetodoDasContas: conta antiga com várias plataformas não vence a configuração de cada uma", () => {
+  // Unieuro: Meta boleto e Google pix na ficha, mas a conta antiga juntava as duas em boleto
+  const config = { Meta: cfg(3000, "boleto"), Google: cfg(1500, "pix") };
   const novo = comMetodoDasContas(config, [conta({ plataformas: ["Meta", "Google"], metodo_pagamento: "boleto" })], "op-1");
-  assert.equal(novo.Meta.metodo_pagamento, "boleto");
-  assert.equal(novo.Google.metodo_pagamento, "boleto");
-  assert.equal(novo.TikTok.metodo_pagamento, "pix");
+  assert.deepEqual(novo, config);
 });
 
 test("comMetodoDasContas: só troca o método, a verba da configuração fica", () => {
@@ -211,4 +210,36 @@ test("comMetodoDasContas: não altera o objeto recebido", () => {
   const copia = structuredClone(config);
   comMetodoDasContas(config, [conta()], "op-1");
   assert.deepEqual(config, copia);
+});
+
+// ---------- contasPorPlataforma ----------
+
+const reg = (id: string, plataformas: string[] | null, ativo: boolean | null = true) => ({ id, plataformas, ativo });
+
+test("contasPorPlataforma separa a conta antiga combinada: ela fica com a primeira plataforma e as outras viram contas novas", () => {
+  const r = contasPorPlataforma([reg("a", ["Google", "Meta"])], ["Meta", "Google"]);
+  assert.deepEqual(r.manter, [{ id: "a", plataforma: "Google" }]);
+  assert.deepEqual(r.novas, ["Meta"]);
+  assert.deepEqual(r.desativar, []);
+});
+
+test("contasPorPlataforma: conta combinada pula a plataforma que saiu da operação", () => {
+  const r = contasPorPlataforma([reg("a", ["Meta", "Google"]), reg("b", ["ChatGPT Ads"])], ["Google", "ChatGPT Ads"]);
+  assert.deepEqual(r.manter, [{ id: "a", plataforma: "Google" }, { id: "b", plataforma: "ChatGPT Ads" }]);
+  assert.deepEqual(r.novas, []);
+});
+
+test("contasPorPlataforma reaproveita conta inativa da plataforma (histórico) e desativa só as ativas que sobram", () => {
+  const r = contasPorPlataforma(
+    [reg("velha", ["Meta"], false), reg("outra", ["Meta"]), reg("tiktok", ["TikTok"]), reg("parada", ["Kwai"], false)],
+    ["Meta"],
+  );
+  assert.deepEqual(r.manter, [{ id: "velha", plataforma: "Meta" }]);
+  assert.deepEqual(r.desativar, ["outra", "tiktok"]);
+  assert.deepEqual(r.novas, []);
+});
+
+test("contasPorPlataforma: sem contas, toda plataforma é nova; conta sem lista é desativada", () => {
+  assert.deepEqual(contasPorPlataforma([], ["Meta", "Google"]), { manter: [], desativar: [], novas: ["Meta", "Google"] });
+  assert.deepEqual(contasPorPlataforma([reg("x", null)], ["Meta"]).desativar, ["x"]);
 });

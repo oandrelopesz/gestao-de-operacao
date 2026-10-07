@@ -42,7 +42,7 @@ const METODOS_PAGAMENTO = [
 
 const saldoAdsSchema = z.object({
   cliente_id: z.string().min(1, "Selecione um cliente"),
-  plataformas: z.array(z.string()).min(1, "Selecione pelo menos uma plataforma"),
+  plataformas: z.array(z.string()).min(1, "Selecione a plataforma"),
   metodo_pagamento: z.enum(["cartao", "pix", "boleto"]),
   verba_diaria: z.number().min(0, "Valor inválido").optional().nullable(),
   observacoes: z.string().optional(),
@@ -109,12 +109,8 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
     form.setValue("plataformas", current.filter(p => p !== plat), { shouldValidate: true });
   };
 
-  const addPlataforma = (plat: string) => {
-    const current = form.getValues("plataformas");
-    if (!current.includes(plat)) {
-      form.setValue("plataformas", [...current, plat], { shouldValidate: true });
-    }
-  };
+  // Uma plataforma por conta (recarga, forma de pagamento e alerta são de cada plataforma): escolher outra troca
+  const addPlataforma = (plat: string) => form.setValue("plataformas", [plat], { shouldValidate: true });
 
   const opcoesClientes = useMemo(
     () => clientes.map((c) => ({ id: c.id, nome: c.nome, agencia: agenciaLabelOf(c.agencia) })),
@@ -149,7 +145,7 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
             name="plataformas"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Plataformas</FormLabel>
+                <FormLabel>Plataforma</FormLabel>
                 <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md items-center">
                   {field.value.map((plat) => (
                     <Badge key={plat} variant="secondary" className="gap-1 pr-1">
