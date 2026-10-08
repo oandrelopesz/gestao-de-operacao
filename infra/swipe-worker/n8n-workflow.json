@@ -12,7 +12,7 @@
     },
     {
       "parameters": {
-        "url": "https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_jobs",
+        "url": "https://uajusldnvzgakffofkhl.supabase.co/rest/v1/swipe_jobs",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
@@ -29,7 +29,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [-140, 0],
-      "credentials": { "httpHeaderAuth": { "id": "FM9KesEpqvc3xK4e", "name": "Supabase - Gestão de Operação (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
     },
     {
       "parameters": {
@@ -46,7 +46,7 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_jobs?id=eq.{{ $json.id }}",
+        "url": "=https://uajusldnvzgakffofkhl.supabase.co/rest/v1/swipe_jobs?id=eq.{{ $json.id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -61,12 +61,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [300, -100],
-      "credentials": { "httpHeaderAuth": { "id": "FM9KesEpqvc3xK4e", "name": "Supabase - Gestão de Operação (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_itens?id=eq.{{ $('Tem job?').item.json.item_id }}",
+        "url": "=https://uajusldnvzgakffofkhl.supabase.co/rest/v1/swipe_itens?id=eq.{{ $('Tem job?').item.json.item_id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -81,7 +81,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [520, -100],
-      "credentials": { "httpHeaderAuth": { "id": "FM9KesEpqvc3xK4e", "name": "Supabase - Gestão de Operação (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
     },
     {
       "parameters": {
@@ -129,7 +129,7 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_itens?id=eq.{{ $json.item_id }}",
+        "url": "=https://uajusldnvzgakffofkhl.supabase.co/rest/v1/swipe_itens?id=eq.{{ $json.item_id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -144,12 +144,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1400, -260],
-      "credentials": { "httpHeaderAuth": { "id": "FM9KesEpqvc3xK4e", "name": "Supabase - Gestão de Operação (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_jobs?id=eq.{{ $('Decidir').item.json.job_id }}",
+        "url": "=https://uajusldnvzgakffofkhl.supabase.co/rest/v1/swipe_jobs?id=eq.{{ $('Decidir').item.json.job_id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -164,12 +164,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1620, -260],
-      "credentials": { "httpHeaderAuth": { "id": "FM9KesEpqvc3xK4e", "name": "Supabase - Gestão de Operação (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_jobs?id=eq.{{ $json.job_id }}&status=eq.rodando",
+        "url": "=https://uajusldnvzgakffofkhl.supabase.co/rest/v1/swipe_jobs?id=eq.{{ $json.job_id }}&status=eq.rodando",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -184,12 +184,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1400, -100],
-      "credentials": { "httpHeaderAuth": { "id": "FM9KesEpqvc3xK4e", "name": "Supabase - Gestão de Operação (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_itens?id=eq.{{ $('Decidir').item.json.item_id }}&status=eq.baixando",
+        "url": "=https://uajusldnvzgakffofkhl.supabase.co/rest/v1/swipe_itens?id=eq.{{ $('Decidir').item.json.item_id }}&status=eq.baixando",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -204,12 +204,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1620, -100],
-      "credentials": { "httpHeaderAuth": { "id": "FM9KesEpqvc3xK4e", "name": "Supabase - Gestão de Operação (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_itens?id=eq.{{ $json.item_id }}&status=eq.baixando",
+        "url": "=https://uajusldnvzgakffofkhl.supabase.co/rest/v1/swipe_itens?id=eq.{{ $json.item_id }}&status=eq.baixando",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -224,12 +224,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1400, 60],
-      "credentials": { "httpHeaderAuth": { "id": "FM9KesEpqvc3xK4e", "name": "Supabase - Gestão de Operação (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://bnpvzguapunsztsdvmrs.supabase.co/rest/v1/swipe_jobs?id=eq.{{ $('Decidir').item.json.job_id }}&status=eq.rodando",
+        "url": "=https://uajusldnvzgakffofkhl.supabase.co/rest/v1/swipe_jobs?id=eq.{{ $('Decidir').item.json.job_id }}&status=eq.rodando",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -244,7 +244,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1620, 60],
-      "credentials": { "httpHeaderAuth": { "id": "FM9KesEpqvc3xK4e", "name": "Supabase - Gestão de Operação (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
     },
     {
       "parameters": {

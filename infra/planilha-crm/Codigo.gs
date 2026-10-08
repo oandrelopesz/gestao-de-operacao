@@ -11,7 +11,7 @@
  */
 
 var CFG = {
-  EDGE: 'https://bnpvzguapunsztsdvmrs.supabase.co/functions/v1/planilha',
+  EDGE: 'https://uajusldnvzgakffofkhl.supabase.co/functions/v1/planilha',
   FONTE: 'Poppins',
   CRM: 'CRM',
   LIXEIRA: 'CRM - lixeira',

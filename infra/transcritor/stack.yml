@@ -58,9 +58,9 @@ services:
     command: ["node", "src/transcritor/main.js"]
     environment:
       PORTA: "8090"
-      SUPABASE_URL: "https://bnpvzguapunsztsdvmrs.supabase.co"
+      SUPABASE_URL: "https://uajusldnvzgakffofkhl.supabase.co"
       # Chave pública do app (a mesma do front)
-      SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJucHZ6Z3VhcHVuc3p0c2R2bXJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0MTM3NzIsImV4cCI6MjA5Mjk4OTc3Mn0.2JNYq2-Ra5Na0kIUJtEnpER1IK7uBg6mhsw3IlW6duA"
+      SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhanVzbGRudnpnYWtmZm9ma2hsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MDcxMTMsImV4cCI6MjEwNjk4MzExM30.iHFXZN_p3_A9MOI9NAVd5CLyi0fYFMw2B7IY5VIRcQ4"
       SPEACHES_URL: "http://speaches:8000"
       MODELO: "deepdml/faster-whisper-large-v3-turbo-ct2"
       # Quem pode enviar arquivos: login Google do app (ID token conferido no tokeninfo)
