@@ -35,7 +35,7 @@ services:
       - source: swipe_cookies_linkedin
         target: /cookies/linkedin.txt
         mode: 0444
-      - source: swipe_cookies_youtube_v2
+      - source: swipe_cookies_youtube_v3
         target: /cookies/youtube.txt
         mode: 0444
     networks:
@@ -66,7 +66,7 @@ configs:
     external: true
   swipe_cookies_linkedin:
     external: true
-  swipe_cookies_youtube_v2:
+  swipe_cookies_youtube_v3:
     external: true
 
 networks:

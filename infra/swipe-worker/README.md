@@ -55,7 +55,7 @@ Threads o do Instagram. Configs montados: `swipe_cookies_instagram_v2`, `_tiktok
 - **YouTube** (24/09/2026, vídeo e Shorts): a imagem traz o plugin bgutil (PO token, serviço `bgutil`
   na stack do Transcritor, `http://bgutil:4416`) e o yt-dlp usa o Node como motor JS
   (`/etc/yt-dlp.conf`). Mesmo assim a VPS precisa de cookies **logados** de uma conta secundária
-  (config `swipe_cookies_youtube_v2`, só as linhas de youtube.com/google.com): exportar num perfil
+  (config `swipe_cookies_youtube_v3`, só as linhas de youtube.com/google.com): exportar num perfil
   separado do Chrome e fechar o perfil logo depois — seguir navegando no YouTube rotaciona a sessão e
   invalida o arquivo. Cookie de visitante (sem `LOGIN_INFO`/`SID`) não passa do "Sign in to confirm
   you're not a bot". Para renovar: novo config `_v3` e trocar o nome nas stacks 6 e 7.
