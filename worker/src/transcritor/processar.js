@@ -21,6 +21,8 @@ export class ErroTranscricao extends Error {
 
 const YT_DLP = "/usr/local/bin/yt-dlp";
 const TIMEOUT_TRECHO_MS = 45 * 60 * 1000;
+// O Groq responde um trecho de 3 min em segundos; travou, desiste e usa a VPS
+const TIMEOUT_GROQ_MS = 3 * 60 * 1000;
 
 const primeiraLinha = (s) => String(s || "").split(/\r?\n/).map((l) => l.replace(/^ERROR:\s*/, "").trim()).find(Boolean)?.slice(0, 160) || "erro desconhecido";
 
@@ -68,35 +70,57 @@ async function duracaoDe(arquivo, rodar) {
 // Sem `hotwords`: junto com o prompt, faz o Whisper entrar em laço e, sozinho, tira a pontuação
 // (testado na VPS em 24/09/2026). O glossário vai só no prompt.
 async function transcreverTrecho({ arquivo, idioma, prompt }, { config, fetch: _fetch, abrirBlob }) {
-  const form = new FormData();
-  form.set("file", await abrirBlob(arquivo, { type: "audio/ogg" }), "audio.ogg");
-  form.set("model", config.modelo);
-  form.set("response_format", "verbose_json");
-  form.append("timestamp_granularities[]", "segment");
-  form.set("temperature", "0");
-  if (idioma) form.set("language", idioma);
-  if (prompt) form.set("prompt", prompt);
-  const ac = new AbortController();
-  let pausado = false;
-  const soltar = registrar(() => { pausado = true; ac.abort(); });
-  const limite = setTimeout(() => ac.abort(), TIMEOUT_TRECHO_MS);
-  try {
-    const r = await _fetch(`${config.speachesUrl}/v1/audio/transcriptions`, { method: "POST", body: form, signal: ac.signal });
-    const corpo = await r.text();
-    if (!r.ok) throw new Error(`Speaches ${r.status}: ${corpo.slice(0, 200)}`);
-    return JSON.parse(corpo);
-  } catch (e) {
-    if (pausado) throw new JobPausado();
-    if (ac.signal.aborted) throw new Error("A transcrição de um trecho passou de 45 minutos");
-    throw e;
-  } finally {
-    clearTimeout(limite);
-    soltar();
+  const formulario = async (modelo) => {
+    const form = new FormData();
+    form.set("file", await abrirBlob(arquivo, { type: "audio/ogg" }), "audio.ogg");
+    form.set("model", modelo);
+    form.set("response_format", "verbose_json");
+    form.append("timestamp_granularities[]", "segment");
+    form.set("temperature", "0");
+    if (idioma) form.set("language", idioma);
+    if (prompt) form.set("prompt", prompt);
+    return form;
+  };
+  const pedir = async (nome, url, modelo, headers, limiteMs) => {
+    const ac = new AbortController();
+    let pausado = false;
+    const soltar = registrar(() => { pausado = true; ac.abort(); });
+    const limite = setTimeout(() => ac.abort(), limiteMs);
+    try {
+      const r = await _fetch(url, { method: "POST", body: await formulario(modelo), headers, signal: ac.signal });
+      const corpo = await r.text();
+      if (!r.ok) throw new Error(`${nome} ${r.status}: ${corpo.slice(0, 200)}`);
+      return JSON.parse(corpo);
+    } catch (e) {
+      if (pausado) throw new JobPausado();
+      if (ac.signal.aborted) throw new Error(`A transcrição de um trecho passou de ${Math.round(limiteMs / 60000)} minutos (${nome})`);
+      throw e;
+    } finally {
+      clearTimeout(limite);
+      soltar();
+    }
+  };
+  if (config.groqKey) {
+    try {
+      return await pedir("Groq", `${config.groqUrl}/v1/audio/transcriptions`, config.groqModelo, { Authorization: `Bearer ${config.groqKey}` }, TIMEOUT_GROQ_MS);
+    } catch (e) {
+      if (e instanceof JobPausado) throw e;
+      // Limite do plano, Groq fora do ar etc.: este trecho vai ao Whisper da VPS
+      console.log(JSON.stringify({ evento: "groq.falhou", erro: String(e?.message || e).slice(0, 300), em: new Date().toISOString() }));
+    }
   }
+  return pedir("Speaches", `${config.speachesUrl}/v1/audio/transcriptions`, config.modelo, undefined, TIMEOUT_TRECHO_MS);
 }
 
-/** Código de idioma curto ("pt", "en") para fixar nos próximos trechos; nome completo não serve. */
-const codigoIdioma = (l) => (typeof l === "string" && /^[a-z]{2,3}$/.test(l) ? l : null);
+// O Speaches devolve o código ("pt"); o Groq, o nome em inglês ("Portuguese")
+const IDIOMAS = { portuguese: "pt", english: "en", spanish: "es", french: "fr", italian: "it", german: "de" };
+
+/** Código de idioma curto ("pt", "en") para fixar nos próximos trechos. */
+const codigoIdioma = (l) => {
+  if (typeof l !== "string") return null;
+  const s = l.toLowerCase();
+  return /^[a-z]{2,3}$/.test(s) ? s : IDIOMAS[s] ?? null;
+};
 
 /**
  * Transcreve `t` (linha de `transcricoes` já reservada, status "baixando").
@@ -149,7 +173,7 @@ export async function processar(t, deps) {
         { arquivo, idioma: codigo, prompt: promptComContexto(promptGlossario, textoAnterior) },
         { config, fetch: _fetch, abrirBlob },
       );
-      idioma = idioma || r.language || null;
+      idioma = idioma || codigoIdioma(r.language) || r.language || null;
       codigo = codigo || codigoIdioma(r.language);
       const segs = Array.isArray(r.segments) && r.segments.length ? r.segments : [{ start: 0, end: p.fim - p.inicio, text: r.text || "" }];
       segmentos.push(...deslocarSegmentos(segs, p.inicio));

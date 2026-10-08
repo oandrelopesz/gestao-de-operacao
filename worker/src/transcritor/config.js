@@ -14,6 +14,10 @@ export function lerConfigTranscritor(env = process.env) {
     anonKey: obrigatoria("SUPABASE_ANON_KEY"),
     speachesUrl: (env.SPEACHES_URL || "http://speaches:8000").replace(/\/+$/, ""),
     modelo: env.MODELO || "deepdml/faster-whisper-large-v3-turbo-ct2",
+    // Com GROQ_API_KEY, cada trecho vai primeiro ao Whisper do Groq (nuvem); se falhar, ao Speaches da VPS
+    groqKey: env.GROQ_API_KEY || "",
+    groqUrl: (env.GROQ_URL || "https://api.groq.com/openai").replace(/\/+$/, ""),
+    groqModelo: env.GROQ_MODELO || "whisper-large-v3-turbo",
     googleClientId: obrigatoria("GOOGLE_CLIENT_ID"),
     emailsPermitidos: lista(env.EMAILS_PERMITIDOS).map((e) => e.toLowerCase()),
     origens: lista(env.ORIGENS || "https://gestao-de-operacao.lovable.app"),

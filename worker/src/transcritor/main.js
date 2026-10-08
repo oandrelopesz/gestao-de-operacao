@@ -111,7 +111,7 @@ async function main() {
         aplicarCors(req, res, config.origens);
         if (req.url === "/health") {
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: true, modelo: modeloPronto ? "pronto" : "baixando", ocupado, atual, versao: config.versao }));
+          res.end(JSON.stringify({ ok: true, modelo: modeloPronto ? "pronto" : "baixando", groq: Boolean(config.groqKey), ocupado, atual, versao: config.versao }));
           return;
         }
         res.writeHead(404);

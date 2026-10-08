@@ -188,3 +188,43 @@ test("pedido de parada no meio do processamento vira JobPausado", async () => {
     reiniciarParada();
   });
 });
+
+const configGroq = (pasta) => ({ ...config(pasta), groqKey: "gsk_teste", groqUrl: "https://api.groq.com/openai", groqModelo: "whisper-large-v3-turbo" });
+
+test("com a chave do Groq: o trecho vai ao Groq com a chave e o modelo dele (a VPS fica parada)", async () => {
+  await comPasta(async (pasta) => {
+    const c = cenario({ duracao: 90 });
+    const pedidos = [];
+    const fetchGroq = async (url, init) => { pedidos.push({ url, init }); return c.fetchFake(url, init); };
+    await processar({ id: "g1", origem: "arquivo" }, { banco: c.banco, config: configGroq(pasta), rodar: c.rodar, fetch: fetchGroq, abrirBlob });
+    assert.equal(pedidos.length, 1);
+    assert.equal(pedidos[0].url, "https://api.groq.com/openai/v1/audio/transcriptions");
+    assert.equal(pedidos[0].init.headers.Authorization, "Bearer gsk_teste");
+    assert.equal(c.formularios[0].get("model"), "whisper-large-v3-turbo");
+  });
+});
+
+test("Groq falhou (limite 429): o mesmo trecho vai ao Whisper da VPS, sem perder a transcrição", async () => {
+  await comPasta(async (pasta) => {
+    const c = cenario({ duracao: 90 });
+    const urls = [];
+    const fetchLimite = async (url, init) => {
+      urls.push(url);
+      if (url.includes("groq")) return { ok: false, status: 429, text: async () => '{"error":{"message":"Rate limit reached"}}' };
+      return c.fetchFake(url, init);
+    };
+    const r = await processar({ id: "g2", origem: "arquivo" }, { banco: c.banco, config: configGroq(pasta), rodar: c.rodar, fetch: fetchLimite, abrirBlob });
+    assert.deepEqual(urls, ["https://api.groq.com/openai/v1/audio/transcriptions", "http://speaches:8000/v1/audio/transcriptions"]);
+    assert.equal(c.formularios.at(-1).get("model"), "turbo", "na VPS vale o modelo da VPS");
+    assert.match(r.texto, /Trecho/);
+  });
+});
+
+test("idioma por extenso (como o Groq devolve) vira código e fixa os próximos trechos", async () => {
+  await comPasta(async (pasta) => {
+    const c = cenario({ duracao: 700, respostas: (n) => ({ language: "Portuguese", text: `Parte ${n}.`, segments: [{ start: 0, end: 4, text: `Parte ${n}.` }] }) });
+    const r = await processar({ id: "g3", origem: "arquivo" }, { banco: c.banco, config: configGroq(pasta), rodar: c.rodar, fetch: c.fetchFake, abrirBlob });
+    assert.equal(r.idioma, "pt");
+    assert.equal(c.formularios[1].get("language"), "pt");
+  });
+});

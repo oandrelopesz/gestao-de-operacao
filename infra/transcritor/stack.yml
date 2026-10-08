@@ -63,6 +63,9 @@ services:
       SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhanVzbGRudnpnYWtmZm9ma2hsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MDcxMTMsImV4cCI6MjEwNjk4MzExM30.iHFXZN_p3_A9MOI9NAVd5CLyi0fYFMw2B7IY5VIRcQ4"
       SPEACHES_URL: "http://speaches:8000"
       MODELO: "deepdml/faster-whisper-large-v3-turbo-ct2"
+      # Whisper do Groq (nuvem) primeiro; se falhar ou bater o limite, o trecho vai ao speaches acima.
+      # A chave fica nas variáveis da stack no Portainer (nunca neste arquivo).
+      GROQ_API_KEY: ${GROQ_API_KEY}
       # Quem pode enviar arquivos: login Google do app (ID token conferido no tokeninfo)
       GOOGLE_CLIENT_ID: "992656410238-rv5027f2sb5a9p682u2lljej6r8c6pdd.apps.googleusercontent.com"
       EMAILS_PERMITIDOS: "contato@andrelopes.digital"

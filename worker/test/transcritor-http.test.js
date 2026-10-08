@@ -13,8 +13,10 @@ function servidor(handler) {
 test("postarLongo envia multipart e devolve a resposta (ok, status, text)", async () => {
   let recebido = "";
   let tipo = "";
+  let chave = "";
   const s = await servidor((req, res) => {
     tipo = req.headers["content-type"];
+    chave = req.headers.authorization;
     req.on("data", (c) => (recebido += c));
     req.on("end", () => setTimeout(() => { res.writeHead(200, { "Content-Type": "application/json" }); res.end('{"text":"olá"}'); }, 300));
   });
@@ -22,8 +24,9 @@ test("postarLongo envia multipart e devolve a resposta (ok, status, text)", asyn
     const form = new FormData();
     form.set("model", "turbo");
     form.set("file", new Blob(["abc"]), "a.ogg");
-    const r = await postarLongo(`${s.url}/v1/audio/transcriptions`, { body: form });
+    const r = await postarLongo(`${s.url}/v1/audio/transcriptions`, { body: form, headers: { Authorization: "Bearer k" } });
     assert.equal(r.ok, true);
+    assert.equal(chave, "Bearer k", "cabeçalhos extras (chave do Groq) vão junto");
     assert.equal(r.status, 200);
     assert.deepEqual(JSON.parse(await r.text()), { text: "olá" });
     assert.match(tipo, /^multipart\/form-data; boundary=/);

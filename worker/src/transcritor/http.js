@@ -6,11 +6,11 @@ import https from "node:https";
 
 const LIMITE_PADRAO_MS = 45 * 60 * 1000;
 
-export async function postarLongo(url, { body, signal, timeoutMs = LIMITE_PADRAO_MS } = {}) {
+export async function postarLongo(url, { body, signal, headers: extras, timeoutMs = LIMITE_PADRAO_MS } = {}) {
   // O Request do próprio Node monta o multipart (boundary + Content-Type) a partir do FormData
   const pedido = new Request(url, { method: "POST", body });
   const corpo = Buffer.from(await pedido.arrayBuffer());
-  const headers = { "Content-Length": corpo.length };
+  const headers = { ...extras, "Content-Length": corpo.length };
   const tipo = pedido.headers.get("content-type");
   if (tipo) headers["Content-Type"] = tipo;
   const alvo = new URL(url);
