@@ -1,5 +1,7 @@
 # Migração para fora do Lovable: plano de execução
 
+> **CONCLUÍDA em 07/10/2026 (~23h, Brasília).** Diferenças em relação a este plano: o backup diário ficou no GitHub Actions (não na VPS nem no R2); a virada foi adiantada para antes da meia-noite; a chave pública nova foi colada pelo André em lugares "de espera" e religada na virada. Diário completo, testes e caminho de volta em `tools/migracao/README.md`.
+
 > **Para agentes:** executar com superpowers:executing-plans (inline, nesta sessão): quase todos os passos usam o navegador do André, aprovações dele (passkey, código) e CLIs logados nesta máquina, o que não funciona bem com subagentes. Passos com checkbox (`- [ ]`).
 
 **Objetivo:** tirar o sistema do Lovable sem perder dado nem funcionalidade: site na Cloudflare do André, banco/funções/chaves/arquivos/realtime num Supabase próprio em São Paulo, backup diário, e virada com conferência 100%.

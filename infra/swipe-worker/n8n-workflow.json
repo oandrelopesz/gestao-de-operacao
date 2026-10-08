@@ -29,7 +29,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [-140, 0],
-      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação (anon)" } }
     },
     {
       "parameters": {
@@ -61,7 +61,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [300, -100],
-      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação (anon)" } }
     },
     {
       "parameters": {
@@ -81,7 +81,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [520, -100],
-      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação (anon)" } }
     },
     {
       "parameters": {
@@ -144,7 +144,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1400, -260],
-      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação (anon)" } }
     },
     {
       "parameters": {
@@ -164,7 +164,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1620, -260],
-      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação (anon)" } }
     },
     {
       "parameters": {
@@ -184,7 +184,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1400, -100],
-      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação (anon)" } }
     },
     {
       "parameters": {
@@ -204,7 +204,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1620, -100],
-      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação (anon)" } }
     },
     {
       "parameters": {
@@ -224,7 +224,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1400, 60],
-      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação (anon)" } }
     },
     {
       "parameters": {
@@ -244,7 +244,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1620, 60],
-      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação NOVO (anon)" } }
+      "credentials": { "httpHeaderAuth": { "id": "gsuRHTRCgsQs1iRF", "name": "Supabase - Gestão de Operação (anon)" } }
     },
     {
       "parameters": {
