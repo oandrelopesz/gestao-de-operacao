@@ -123,11 +123,11 @@ function SwipePage() {
   }, []);
 
   // A fila muda sem mexer nos itens (reordenar, job começando): enquanto houver algo na fila,
-  // atualiza a cada 5 s com a aba visível.
+  // atualiza a cada 5 s, também com a aba em segundo plano (o Chrome espaça quando ela fica escondida).
   const filaAtiva = fila.some((j) => j.status === "aguardando" || j.status === "rodando");
   useEffect(() => {
     if (!filaAtiva) return;
-    const t = window.setInterval(() => { if (document.visibilityState === "visible") load(); }, 5000);
+    const t = window.setInterval(load, 5000);
     return () => window.clearInterval(t);
   }, [filaAtiva]);
 

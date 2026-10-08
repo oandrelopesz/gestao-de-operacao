@@ -13,30 +13,35 @@ import { FilaComSelecao, type LinhaDaFila } from "@/components/fila/FilaComSelec
 import { TranscreverDialog } from "@/components/transcritor/TranscreverDialog";
 import { ListaTranscricoes } from "@/components/transcritor/ListaTranscricoes";
 import {
-  SemLoginGoogle, URL_TRANSCRITOR, criarDeArquivo, criarDeLinks, enviarArquivo, excluir, fetchTranscricoes, moverPara, pausar, reordenar, retomar,
+  URL_TRANSCRITOR, criarDeArquivo, criarDeLinks, excluir, fetchTranscricoes, moverPara, pausar, reordenar, retomar,
   traduzErroTranscritor, type Transcricao,
 } from "@/lib/transcritor";
+import { cancelarEnvios, iniciarEnvio, retomarEnviosParados, useEnvios } from "@/lib/transcritorEnvios";
 import { formatarDuracao, nomeExibido, rotuloPlataforma, separarTranscricoes } from "@/lib/transcritorTexto";
 
 export const Route = createFileRoute("/_authenticated/transcritor")({ component: TranscritorPage });
-
-interface Envio { progresso: number; erro: string | null; controle: AbortController; arquivo: File }
 
 function TranscritorPage() {
   const [lista, setLista] = useCachedState<Transcricao[] | null>("transcritor.lista", null);
   const [erro, setErro] = useState<string | null>(null);
   const [dialogo, setDialogo] = useState(false);
-  const [envios, setEnvios] = useState<Record<string, Envio>>({});
+  const envios = useEnvios();
   const [servidorOk, setServidorOk] = useState<boolean | null>(null);
   // Enviar arquivos exige o login do Google (o servidor só aceita a sua conta); links não
   const [clientId, setClientId] = useState<string | null>(null);
   const [logado, setLogado] = useState(() => !!idTokenEmCache());
-  const enviosRef = useRef(envios);
-  enviosRef.current = envios;
+  const statusAntes = useRef<Record<string, string> | null>(null);
 
   const carregar = useCallback(async () => {
     try {
-      setLista(await fetchTranscricoes());
+      const nova = await fetchTranscricoes();
+      // Terminou enquanto você estava em outra aba: avisa (e marca o título da aba do navegador)
+      const antes = statusAntes.current;
+      const prontas = antes ? nova.filter((t) => t.status === "pronta" && antes[t.id] && antes[t.id] !== "pronta") : [];
+      statusAntes.current = Object.fromEntries(nova.map((t) => [t.id, t.status]));
+      for (const t of prontas) toast.success(`Transcrição pronta: ${nomeExibido(t)}`);
+      if (prontas.length && document.hidden && !document.title.startsWith("✓ ")) document.title = `✓ ${document.title}`;
+      setLista(nova);
       setErro(null);
     } catch (e) {
       setErro(traduzErroTranscritor(e));
@@ -44,6 +49,17 @@ function TranscritorPage() {
   }, [setLista]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  useEffect(() => {
+    const limparTitulo = () => { if (!document.hidden) document.title = document.title.replace(/^✓ /, ""); };
+    document.addEventListener("visibilitychange", limparTitulo);
+    return () => document.removeEventListener("visibilitychange", limparTitulo);
+  }, []);
+
+  // Um envio terminou ou parou: a lista muda de etapa
+  const idsEnviando = Object.keys(envios).join(",");
+  useEffect(() => { carregar(); }, [idsEnviando, carregar]);
+  useEffect(() => { if (Object.values(envios).some((e) => e.semLogin)) setLogado(false); }, [envios]);
 
   // O servidor da VPS está de pé? (só um aviso; a fila fica no banco de qualquer jeito)
   useEffect(() => {
@@ -63,46 +79,17 @@ function TranscritorPage() {
   const partes = useMemo(() => separarTranscricoes(lista ?? []), [lista]);
   const temFila = partes.andamento.length + partes.aguardando.length > 0;
 
-  // Enquanto houver algo na fila: atualiza a cada 5 s (com a aba visível)
+  // Enquanto houver algo na fila: atualiza a cada 5 s, também com a aba em segundo plano
+  // (o Chrome espaça para 1 por minuto quando a aba fica escondida; volta a 5 s ao reabrir)
   useEffect(() => {
     if (!temFila) return;
-    const t = window.setInterval(() => { if (document.visibilityState === "visible") carregar(); }, 5000);
+    const t = window.setInterval(carregar, 5000);
     return () => window.clearInterval(t);
   }, [temFila, carregar]);
 
-  // Fechar a aba no meio do envio perde o arquivo: avisa
-  useEffect(() => {
-    const aviso = (e: BeforeUnloadEvent) => {
-      if (Object.values(enviosRef.current).some((x) => !x.erro && x.progresso < 1)) { e.preventDefault(); e.returnValue = ""; }
-    };
-    window.addEventListener("beforeunload", aviso);
-    return () => window.removeEventListener("beforeunload", aviso);
-  }, []);
-
-  const iniciarEnvio = (id: string, arquivo: File) => {
-    const controle = new AbortController();
-    setEnvios((prev) => ({ ...prev, [id]: { progresso: 0, erro: null, controle, arquivo } }));
-    enviarArquivo(id, arquivo, {
-      signal: controle.signal,
-      onProgresso: (p) => setEnvios((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], progresso: p } } : prev)),
-    })
-      .then(() => {
-        setEnvios((prev) => { const { [id]: _feito, ...resto } = prev; return resto; });
-        carregar();
-      })
-      .catch((e) => {
-        if (controle.signal.aborted) return;
-        if (e instanceof SemLoginGoogle) setLogado(false);
-        const msg = traduzErroTranscritor(e);
-        setEnvios((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], erro: msg } } : prev));
-        if (!(e instanceof SemLoginGoogle)) toast.error(`Envio de "${arquivo.name}" parou: ${msg}`);
-      });
-  };
-
-  // Entrou com o Google: os envios que pararam continuam de onde o servidor estava
   const aoEntrar = () => {
     setLogado(true);
-    for (const [id, envio] of Object.entries(enviosRef.current)) if (envio.erro) iniciarEnvio(id, envio.arquivo);
+    retomarEnviosParados();
   };
 
   const adicionarLinks = async (itens: { link: string; nome?: string }[]) => {
@@ -139,7 +126,7 @@ function TranscritorPage() {
     if (t.status === "enviando") {
       if (envio?.erro && !logado) return { ...base, etapa: "Aguardando você entrar com o Google (botão acima) — o envio continua sozinho", progresso: envio.progresso, semPausa: true };
       if (envio?.erro) return { ...base, etapa: `Envio parou (${envio.erro}) — cancele e envie de novo`, progresso: envio.progresso, semPausa: true };
-      if (!envio) return { ...base, etapa: "Envio interrompido (a página foi recarregada) — cancele e envie de novo", progresso: null, semPausa: true };
+      if (!envio) return { ...base, etapa: "Envio interrompido (a página foi recarregada ou fechada) — cancele e envie de novo", progresso: null, semPausa: true };
       return { ...base, etapa: `Enviando ${Math.round(envio.progresso * 100)}%`, progresso: envio.progresso, semPausa: true };
     }
     if (t.status === "baixando") return { ...base, etapa: t.origem === "link" ? "Baixando o link" : "Preparando o áudio", progresso: null };
@@ -148,8 +135,7 @@ function TranscritorPage() {
   };
 
   const cancelar = async (ids: string[]) => {
-    for (const id of ids) enviosRef.current[id]?.controle.abort();
-    setEnvios((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => !ids.includes(id))));
+    cancelarEnvios(ids);
     await excluir(ids);
   };
 
