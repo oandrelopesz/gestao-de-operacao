@@ -164,7 +164,7 @@ export function TranscreverDialog({ aberto, onClose, onLinks, onArquivos }: Prop
                 </div>
               );
             })}
-            {arquivos.length > 0 && <p className="text-[11px] text-muted-foreground">Deixe esta aba aberta enquanto os arquivos sobem (dá para continuar usando o sistema em outras abas).</p>}
+            {arquivos.length > 0 && <p className="text-[11px] text-muted-foreground">Pode usar outras páginas do sistema ou outros programas enquanto sobem; só não feche esta aba do navegador até o envio terminar.</p>}
           </div>
         )}
 

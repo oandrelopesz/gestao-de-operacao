@@ -37,9 +37,12 @@ function TranscritorPage() {
       const nova = await fetchTranscricoes();
       // Terminou enquanto você estava em outra aba: avisa (e marca o título da aba do navegador)
       const antes = statusAntes.current;
-      const prontas = antes ? nova.filter((t) => t.status === "pronta" && antes[t.id] && antes[t.id] !== "pronta") : [];
+      const mudouPara = (status: string) => (antes ? nova.filter((t) => t.status === status && antes[t.id] && antes[t.id] !== status) : []);
+      const prontas = mudouPara("pronta");
       statusAntes.current = Object.fromEntries(nova.map((t) => [t.id, t.status]));
-      for (const t of prontas) toast.success(`Transcrição pronta: ${nomeExibido(t)}`);
+      const nomeDoAviso = (t: Transcricao) => t.nome?.trim() || t.arquivo_nome || nomeExibido(t);
+      for (const t of prontas) toast.success(`Transcrição pronta: ${nomeDoAviso(t)}`);
+      for (const t of mudouPara("falhou")) toast.error(`Não deu para transcrever ${nomeDoAviso(t)}`, { description: t.erro ?? undefined });
       if (prontas.length && document.hidden && !document.title.startsWith("✓ ")) document.title = `✓ ${document.title}`;
       setLista(nova);
       setErro(null);
