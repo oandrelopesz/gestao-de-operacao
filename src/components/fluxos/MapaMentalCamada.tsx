@@ -1,14 +1,19 @@
-// Interação do mapa mental: atalhos de teclado, barra flutuante sobre o tópico selecionado, selo "+N" nos ramos
-// recolhidos e reorganização automática ao terminar de escrever, arrastar ou redimensionar um tópico.
-import { useEffect, useRef, useState } from "react";
+// Interação do mapa mental: atalhos de teclado, barra flutuante sobre o tópico selecionado, "+" grudados no tópico
+// (sob o mouse ou selecionado), bolinha de ocultar o ramo, selo "+N" nos ramos recolhidos e reorganização automática
+// ao terminar de escrever, arrastar ou redimensionar um tópico.
+import { useEffect, useRef, useState, type MouseEvent as EventoMouse, type PointerEvent as EventoPonteiro, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ChevronsDownUp, ChevronsUpDown, CornerDownRight, Network, Plus, Trash2 } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, CornerDownRight, FoldVertical, Minus, Network, Plus, Trash2, UnfoldVertical } from "lucide-react";
 import type { AppState, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import type { LadoMapa } from "@/lib/fluxoMapaMental";
 import {
   alternarRecolher, apagarRamo, aposArrastar, criarFilho, criarIrmao, dadosDo, editarTopico, ehEventoNosso, ehTopico,
-  organizarMapa,
+  expandirTudo, organizarMapa, recolherTudo,
 } from "./mapaMental";
+
+/** Distância (px de tela) em que o tópico ainda conta como "sob o mouse": cobre os botões grudados nele */
+const ALCANCE_MOUSE = 72;
 
 type El = ExcalidrawElement;
 
@@ -35,7 +40,33 @@ function topicoSelecionado(api: ExcalidrawImperativeAPI): El | undefined {
 
 export function MapaMentalCamada({ api, raiz }: { api: ExcalidrawImperativeAPI | null; raiz: HTMLElement | null }) {
   const [, setVersao] = useState(0);
+  const [sobMouse, setSobMouse] = useState<string | null>(null);
   const assinatura = useRef("");
+
+  // Tópico mais perto do mouse (dentro do alcance), para mostrar os "+" e a bolinha de ocultar
+  useEffect(() => {
+    if (!api || !raiz) return;
+    const aoMover = (ev: PointerEvent) => {
+      const a = api.getAppState();
+      const caixa = raiz.getBoundingClientRect();
+      const z = a.zoom.value;
+      const x = (ev.clientX - caixa.left) / z - a.scrollX, y = (ev.clientY - caixa.top) / z - a.scrollY;
+      let perto: string | null = null, menor = ALCANCE_MOUSE / z;
+      for (const e of api.getSceneElements()) {
+        if (!ehTopico(e)) continue;
+        const dist = Math.hypot(Math.max(e.x - x, 0, x - e.x - e.width), Math.max(e.y - y, 0, y - e.y - e.height));
+        if (dist <= menor) { menor = dist; perto = e.id; }
+      }
+      setSobMouse((atual) => (atual === perto ? atual : perto));
+    };
+    const aoSair = () => setSobMouse(null);
+    raiz.addEventListener("pointermove", aoMover, { passive: true });
+    raiz.addEventListener("pointerleave", aoSair);
+    return () => {
+      raiz.removeEventListener("pointermove", aoMover);
+      raiz.removeEventListener("pointerleave", aoSair);
+    };
+  }, [api, raiz]);
   const antes = useRef<{ editando: string | null; arrastando: boolean; redimensionando: boolean }>({ editando: null, arrastando: false, redimensionando: false });
 
   // Atalhos (fase de captura: antes do Excalidraw, que usaria Enter/Delete/Tab do jeito dele)
@@ -129,23 +160,36 @@ export function MapaMentalCamada({ api, raiz }: { api: ExcalidrawImperativeAPI |
   const recolhidos = elementos.filter((e) => ehTopico(e) && dadosDo(e)!.recolhido);
   const temFilhos = topico ? elementos.some((e) => ehTopico(e) && dadosDo(e)!.pai === topico.id) || !!dadosDo(topico)!.recolhido : false;
 
+  // Clique nos botões da camada: não chega ao Excalidraw e não tira o foco do quadro. Sem isso, Ctrl+Z e os atalhos
+  // param depois do clique: o React entrega o teclado pela árvore dele, e a camada não fica dentro do Excalidraw.
+  const segurar = {
+    onPointerDown: (ev: EventoPonteiro) => ev.stopPropagation(),
+    onMouseDown: (ev: EventoMouse) => { ev.preventDefault(); raiz.focus({ preventScroll: true }); },
+  };
+  const barraAbaixo = !!topico && naTela(topico.x + topico.width / 2, topico.y).top < 70;
   const barra = topico && (() => {
-    const topo = naTela(topico.x + topico.width / 2, topico.y);
-    const abaixo = topo.top < 70;
-    const pos = abaixo ? naTela(topico.x + topico.width / 2, topico.y + topico.height) : topo;
+    const pos = naTela(topico.x + topico.width / 2, barraAbaixo ? topico.y + topico.height : topico.y);
     const d = dadosDo(topico)!;
-    const botoes = [
+    const doMapa = elementos.filter((e) => ehTopico(e) && dadosDo(e)!.raiz === d.raiz);
+    const tudo = d.pai !== null ? [] : [
+      ...(doMapa.some((e) => { const p = dadosDo(e)!.pai; return p !== null && p !== d.raiz; })
+        ? [{ icone: <FoldVertical size={15} />, dica: "Recolher tudo", acao: () => recolherTudo(api, d.raiz) }] : []),
+      ...(doMapa.some((e) => dadosDo(e)!.recolhido)
+        ? [{ icone: <UnfoldVertical size={15} />, dica: "Expandir tudo", acao: () => expandirTudo(api, d.raiz) }] : []),
+    ];
+    const botoes: { icone: ReactNode; dica: string; acao: () => void; perigo?: boolean }[] = [
       { icone: <CornerDownRight size={15} />, dica: "Tópico filho (Tab)", acao: () => criarFilho(api, raiz, topico.id) },
       { icone: <Plus size={15} />, dica: d.pai === null ? "Novo tópico (Enter)" : "Tópico irmão (Enter)", acao: () => criarIrmao(api, raiz, topico.id) },
       ...(temFilhos ? [{
         icone: d.recolhido ? <ChevronsUpDown size={15} /> : <ChevronsDownUp size={15} />,
         dica: d.recolhido ? "Expandir (Ctrl+.)" : "Recolher (Ctrl+.)", acao: () => alternarRecolher(api, topico.id),
       }] : []),
+      ...tudo,
       { icone: <Network size={15} />, dica: "Organizar o mapa (Ctrl+Shift+L)", acao: () => organizarMapa(api, d.raiz) },
       { icone: <Trash2 size={15} />, dica: d.pai === null ? "Apagar o mapa inteiro (Delete)" : "Apagar o ramo (Delete)", acao: () => apagarRamo(api, topico.id), perigo: true },
     ];
     return (
-      <div className={abaixo ? "mm-barra mm-barra-abaixo" : "mm-barra"} style={{ left: pos.left, top: pos.top }} onPointerDown={(e) => e.stopPropagation()}>
+      <div className={barraAbaixo ? "mm-barra mm-barra-abaixo" : "mm-barra"} style={{ left: pos.left, top: pos.top }} {...segurar}>
         {botoes.map((b) => (
           <button key={b.dica} type="button" title={b.dica} aria-label={b.dica} onClick={b.acao} className={b.perigo ? "mm-perigo" : undefined}>
             {b.icone}
@@ -155,8 +199,51 @@ export function MapaMentalCamada({ api, raiz }: { api: ExcalidrawImperativeAPI |
     );
   })();
 
+  // "+" ao lado (etapa ligada; na ideia central, um de cada lado), "+" embaixo (etapa no mesmo nível) e bolinha de
+  // ocultar as etapas, no tópico sob o mouse e no selecionado
+  const grudados = [...new Set([topico?.id, sobMouse])].flatMap((id) => {
+    const t = id ? elementos.find((e) => e.id === id && ehTopico(e)) : undefined;
+    if (!t) return [];
+    const d = dadosDo(t)!;
+    const temFilhos = elementos.some((e) => ehTopico(e) && dadosDo(e)!.pai === t.id);
+    const lados: LadoMapa[] = d.pai === null ? ["esq", "dir"] : [d.lado];
+    const itens = lados.map((lado) => {
+      const p = naTela(lado === "dir" ? t.x + t.width : t.x, t.y + t.height / 2);
+      // Afasta para não cobrir a bolinha de ocultar (ou o selo "+N" do ramo recolhido)
+      const afastar = d.recolhido ? 56 : temFilhos && d.pai !== null ? 36 : 18;
+      return (
+        <button key={`${t.id}-${lado}`} type="button" className="mm-mais mm-mais-lado" title="Nova etapa ligada (Tab)" aria-label="Nova etapa ligada (Tab)"
+          style={{ left: p.left + (lado === "dir" ? afastar : -afastar), top: p.top }} {...segurar}
+          onClick={() => criarFilho(api, raiz, t.id, d.pai === null ? lado : undefined)}>
+          <Plus size={13} strokeWidth={2.5} />
+        </button>
+      );
+    });
+    // Embaixo: não na ideia central, nem quando a barra do selecionado está embaixo dele
+    if (d.pai !== null && !(barraAbaixo && t.id === topico?.id)) {
+      const p = naTela(t.x + t.width / 2, t.y + t.height);
+      itens.push(
+        <button key={`${t.id}-baixo`} type="button" className="mm-mais mm-mais-baixo" title="Nova etapa abaixo (Enter)" aria-label="Nova etapa abaixo (Enter)"
+          style={{ left: p.left, top: p.top + 10 }} {...segurar} onClick={() => criarIrmao(api, raiz, t.id)}>
+          <Plus size={13} strokeWidth={2.5} />
+        </button>,
+      );
+    }
+    if (d.pai !== null && temFilhos && !d.recolhido) {
+      const p = naTela(d.lado === "dir" ? t.x + t.width : t.x, t.y + t.height / 2);
+      itens.push(
+        <button key={`${t.id}-ocultar`} type="button" className="mm-ocultar" title="Ocultar as etapas (Ctrl+.)" aria-label="Ocultar as etapas (Ctrl+.)"
+          style={{ left: p.left, top: p.top }} {...segurar} onClick={() => alternarRecolher(api, t.id)}>
+          <Minus size={11} strokeWidth={3} />
+        </button>,
+      );
+    }
+    return itens;
+  });
+
   return createPortal(
     <div className="pointer-events-none absolute inset-0 z-[3] overflow-hidden">
+      {grudados}
       {barra}
       {recolhidos.map((e) => {
         const d = dadosDo(e)!;
@@ -166,7 +253,7 @@ export function MapaMentalCamada({ api, raiz }: { api: ExcalidrawImperativeAPI |
         return (
           <button key={e.id} type="button" className={esquerda ? "mm-selo mm-selo-esq" : "mm-selo"} style={{ left: p.left, top: p.top }}
             title={`Expandir ${qtd} ${qtd === 1 ? "tópico" : "tópicos"} (Ctrl+.)`} onClick={() => alternarRecolher(api, e.id)}
-            onPointerDown={(ev) => ev.stopPropagation()}>
+            {...segurar}>
             +{qtd}
           </button>
         );

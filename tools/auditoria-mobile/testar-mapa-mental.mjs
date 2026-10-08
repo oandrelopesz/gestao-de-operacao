@@ -111,6 +111,64 @@ try {
   ts = await topicos();
   r.expandido = ts.some((t) => t.texto === "Anúncios") && ts.some((t) => t.texto === "Orgânico");
 
+  // "+" grudados na célula (aparecem ao passar o mouse): ao lado cria etapa ligada, embaixo cria etapa no mesmo nível
+  // Tira a seleção e leva o mouse para longe do mapa (o clique em (300, 860) cai na barra de zoom, não no quadro)
+  const soltar = async () => { await p.evaluate(() => h.setState({ selectedElementIds: {} })); await p.mouse.move(720, 885); await espera(300); };
+  const passarMouse = async (t) => { const c = await naTela(t.x + t.w / 2, t.y + t.h / 2); await p.mouse.move(c.x, c.y, { steps: 4 }); await espera(300); };
+  const maisVisiveis = async () => ({ lado: await p.locator(".mm-mais-lado").count(), baixo: await p.locator(".mm-mais-baixo").count() });
+  await soltar();
+  await passarMouse(raiz);
+  r.maisNaRaiz = await maisVisiveis();
+  ts = await topicos();
+  await passarMouse(porTexto("Anúncios"));
+  r.maisNoTopico = await maisVisiveis();
+  await foto("05b-mais");
+  await p.locator(".mm-mais-lado").first().click(); await espera(500);
+  r.maisLadoEscrevendo = await escrevendo();
+  await p.keyboard.type("Meta Ads"); await p.keyboard.press("Escape"); await espera(600);
+  await soltar();
+  ts = await topicos();
+  await passarMouse(porTexto("Anúncios"));
+  await p.locator(".mm-mais-baixo").first().click(); await espera(500);
+  await p.keyboard.type("Google Ads"); await p.keyboard.press("Escape"); await espera(600);
+  ts = await topicos();
+  r.maisCriou = {
+    metaFilhoDeAnuncios: porTexto("Meta Ads")?.pai === porTexto("Anúncios")?.id,
+    googleIrmaoDeAnuncios: porTexto("Google Ads")?.pai === porTexto("Marketing")?.id,
+    sobreposicoes: sobreposicoes(ts),
+  };
+
+  // Bolinha de ocultar o ramo (ao passar o mouse) e o selo "+N" para mostrar de novo
+  await soltar();
+  await passarMouse(porTexto("Marketing"));
+  await p.locator(".mm-ocultar").first().click(); await espera(500);
+  ts = await topicos();
+  r.ocultarPeloMouse = { marketingRecolhido: porTexto("Marketing")?.recolhido, selo: await p.locator(".mm-selo").first().textContent().catch(() => null) };
+  await foto("05c-ocultado");
+  await p.locator(".mm-selo").first().click(); await espera(500);
+  ts = await topicos();
+  r.mostrarPeloSelo = ["Anúncios", "Orgânico", "Meta Ads", "Google Ads"].every((t) => !!porTexto(t));
+
+  // "Recolher tudo" e "Expandir tudo" na barra da ideia central (com um ramo recolhido dentro de outro)
+  await clicarNoTopico(porTexto("Anúncios"));
+  await p.keyboard.press("Control+."); await espera(400);
+  await soltar();
+  ts = await topicos();
+  await clicarNoTopico(ts.find((t) => t.pai === null));
+  await p.getByRole("button", { name: "Recolher tudo" }).click(); await espera(500);
+  ts = await topicos();
+  r.recolherTudo = { visiveis: ts.length, marketingRecolhido: porTexto("Marketing")?.recolhido, semAnuncios: !porTexto("Anúncios") };
+  await foto("05d-recolher-tudo");
+  await p.getByRole("button", { name: "Expandir tudo" }).click(); await espera(500);
+  ts = await topicos();
+  r.expandirTudo = { todos: ["Anúncios", "Orgânico", "Meta Ads", "Google Ads"].every((t) => !!porTexto(t)), nenhumRecolhido: !ts.some((t) => t.recolhido) };
+  await p.keyboard.press("Control+z"); await espera(400);
+  r.desfazerExpandirTudoNumPasso = !!(await topicos()).find((t) => t.texto === "Marketing")?.recolhido;
+  ts = await topicos();
+  await clicarNoTopico(ts.find((t) => t.pai === null));
+  await p.getByRole("button", { name: "Expandir tudo" }).click(); await espera(500);
+  ts = await topicos();
+
   // Apagar o ramo Orgânico e desfazer
   await clicarNoTopico(ts.find((t) => t.texto === "Orgânico"));
   await p.keyboard.press("Delete"); await espera(400);

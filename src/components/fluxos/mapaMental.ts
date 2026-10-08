@@ -313,6 +313,52 @@ export function expandir(api: ExcalidrawImperativeAPI, id: string): void {
   organizarMapa(api, d.raiz, extras, mudancas, id);
 }
 
+/** Recolhe cada tópico de 1º nível que tem etapas: só a ideia central e o 1º nível ficam à vista (um passo de desfazer). */
+export function recolherTudo(api: ExcalidrawImperativeAPI, raizId: string): void {
+  const vivos = api.getSceneElements();
+  const nos = nosDoMapa(vivos, raizId);
+  const mudancas = new Map<string, Partial<El>>();
+  for (const n of nos.filter((x) => x.pai === raizId)) {
+    const abaixo = descendentes(nos, n.id);
+    if (!abaixo.length) continue;
+    const ids = idsDoRamo(api, raizId, new Set(abaixo));
+    // Ramo já recolhido mais abaixo vai junto com o oculto dele (o "Expandir tudo" abre os dois)
+    const guardados = vivos.filter((e) => ids.has(e.id)).map((e) => JSON.parse(JSON.stringify(e)) as El);
+    ids.forEach((i) => mudancas.set(i, { isDeleted: true }));
+    const el = vivos.find((e) => e.id === n.id)!;
+    mudancas.set(n.id, { customData: { ...(el.customData ?? {}), mm: { ...dadosDo(el)!, recolhido: true, oculto: guardados } } });
+  }
+  if (mudancas.size) organizarMapa(api, raizId, [], mudancas, raizId);
+}
+
+/** Expande todos os ramos recolhidos do mapa, inclusive os guardados dentro de outros (um passo de desfazer). */
+export function expandirTudo(api: ExcalidrawImperativeAPI, raizId: string): void {
+  const naCena = new Set(api.getSceneElementsIncludingDeleted().map((e) => e.id));
+  const extras: El[] = [];
+  const mudancas = new Map<string, Partial<El>>();
+  const semRecolher = (e: El) => {
+    const { oculto: _oculto, recolhido: _recolhido, ...resto } = dadosDo(e)!;
+    return { ...(e.customData ?? {}), mm: resto };
+  };
+  const restaurar = (guardados: El[]) => {
+    for (const g of guardados) {
+      const recolhido = !!dadosDo(g)?.recolhido;
+      const { version: _v, versionNonce: _n, ...campos } = g;
+      const props = { ...campos, isDeleted: false, ...(recolhido ? { customData: semRecolher(g) } : {}) } as Partial<El>;
+      if (naCena.has(g.id)) mudancas.set(g.id, props);
+      else extras.push(newElementWith(g as never, props as never) as El);
+      if (recolhido) restaurar(dadosDo(g)!.oculto ?? []);
+    }
+  };
+  for (const e of api.getSceneElements()) {
+    const d = dadosDo(e);
+    if (!ehTopico(e) || d!.raiz !== raizId || !d!.recolhido) continue;
+    mudancas.set(e.id, { customData: semRecolher(e) });
+    restaurar(d!.oculto ?? []);
+  }
+  if (mudancas.size) organizarMapa(api, raizId, extras, mudancas, raizId);
+}
+
 export function alternarRecolher(api: ExcalidrawImperativeAPI, id: string): void {
   const el = topicoPorId(api, id);
   if (!el) return;
