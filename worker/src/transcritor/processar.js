@@ -1,12 +1,15 @@
 // Uma transcrição: mídia (link baixado ou arquivo enviado) → áudio leve → trechos cortados em
 // silêncios → Speaches (faster-whisper) trecho a trecho → texto com parágrafos.
-import { chmod, copyFile, mkdir, readdir, rm } from "node:fs/promises";
+import { chmod, copyFile, mkdir, readdir, rename, rm } from "node:fs/promises";
 import { openAsBlob } from "node:fs";
 import { join } from "node:path";
 import { rodar as rodarPadrao } from "../exec.js";
 import { JobPausado, checarParada, registrar } from "../parada.js";
 import { cookiesDe } from "../jobs/download.js";
-import { glossarioParaPrompt, montarTexto } from "./texto.js";
+import { agruparParagrafos, glossarioParaPrompt, prepararSegmentos } from "./texto.js";
+import { alinharPalavras, aplicarCorrecoes, paragrafosParaMarcas, textoDeMarcas } from "./termos.js";
+import { revisarTermos } from "./revisao.js";
+import { caminhoAudio } from "./audio.js";
 import { TRECHO_ALVO_S, deslocarSegmentos, escolherCortes, lerSilencios, promptComContexto, trechos } from "./cortes.js";
 import { caminhoUpload } from "./uploads.js";
 import { postarLongo } from "./http.js";
@@ -76,6 +79,7 @@ async function transcreverTrecho({ arquivo, idioma, prompt }, { config, fetch: _
     form.set("model", modelo);
     form.set("response_format", "verbose_json");
     form.append("timestamp_granularities[]", "segment");
+    form.append("timestamp_granularities[]", "word");
     form.set("temperature", "0");
     if (idioma) form.set("language", idioma);
     if (prompt) form.set("prompt", prompt);
@@ -124,11 +128,11 @@ const codigoIdioma = (l) => {
 
 /**
  * Transcreve `t` (linha de `transcricoes` já reservada, status "baixando").
- * Devolve `{ texto, idioma, duracao }`. Lança ErroTranscricao (mensagem para o usuário),
+ * Devolve `{ texto, idioma, duracao, marcas, correcoes }` (correcoes = pares da revisão por IA). Lança ErroTranscricao (mensagem para o usuário),
  * JobPausado (pausa/cancelamento) ou outro erro (tenta de novo).
  */
 export async function processar(t, deps) {
-  const { banco, config, glossario = [], rodar = rodarPadrao, fetch: _fetch = postarLongo, abrirBlob = openAsBlob, existe } = deps;
+  const { banco, config, glossario = [], memoria = [], fetchRevisao = globalThis.fetch, esperar, rodar = rodarPadrao, fetch: _fetch = postarLongo, abrirBlob = openAsBlob, existe } = deps;
   const dir = join(config.pasta, "jobs", t.id);
   await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
@@ -156,8 +160,12 @@ export async function processar(t, deps) {
     }
     const partes = trechos(cortes, duracao);
 
-    const promptGlossario = glossarioParaPrompt(glossario);
+    // Correções manuais (mais usadas primeiro): valem sempre e seus `para` vão ao prompt antes do glossário
+    const manuais = memoria.filter((m) => m.origem === "manual").sort((a, b) => (b.vezes ?? 0) - (a.vezes ?? 0));
+    const promptGlossario = glossarioParaPrompt([...manuais.map((m) => m.para), ...glossario]);
+    const tetoWhisper = config.groqKey ? 0.9 : 0.99;
     const segmentos = [];
+    const palavras = [];
     let idioma = null;
     let codigo = null;
     let textoAnterior = "";
@@ -177,15 +185,41 @@ export async function processar(t, deps) {
       codigo = codigo || codigoIdioma(r.language);
       const segs = Array.isArray(r.segments) && r.segments.length ? r.segments : [{ start: 0, end: p.fim - p.inicio, text: r.text || "" }];
       segmentos.push(...deslocarSegmentos(segs, p.inicio));
+      const ps = Array.isArray(r.words) && r.words.length ? r.words : segs.flatMap((s) => s.words || []);
+      palavras.push(...deslocarSegmentos(ps, p.inicio));
       textoAnterior = r.text || segs.map((s) => s.text).join(" ");
-      await banco.atualizar(t.id, { progresso: Math.min(0.99, p.fim / duracao) }, ["transcrevendo"]);
+      await banco.atualizar(t.id, { progresso: Math.min(tetoWhisper, (p.fim / duracao) * tetoWhisper) }, ["transcrevendo"]);
       if (arquivo !== audio) await rm(arquivo, { force: true });
     }
 
-    const texto = montarTexto(segmentos);
+    // Termos: palavras com tempo → correções manuais → revisão por IA → parágrafos → marcas
+    let segs = alinharPalavras(prepararSegmentos(segmentos), palavras);
+    segs = aplicarCorrecoes(segs, manuais).segmentos;
+    const revisao = await revisarTermos(segs, {
+      glossario,
+      memoria,
+      config,
+      fetch: fetchRevisao,
+      esperar,
+      aoProgresso: (f) => banco.atualizar(t.id, { progresso: 0.9 + f * 0.09 }, ["transcrevendo"]).catch(() => {}),
+    });
+    const marcas = paragrafosParaMarcas(agruparParagrafos(revisao.segmentos));
+    const texto = textoDeMarcas(marcas);
     if (!texto) throw new ErroTranscricao("Não encontrei fala nesse áudio");
     checarParada();
-    return { texto, idioma, duracao };
+
+    // Áudio leve para o player da aba (falha só loga: a transcrição vale mais)
+    try {
+      const m4a = join(dir, "audio.m4a");
+      await rodar("ffmpeg", ["-hide_banner", "-nostdin", "-y", "-i", audio, "-c:a", "aac", "-b:a", "48k", "-movflags", "+faststart", m4a], { timeout: 30 * 60 * 1000 });
+      await mkdir(join(config.pasta, "audios"), { recursive: true });
+      await rename(m4a, caminhoAudio(config.pasta, t.id));
+    } catch (e) {
+      if (e instanceof JobPausado) throw e;
+      console.log(JSON.stringify({ evento: "audio.falhou", id: t.id, erro: String(e?.message || e).slice(0, 300) }));
+    }
+    checarParada();
+    return { texto, idioma, duracao, marcas, correcoes: revisao.correcoes };
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }

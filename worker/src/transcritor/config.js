@@ -18,6 +18,8 @@ export function lerConfigTranscritor(env = process.env) {
     groqKey: env.GROQ_API_KEY || "",
     groqUrl: (env.GROQ_URL || "https://api.groq.com/openai").replace(/\/+$/, ""),
     groqModelo: env.GROQ_MODELO || "whisper-large-v3-turbo",
+    // Revisão dos termos por IA (chat do Groq); só roda com GROQ_API_KEY
+    groqModeloRevisao: env.GROQ_MODELO_REVISAO || "openai/gpt-oss-120b",
     googleClientId: obrigatoria("GOOGLE_CLIENT_ID"),
     emailsPermitidos: lista(env.EMAILS_PERMITIDOS).map((e) => e.toLowerCase()),
     origens: lista(env.ORIGENS || "https://gestao-de-operacao.lovable.app"),

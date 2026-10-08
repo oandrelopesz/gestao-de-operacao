@@ -47,6 +47,7 @@ import { ContasInstagramCard } from "@/components/instagram/ContasVisiveis";
 import { LivrosMetaCard } from "@/components/admin/LivrosMetaCard";
 import { LinksTemasCard } from "@/components/links/TemasLinks";
 import { GlossarioCard } from "@/components/transcritor/GlossarioCard";
+import { MemoriaTermosCard } from "@/components/transcritor/MemoriaTermosCard";
 import { NotasTemasCard } from "@/components/notas/TemasNotas";
 
 // Seções do Admin, uma por aba do sistema (?secao= na URL)
@@ -927,6 +928,7 @@ function AdminPage() {
 
           <TabsContent value="transcritor" className="mt-0 space-y-6">
             <GlossarioCard />
+            <MemoriaTermosCard />
           </TabsContent>
 
           <TabsContent value="links" className="mt-0 space-y-6">

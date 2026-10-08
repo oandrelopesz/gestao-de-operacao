@@ -6,6 +6,7 @@ import { statusDoDrive } from "@/lib/googleDrive";
 import { getConfig, setConfig } from "@/lib/appConfig";
 import { moverVariosNaFila, novasPosicoes } from "@/lib/swipeFila";
 import { expiraEmDias, plataformaDoLink, tipoDeArquivo, type StatusTranscricao } from "@/lib/transcritorTexto";
+import { type Marcas, chaveTermo, textoDeMarcas } from "@/lib/transcritorMarcas";
 
 /** Orquestrador na VPS (Traefik, sem proxy da Cloudflare para não limitar o tamanho do envio). */
 export const URL_TRANSCRITOR = "https://transcritor.minuanoai.com.br";
@@ -225,3 +226,60 @@ export function moverPara(aguardando: Transcricao[], ids: string[], destino: "to
 export const CHAVE_GLOSSARIO = "transcritor_glossario";
 export const lerGlossario = () => getConfig<string[]>(CHAVE_GLOSSARIO, []);
 export const salvarGlossario = (termos: string[]) => setConfig(CHAVE_GLOSSARIO, [...new Set(termos.map((t) => t.trim()).filter(Boolean))]);
+
+/** Áudio da transcrição (o orquestrador serve com Range; o player usa esta URL). */
+export const urlAudio = (id: string) => `${URL_TRANSCRITOR}/audio/${id}.m4a`;
+
+/** Texto e marcas (palavras com tempo) de uma transcrição. */
+export async function detalhe(id: string): Promise<{ texto: string | null; marcas: Marcas | null }> {
+  const { data, error } = await tabela().select("texto, marcas").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data || { texto: null, marcas: null };
+}
+
+/** Grava as marcas e o texto que sai delas (o texto fica igual ao que o player mostra). */
+export async function salvarMarcas(id: string, marcas: Marcas): Promise<void> {
+  const { error } = await tabela().update({ marcas, texto: textoDeMarcas(marcas) }).eq("id", id);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------- Memória de termos
+
+export interface Termo {
+  id: string;
+  de: string;
+  para: string;
+  origem: "manual" | "ia";
+  vezes: number;
+  updated_at: string;
+}
+
+// A tabela ainda não está nos tipos gerados do Supabase
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const tabelaTermos = () => supabase.from("transcritor_termos" as any) as any;
+
+/** Mais usados primeiro; empate: o mais recente. */
+export async function listarTermos(): Promise<Termo[]> {
+  const { data, error } = await tabelaTermos()
+    .select("id, de, para, origem, vezes, updated_at")
+    .order("vezes", { ascending: false })
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data || []) as Termo[];
+}
+
+/** Correção feita à mão: vale sempre nas próximas transcrições. */
+export async function registrarTermoManual(de: string, para: string): Promise<void> {
+  const d = de.trim();
+  const p = para.trim();
+  if (!d || !p) throw new Error("Preencha como sai e o certo");
+  const chave = chaveTermo(d);
+  if (!chave) throw new Error("Como sai precisa ter letras ou números");
+  const { error } = await supabase.rpc("registrar_termos" as any, { itens: [{ chave, de: d, para: p, origem: "manual" }] });
+  if (error) throw error;
+}
+
+export async function excluirTermo(id: string): Promise<void> {
+  const { error } = await tabelaTermos().delete().eq("id", id);
+  if (error) throw error;
+}

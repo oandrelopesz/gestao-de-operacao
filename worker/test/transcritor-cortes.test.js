@@ -43,7 +43,14 @@ test("deslocarSegmentos soma o início do trecho aos tempos", () => {
 test("promptComContexto: glossário + final do trecho anterior, dentro do limite", () => {
   const p = promptComContexto("Termos que podem aparecer: CTR.", "x".repeat(1000));
   assert.ok(p.startsWith("Termos que podem aparecer: CTR."));
-  assert.ok(p.length <= 900);
+  assert.ok(p.length <= 560);
   assert.equal(promptComContexto(undefined, ""), undefined);
   assert.equal(promptComContexto(undefined, "final do trecho"), "final do trecho");
+});
+
+test("promptComContexto usa só os últimos 150 caracteres do trecho anterior", () => {
+  const anterior = "a".repeat(300) + "FIM";
+  const p = promptComContexto(undefined, anterior);
+  assert.equal(p.length, 150);
+  assert.ok(p.endsWith("FIM"));
 });

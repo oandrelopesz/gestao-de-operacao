@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { montarTexto, glossarioParaPrompt, glossarioParaHotwords } from "../src/transcritor/texto.js";
+import { montarTexto, glossarioParaPrompt, glossarioParaHotwords, prepararSegmentos, agruparParagrafos } from "../src/transcritor/texto.js";
 
 const seg = (start, end, text) => ({ start, end, text });
+const FRASE = "Conversa em português sobre marketing digital, tráfego pago, IA, empreendedorismo, vendas e finanças.";
 
 test("montarTexto junta os segmentos em texto corrido, sem quebras soltas", () => {
   const t = montarTexto([seg(0, 2, " Olá, pessoal."), seg(2.1, 4, "  Hoje vamos falar de   ROAS"), seg(4.2, 6, " e CTR.")]);
@@ -35,13 +36,46 @@ test("montarTexto ignora segmentos vazios e devolve '' sem fala", () => {
   assert.equal(montarTexto([]), "");
 });
 
-test("glossário vira prompt (frase de contexto) e hotwords (lista curta)", () => {
+test("glossário vira prompt (frase de assunto + termos) e hotwords (lista curta)", () => {
   const termos = ["CTR", "ROAS", "lookalike", " ", "CTR"];
-  assert.equal(glossarioParaPrompt(termos), "Termos que podem aparecer: CTR, ROAS, lookalike.");
+  assert.equal(glossarioParaPrompt(termos), `${FRASE} Termos: CTR, ROAS, lookalike.`);
   assert.equal(glossarioParaHotwords(termos), "CTR ROAS lookalike");
-  assert.equal(glossarioParaPrompt([]), undefined);
+  assert.equal(glossarioParaPrompt([]), FRASE, "sem termos devolve só a frase de assunto");
   const muitos = Array.from({ length: 400 }, (_, i) => `termo${i}`);
-  assert.ok(glossarioParaPrompt(muitos).length <= 800, "prompt fica curto para não atrapalhar o modelo");
+  const longo = glossarioParaPrompt(muitos);
+  assert.ok(longo.length <= 400, "prompt respeita o limite de 400 caracteres");
+  assert.ok(longo.startsWith(`${FRASE} Termos: termo0, termo1`));
+  assert.ok(longo.endsWith("."));
+});
+
+test("prepararSegmentos tira alucinação e laço, limpa o texto e some com segmento vazio", () => {
+  const laco = "Com isso você segmenta. ";
+  const saida = prepararSegmentos([
+    { start: 0, end: 2, text: " Thank you. ", no_speech_prob: 0.9 },
+    { start: 2, end: 4, text: "Primeira  ideia." },
+    { start: 4, end: 6, text: laco + laco + laco.trim() },
+    { start: 6, end: 7, text: "   " },
+    { start: 7, end: 9, text: "Fim." },
+  ]);
+  // segmento vazio some e o anterior "cobre" o tempo dele (fim vai de 6 para 7)
+  assert.deepEqual(
+    saida.map((s) => [s.start, s.end, s.text]),
+    [
+      [2, 4, "Primeira ideia."],
+      [4, 7, "Com isso você segmenta."],
+      [7, 9, "Fim."],
+    ]
+  );
+});
+
+test("agruparParagrafos devolve parágrafos de segmentos, pulando segmento sem texto", () => {
+  const segs = [seg(0, 2, "Primeira ideia."), seg(4, 6, "Segunda ideia depois de uma pausa."), seg(6.2, 7, "   "), seg(7, 8, "Continua junto.")];
+  const paragrafos = agruparParagrafos(segs);
+  assert.equal(paragrafos.length, 2);
+  assert.deepEqual(paragrafos[0], [segs[0]]);
+  assert.deepEqual(paragrafos[1], [segs[1], segs[3]]);
+  assert.deepEqual(agruparParagrafos([]), []);
+  assert.deepEqual(agruparParagrafos([seg(0, 1, " ")]), []);
 });
 
 test("montarTexto tira o laço do Whisper (mesma frase ou bloco repetido 3+ vezes seguidas)", () => {

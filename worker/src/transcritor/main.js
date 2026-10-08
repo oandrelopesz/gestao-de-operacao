@@ -8,6 +8,7 @@ import { lerConfigTranscritor } from "./config.js";
 import { criarBanco } from "./banco.js";
 import { criarVerificador } from "./auth.js";
 import { aplicarCors, caminhoUpload, criarRotasUpload } from "./uploads.js";
+import { caminhoAudio, criarRotaAudio } from "./audio.js";
 import { ErroTranscricao, processar } from "./processar.js";
 import { JobPausado, reiniciarParada, vigiarPausa } from "../parada.js";
 import { postarLongo } from "./http.js";
@@ -17,7 +18,7 @@ const EM_ANDAMENTO = ["baixando", "transcrevendo"];
 const log = (evento, dados = {}) => console.log(JSON.stringify({ evento, ...dados }));
 
 /** Processa a próxima da fila. Devolve false quando não há nada para fazer. */
-export async function rodarUma({ banco, config, processarFn = processar, vigiar = vigiarPausa, removerUpload }) {
+export async function rodarUma({ banco, config, processarFn = processar, vigiar = vigiarPausa, removerUpload, removerAudio }) {
   const t = await banco.proxima();
   if (!t) return false;
   const reservada = await banco.atualizar(
@@ -27,20 +28,29 @@ export async function rodarUma({ banco, config, processarFn = processar, vigiar 
   );
   if (!reservada) return true; // mudou no meio (pausada/cancelada): pega a próxima
   const apagarUpload = removerUpload || ((id) => rm(caminhoUpload(config.pasta, id), { force: true }));
+  const apagarAudio = removerAudio || ((id) => rm(caminhoAudio(config.pasta, id), { force: true }));
   reiniciarParada();
   const pararVigia = vigiar({ jobId: t.id, tabela: "transcricoes", statusDeParada: ["pausada"], supabaseUrl: config.supabaseUrl, anonKey: config.anonKey });
   log("transcricao.inicio", { id: t.id, origem: t.origem, tentativa: reservada.tentativas });
   try {
-    const glossario = await banco.glossario().catch(() => []);
-    const r = await processarFn(reservada, { banco, config, glossario });
-    await banco.atualizar(t.id, { status: "pronta", texto: r.texto, idioma: r.idioma, duracao_seg: r.duracao, progresso: 1, erro: null }, EM_ANDAMENTO);
+    const [glossario, memoria] = await Promise.all([banco.glossario().catch(() => []), banco.termos().catch(() => [])]);
+    const r = await processarFn(reservada, { banco, config, glossario, memoria });
+    const gravada = await banco.atualizar(t.id, { status: "pronta", texto: r.texto, marcas: r.marcas ?? null, idioma: r.idioma, duracao_seg: r.duracao, progresso: 1, erro: null }, EM_ANDAMENTO);
     await apagarUpload(t.id);
+    // Cancelada no meio (a linha sumiu): o áudio gerado não tem dono
+    if (!gravada) await apagarAudio(t.id);
+    // Memória: o que a IA corrigiu vira exemplo para as próximas; falha aqui não derruba nada
+    const novas = (r.correcoes || []).map((c) => ({ de: c.de, para: c.para, origem: "ia" }));
+    if (gravada && novas.length) await banco.registrarTermos(novas).catch((e) => log("termos.registro_erro", { id: t.id, erro: String(e?.message || e).slice(0, 200) }));
     log("transcricao.pronta", { id: t.id, duracao: r.duracao, caracteres: r.texto.length });
   } catch (e) {
     if (e instanceof JobPausado) {
       // Pausada: mantém o arquivo enviado para retomar. Cancelada (linha apagada): apaga tudo.
       const atual = await banco.linha(t.id).catch(() => null);
-      if (!atual) await apagarUpload(t.id);
+      if (!atual) {
+        await apagarUpload(t.id);
+        await apagarAudio(t.id);
+      }
       log(atual ? "transcricao.pausada" : "transcricao.cancelada", { id: t.id });
       return true;
     }
@@ -59,6 +69,14 @@ export async function rodarUma({ banco, config, processarFn = processar, vigiar 
 /** Apaga do disco o que não tem mais linha no banco e o que passou de 24 h. */
 export async function faxina({ banco, config, emUso = () => null, agora = Date.now() }) {
   const ids = await banco.idsExistentes();
+  // Áudios do player: só saem quando a transcrição some (sem regra de 24 h)
+  try {
+    for (const nome of await readdir(join(config.pasta, "audios"))) {
+      if (!nome.endsWith(".m4a") || ids.has(nome.slice(0, -4))) continue;
+      await rm(join(config.pasta, "audios", nome), { force: true }).catch(() => {});
+      log("faxina.apagado", { caminho: join(config.pasta, "audios", nome) });
+    }
+  } catch { /* sem pasta ainda */ }
   for (const sub of ["uploads", "jobs"]) {
     const dir = join(config.pasta, sub);
     let itens = [];
@@ -82,6 +100,7 @@ async function main() {
   const verificar = criarVerificador({ clientId: config.googleClientId, emailsPermitidos: config.emailsPermitidos });
   await mkdir(join(config.pasta, "uploads"), { recursive: true });
   await mkdir(join(config.pasta, "jobs"), { recursive: true });
+  await mkdir(join(config.pasta, "audios"), { recursive: true });
   await banco.devolverInterrompidas().then((l) => log("fila.devolvidas", { qtd: l?.length ?? 0 })).catch((e) => log("fila.devolver_erro", { erro: String(e.message) }));
 
   let ocupado = false;
@@ -104,14 +123,16 @@ async function main() {
   };
   garantirModelo();
   const rotas = criarRotasUpload({ pasta: config.pasta, banco, verificar, origens: config.origens });
+  const rotaAudio = criarRotaAudio({ pasta: config.pasta, origens: config.origens });
   http
     .createServer(async (req, res) => {
       try {
+        if (await rotaAudio(req, res)) return;
         if (await rotas(req, res)) return;
         aplicarCors(req, res, config.origens);
         if (req.url === "/health") {
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: true, modelo: modeloPronto ? "pronto" : "baixando", groq: Boolean(config.groqKey), ocupado, atual, versao: config.versao }));
+          res.end(JSON.stringify({ ok: true, modelo: modeloPronto ? "pronto" : "baixando", groq: Boolean(config.groqKey), revisao: Boolean(config.groqKey), ocupado, atual, versao: config.versao }));
           return;
         }
         res.writeHead(404);

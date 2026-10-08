@@ -55,16 +55,20 @@ const NAO_E_FALA = 0.5;
 const ehAlucinacao = (s) =>
   Number(s.no_speech_prob) >= NAO_E_FALA && ALUCINACOES.includes(normalizar(limpar(s.text)));
 
-/** Segmentos `{ start, end, text }` → texto com parágrafos separados por uma linha em branco. */
-export function montarTexto(segmentos) {
-  segmentos = tirarLacos((segmentos || []).filter((s) => !ehAlucinacao(s)));
+/** Segmentos do Whisper → sem alucinação e sem laço, com texto limpo (segmento vazio some). */
+export function prepararSegmentos(segmentos) {
+  return tirarLacos((segmentos || []).filter((s) => !ehAlucinacao(s)));
+}
+
+/** Segmentos → parágrafos (array de arrays de segmentos). Quebra só em fim de frase com pausa ou texto longo. */
+export function agruparParagrafos(segmentos) {
   const paragrafos = [];
   let atual = [];
   let palavras = 0;
   let fimAnterior = null;
 
   const fechar = () => {
-    if (atual.length) paragrafos.push(atual.join(" "));
+    if (atual.length) paragrafos.push(atual);
     atual = [];
     palavras = 0;
   };
@@ -72,36 +76,46 @@ export function montarTexto(segmentos) {
   for (const s of segmentos || []) {
     const texto = limpar(s.text);
     if (!texto) continue;
-    const anterior = atual.at(-1);
+    const anterior = atual.length ? limpar(atual.at(-1).text) : null;
     const acabouFrase = anterior != null && FIM_DE_FRASE.test(anterior);
     const pausa = fimAnterior != null && Number.isFinite(s.start) ? s.start - fimAnterior : 0;
     if (acabouFrase && (pausa >= PAUSA_PARAGRAFO_S || palavras >= PALAVRAS_POR_PARAGRAFO)) fechar();
-    atual.push(texto);
+    atual.push(s);
     palavras += texto.split(" ").length;
     if (Number.isFinite(s.end)) fimAnterior = s.end;
   }
   fechar();
-  return paragrafos.join("\n\n");
+  return paragrafos;
+}
+
+/** Segmentos `{ start, end, text }` → texto com parágrafos separados por uma linha em branco. */
+export function montarTexto(segmentos) {
+  return agruparParagrafos(prepararSegmentos(segmentos))
+    .map((p) => p.map((x) => limpar(x.text)).join(" "))
+    .join("\n\n");
 }
 
 const unicos = (termos) => [...new Set((termos || []).map((t) => String(t).trim()).filter(Boolean))];
 
+const FRASE_ASSUNTO = "Conversa em português sobre marketing digital, tráfego pago, IA, empreendedorismo, vendas e finanças.";
+
 /**
- * Glossário → `prompt` do Whisper (contexto que puxa a grafia certa dos termos). O Whisper só usa
- * ~224 tokens do prompt; passar do ponto não ajuda e pode fazer o modelo "repetir" o prompt.
+ * Glossário → `prompt` do Whisper: frase de assunto fixa + os termos que couberem em `maxCaracteres`.
+ * O Whisper só usa ~224 tokens do prompt; passar do ponto não ajuda e pode fazer o modelo "repetir" o prompt.
  */
-export function glossarioParaPrompt(termos, maxCaracteres = 800) {
+export function glossarioParaPrompt(termos, maxCaracteres = 400) {
   const lista = unicos(termos);
-  if (!lista.length) return undefined;
+  if (!lista.length) return FRASE_ASSUNTO;
   const escolhidos = [];
-  let tamanho = "Termos que podem aparecer: .".length;
+  let tamanho = `${FRASE_ASSUNTO} Termos: .`.length;
   for (const t of lista) {
     const extra = (escolhidos.length ? 2 : 0) + t.length;
     if (tamanho + extra > maxCaracteres) break;
     escolhidos.push(t);
     tamanho += extra;
   }
-  return `Termos que podem aparecer: ${escolhidos.join(", ")}.`;
+  if (!escolhidos.length) return FRASE_ASSUNTO;
+  return `${FRASE_ASSUNTO} Termos: ${escolhidos.join(", ")}.`;
 }
 
 /** Glossário → `hotwords` do faster-whisper (reforço extra de reconhecimento). */

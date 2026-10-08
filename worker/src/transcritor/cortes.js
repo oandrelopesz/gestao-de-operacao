@@ -3,8 +3,9 @@
 
 export const TRECHO_ALVO_S = 180;
 const JANELA_S = 20;
-const CONTEXTO_CARACTERES = 200;
-const PROMPT_MAX = 900;
+// Só o Whisper usa ~224 tokens de prompt; o resto passa do limite e é ignorado.
+const CONTEXTO_CARACTERES = 150;
+const PROMPT_MAX = 560;
 
 /** Saída do `ffmpeg -af silencedetect` → meio de cada silêncio (segundos). */
 export function lerSilencios(stderr) {

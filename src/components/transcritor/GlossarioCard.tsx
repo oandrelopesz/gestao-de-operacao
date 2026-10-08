@@ -40,7 +40,7 @@ export function GlossarioCard() {
       <CardHeader>
         <CardTitle>Glossário do Transcritor</CardTitle>
         <CardDescription>
-          Termos em inglês, siglas e jargões que devem sair escritos certo (ex.: CPM, ROAS, lookalike, copywriting). Um por linha. Os primeiros da lista têm prioridade.
+          Termos e siglas do nicho (IA, marketing, empreendedorismo, finanças) que devem sair escritos certo. Um por linha. Os primeiros vão como dica ao reconhecimento de voz; a revisão por IA usa a lista inteira.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

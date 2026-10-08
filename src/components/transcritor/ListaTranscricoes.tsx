@@ -15,7 +15,9 @@ import {
 import { cn } from "@/lib/utils";
 import {
   VALIDADE_MAX, formatarDuracao, nomeExibido, ordenarProntas, rotuloPlataforma, rotuloValidade, nomeIdioma, type OrdemProntas } from "@/lib/transcritorTexto";
-import { definirValidade, excluir, renomear, tentarDeNovo, textos, traduzErroTranscritor, type Transcricao } from "@/lib/transcritor";
+import { definirValidade, detalhe, excluir, renomear, tentarDeNovo, textos, traduzErroTranscritor, type Transcricao } from "@/lib/transcritor";
+import { textoDeMarcas, type Marcas } from "@/lib/transcritorMarcas";
+import { PlayerTranscricao } from "./PlayerTranscricao";
 
 const CHAVE_ORDEM = "transcritor_ordem";
 
@@ -71,6 +73,7 @@ export function ListaTranscricoes({ concluidas, onMudou }: Props) {
   const [ordem, setOrdem] = useState<OrdemProntas>("recentes");
   const [aberta, setAberta] = useState<string | null>(null);
   const [textoAberto, setTextoAberto] = useState<Record<string, string>>({});
+  const [marcasAbertas, setMarcasAbertas] = useState<Record<string, Marcas | null>>({});
   const [editando, setEditando] = useState<{ id: string; nome: string } | null>(null);
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [paraExcluir, setParaExcluir] = useState<string[] | null>(null);
@@ -134,7 +137,14 @@ export function ListaTranscricoes({ concluidas, onMudou }: Props) {
   const abrir = async (t: Transcricao) => {
     if (aberta === t.id) { setAberta(null); return; }
     setAberta(t.id);
-    if (t.status === "pronta") await buscarTexto(t.id).catch((e) => toast.error(traduzErroTranscritor(e)));
+    if (t.status !== "pronta") return;
+    try {
+      const d = await detalhe(t.id);
+      setMarcasAbertas((prev) => ({ ...prev, [t.id]: d.marcas }));
+      setTextoAberto((prev) => ({ ...prev, [t.id]: d.texto ?? "" }));
+    } catch (e) {
+      toast.error(traduzErroTranscritor(e));
+    }
   };
 
   const salvarNome = async () => {
@@ -240,6 +250,12 @@ export function ListaTranscricoes({ concluidas, onMudou }: Props) {
                 <div className="border-t bg-muted/20 px-4 py-3">
                   {textoAberto[t.id] == null ? (
                     <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                  ) : marcasAbertas[t.id] ? (
+                    <PlayerTranscricao id={t.id} marcas={marcasAbertas[t.id] as Marcas}
+                      onCorrigido={(m) => {
+                        setMarcasAbertas((prev) => ({ ...prev, [t.id]: m }));
+                        setTextoAberto((prev) => ({ ...prev, [t.id]: textoDeMarcas(m) }));
+                      }} />
                   ) : (
                     <div className="max-h-96 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed">{textoAberto[t.id]}</div>
                   )}

@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ErroTranscricao, processar } from "../src/transcritor/processar.js";
-import { rodarUma } from "../src/transcritor/main.js";
+import { faxina, rodarUma } from "../src/transcritor/main.js";
+import { textoDeMarcas } from "../src/transcritor/termos.js";
+import { caminhoAudio } from "../src/transcritor/audio.js";
 import { JobPausado, pedirParada, reiniciarParada } from "../src/parada.js";
 
 const SILENCIOS = "[silencedetect] silence_start: 178\n[silencedetect] silence_end: 180 | silence_duration: 2\n";
@@ -123,6 +125,9 @@ function bancoFila({ linha = { id: "t9", origem: "arquivo", status: "aguardando"
     atualizar: async (id, campos, so) => { atualizacoes.push({ campos, so }); return { ...linha, ...campos }; },
     linha: async () => (linhaDepois === "igual" ? linha : linhaDepois),
     glossario: async () => ["CTR"],
+    termos: async () => [],
+    registrados: [],
+    registrarTermos: async function (itens) { this.registrados.push(...itens); },
   };
 }
 const semVigia = () => () => {};
@@ -226,5 +231,107 @@ test("idioma por extenso (como o Groq devolve) vira código e fixa os próximos 
     const r = await processar({ id: "g3", origem: "arquivo" }, { banco: c.banco, config: configGroq(pasta), rodar: c.rodar, fetch: c.fetchFake, abrirBlob });
     assert.equal(r.idioma, "pt");
     assert.equal(c.formularios[1].get("language"), "pt");
+  });
+});
+
+// ---------------------------------------------------------------- termos, marcas e áudio
+
+const unico = (words, text = "Rói da campanha. Cê tê erre subiu.") => () => ({ language: "pt", text, words, segments: [{ start: 0, end: 6, text }] });
+const PALAVRAS = [["Rói", 0, 1], ["da", 1, 1.5], ["campanha.", 1.5, 2.5], ["Cê", 3, 3.3], ["tê", 3.3, 3.6], ["erre", 3.6, 4], ["subiu.", 4, 5]]
+  .map(([word, start, end]) => ({ word, start, end }));
+
+test("palavras viram marcas com tempo e o texto é igual a textoDeMarcas", async () => {
+  await comPasta(async (pasta) => {
+    const c = cenario({ duracao: 90, respostas: unico(PALAVRAS) });
+    const r = await processar({ id: "m1", origem: "arquivo" }, { banco: c.banco, config: config(pasta), rodar: c.rodar, fetch: c.fetchFake, abrirBlob });
+    assert.equal(r.texto, textoDeMarcas(r.marcas));
+    assert.equal(r.texto, "Rói da campanha. Cê tê erre subiu.");
+    assert.deepEqual(r.marcas.p[0][0], ["Rói", 0, 1]);
+    assert.deepEqual(r.marcas.p[0][3], ["Cê", 3, 3.3]);
+    assert.deepEqual(r.correcoes, []);
+    assert.match(String(c.formularios[0].getAll("timestamp_granularities[]")), /segment,word/);
+  });
+});
+
+test("correção manual da memória é aplicada e o 'para' vai ao prompt antes do glossário", async () => {
+  await comPasta(async (pasta) => {
+    const c = cenario({ duracao: 90, respostas: unico(PALAVRAS) });
+    const memoria = [{ de: "cê tê erre", para: "CTR", origem: "manual", vezes: 3 }, { de: "rói", para: "ROI", origem: "ia", vezes: 9 }];
+    const r = await processar({ id: "m2", origem: "arquivo" }, { banco: c.banco, config: config(pasta), glossario: ["ROAS"], memoria, rodar: c.rodar, fetch: c.fetchFake, abrirBlob });
+    assert.equal(r.texto, "Rói da campanha. CTR subiu.", "a da IA não é aplicada sozinha, só a manual");
+    assert.match(c.formularios[0].get("prompt"), /Termos: CTR, ROAS./);
+    assert.deepEqual(r.marcas.p[0].at(-2), ["CTR", 3, 4]);
+  });
+});
+
+test("gera o áudio m4a em audios/<id>.m4a (aac 48k, faststart)", async () => {
+  await comPasta(async (pasta) => {
+    const c = cenario({ duracao: 90 });
+    await processar({ id: "a1", origem: "arquivo" }, { banco: c.banco, config: config(pasta), rodar: c.rodar, fetch: c.fetchFake, abrirBlob });
+    assert.deepEqual(await readdir(join(pasta, "audios")), ["a1.m4a"]);
+    assert.equal(await readFile(caminhoAudio(pasta, "a1"), "utf8"), "audio");
+    const cmd = c.chamadas.find((x) => x.args.includes("aac"));
+    assert.ok(cmd.args.includes("48k") && cmd.args.includes("+faststart"));
+  });
+});
+
+test("falha do ffmpeg do áudio só loga: a transcrição sai igual", async () => {
+  await comPasta(async (pasta) => {
+    const c = cenario({ duracao: 90 });
+    const rodar = async (cmd, args, o) => { if (args.includes("aac")) throw new Error("sem codec"); return c.rodar(cmd, args, o); };
+    const r = await processar({ id: "a2", origem: "arquivo" }, { banco: c.banco, config: config(pasta), rodar, fetch: c.fetchFake, abrirBlob });
+    assert.ok(r.texto.length > 0);
+    await assert.rejects(() => readdir(join(pasta, "audios")));
+  });
+});
+
+test("com a chave do Groq a revisão por IA troca o termo e devolve as correções", async () => {
+  await comPasta(async (pasta) => {
+    const c = cenario({ duracao: 90, respostas: unico(PALAVRAS) });
+    const pedidos = [];
+    const fetchRevisao = async (url, init) => {
+      pedidos.push({ url, corpo: JSON.parse(init.body) });
+      return { ok: true, status: 429 === 0, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify({ correcoes: [{ de: "Rói", para: "ROI" }] }) } }] }) };
+    };
+    const r = await processar({ id: "r1", origem: "arquivo" }, { banco: c.banco, config: { ...configGroq(pasta), groqModeloRevisao: "modelo-x" }, rodar: c.rodar, fetch: c.fetchFake, fetchRevisao, abrirBlob });
+    assert.equal(pedidos.length, 1);
+    assert.equal(pedidos[0].corpo.model, "modelo-x");
+    assert.equal(r.texto, "ROI da campanha. Cê tê erre subiu.");
+    assert.deepEqual(r.correcoes, [{ de: "Rói", para: "ROI" }]);
+  });
+});
+
+test("rodarUma: grava marcas e registra as correções da IA; falha no registro não derruba", async () => {
+  const banco = bancoFila();
+  banco.registrarTermos = async () => { throw new Error("rpc fora"); };
+  const marcas = { v: 1, p: [[["Olá.", 0, 1]]] };
+  await rodarUma({ banco, config: { pasta: "/x" }, vigiar: semVigia, removerUpload: async () => {}, processarFn: async () => ({ texto: "Olá.", idioma: "pt", duracao: 1, marcas, correcoes: [{ de: "rói", para: "ROI" }] }) });
+  const fim = banco.atualizacoes.at(-1);
+  assert.equal(fim.campos.status, "pronta");
+  assert.deepEqual(fim.campos.marcas, marcas);
+  const banco2 = bancoFila();
+  await rodarUma({ banco: banco2, config: { pasta: "/x" }, vigiar: semVigia, removerUpload: async () => {}, processarFn: async () => ({ texto: "Olá.", idioma: "pt", duracao: 1, marcas, correcoes: [{ de: "rói", para: "ROI" }] }) });
+  assert.deepEqual(banco2.registrados, [{ de: "rói", para: "ROI", origem: "ia" }]);
+});
+
+test("rodarUma: linha cancelada no meio ou gravação sem linha apaga o áudio", async () => {
+  const apagados = [];
+  const removerAudio = async (id) => apagados.push(id);
+  let banco = bancoFila({ linhaDepois: null });
+  await rodarUma({ banco, config: { pasta: "/x" }, vigiar: semVigia, removerUpload: async () => {}, removerAudio, processarFn: async () => { throw new JobPausado(); } });
+  assert.deepEqual(apagados, ["t9"]);
+  banco = bancoFila();
+  banco.atualizar = async (id, campos) => (campos.status === "baixando" ? { id, tentativas: 1 } : null);
+  await rodarUma({ banco, config: { pasta: "/x" }, vigiar: semVigia, removerUpload: async () => {}, removerAudio, processarFn: async () => ({ texto: "Olá.", idioma: "pt", duracao: 1, marcas: { v: 1, p: [] }, correcoes: [] }) });
+  assert.deepEqual(apagados, ["t9", "t9"]);
+});
+
+test("faxina: apaga áudio de id inexistente e mantém o de linha existente", async () => {
+  await comPasta(async (pasta) => {
+    await mkdir(join(pasta, "audios"), { recursive: true });
+    await writeFile(join(pasta, "audios", "vivo.m4a"), "x");
+    await writeFile(join(pasta, "audios", "orfao.m4a"), "x");
+    await faxina({ banco: { idsExistentes: async () => new Set(["vivo"]) }, config: { pasta } });
+    assert.deepEqual(await readdir(join(pasta, "audios")), ["vivo.m4a"]);
   });
 });

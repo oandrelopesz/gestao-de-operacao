@@ -1,5 +1,7 @@
 // Acesso mínimo à tabela `transcricoes` pelo PostgREST (chave pública, RLS aberta como no app).
 
+import { chaveTermo } from "./termos.js";
+
 export function criarBanco({ supabaseUrl, anonKey, fetch: _fetch = fetch }) {
   const base = `${supabaseUrl}/rest/v1`;
   const cabecalhos = { apikey: anonKey, Authorization: `Bearer ${anonKey}`, "Content-Type": "application/json" };
@@ -48,6 +50,17 @@ export function criarBanco({ supabaseUrl, anonKey, fetch: _fetch = fetch }) {
         headers: { Prefer: "return=representation" },
         body: JSON.stringify({ status: "aguardando", progresso: 0 }),
       });
+    },
+    /** Memória de termos (manuais e da IA), as mais usadas primeiro. */
+    async termos() {
+      const linhas = await pedir("/transcritor_termos?select=de,para,origem,vezes&order=vezes.desc&limit=500");
+      return Array.isArray(linhas) ? linhas : [];
+    },
+    /** Registra correções na memória: itens `{ de, para, origem }`; a chave é calculada aqui. */
+    async registrarTermos(itens) {
+      const lista = (itens || []).map((i) => ({ chave: chaveTermo(i.de), de: i.de, para: i.para, origem: i.origem })).filter((i) => i.chave);
+      if (!lista.length) return;
+      await pedir("/rpc/registrar_termos", { method: "POST", body: JSON.stringify({ itens: lista }) });
     },
     async glossario() {
       const linhas = await pedir("/app_config?chave=eq.transcritor_glossario&select=valor");
