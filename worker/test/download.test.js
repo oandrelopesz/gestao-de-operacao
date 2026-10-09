@@ -266,3 +266,12 @@ test("cookies vão para uma cópia gravável na pasta do job (yt-dlp e gallery-d
   const args = d.chamadas[0].args;
   assert.equal(args[args.indexOf("--cookies") + 1], "/tmp/j/.cookies.txt");
 });
+
+test("Instagram bloqueado (resposta vazia) falha logo, sem gallery-dl nem página", async () => {
+  const d = deps({ ytdlp: new ComandoFalhou("yt-dlp", 1, "ERROR: [Instagram] x: Instagram sent an empty media response. Check if this post is accessible in your browser"), gallery: {}, midias: [] });
+  let pagina = 0;
+  d.capturarMidiaDaPagina = async () => { pagina += 1; return null; };
+  await assert.rejects(baixar({ link: "https://instagram.com/reel/x", rede: "instagram", dir: "/tmp/j" }, d), /empty media response/);
+  assert.equal(d.chamadas.length, 1);
+  assert.equal(pagina, 0);
+});

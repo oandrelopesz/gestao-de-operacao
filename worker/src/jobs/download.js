@@ -143,10 +143,13 @@ export async function baixar({ link, rede, dir, categoria }, deps = {}) {
   };
 
   let arquivos = carrossel ? await comGalleryDl() : await comYtDlp();
-  if (arquivos.length === 0) arquivos = carrossel ? await comYtDlp() : await comGalleryDl();
+  // Instagram que já recusou (resposta vazia, 429, pedido de login): os outros métodos batem no mesmo
+  // bloqueio e só gastam ~3 min por tentativa e agravam o limite. Falha logo, com o motivo.
+  const bloqueado = rede === "instagram" && arquivos.length === 0 && erros.some((e) => BLOQUEIO_INSTAGRAM.test(e));
+  if (arquivos.length === 0 && !bloqueado) arquivos = carrossel ? await comYtDlp() : await comGalleryDl();
 
   // Última tentativa: abrir a página e pegar o vídeo/imagem principal que ela carrega
-  if (arquivos.length === 0) {
+  if (arquivos.length === 0 && !bloqueado) {
     const r = await pelaPagina();
     if (r) arquivos = r.arquivos;
   }
@@ -203,6 +206,8 @@ export async function normalizarFormatos(arquivos, deps = {}) {
   }
   return saida;
 }
+
+const BLOQUEIO_INSTAGRAM = /empty media response|429|too many requests|rate.?limit|login required|checkpoint/i;
 
 function primeiraLinhaDeErro(e) {
   const texto = (e?.stderr || e?.message || "").split("\n").map((l) => l.trim()).filter(Boolean);
