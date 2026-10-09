@@ -25,6 +25,8 @@ import {
 import { ClientePicker, type DonoDemanda } from "@/components/demandas/ClientePicker";
 import { cn } from "@/lib/utils";
 import { hojeBrasilia } from "@/lib/entrega";
+import { churnDoMes, type ClienteChurn, type LinhaChurn } from "@/lib/churn";
+import { UserMinus } from "lucide-react";
 import {
   agenciaDaConclusao,
   agregar,
@@ -128,8 +130,10 @@ function DashboardPage() {
   const [hoje, setHoje] = useState(() => hojeBrasilia());
   const [conclusoes, setConclusoes] = useState<ConclusaoRow[]>([]);
   const [clientes, setClientes] = useState<{ id: string; nome: string; agencia: string | null }[]>([]);
+  const [clientesChurn, setClientesChurn] = useState<ClienteChurn[]>([]);
   const [clientesArquivados, setClientesArquivados] = useState<{ id: string; nome: string; agencia: string | null }[]>([]);
   const { agencias, todasAgencias, meta: metaAgencia } = useAgencias();
+  const churn = useMemo(() => churnDoMes(clientesChurn, hoje.slice(0, 7)), [clientesChurn, hoje]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [selecionado, setSelecionado] = useState<string | null>(null);
@@ -176,6 +180,10 @@ function DashboardPage() {
         .order("nome");
       if (errCli) throw errCli;
 
+      // Todos os clientes (inclusive arquivados e em churn) para o cartão de churn do mês
+      const { data: todos, error: errTodos } = await supabase.from("clientes").select("agencia, status_operacional, churn_em, arquivado");
+      if (errTodos) throw errTodos;
+
       // Demanda de mais de um cliente conta uma vez para cada cliente (uma entrada por cliente)
       const noPeriodo = expandirPorCliente(
         linhas.filter((c) => {
@@ -200,6 +208,7 @@ function DashboardPage() {
       if (minha !== seq.current) return;
       setConclusoes(noPeriodo);
       setClientes(ativos);
+      setClientesChurn((todos ?? []).map((t) => ({ agencia: t.agencia ?? "", status_operacional: t.status_operacional ?? "ativo", churn_em: t.churn_em, arquivado: t.arquivado })));
       setClientesArquivados(arquivados);
       setErro(null);
     } catch (e: any) {
@@ -469,7 +478,7 @@ function DashboardPage() {
       )}
 
       {/* Cartões de resumo */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <ResumoCard
           titulo="Concluídas no período"
           valor={total}
@@ -498,6 +507,12 @@ function DashboardPage() {
           valor={atraso.atrasadas.length}
           icone={<AlertTriangle size={18} className="text-red-500" />}
           detalhe={total > 0 ? `${formatarPct(atraso.percentual)} das ${total} concluídas` : "Concluídas depois da data de entrega"}
+          loading={loading}
+        />
+        <ChurnCard
+          churn={churn}
+          mes={hoje.slice(0, 7)}
+          agencias={todasAgencias}
           loading={loading}
         />
       </div>
@@ -832,6 +847,62 @@ function ResumoCard({
           <>
             <p className="mt-2 text-3xl font-bold tabular-nums">{valor}</p>
             <p className="mt-1 text-xs text-muted-foreground truncate">{detalhe}</p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Churns do mês: quantos clientes saíram e a % sobre o total de clientes; embaixo, o mesmo por agência sobre a base dela. */
+function ChurnCard({
+  churn,
+  mes,
+  agencias,
+  loading,
+}: {
+  churn: { total: LinhaChurn; porAgencia: Record<string, LinhaChurn> };
+  mes: string;
+  agencias: { id: string; label: string; hex: string; ordem: number }[];
+  loading: boolean;
+}) {
+  const pct = (l: LinhaChurn) => (l.pct === null ? "—" : formatarPct(l.pct * 100));
+  const mesPorExtenso = new Date(`${mes}-15T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const linhas = agencias.filter((a) => (churn.porAgencia[a.id]?.churns ?? 0) > 0).sort((a, b) => a.ordem - b.ordem);
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">Churns do mês</p>
+          <div className="rounded-md bg-muted p-1.5"><UserMinus size={18} className="text-red-500" /></div>
+        </div>
+        {loading ? (
+          <>
+            <Skeleton className="mt-3 h-8 w-16" />
+            <Skeleton className="mt-2 h-3 w-40" />
+          </>
+        ) : (
+          <>
+            <p className="mt-2 text-3xl font-bold tabular-nums">{churn.total.churns}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {pct(churn.total)} dos {churn.total.base} clientes · {mesPorExtenso}
+            </p>
+            <div className="mt-3 space-y-1 border-t pt-3">
+              {linhas.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum churn neste mês.</p>
+              ) : (
+                linhas.map((a) => {
+                  const l = churn.porAgencia[a.id];
+                  return (
+                    <p key={a.id} className="flex items-center gap-1.5 text-xs">
+                      <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: a.hex }} />
+                      <span className="truncate font-medium">{l.churns} churn{l.churns === 1 ? "" : "s"} {a.label}</span>
+                      <span className="ml-auto shrink-0 text-muted-foreground tabular-nums">{pct(l)} dos {l.base}</span>
+                    </p>
+                  );
+                })
+              )}
+            </div>
           </>
         )}
       </CardContent>

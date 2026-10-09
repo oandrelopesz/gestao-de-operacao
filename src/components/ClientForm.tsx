@@ -81,10 +81,18 @@ const clientSchema = z.object({
   observacoes: z.string().optional(),
   em_onboarding: z.boolean(),
   status_operacional: z.enum(["ativo", "pausado", "churn"]),
+  /** Churn: até quando vai o contrato (vazio com efeito imediato) e se o fim vale já. */
+  contrato_ate: z.string().optional().nullable(),
+  churn_imediato: z.boolean(),
+  /** Só leitura: dia em que foi marcado como churn (o banco grava). */
+  churn_em: z.string().optional().nullable(),
   /** false = cliente ainda não investe em ads (operações não entram nos totais) */
   trafego_ativo: z.boolean(),
   operacoes: z.array(operacaoSchema),
 }).superRefine((values, ctx) => {
+  if (values.status_operacional === "churn" && !values.churn_imediato && !values.contrato_ate) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contrato_ate"], message: "Informe até quando vai o contrato ou marque efeito imediato." });
+  }
   if (!values.trafego_ativo) return;
   if (values.operacoes.length === 0) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["operacoes"], message: "Adicione pelo menos uma operação ou desligue o tráfego." });
@@ -176,6 +184,9 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
       observacoes: initialValues?.observacoes || "",
       em_onboarding: initialValues?.em_onboarding ?? false,
       status_operacional: initialValues?.status_operacional || "ativo",
+      contrato_ate: initialValues?.contrato_ate ?? null,
+      churn_imediato: initialValues?.churn_imediato ?? false,
+      churn_em: initialValues?.churn_em ?? null,
       trafego_ativo: initialValues?.trafego_ativo ?? true,
       operacoes: operacoesIniciais,
     },
@@ -183,6 +194,9 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "operacoes" });
   const trafegoAtivo = form.watch("trafego_ativo");
+  const emChurn = form.watch("status_operacional") === "churn";
+  const churnImediato = form.watch("churn_imediato");
+  const churnEm = form.watch("churn_em");
   const operacoes = form.watch("operacoes");
 
   const totalMensalBRL = operacoes.reduce((acc, op) => acc + paraBRL(verbaMensalDaOperacao(op), op.moeda, cotacoes), 0);
@@ -305,6 +319,56 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
             )}
           />
         </div>
+
+        {/* Churn: até quando vai o contrato, ou efeito imediato */}
+        {emChurn && (
+          <div className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+            <p className="text-sm font-medium">Fim do contrato</p>
+            <FormField
+              control={form.control}
+              name="churn_imediato"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between gap-4 space-y-0">
+                  <div>
+                    <FormLabel>Efeito imediato</FormLabel>
+                    <p className="text-xs text-muted-foreground">Sai do Saldo e de tudo agora, e a data abaixo é limpa.</p>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(v) => {
+                        field.onChange(v);
+                        if (v) form.setValue("contrato_ate", null);
+                      }}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="contrato_ate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Até quando vai o contrato</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      disabled={churnImediato}
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value || null)}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">Fica no Saldo até essa data e depois sai.</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <p className="text-xs text-muted-foreground">
+              {churnEm ? `Churn registrado em ${churnEm.split("-").reverse().join("/")}.` : "O dia do churn é o dia em que você salvar."} Ele conta no mês desse dia, mesmo que o contrato vá até o mês seguinte.
+            </p>
+          </div>
+        )}
 
         {/* Alavanca de tráfego */}
         <FormField

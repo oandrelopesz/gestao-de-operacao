@@ -248,6 +248,9 @@ export type Database = {
           verba_ads: number
           verba_diaria_manual: number | null
           verba_total_contratada: number | null
+          churn_efeito_imediato: boolean
+          churn_em: string | null
+          contrato_ate: string | null
         }
         Insert: {
           agencia?: string
@@ -272,6 +275,9 @@ export type Database = {
           verba_ads?: number
           verba_diaria_manual?: number | null
           verba_total_contratada?: number | null
+          churn_efeito_imediato?: boolean
+          churn_em?: string | null
+          contrato_ate?: string | null
         }
         Update: {
           agencia?: string
@@ -296,6 +302,9 @@ export type Database = {
           verba_ads?: number
           verba_diaria_manual?: number | null
           verba_total_contratada?: number | null
+          churn_efeito_imediato?: boolean
+          churn_em?: string | null
+          contrato_ate?: string | null
         }
         Relationships: [
           {

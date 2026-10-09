@@ -185,6 +185,9 @@ export async function loadClienteFormValues(clienteId: string): Promise<ClienteF
     em_onboarding: cliente.em_onboarding || false,
     status_operacional: (cliente.status_operacional || "ativo") as ClientFormValues["status_operacional"],
     trafego_ativo: (cliente as any).trafego_ativo ?? true,
+    contrato_ate: (cliente as any).contrato_ate ?? null,
+    churn_imediato: (cliente as any).churn_efeito_imediato ?? false,
+    churn_em: (cliente as any).churn_em ?? null,
     operacoes,
   };
 }
@@ -218,6 +221,9 @@ export async function saveCliente(values: ClientFormValues, editingId?: string |
     observacoes: values.observacoes || null,
     em_onboarding: values.em_onboarding,
     status_operacional: values.status_operacional,
+    // O gatilho do banco guarda o dia do churn e limpa tudo se o cliente sair do churn; aqui vai só o que o André preenche.
+    churn_efeito_imediato: values.status_operacional === "churn" && values.churn_imediato,
+    contrato_ate: values.status_operacional === "churn" && !values.churn_imediato ? values.contrato_ate || null : null,
     trafego_ativo: values.trafego_ativo,
     verba_ads: Math.round(totalMensalBRL * 100) / 100,
     tipo_verba: operacoes.length > 0 && totais.length === operacoes.length ? "total_periodo" : "mensal",
