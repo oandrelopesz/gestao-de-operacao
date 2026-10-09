@@ -2872,6 +2872,9 @@ export type Database = {
           updated_at: string
           user_id: string
           verba_diaria: number | null
+          pausado: boolean
+          pausado_desde: string | null
+          saldo_congelado: number | null
         }
         Insert: {
           alerta_dispensado_em?: string | null
@@ -2888,6 +2891,9 @@ export type Database = {
           updated_at?: string
           user_id: string
           verba_diaria?: number | null
+          pausado?: boolean
+          pausado_desde?: string | null
+          saldo_congelado?: number | null
         }
         Update: {
           alerta_dispensado_em?: string | null
@@ -2904,6 +2910,9 @@ export type Database = {
           updated_at?: string
           user_id?: string
           verba_diaria?: number | null
+          pausado?: boolean
+          pausado_desde?: string | null
+          saldo_congelado?: number | null
         }
         Relationships: [
           {

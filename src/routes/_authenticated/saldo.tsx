@@ -22,6 +22,7 @@ import {
   CalendarClock,
   Scale,
 } from "lucide-react";
+import { Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SaldoAdsForm, SaldoAdsFormValues } from "@/components/SaldoAdsForm";
 import { RecargaForm, RecargaFormValues, RecargaConta } from "@/components/RecargaForm";
+import { RecargaLoteForm, type RecargaLoteValues } from "@/components/RecargaLoteForm";
 import { usePlataformas } from "@/lib/plataformas";
 import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { cn } from "@/lib/utils";
@@ -111,6 +113,8 @@ interface SaldoRow {
   valor_ultima_recarga: number | null;
   /** O último lançamento é um ajuste de saldo (não uma recarga) */
   ultimo_ajuste?: boolean | null;
+  /** Tráfego pausado nesta plataforma: o saldo congela e ela sai dos alertas e da verba */
+  plataforma_pausada?: boolean | null;
   saldo_atual_estimado: number;
   dias_restantes: number | null;
   data_prevista_fim: string | null;
@@ -156,6 +160,7 @@ const contaDeRecarga = (row: SaldoRow, comOperacao = false): RecargaConta => ({
   verba_diaria: row.verba_diaria_calc,
   moeda: row.moeda,
   saldo_estimado: row.saldo_atual_estimado,
+  pausada: row.plataforma_pausada,
 });
 
 const formatDate = (iso?: string | null) => {
@@ -195,7 +200,7 @@ function SaldoPage() {
   const [editing, setEditing] = useState<SaldoRow | null>(null);
   const [editingClient, setEditingClient] = useState<any>(null);
   /** Recarga (ou ajuste de saldo) em andamento: plataformas do cliente (o usuário escolhe em qual foi) e a sugerida */
-  const [recargaTarget, setRecargaTarget] = useState<{ cliente_nome: string; contas: SaldoRow[]; defaultId?: string; ajuste?: boolean } | null>(null);
+  const [recargaTarget, setRecargaTarget] = useState<{ cliente_nome: string; contas: SaldoRow[]; defaultId?: string; ajuste?: boolean; lote?: boolean } | null>(null);
   const [novoRegistroClienteId, setNovoRegistroClienteId] = useState<string | null>(null);
   const [selectedForHistory, setSelectedForHistory] = useState<SaldoRow | null>(null);
   const [historyIsConsolidated, setHistoryIsConsolidated] = useState(false);
@@ -324,13 +329,14 @@ function SaldoPage() {
    * Abre o modal de recarga: o usuário escolhe a plataforma entre as que o cliente roda (Pix/Boleto).
    * Com `ajuste`, o valor informado substitui o saldo estimado (ver 20261007150000_saldo_ajuste.sql).
    */
-  const openRecarga = (contas: SaldoRow[], sugerida?: SaldoRow, clienteNome?: string, ajuste = false) => {
+  const openRecarga = (contas: SaldoRow[], sugerida?: SaldoRow, clienteNome?: string, ajuste = false, lote = false) => {
     const monitoradas = contas.filter((c) => c.metodo_pagamento !== "cartao");
     setRecargaTarget({
       cliente_nome: clienteNome ?? (sugerida?.cliente_nome || monitoradas[0]?.cliente_nome || ""),
       contas: monitoradas.length > 0 ? monitoradas : contas,
       defaultId: sugerida?.id,
       ajuste,
+      lote,
     });
     setRecargaModalOpen(true);
   };
@@ -357,6 +363,42 @@ function SaldoPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  /** Uma recarga por plataforma preenchida, todas de uma vez (um único popup). */
+  const handleRecargaLote = async (values: RecargaLoteValues) => {
+    setSaving(true);
+    try {
+      const linhas = values.itens.map((i) => ({
+        saldo_ads_id: i.saldo_ads_id,
+        data_recarga: values.data_recarga,
+        valor: i.valor,
+        metodo_pagamento: i.metodo_pagamento,
+        observacoes: values.observacoes || null,
+      }));
+      const { error } = await supabase.from("recargas").insert(linhas);
+      if (error) throw error;
+      toast.success(linhas.length === 1 ? "Recarga registrada — previsão recalculada" : `${linhas.length} recargas registradas — previsões recalculadas`);
+      setRecargaModalOpen(false);
+      setRecargaTarget(null);
+      fetchSaldo(true);
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao salvar as recargas");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Pausa ou retoma o tráfego de uma plataforma. O saldo congela na pausa; o cadastro do cliente acompanha (gatilho no banco). */
+  const setPausaPlataforma = async (plat: SaldoRow, pausado: boolean) => {
+    const { error } = await supabase.from("saldo_ads").update({ pausado }).eq("id", plat.id);
+    if (error) {
+      toast.error(error.message || "Erro ao atualizar o tráfego");
+      return;
+    }
+    const nome = (plat.plataformas || []).join(", ");
+    toast.success(pausado ? `Tráfego pausado em ${nome}: o saldo fica congelado` : `Tráfego retomado em ${nome}`);
+    fetchSaldo(true);
   };
 
   /**
@@ -448,7 +490,7 @@ function SaldoPage() {
 
       if (item.metodo_pagamento !== "cartao") {
         group.saldo_total_consolidado += emBRL(item, item.saldo_atual_estimado);
-        group.verba_diaria_total += emBRL(item, item.verba_diaria_calc);
+        if (!item.plataforma_pausada) group.verba_diaria_total += emBRL(item, item.verba_diaria_calc);
 
         const status = statusEfetivo(item);
         const currentWeight = STATUS_ALERTA.find((s) => s.id === status)?.weight ?? 0;
@@ -572,9 +614,6 @@ function SaldoPage() {
               <BellOff size={16} /> Zerar alertas ({activeAlerts.length})
             </Button>
           )}
-          <Button className="gap-2" onClick={() => { setEditing(null); setNovoRegistroClienteId(null); setModalOpen(true); }}>
-            <Plus size={16} /> Novo registro
-          </Button>
           <Button variant="outline" size="icon" onClick={() => fetchSaldo()} disabled={loading} title="Atualizar">
             <RefreshCw size={16} className={cn(loading && "animate-spin")} />
           </Button>
@@ -789,12 +828,9 @@ function SaldoPage() {
                         <DropdownMenuItem onClick={() => openClientEditor(group.cliente_id)}>
                           <UserCog size={14} className="mr-2" /> Editar cliente
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setEditing(null); setNovoRegistroClienteId(group.cliente_id); setModalOpen(true); }}>
-                          <Plus size={14} className="mr-2" /> Nova plataforma
-                        </DropdownMenuItem>
                         {!isCartaoOnly && (
-                          <DropdownMenuItem onClick={() => openRecarga(group.plataformas, undefined, group.cliente_nome)}>
-                            <ArrowUpCircle size={14} className="mr-2" /> Adicionar recarga
+                          <DropdownMenuItem onClick={() => openRecarga(group.plataformas, undefined, group.cliente_nome, false, group.plataformas.filter((p) => p.metodo_pagamento !== "cartao").length > 1)}>
+                            <ArrowUpCircle size={14} className="mr-2" /> {group.plataformas.filter((p) => p.metodo_pagamento !== "cartao").length > 1 ? "Recarregar plataformas" : "Adicionar recarga"}
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
@@ -894,6 +930,10 @@ function SaldoPage() {
                                 <DropdownMenuContent align="end" className="w-[210px]">
                                   <DropdownMenuItem onClick={() => { setEditing(plat); setModalOpen(true); }}>
                                     <Pencil size={12} className="mr-2" /> Editar registro
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setPausaPlataforma(plat, !plat.plataforma_pausada)}>
+                                    {plat.plataforma_pausada ? <Play size={12} className="mr-2" /> : <Pause size={12} className="mr-2" />}
+                                    {plat.plataforma_pausada ? "Retomar tráfego" : "Pausar tráfego"}
                                   </DropdownMenuItem>
                                   {!isCartao && (
                                     <>
@@ -1029,21 +1069,28 @@ function SaldoPage() {
       </Dialog>
 
       <Dialog open={recargaModalOpen} onOpenChange={(o) => { setRecargaModalOpen(o); if (!o) setRecargaTarget(null); }}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className={recargaTarget?.lote ? "sm:max-w-[520px]" : "sm:max-w-[400px]"}>
           <DialogHeader>
-            <DialogTitle>{recargaTarget?.ajuste ? "Ajustar saldo" : "Adicionar recarga"}</DialogTitle>
+            <DialogTitle>{recargaTarget?.ajuste ? "Ajustar saldo" : recargaTarget?.lote ? "Recarregar plataformas" : "Adicionar recarga"}</DialogTitle>
             <DialogDescription>
               {recargaTarget?.ajuste ? (
                 <>Informe o saldo que está agora na conta de <strong>{recargaTarget.cliente_nome || "o cliente"}</strong>. Não conta como investimento.</>
               ) : (
                 <>
                   Novo aporte para <strong>{recargaTarget?.cliente_nome || "o cliente"}</strong>
-                  {recargaTarget && recargaTarget.contas.length > 1 ? " — escolha em qual plataforma a recarga foi feita" : ""}.
+                  {recargaTarget && recargaTarget.contas.length > 1 ? (recargaTarget.lote ? " — preencha o valor de cada plataforma que recebeu recarga" : " — escolha em qual plataforma a recarga foi feita") : ""}.
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
-          {recargaTarget && (
+          {recargaTarget?.lote && (
+            <RecargaLoteForm
+              loading={saving}
+              contas={recargaTarget.contas.map((c) => contaDeRecarga(c, new Set(recargaTarget.contas.map((x) => x.operacao_id || "")).size > 1))}
+              onSubmit={handleRecargaLote}
+            />
+          )}
+          {recargaTarget && !recargaTarget.lote && (
             <RecargaForm
               loading={saving}
               contas={(() => { const multi = new Set(recargaTarget.contas.map((c) => c.operacao_id || "")).size > 1; return recargaTarget.contas.map((c) => contaDeRecarga(c, multi)); })()}

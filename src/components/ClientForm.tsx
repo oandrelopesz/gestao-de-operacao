@@ -47,6 +47,8 @@ const metodoPagamentoSchema = z.enum(["cartao", "pix", "boleto"]);
 const plataformaConfigSchema = z.object({
   verba: z.number().min(0),
   metodo_pagamento: metodoPagamentoSchema,
+  /** Tráfego pausado nesta plataforma (espelha a conta do Saldo) */
+  pausado: z.boolean().optional(),
 });
 
 export type PlataformaConfig = z.infer<typeof plataformaConfigSchema>;
@@ -197,6 +199,13 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
   const emChurn = form.watch("status_operacional") === "churn";
   const churnImediato = form.watch("churn_imediato");
   const churnEm = form.watch("churn_em");
+  // Desmarcar "tráfego ativo" pausa todas as plataformas; marcar de novo retoma todas
+  const pausarTudo = (pausado: boolean) => {
+    form.getValues("operacoes").forEach((op, i) => {
+      const cfg = Object.fromEntries(Object.entries(op.plataformas_config).map(([k, v]) => [k, { ...v, pausado }]));
+      form.setValue(`operacoes.${i}.plataformas_config`, cfg, { shouldValidate: true });
+    });
+  };
   const operacoes = form.watch("operacoes");
 
   const totalMensalBRL = operacoes.reduce((acc, op) => acc + paraBRL(verbaMensalDaOperacao(op), op.moeda, cotacoes), 0);
@@ -385,7 +394,7 @@ export function ClientForm({ initialValues, onSubmit, loading }: ClientFormProps
                 </p>
               </div>
               <FormControl>
-                <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-emerald-500" />
+                <Switch checked={field.value} onCheckedChange={(v) => { field.onChange(v); pausarTudo(!v); }} className="data-[state=checked]:bg-emerald-500" />
               </FormControl>
             </FormItem>
           )}
@@ -677,15 +686,16 @@ function OperacaoEditor({ form, index, plataformasDisponiveis, metodoPadrao, ver
         </p>
       ) : (
         <div className="space-y-2">
-          <div className="hidden sm:grid sm:grid-cols-[1fr_1.1fr_1.1fr] gap-2 px-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+          <div className="hidden sm:grid sm:grid-cols-[1fr_1.1fr_1.1fr_auto] gap-2 px-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
             <span>Plataforma</span>
             <span>Forma de pagamento</span>
             <span>{tipoVerba === "mensal" ? `Verba / mês (${simbolo})` : `Verba total (${simbolo})`}</span>
+            <span>Tráfego</span>
           </div>
           {plataformas.map((plat) => {
             const cfg = config[plat] || { verba: 0, metodo_pagamento: metodoPadrao };
             return (
-              <div key={plat} className="grid grid-cols-1 sm:grid-cols-[1fr_1.1fr_1.1fr] gap-2 items-center rounded-md border bg-background p-2">
+              <div key={plat} className="grid grid-cols-1 sm:grid-cols-[1fr_1.1fr_1.1fr_auto] gap-2 items-center rounded-md border bg-background p-2">
                 <Badge variant="secondary" className="justify-self-start">{plat}</Badge>
                 <Select
                   value={cfg.metodo_pagamento}
@@ -707,6 +717,10 @@ function OperacaoEditor({ form, index, plataformasDisponiveis, metodoPadrao, ver
                   value={toDisplay(cfg.verba)}
                   onChange={(e) => setConfig(plat, { verba: parseBRLInput(e.target.value) })}
                 />
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Switch checked={!cfg.pausado} onCheckedChange={(v) => setConfig(plat, { pausado: !v })} aria-label={`Tráfego rodando — ${plat}`} />
+                  <span className="w-12">{cfg.pausado ? "Pausado" : "Rodando"}</span>
+                </label>
               </div>
             );
           })}

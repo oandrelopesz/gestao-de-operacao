@@ -67,6 +67,7 @@ interface SaldoAdsRegistro {
   metodo_pagamento: PlataformaConfig["metodo_pagamento"] | null;
   verba_diaria: number | null;
   ativo: boolean;
+  pausado?: boolean | null;
 }
 
 interface OperacaoRegistro {
@@ -90,7 +91,7 @@ function parsePlataformasConfig(raw: unknown): Record<string, PlataformaConfig> 
   Object.entries(raw as Record<string, any>).forEach(([nome, cfg]) => {
     if (!cfg || typeof cfg !== "object") return;
     const metodo = ["cartao", "pix", "boleto"].includes(cfg.metodo_pagamento) ? cfg.metodo_pagamento : "pix";
-    out[nome] = { verba: Number(cfg.verba || 0), metodo_pagamento: metodo };
+    out[nome] = { verba: Number(cfg.verba || 0), metodo_pagamento: metodo, ...(cfg.pausado === true ? { pausado: true } : {}) };
   });
   return out;
 }
@@ -112,7 +113,7 @@ export async function loadClienteFormValues(clienteId: string): Promise<ClienteF
       .order("created_at", { ascending: true }),
     supabase
       .from("saldo_ads")
-      .select("id, operacao_id, plataformas, metodo_pagamento, verba_diaria, ativo")
+      .select("id, operacao_id, plataformas, metodo_pagamento, verba_diaria, ativo, pausado")
       .eq("cliente_id", clienteId)
       .order("created_at", { ascending: true }),
   ]);
@@ -135,6 +136,11 @@ export async function loadClienteFormValues(clienteId: string): Promise<ClienteF
         const registro = doSaldo.find((r) => (r.plataformas || []).includes(p));
         config[p] = { verba: 0, metodo_pagamento: registro?.metodo_pagamento || "pix" };
       }
+    });
+    // A pausa de cada plataforma vale a da conta do Saldo (é lá que o saldo congela)
+    plataformas.forEach((p) => {
+      const registro = doSaldo.find((r) => (r.plataformas || []).includes(p));
+      if (registro && registro.pausado != null) config[p] = { ...config[p], pausado: registro.pausado };
     });
     return novaOperacao({
       id: op.id,
@@ -204,7 +210,11 @@ export async function saveCliente(values: ClientFormValues, editingId?: string |
 
   const operacoes = values.operacoes.map((op) => {
     const cfg: Record<string, PlataformaConfig> = {};
-    op.plataformas.forEach((p) => { cfg[p] = op.plataformas_config?.[p] || { verba: 0, metodo_pagamento: "pix" }; });
+    op.plataformas.forEach((p) => {
+      const base = op.plataformas_config?.[p] || { verba: 0, metodo_pagamento: "pix" as const };
+      // Tráfego desligado no cliente = tudo pausado
+      cfg[p] = { ...base, pausado: !values.trafego_ativo || !!base.pausado };
+    });
     return { ...op, plataformas_config: cfg };
   });
 
@@ -322,6 +332,7 @@ export async function saveCliente(values: ClientFormValues, editingId?: string |
           plataformas: [plataforma],
           metodo_pagamento: op.plataformas_config[plataforma].metodo_pagamento,
           verba_diaria: verbaDiariaPor[plataforma] || 0,
+          pausado: !!op.plataformas_config[plataforma].pausado,
           ativo: true,
         })
         .eq("id", id);
@@ -336,6 +347,7 @@ export async function saveCliente(values: ClientFormValues, editingId?: string |
         plataformas: [p],
         metodo_pagamento: op.plataformas_config[p].metodo_pagamento,
         verba_diaria: verbaDiariaPor[p] || 0,
+        pausado: !!op.plataformas_config[p].pausado,
         ativo: true,
       })));
       if (error) throw error;

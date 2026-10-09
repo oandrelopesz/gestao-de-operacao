@@ -44,6 +44,8 @@ export interface RecargaConta {
   moeda?: string | null;
   /** Saldo que o sistema estima hoje (mostrado no ajuste, para comparar) */
   saldo_estimado?: number | null;
+  /** Tráfego pausado nesta plataforma (a recarga continua valendo) */
+  pausada?: boolean | null;
 }
 
 interface RecargaFormProps {
