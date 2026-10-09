@@ -28,6 +28,11 @@ export interface FonteCobravel extends FonteDoMes {
   forma_pagamento?: string | null;
   cobranca_desde?: string | null;
   parcelas?: { dia: number; valor: number; forma?: string | null }[] | null;
+  /**
+   * Fonte por cliente: o valor esperado de um mês ("YYYY-MM") ainda não acertado. Mês acertado segue congelado no
+   * recebimento (`valor_devido`); sem esta função vale `valor_mensal` em todos os meses.
+   */
+  valorDoMes?: ((mes: string) => number) | null;
 }
 
 export type SituacaoCobranca = "recebido" | "parcial" | "isento" | "atrasado" | "pendente" | "a_vencer";
@@ -112,7 +117,7 @@ export function cobrancasDaFonte(fonte: FonteCobravel, registros: RegistroRecebi
     parcelas.forEach((p, i) => {
       const numero = i + 1;
       const registro = registros.find((r) => r.mes_referencia.slice(0, 7) === mes && (r.parcela ?? 1) === numero) ?? null;
-      const valor = arred(valorDevidoDoRegistro(registro) ?? p.valor);
+      const valor = arred(valorDevidoDoRegistro(registro) ?? (fonte.valorDoMes ? fonte.valorDoMes(mes) : p.valor));
       const pagoInformado = registro?.recebido ? Number(registro.valor_recebido ?? valor) : 0;
       const pago = arred(Math.max(0, Math.min(pagoInformado, valor)));
       const vencimento = vencimentoNoMes(p.dia, `${mes}-01`);

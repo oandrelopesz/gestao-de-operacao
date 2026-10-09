@@ -82,6 +82,9 @@ import {
   isentarCobranca,
   isentarMes,
 } from "@/lib/financeiroAcoes";
+import { valorDoMesPorCliente } from "@/lib/financeiroPorClienteDados";
+import { calcularPorCliente } from "@/lib/financeiroPorCliente";
+import { ClientesDaFonte } from "@/components/financeiro/ClientesDaFonte";
 import { TipoBadge } from "@/components/financeiro/TipoBadge";
 import { FormaBadge } from "@/components/financeiro/FormaBadge";
 import { CobrancaLinha } from "@/components/financeiro/CobrancaLinha";
@@ -283,6 +286,15 @@ function FinanceiroPage() {
 
   useEffect(() => {
     fetchFinanceiro();
+    // Cliente mudou (churn, arquivado, agência) ou valor personalizado salvo: refaz a conta das fontes por cliente
+    const canal = supabase
+      .channel("financeiro-por-cliente")
+      .on("postgres_changes", { event: "*", schema: "public", table: "clientes" }, () => { fetchFinanceiro(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "financeiro_fonte_clientes" }, () => { fetchFinanceiro(); })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(canal);
+    };
   }, []);
 
   // Hoje em Brasília (o mesmo do banco); meses "YYYY-MM"
@@ -297,7 +309,14 @@ function FinanceiroPage() {
       if (lista) lista.push(r);
       else registrosPorFonte.set(r.fonte_id, [r]);
     }
-    return new Map(data.map((f) => [f.fonte_id, cobrancasDaFonte(f, registrosPorFonte.get(f.fonte_id) ?? [], hoje)]));
+    // Fonte por cliente: mês ainda não acertado vale o que os clientes dão naquele mês (o acertado fica congelado)
+    return new Map(
+      data.map((f) => {
+        const pc = f.por_cliente;
+        const fonte = pc ? { ...f, valorDoMes: (m: string) => valorDoMesPorCliente(pc, m) } : f;
+        return [f.fonte_id, cobrancasDaFonte(fonte, registrosPorFonte.get(f.fonte_id) ?? [], hoje)];
+      }),
+    );
   }, [data, registros, hoje]);
 
   // Mês escolhido (da URL), dentro dos meses navegáveis; inválido ou fora deles vira o mês atual
@@ -774,9 +793,11 @@ function FinanceiroPage() {
                     </div>
                     <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                       <span>
-                        {fracionado
-                          ? `${parcelas.length} parcelas · ${descreverDias(parcelas)}`
-                          : `Todo dia ${fonte.dia_recebimento}`}
+                        {fonte.por_cliente
+                          ? `${contagem(calcularPorCliente(fonte.por_cliente.config, fonte.por_cliente.clientes, fonte.por_cliente.personalizados, mesAtual).quantidade, "cliente", "clientes")} · todo dia ${fonte.dia_recebimento}`
+                          : fracionado
+                            ? `${parcelas.length} parcelas · ${descreverDias(parcelas)}`
+                            : `Todo dia ${fonte.dia_recebimento}`}
                       </span>
                       <Badge variant="outline" className={cn("shrink-0 text-[9px] font-bold", info.classe)}>
                         {info.label}
@@ -926,7 +947,7 @@ function FinanceiroPage() {
           <div className="mt-8 space-y-8 pb-8">
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 rounded-xl bg-muted/50 border space-y-1">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Valor Mensal</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{fonteHistorico?.por_cliente ? "Valor do Mês" : "Valor Mensal"}</p>
                 <p className="text-xl font-bold">{formatBRL(fonteHistorico?.valor_mensal)}</p>
               </div>
               <div className="p-4 rounded-xl bg-muted/50 border space-y-1">
@@ -938,6 +959,16 @@ function FinanceiroPage() {
                 </p>
               </div>
             </div>
+
+            {fonteHistorico?.por_cliente && (
+              <ClientesDaFonte
+                fonteId={fonteHistorico.fonte_id}
+                dados={fonteHistorico.por_cliente}
+                mes={mesAtual}
+                nomeMes={nomeDoMes(`${mesAtual}-01`)}
+                onSalvo={fetchFinanceiro}
+              />
+            )}
 
             {parcelasHistorico.length > 0 && (
               <div className="space-y-1.5">

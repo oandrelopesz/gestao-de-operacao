@@ -171,3 +171,13 @@ test("mesEscolhido: nunca devolve mês fora da lista (nem quebra) quando a lista
   assert.equal(mesEscolhido(42, ["2026-09", "2026-10", "2026-11"], "2026-11-03"), "2026-11");
   assert.equal(mesEscolhido("2026-09", [], "2026-11-03"), "2026-11");
 });
+
+test("valorDoMes (fonte por cliente): mês sem acerto usa o valor do mês; acertado fica congelado", () => {
+  const valores: Record<string, number> = { "2026-09": 800, "2026-10": 600 };
+  const fonte = { ...unica, valorDoMes: (m: string) => valores[m] };
+  const c = cobrancasDaFonte(fonte, [reg({ mes: "2026-09", recebido: true, isento: false, valor_recebido: 1000, valor_devido: 1000 })], "2026-10-02");
+  assert.equal(c.find((x) => x.mes === "2026-09")!.valor, 1000);
+  assert.equal(c.find((x) => x.mes === "2026-10")!.valor, 600);
+  // sem a função, vale valor_mensal em todos os meses
+  assert.equal(cobrancasDaFonte(unica, [], "2026-10-02")[1].valor, 1000);
+});

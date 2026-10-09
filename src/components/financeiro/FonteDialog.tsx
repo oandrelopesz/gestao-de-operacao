@@ -34,6 +34,8 @@ import {
 } from "@/lib/financeiro";
 import { ANO_COBRANCA_MAX, ANO_COBRANCA_MIN, COBRANCA_DESDE_PADRAO, FORMAS_DE_PAGAMENTO, formaDePagamento, type FormaPagamento } from "@/lib/financeiroCobranca";
 import { hojeBrasilia } from "@/lib/entrega";
+import type { DadosPorCliente } from "@/lib/financeiroPorClienteDados";
+import type { ModeloPorCliente, TipoRecebimento } from "@/lib/financeiroPorCliente";
 import { ParcelasEditor } from "@/components/financeiro/ParcelasEditor";
 import { useAgencias } from "@/lib/agencias";
 import { toast } from "sonner";
@@ -88,6 +90,13 @@ export type FinanceiroView = {
   forma_pagamento?: string | null;
   /** Primeiro mês cobrado ("YYYY-MM-DD", sempre dia 1) */
   cobranca_desde?: string | null;
+  /** fixo (padrão) | por_cliente: o valor do mês vem dos clientes da agência */
+  tipo_recebimento?: string | null;
+  modelo_por_cliente?: string | null;
+  valor_fixo?: number | null;
+  valor_por_cliente?: number | null;
+  /** Só em fonte por cliente: clientes da agência e valores personalizados (vem de enriquecerPorCliente) */
+  por_cliente?: DadosPorCliente | null;
 };
 
 /** Pré-preenchimento de uma fonte nova (ex.: lead ganho no CRM) */
@@ -118,6 +127,11 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
   // Forma de pagamento do cliente (SEM_FORMA = não informada) e primeiro mês cobrado ("YYYY-MM")
   const [formaForm, setFormaForm] = useState<string>(SEM_FORMA);
   const [cobrancaDesdeForm, setCobrancaDesdeForm] = useState("");
+  // Recebimento fixo ou por cliente (modelo, fixo e valor padrão por cliente)
+  const [recebimentoForm, setRecebimentoForm] = useState<TipoRecebimento>("fixo");
+  const [modeloForm, setModeloForm] = useState<ModeloPorCliente>("fixo_variavel");
+  const [valorFixoTexto, setValorFixoTexto] = useState("");
+  const [valorPorClienteTexto, setValorPorClienteTexto] = useState("");
   const { todasAgencias } = useAgencias();
 
   // Ao abrir, prepara o formulário (ajuste de estado durante o render: o conteúdo já monta com os valores certos,
@@ -145,6 +159,10 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
       setTipoForm(fonte?.tipo || "agencia");
       setAgenciaForm(fonte?.agencia_id ?? null);
       setFormaForm(formaDePagamento(fonte?.forma_pagamento) ?? SEM_FORMA);
+      setRecebimentoForm(fonte?.tipo_recebimento === "por_cliente" ? "por_cliente" : "fixo");
+      setModeloForm(fonte?.modelo_por_cliente === "so_variavel" ? "so_variavel" : "fixo_variavel");
+      setValorFixoTexto(fonte?.valor_fixo ? textoDoValor(fonte.valor_fixo) : "");
+      setValorPorClienteTexto(fonte?.valor_por_cliente ? textoDoValor(fonte.valor_por_cliente) : "");
       // Fonte nova começa a ser cobrada neste mês; fonte antiga sem o campo (cache de antes da migration) em setembro de 2026
       setCobrancaDesdeForm(String(fonte ? (fonte.cobranca_desde ?? COBRANCA_DESDE_PADRAO) : hojeBrasilia()).slice(0, 7));
     }
@@ -159,8 +177,10 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
     : [{ dia: parseInt(diaTexto), valor: parseBRLInput(valorMensalTexto) }];
   // Editar a quantidade, os dias ou os valores refaz a cobrança dos meses que já passaram (cada mês usa as parcelas
   // atuais): com "cobrar a partir de" antes deste mês, avisa e oferece cobrar só daqui para frente
+  const porCliente = recebimentoForm === "por_cliente";
   const avisoMesesAnteriores =
     !!editingFonte &&
+    !porCliente &&
     /^\d{4}-\d{2}$/.test(cobrancaDesdeForm) &&
     cobrancaDesdeForm < mesAtual &&
     mudouAsParcelas(parcelasDaFonte(editingFonte), parcelasDoFormulario);
@@ -191,7 +211,22 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
       toast.error(`Informe o mês e o ano (de ${ANO_COBRANCA_MIN} a ${ANO_COBRANCA_MAX}).`);
       return;
     }
-    if (fracionado) {
+    if (porCliente) {
+      if (!agenciaForm) {
+        toast.error("Escolha a agência: os clientes dela entram na conta.");
+        return;
+      }
+      if (!(parseBRLInput(valorPorClienteTexto) >= 0) || !valorPorClienteTexto) {
+        toast.error("Informe o valor por cliente.");
+        return;
+      }
+      // valor_mensal fica só como base guardada (o valor do mês é calculado com os clientes na hora de mostrar)
+      pagamento = {
+        valor_mensal: modeloForm === "fixo_variavel" ? parseBRLInput(valorFixoTexto) : 0,
+        dia_recebimento: parseInt(diaTexto),
+        parcelas: null,
+      };
+    } else if (fracionado) {
       const erro = validarParcelas(parcelasForm);
       if (erro) {
         toast.error(erro);
@@ -212,8 +247,12 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
     const values = {
       nome: formData.get("nome") as string,
       tipo: tipoForm,
-      agencia_id: tipoForm === "freelancer" ? agenciaForm : null,
+      agencia_id: tipoForm === "freelancer" || porCliente ? agenciaForm : null,
       ...pagamento,
+      tipo_recebimento: recebimentoForm,
+      modelo_por_cliente: porCliente ? modeloForm : null,
+      valor_fixo: porCliente && modeloForm === "fixo_variavel" ? parseBRLInput(valorFixoTexto) : null,
+      valor_por_cliente: porCliente ? parseBRLInput(valorPorClienteTexto) : null,
       forma_pagamento: formaDePagamento(formaForm),
       cobranca_desde: `${cobrancaDesdeForm}-01`,
       ativo: formData.get("ativo") === "on",
@@ -282,7 +321,49 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
                   </div>
                 </RadioGroup>
               </div>
-              {tipoForm === "freelancer" && (
+              <div className="grid gap-2">
+                <Label>Como você recebe</Label>
+                <RadioGroup value={recebimentoForm} onValueChange={(v) => setRecebimentoForm(v as TipoRecebimento)} className="flex flex-wrap gap-x-4 gap-y-2">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="fixo" id="recebimento_fixo" />
+                    <Label htmlFor="recebimento_fixo" className="font-normal cursor-pointer">Pagamento fixo</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="por_cliente" id="recebimento_por_cliente" />
+                    <Label htmlFor="recebimento_por_cliente" className="font-normal cursor-pointer">Recebimento por cliente</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              {porCliente && (
+                <div className="grid gap-4 rounded-md border bg-muted/30 p-3">
+                  <RadioGroup value={modeloForm} onValueChange={(v) => setModeloForm(v as ModeloPorCliente)} className="flex flex-wrap gap-x-4 gap-y-2">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="fixo_variavel" id="modelo_fixo_variavel" />
+                      <Label htmlFor="modelo_fixo_variavel" className="font-normal cursor-pointer">Fixo + variável por cliente</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="so_variavel" id="modelo_so_variavel" />
+                      <Label htmlFor="modelo_so_variavel" className="font-normal cursor-pointer">Apenas variável</Label>
+                    </div>
+                  </RadioGroup>
+                  <div className="grid grid-cols-2 gap-4">
+                    {modeloForm === "fixo_variavel" && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="valor_fixo">Valor fixo mensal</Label>
+                        <Input id="valor_fixo" placeholder="R$ 0,00" value={valorFixoTexto} onChange={(e) => setValorFixoTexto(maskBRLInput(e.target.value))} />
+                      </div>
+                    )}
+                    <div className="grid gap-2">
+                      <Label htmlFor="valor_por_cliente">Valor por cliente</Label>
+                      <Input id="valor_por_cliente" placeholder="R$ 0,00" value={valorPorClienteTexto} onChange={(e) => setValorPorClienteTexto(maskBRLInput(e.target.value))} />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    O valor do mês é calculado com os clientes ativos da agência. Cliente em churn sai da conta, e na ficha da fonte você muda o valor de um cliente específico.
+                  </p>
+                </div>
+              )}
+              {(tipoForm === "freelancer" || porCliente) && (
                 <div className="grid gap-2">
                   <Label htmlFor="agencia_id">Agência</Label>
                   <Select value={agenciaForm || SEM_AGENCIA} onValueChange={(v) => setAgenciaForm(v === SEM_AGENCIA ? null : v)}>
@@ -298,28 +379,34 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
                         ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">Para qual agência você faz esse trabalho.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {porCliente ? "Os clientes ativos dessa agência entram na conta do mês." : "Para qual agência você faz esse trabalho."}
+                  </p>
                 </div>
               )}
-              <ParcelasEditor
-                ativo={fracionado}
-                onAtivoChange={alternarFracionado}
-                parcelas={parcelasForm}
-                onChange={setParcelasForm}
-              />
-              {!fracionado && (
+              {!porCliente && (
+                <ParcelasEditor
+                  ativo={fracionado}
+                  onAtivoChange={alternarFracionado}
+                  parcelas={parcelasForm}
+                  onChange={setParcelasForm}
+                />
+              )}
+              {(porCliente || !fracionado) && (
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="valor_mensal">Valor Mensal</Label>
-                    <Input
-                      id="valor_mensal"
-                      name="valor_mensal"
-                      placeholder="R$ 0,00"
-                      value={valorMensalTexto}
-                      onChange={(e) => setValorMensalTexto(maskBRLInput(e.target.value))}
-                      required
-                    />
-                  </div>
+                  {!porCliente ? (
+                    <div className="grid gap-2">
+                      <Label htmlFor="valor_mensal">Valor Mensal</Label>
+                      <Input
+                        id="valor_mensal"
+                        name="valor_mensal"
+                        placeholder="R$ 0,00"
+                        value={valorMensalTexto}
+                        onChange={(e) => setValorMensalTexto(maskBRLInput(e.target.value))}
+                        required
+                      />
+                    </div>
+                  ) : null}
                   <div className="grid gap-2">
                     <div className="flex items-center gap-1.5">
                       <Label htmlFor="dia_recebimento">Dia do Recebimento</Label>

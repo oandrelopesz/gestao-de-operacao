@@ -12,6 +12,7 @@ import { hasCached, setCached } from "@/lib/pageCache";
 import { carregarColunas as carregarColunasCrm, carregarEventos as carregarEventosCrm, carregarLeads as carregarLeadsCrm } from "@/lib/crmDados";
 import { emLotes } from "@/lib/aquecimento";
 import { hojeBrasilia } from "@/lib/entrega";
+import { enriquecerPorCliente } from "@/lib/financeiroPorClienteDados";
 import type { QueryClient } from "@tanstack/react-query";
 
 /**
@@ -149,7 +150,8 @@ export async function loadAcessos() {
 export async function loadFinanceiro() {
   const { data, error } = await supabase.from("financeiro_view" as any).select("*").order("nome");
   if (error) throw error;
-  return (data as any[]) || [];
+  // Fonte por cliente: valor do mês e lista de clientes vêm dos clientes da agência
+  return enriquecerPorCliente(((data as any[]) || []), hojeBrasilia().slice(0, 7));
 }
 
 /**

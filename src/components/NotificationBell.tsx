@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/clientes";
 import { hojeBrasilia } from "@/lib/entrega";
 import { parcelasParaAvisar } from "@/lib/financeiro";
+import { enriquecerPorCliente } from "@/lib/financeiroPorClienteDados";
 import { useNavigate } from "@tanstack/react-router";
 
 interface SaldoAlerta {
@@ -72,7 +73,8 @@ export function NotificationBell() {
       if (finError) throw finError;
 
       const hoje = hojeBrasilia();
-      const finAlertas = ((finData as any[]) || []).flatMap((fonte): FinanceiroAlerta[] =>
+      // Fonte por cliente: o valor do mês vem dos clientes da agência
+      const finAlertas = (await enriquecerPorCliente(((finData as any[]) || []), hoje.slice(0, 7))).flatMap((fonte): FinanceiroAlerta[] =>
         parcelasParaAvisar(fonte, hoje)
           .map((p) => ({
             id: p.total > 1 ? `${fonte.fonte_id}:${fonte.mes_atual}:${p.numero}` : fonte.fonte_id,
@@ -117,6 +119,7 @@ export function NotificationBell() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recargas' }, () => fetchAlertas())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'financeiro_fontes' }, () => fetchAlertas())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'financeiro_recebimentos' }, () => fetchAlertas())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'financeiro_fonte_clientes' }, () => fetchAlertas())
       .subscribe();
 
     return () => {
