@@ -43,6 +43,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ClientForm, ClientFormValues } from "@/components/ClientForm";
+import { PausaLoteDialog } from "@/components/PausaLoteDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useCachedState, hasCached } from "@/lib/pageCache";
 import { CACHE_KEYS, loadClientesView, loadClientesArquivados } from "@/lib/data";
@@ -293,6 +294,7 @@ function ClientesPage() {
   };
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pausaLote, setPausaLote] = useState<{ id: string; nome: string } | null>(null);
   const [deletingName, setDeletingName] = useState<string>("");
 
   return (
@@ -626,6 +628,7 @@ function ClientesPage() {
               onRestore={() => handleRestore(c.id)}
               onDelete={() => { setDeletingId(c.id); setDeletingName(c.nome); }}
               onToggleTrafego={() => handleToggleTrafego(c)}
+              onPausaLote={() => setPausaLote({ id: c.id, nome: c.nome })}
             />
           ))}
         </div>
@@ -690,7 +693,7 @@ function ClientesPage() {
                             <MoreVertical size={16} />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[140px]">
+                        <DropdownMenuContent align="end" className="w-[200px]">
                           {c.arquivado ? (
                             <DropdownMenuItem onClick={() => handleRestore(c.id)}>
                               <ArchiveRestore size={14} className="mr-2" /> Restaurar
@@ -702,6 +705,9 @@ function ClientesPage() {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleToggleTrafego(c)}>
                                 {c.trafego_ativo === false ? <><Play size={14} className="mr-2" /> Ativar tráfego</> : <><Pause size={14} className="mr-2" /> Pausar tráfego</>}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setPausaLote({ id: c.id, nome: c.nome })}>
+                                <Pause size={14} className="mr-2" /> Pausar/retomar plataformas
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleArchive(c.id)}>
                                 <Archive size={14} className="mr-2" /> Arquivar
@@ -745,6 +751,14 @@ function ClientesPage() {
         </DialogContent>
       </Dialog>
 
+      <PausaLoteDialog
+        clienteId={pausaLote?.id ?? null}
+        clienteNome={pausaLote?.nome ?? ""}
+        open={!!pausaLote}
+        onOpenChange={(o) => { if (!o) setPausaLote(null); }}
+        onDone={() => fetchClientes()}
+      />
+
       <AlertDialog open={!!deletingId} onOpenChange={(o) => { if (!o) setDeletingId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -781,7 +795,7 @@ function MetricCard({ icon, label, value, hint }: { icon: React.ReactNode; label
 }
 
 function ClienteCard({
-  cliente, borderColor, showAgenciaBadge, onEdit, onArchive, onRestore, onDelete, onToggleTrafego,
+  cliente, borderColor, showAgenciaBadge, onEdit, onArchive, onRestore, onDelete, onToggleTrafego, onPausaLote,
 }: {
   cliente: ClienteView;
   borderColor?: string;
@@ -791,6 +805,7 @@ function ClienteCard({
   onRestore: () => void;
   onDelete: () => void;
   onToggleTrafego: () => void;
+  onPausaLote: () => void;
 }) {
   const { meta: agenciaMetaOf, label: agenciaLabelOf } = useAgencias();
   const nps = NPS_STATUS_META[cliente.nps_status];
@@ -814,7 +829,7 @@ function ClienteCard({
               <MoreVertical size={16} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[140px]">
+          <DropdownMenuContent align="end" className="w-[200px]">
             {cliente.arquivado ? (
               <DropdownMenuItem onClick={onRestore}>
                 <ArchiveRestore size={14} className="mr-2" /> Restaurar
@@ -826,6 +841,9 @@ function ClienteCard({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onToggleTrafego}>
                   {cliente.trafego_ativo === false ? <><Play size={14} className="mr-2" /> Ativar tráfego</> : <><Pause size={14} className="mr-2" /> Pausar tráfego</>}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onPausaLote}>
+                  <Pause size={14} className="mr-2" /> Pausar/retomar plataformas
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onArchive}>
                   <Archive size={14} className="mr-2" /> Arquivar

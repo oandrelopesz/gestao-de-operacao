@@ -59,6 +59,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { SaldoAdsForm, SaldoAdsFormValues } from "@/components/SaldoAdsForm";
 import { RecargaForm, RecargaFormValues, RecargaConta } from "@/components/RecargaForm";
 import { RecargaLoteForm, type RecargaLoteValues } from "@/components/RecargaLoteForm";
+import { PausaLoteDialog } from "@/components/PausaLoteDialog";
 import { usePlataformas } from "@/lib/plataformas";
 import { ClientForm, ClientFormValues } from "@/components/ClientForm";
 import { cn } from "@/lib/utils";
@@ -207,6 +208,7 @@ function SaldoPage() {
   /** Conta cuja plataforma está sendo removida da operação (guardada além do diálogo para o texto não sumir ao fechar) */
   const [removendo, setRemovendo] = useState<SaldoRow | null>(null);
   const [confirmRemover, setConfirmRemover] = useState(false);
+  const [pausaLote, setPausaLote] = useState<{ id: string; nome: string } | null>(null);
   /** Impede duas remoções ao mesmo tempo: cada uma recarrega e regrava o cadastro do cliente */
   const [removendoAndamento, setRemovendoAndamento] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -833,6 +835,11 @@ function SaldoPage() {
                             <ArrowUpCircle size={14} className="mr-2" /> {group.plataformas.filter((p) => p.metodo_pagamento !== "cartao").length > 1 ? "Recarregar plataformas" : "Adicionar recarga"}
                           </DropdownMenuItem>
                         )}
+                        {hasMultiple && (
+                          <DropdownMenuItem onClick={() => setPausaLote({ id: group.cliente_id, nome: group.cliente_nome })}>
+                            <Pause size={14} className="mr-2" /> Pausar ou retomar plataformas
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => fetchHistory(group.plataformas[0], true)}>
                           <History size={14} className="mr-2" /> Histórico consolidado
@@ -1067,6 +1074,14 @@ function SaldoPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <PausaLoteDialog
+        clienteId={pausaLote?.id ?? null}
+        clienteNome={pausaLote?.nome ?? ""}
+        open={!!pausaLote}
+        onOpenChange={(o) => { if (!o) setPausaLote(null); }}
+        onDone={() => fetchSaldo(true)}
+      />
 
       <Dialog open={recargaModalOpen} onOpenChange={(o) => { setRecargaModalOpen(o); if (!o) setRecargaTarget(null); }}>
         <DialogContent className={recargaTarget?.lote ? "sm:max-w-[520px]" : "sm:max-w-[400px]"}>
