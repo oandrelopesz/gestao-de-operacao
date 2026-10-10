@@ -90,6 +90,8 @@ export type FinanceiroView = {
   forma_pagamento?: string | null;
   /** Primeiro mês cobrado ("YYYY-MM-DD", sempre dia 1) */
   cobranca_desde?: string | null;
+  /** Último mês cobrado ("YYYY-MM-DD"); preenchido = contrato encerrado */
+  cobranca_ate?: string | null;
   /** fixo (padrão) | por_cliente: o valor do mês vem dos clientes da agência */
   tipo_recebimento?: string | null;
   modelo_por_cliente?: string | null;
@@ -127,6 +129,9 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
   // Forma de pagamento do cliente (SEM_FORMA = não informada) e primeiro mês cobrado ("YYYY-MM")
   const [formaForm, setFormaForm] = useState<string>(SEM_FORMA);
   const [cobrancaDesdeForm, setCobrancaDesdeForm] = useState("");
+  // Encerrar contrato (freelancer): liga e o último mês cobrado ("YYYY-MM")
+  const [encerrarForm, setEncerrarForm] = useState(false);
+  const [cobrancaAteForm, setCobrancaAteForm] = useState("");
   // Recebimento fixo ou por cliente (modelo, fixo e valor padrão por cliente)
   const [recebimentoForm, setRecebimentoForm] = useState<TipoRecebimento>("fixo");
   const [modeloForm, setModeloForm] = useState<ModeloPorCliente>("fixo_variavel");
@@ -164,6 +169,8 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
       setValorFixoTexto(fonte?.valor_fixo ? textoDoValor(fonte.valor_fixo) : "");
       setValorPorClienteTexto(fonte?.valor_por_cliente ? textoDoValor(fonte.valor_por_cliente) : "");
       // Fonte nova começa a ser cobrada neste mês; fonte antiga sem o campo (cache de antes da migration) em setembro de 2026
+      setEncerrarForm(!!fonte?.cobranca_ate);
+      setCobrancaAteForm(String(fonte?.cobranca_ate ?? hojeBrasilia()).slice(0, 7));
       setCobrancaDesdeForm(String(fonte ? (fonte.cobranca_desde ?? COBRANCA_DESDE_PADRAO) : hojeBrasilia()).slice(0, 7));
     }
   }
@@ -211,6 +218,11 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
       toast.error(`Informe o mês e o ano (de ${ANO_COBRANCA_MIN} a ${ANO_COBRANCA_MAX}).`);
       return;
     }
+    const encerra = tipoForm === "freelancer" && encerrarForm;
+    if (encerra && (!/^\d{4}-(0[1-9]|1[0-2])$/.test(cobrancaAteForm) || cobrancaAteForm < cobrancaDesdeForm)) {
+      toast.error('O último mês cobrado precisa ser um mês válido, igual ou depois de "Cobrar a partir de".');
+      return;
+    }
     if (porCliente) {
       if (!agenciaForm) {
         toast.error("Escolha a agência: os clientes dela entram na conta.");
@@ -255,6 +267,7 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
       valor_por_cliente: porCliente ? parseBRLInput(valorPorClienteTexto) : null,
       forma_pagamento: formaDePagamento(formaForm),
       cobranca_desde: `${cobrancaDesdeForm}-01`,
+      cobranca_ate: encerra ? `${cobrancaAteForm}-01` : null,
       ativo: formData.get("ativo") === "on",
       observacoes: formData.get("observacoes") as string,
     };
@@ -481,6 +494,21 @@ export function FonteDialog({ aberto, onFechar, fonte, inicial, onSalvo }: Fonte
                   <Button type="button" variant="outline" size="sm" className="whitespace-normal text-left" onClick={() => setCobrancaDesdeForm(mesAtual)}>
                     {`Cobrar a partir de ${nomeDoMes(hoje)}`}
                   </Button>
+                </div>
+              )}
+              {tipoForm === "freelancer" && (
+                <div className="grid gap-2 rounded-md border bg-muted/30 p-3">
+                  <div className="flex items-center space-x-2">
+                    <Switch id="encerrar" checked={encerrarForm} onCheckedChange={setEncerrarForm} />
+                    <Label htmlFor="encerrar">Encerrar contrato</Label>
+                  </div>
+                  {encerrarForm && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="cobranca_ate">Último mês cobrado</Label>
+                      <Input id="cobranca_ate" type="month" min={cobrancaDesdeForm || undefined} max={`${ANO_COBRANCA_MAX}-12`} value={cobrancaAteForm} onChange={(e) => setCobrancaAteForm(e.target.value)} required />
+                      <p className="text-xs text-muted-foreground">Depois desse mês não cobra mais nem avisa. O que já foi cobrado e recebido continua no histórico.</p>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="flex items-center space-x-2 py-2">

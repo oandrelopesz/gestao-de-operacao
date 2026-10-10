@@ -27,6 +27,8 @@ export interface RegistroRecebimento {
 export interface FonteCobravel extends FonteDoMes {
   forma_pagamento?: string | null;
   cobranca_desde?: string | null;
+  /** Último mês cobrado ("YYYY-MM-DD"); depois dele o contrato está encerrado */
+  cobranca_ate?: string | null;
   parcelas?: { dia: number; valor: number; forma?: string | null }[] | null;
   /**
    * Fonte por cliente: o valor esperado de um mês ("YYYY-MM") ainda não acertado. Mês acertado segue congelado no
@@ -75,10 +77,12 @@ function proximoMes(mes: string): string {
 }
 
 /** "YYYY-MM" de cada mês de `desde` até o mês de `hoje` (inclusive). Data inválida ou de ano fora de 2020-2100 vale como setembro de 2026. */
-export function mesesCobrados(desde: string | null | undefined, hoje: string): string[] {
+export function mesesCobrados(desde: string | null | undefined, hoje: string, ate?: string | null): string[] {
   const pedido = String(desde ?? "").slice(0, 7);
   const inicio = mesDeCobrancaValido(pedido) ? pedido : COBRANCA_DESDE_PADRAO.slice(0, 7);
-  const fim = hoje.slice(0, 7);
+  // Contrato encerrado: o último mês cobrado é "cobranca_ate" (se vier antes de hoje)
+  const encerra = String(ate ?? "").slice(0, 7);
+  const fim = mesDeCobrancaValido(encerra) && encerra < hoje.slice(0, 7) ? encerra : hoje.slice(0, 7);
   const out: string[] = [];
   for (let mes = inicio; mes <= fim && out.length < 600; mes = proximoMes(mes)) out.push(mes);
   return out;
@@ -113,7 +117,7 @@ export function parcelasComForma(fonte: FonteCobravel) {
 export function cobrancasDaFonte(fonte: FonteCobravel, registros: RegistroRecebimento[], hoje: string): Cobranca[] {
   const parcelas = parcelasComForma(fonte);
   const out: Cobranca[] = [];
-  for (const mes of mesesCobrados(fonte.cobranca_desde, hoje)) {
+  for (const mes of mesesCobrados(fonte.cobranca_desde, hoje, fonte.cobranca_ate)) {
     parcelas.forEach((p, i) => {
       const numero = i + 1;
       const registro = registros.find((r) => r.mes_referencia.slice(0, 7) === mes && (r.parcela ?? 1) === numero) ?? null;

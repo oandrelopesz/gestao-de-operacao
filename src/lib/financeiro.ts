@@ -45,6 +45,8 @@ export interface FonteDoMes {
   recebimentos_mes?: RecebimentoMes[] | null;
   /** Primeiro mês cobrado ("YYYY-MM-DD"); antes dele a fonte está fora da cobrança. */
   cobranca_desde?: string | null;
+  /** Último mês cobrado ("YYYY-MM-DD"); depois dele o contrato está encerrado. null = em andamento. */
+  cobranca_ate?: string | null;
 }
 
 export interface ParcelaDoMes extends Parcela {
@@ -184,6 +186,7 @@ export function situacaoDoMes(fonte: FonteDoMes, hoje: string): SituacaoDoMes {
  */
 export function parcelasParaAvisar(fonte: FonteDoMes, hoje: string): ParcelaDoMes[] {
   if (fonte.cobranca_desde && String(fonte.cobranca_desde).slice(0, 7) > hoje.slice(0, 7)) return [];
+  if (fonte.cobranca_ate && String(fonte.cobranca_ate).slice(0, 7) < hoje.slice(0, 7)) return [];
   return situacaoDoMes(fonte, hoje).parcelas.filter((p) => (p.status === "pendente" || p.status === "atrasado") && p.falta > 0);
 }
 

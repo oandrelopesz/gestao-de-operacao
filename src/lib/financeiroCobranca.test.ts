@@ -181,3 +181,8 @@ test("valorDoMes (fonte por cliente): mês sem acerto usa o valor do mês; acert
   // sem a função, vale valor_mensal em todos os meses
   assert.equal(cobrancasDaFonte(unica, [], "2026-10-02")[1].valor, 1000);
 });
+
+test("mesesCobrados: contrato encerrado para no último mês cobrado; encerramento futuro não corta", () => {
+  assert.deepEqual(mesesCobrados("2026-08-01", "2026-11-05", "2026-10-01"), ["2026-08", "2026-09", "2026-10"]);
+  assert.deepEqual(mesesCobrados("2026-08-01", "2026-09-05", "2026-12-01"), ["2026-08", "2026-09"]);
+});

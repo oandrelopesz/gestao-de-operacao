@@ -367,14 +367,14 @@ function FinanceiroPage() {
       ...totaisDe(resumos.flatMap((r) => r.doMes)),
       atrasado: atrasado.total,
       atrasoDeMesesAnteriores: atrasado.itens.some((c) => c.mes < mesAtual),
-      fontes: resumos.length,
+      fontes: data.filter((f) => !(f.cobranca_ate && f.cobranca_ate.slice(0, 7) < mesAtual)).length,
       fontesCobradas: cobradas.length,
       fontesResolvidas: cobradas.filter((r) => r.situacao === "recebido" || r.situacao === "isento").length,
       fontesComIsencao: resumos.filter((r) => r.doMes.some((c) => c.situacao === "isento")).length,
       fontesEmAberto: resumos.filter((r) => r.doMes.some((c) => c.falta > 0)).length,
       fontesAtrasadas: resumos.filter((r) => r.atrasado.total > 0).length,
     };
-  }, [porFonte, mesAtual]);
+  }, [porFonte, data, mesAtual]);
 
   const marcarOcupada = (fonteId: string, ocupada: boolean) => {
     const proximas = new Set(ocupadasRef.current);
@@ -753,6 +753,9 @@ function FinanceiroPage() {
                         <CardTitle className="min-w-0 max-w-full text-base font-bold truncate">{fonte.nome}</CardTitle>
                         <TipoBadge tipo={fonte.tipo} agenciaId={fonte.agencia_id} className="text-[9px] py-0 px-1.5 h-4" />
                         <FormaBadge forma={formaDePagamento(fonte.forma_pagamento)} className="text-[9px] py-0 px-1.5 h-4" />
+                        {fonte.cobranca_ate && fonte.cobranca_ate.slice(0, 7) < mesAtual && (
+                          <Badge variant="outline" className="text-[9px] py-0 px-1.5 h-4 text-zinc-500">Contrato encerrado</Badge>
+                        )}
                       </div>
                     </div>
                     <DropdownMenu>
