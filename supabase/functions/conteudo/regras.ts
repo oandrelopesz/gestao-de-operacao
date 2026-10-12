@@ -81,7 +81,8 @@ const NOME_LOGO = /^logo_(principal|icone|clara|escura)$/;
 
 /** Imagem cinza usada na prévia dos moldes. */
 export const IMAGEM_EXEMPLO = `data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${LARGURA}" height="${ALTURA}"><rect width="100%" height="100%" fill="#9ca3af"/><text x="50%" y="50%" font-family="sans-serif" font-size="64" fill="#f3f4f6" text-anchor="middle">foto</text></svg>`,
+  // Tons do claro ao escuro, para logo ou texto posto sobre a foto aparecer como problema já na prévia do molde
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${LARGURA}" height="${ALTURA}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f5efe6"/><stop offset=".35" stop-color="#c9a46a"/><stop offset=".65" stop-color="#5b6f8c"/><stop offset="1" stop-color="#151515"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><text x="50%" y="50%" font-family="sans-serif" font-size="64" fill="#ffffff" text-anchor="middle">foto</text></svg>`,
 )}`;
 
 export function escaparHtml(s: string): string {
