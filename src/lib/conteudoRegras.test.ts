@@ -4,8 +4,15 @@ import {
   AGENDA_PADRAO, ARQUIVO_LOG, DIRECAO_ARTE, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre,
   faltaParaGerar, fontesDoCofre, fontFace, pesoDoNome, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
   esperaDoCloudflare, mudancasCofre, remontarComMolde, pilaresDaSemana, normalizarNome, notaDoKit, pilaresDaNota, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
-  usosDeFotos, validarMolde, varianteDoNome, moldesEmUso,
+  usosDeFotos, validarMolde, varianteDoNome, moldesEmUso, logosComReserva,
 } from "../../supabase/functions/conteudo/regras.ts";
+
+test("logosComReserva: variante que o cliente não tem usa a principal (ou a que houver), nunca fica vazia", () => {
+  assert.deepEqual(logosComReserva({ logo_principal: "P" }), { logo_principal: "P", logo_icone: "P", logo_clara: "P", logo_escura: "P" });
+  assert.deepEqual(logosComReserva({ logo_clara: "C", logo_principal: "P" }), { logo_principal: "P", logo_icone: "P", logo_clara: "C", logo_escura: "P" });
+  assert.deepEqual(logosComReserva({ logo_escura: "E" }), { logo_principal: "E", logo_icone: "E", logo_clara: "E", logo_escura: "E" });
+  assert.deepEqual(logosComReserva({}), {});
+});
 import type {
   Alteracao, CampoMolde, Lamina, Molde, Moldes, RespostaTexto, TipoMolde,
 } from "../../supabase/functions/conteudo/regras.ts";

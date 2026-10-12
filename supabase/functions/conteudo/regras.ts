@@ -30,6 +30,16 @@ export const ARQUIVO_LOG = "Log (60 dias)";
 export const LEGENDA_MAX = 2200;
 
 export interface Logo { variante: VarianteLogo; chave: string; largura: number; altura: number }
+
+/**
+ * Molde aprovado pode pedir uma variante que o cliente não tem mais (trocou ou removeu a logo): sem reserva a imagem
+ * sai quebrada no post. A variante que falta usa a principal ou, sem ela, a primeira que houver.
+ */
+export function logosComReserva(logos: Record<string, string>): Record<string, string> {
+  const reserva = logos.logo_principal ?? VARIANTES_LOGO.map((v) => logos[`logo_${v}`]).find(Boolean);
+  if (!reserva) return { ...logos };
+  return Object.fromEntries(VARIANTES_LOGO.map((v) => [`logo_${v}`, logos[`logo_${v}`] ?? reserva]));
+}
 export interface Fonte { familia: string; origem: "google" | "fontshare" | "arquivo"; chave?: string; peso?: number }
 export interface Pilar { nome: string; descricao: string }
 /** dia: 0 = domingo ... 6 = sábado (como no GMN); hora "HH:MM" de Brasília. */

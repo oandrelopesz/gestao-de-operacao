@@ -1,7 +1,7 @@
 // Montagem das lâminas: recursos do cliente (fontes e logos embutidas como data:, sem depender de CORS) e o HTML final.
 import { base64, dataUri, ler } from "./arquivos.ts";
 import { cssFontshare, cssGoogle } from "./render.ts";
-import { extensaoFonte, fontFace, htmlParaRender, preencherMolde, type CampoMolde, type Fonte, type Logo } from "./regras.ts";
+import { extensaoFonte, fontFace, htmlParaRender, logosComReserva, preencherMolde, type CampoMolde, type Fonte, type Logo } from "./regras.ts";
 
 /** cssFontes: @font-face e CSS do Google; logos: logo_<variante> → data: */
 export interface Recursos { cssFontes: string; logos: Record<string, string> }
@@ -20,7 +20,7 @@ export async function carregarRecursos(c: { fontes: Fonte[]; logos: Logo[] }): P
   }
   const logos: Record<string, string> = {};
   for (const l of c.logos ?? []) logos[`logo_${l.variante}`] = await dataUri(l.chave);
-  return { cssFontes: css.join("\n"), logos };
+  return { cssFontes: css.join("\n"), logos: logosComReserva(logos) };
 }
 
 export function montarLamina(html: string, campos: CampoMolde[], valores: Record<string, string>, r: Recursos, ajusteCss?: string): string {
