@@ -1,5 +1,5 @@
 // HTML para JPG pelo Cloudflare Browser Rendering (API REST de screenshot) e o CSS das fontes do Google.
-import { ALTURA, LARGURA } from "./regras.ts";
+import { ALTURA, LARGURA, slugFontshare, type Fonte } from "./regras.ts";
 
 /** Limite de uso do Cloudflare (429): a montagem espera e tenta de novo, sem contar como tentativa. */
 export class LimiteCloudflare extends Error {}
@@ -42,4 +42,26 @@ export async function cssGoogle(familia: string): Promise<string> {
     await r.body?.cancel();
   }
   throw new Error(`A fonte "${familia}" não existe no Google Fonts.`);
+}
+
+/** CSS das fontes do Fontshare. A API devolve 200 mesmo para nome inexistente, então só vale o corpo com @font-face. */
+export async function cssFontshare(familia: string): Promise<string> {
+  const slug = slugFontshare(familia);
+  for (const pesos of ["@300,400,500,600,700", "@400,700", "@1"]) {
+    const r = await fetch(`https://api.fontshare.com/v2/css?f[]=${slug}${pesos}&display=block`, { signal: AbortSignal.timeout(15_000) });
+    if (!r.ok) { await r.body?.cancel(); continue; }
+    const css = await r.text();
+    // as URLs vêm sem protocolo (//cdn...); no HTML do render, sem origem, elas não carregam
+    if (css.includes("@font-face")) return css.replace(/url\((['"]?)\/\//g, "url($1https://");
+  }
+  throw new Error(`A fonte ${familia} não existe no Fontshare.`);
+}
+
+/** Primeira fonte que existe: para cada nome tenta Google e depois Fontshare. */
+export async function resolverFonte(familia: string, reservas: string[]): Promise<Fonte | null> {
+  for (const nome of [familia, ...reservas]) {
+    try { await cssGoogle(nome); return { familia: nome, origem: "google" }; } catch { /* tenta o próximo */ }
+    try { await cssFontshare(nome); return { familia: nome, origem: "fontshare" }; } catch { /* tenta o próximo */ }
+  }
+  return null;
 }

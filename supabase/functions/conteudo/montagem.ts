@@ -1,6 +1,6 @@
 // Montagem das lâminas: recursos do cliente (fontes e logos embutidas como data:, sem depender de CORS) e o HTML final.
 import { base64, dataUri, ler } from "./arquivos.ts";
-import { cssGoogle } from "./render.ts";
+import { cssFontshare, cssGoogle } from "./render.ts";
 import { extensaoFonte, fontFace, htmlParaRender, preencherMolde, type CampoMolde, type Fonte, type Logo } from "./regras.ts";
 
 /** cssFontes: @font-face e CSS do Google; logos: logo_<variante> → data: */
@@ -10,6 +10,7 @@ export async function carregarRecursos(c: { fontes: Fonte[]; logos: Logo[] }): P
   const css: string[] = [];
   for (const f of c.fontes ?? []) {
     if (f.origem === "google") css.push(await cssGoogle(f.familia));
+    else if (f.origem === "fontshare") css.push(await cssFontshare(f.familia));
     else if (f.chave) {
       const ext = extensaoFonte(f.chave);
       if (!ext) continue;
