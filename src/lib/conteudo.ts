@@ -114,8 +114,9 @@ export const cofrePastas = () => chamar<{ pastas: string[]; sincronizado_em: str
 export const cofreArquivos = (pasta: string) =>
   chamar<{ arquivos: { caminho: string; conteudo: string }[]; total: number; sincronizado_em: string | null }>({ acao: "cofre_ler", pasta });
 export const lerPastasDrive = (clienteId: string) => chamar<{ pastas: PastaDrive[] }>({ acao: "drive_pastas", cliente_id: clienteId });
-export const kitDoCofre = (clienteId: string) =>
-  chamar<{ kit: { fontes: number; logos: number; pilares: number; conta: boolean; drive: boolean; avisos: string[] } }>({ acao: "kit_do_cofre", cliente_id: clienteId });
+/** Com soFontes, o servidor devolve só `kit.fontes` e `kit.avisos`. */
+export const kitDoCofre = (clienteId: string, soFontes = false) =>
+  chamar<{ kit: { fontes: number; logos?: number; pilares?: number; conta?: boolean; drive?: boolean; avisos: string[] } }>({ acao: "kit_do_cofre", cliente_id: clienteId, so_fontes: soFontes });
 
 // ------------------------------------------------------------------ moldes
 

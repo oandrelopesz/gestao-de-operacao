@@ -77,6 +77,11 @@ export function AbaKit({ cliente, recarregar }: { cliente: ClienteConteudo; reca
     toast.success(`Kit puxado: ${kit.fontes} fontes, ${kit.logos} logos, ${kit.pilares} pilares${kit.conta ? ", conta do Instagram" : ""}${kit.drive ? ", Drive" : ""}.`);
     kit.avisos.forEach((a) => toast.warning(a));
   });
+  const puxarFontes = () => fazer("fontes", async () => {
+    const { kit } = await kitDoCofre(cliente.id, true);
+    toast.success("Fontes atualizadas do cofre.");
+    kit.avisos.forEach((a) => toast.warning(a));
+  });
   const lerDrive =() => fazer("drive", async () => {
     await salvarCliente(cliente.id, { drive_url: f.drive_url.trim() });
     const r = await lerPastasDrive(cliente.id);
@@ -148,10 +153,15 @@ export function AbaKit({ cliente, recarregar }: { cliente: ClienteConteudo; reca
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-medium">Fontes</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium">Fontes</h3>
+          <Button variant="ghost" size="sm" onClick={puxarFontes} disabled={!!ocupado}>
+            {ocupado === "fontes" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FolderSync className="mr-1 h-4 w-4" />}Puxar do cofre
+          </Button>
+        </div>
         {cliente.fontes.map((fonte, i) => (
           <div key={`${fonte.familia}-${i}`} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
-            <span>{fonte.familia}{fonte.peso ? ` ${fonte.peso}` : ""} ({fonte.origem === "google" ? "Google Fonts" : fonte.origem === "fontshare" ? "Fontshare" : "arquivo"})</span>
+            <span>{fonte.familia}{fonte.peso ? ` ${fonte.peso}` : ""} ({fonte.origem === "google" ? "Google Fonts" : fonte.origem === "fontshare" ? "Fontshare" : fonte.chave?.startsWith("instagram/conteudo/cofre/") ? "arquivo do cofre" : "arquivo"})</span>
             <Button variant="ghost" size="icon" aria-label={`Remover fonte ${fonte.familia}`} onClick={() => removerFonte(i)}><Trash2 className="h-4 w-4" /></Button>
           </div>
         ))}
