@@ -1,5 +1,5 @@
 // HTML para JPG pelo Cloudflare Browser Rendering (API REST de screenshot) e o CSS das fontes do Google.
-import { ALTURA, LARGURA, slugFontshare, type Fonte } from "./regras.ts";
+import { ALTURA, LARGURA, esperaDoCloudflare, slugFontshare, type Fonte } from "./regras.ts";
 
 /** Limite de uso do Cloudflare (429): a montagem espera e tenta de novo, sem contar como tentativa. */
 export class LimiteCloudflare extends Error {}
@@ -9,18 +9,27 @@ export const cloudflareConfigurado = () => !!Deno.env.get("CLOUDFLARE_ACCOUNT_ID
 export async function renderizar(html: string): Promise<Uint8Array> {
   if (!cloudflareConfigurado()) throw new Error("Faltam os secrets CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_BROWSER_TOKEN.");
   const conta = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
-  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${conta}/browser-rendering/screenshot`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${Deno.env.get("CLOUDFLARE_BROWSER_TOKEN")}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      html,
-      viewport: { width: LARGURA, height: ALTURA },
-      screenshotOptions: { type: "jpeg", quality: 90 },
-      gotoOptions: { waitUntil: "load", timeout: 30000 },
-      waitForSelector: { selector: "body[data-pronto]", timeout: 20000 },
-    }),
-    signal: AbortSignal.timeout(60_000),
+  const corpoPedido = JSON.stringify({
+    html,
+    viewport: { width: LARGURA, height: ALTURA },
+    screenshotOptions: { type: "jpeg", quality: 90 },
+    gotoOptions: { waitUntil: "load", timeout: 30000 },
+    waitForSelector: { selector: "body[data-pronto]", timeout: 20000 },
   });
+  for (let tentativa = 0; ; tentativa++) {
+    const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${conta}/browser-rendering/screenshot`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${Deno.env.get("CLOUDFLARE_BROWSER_TOKEN")}`, "Content-Type": "application/json" },
+      body: corpoPedido,
+      signal: AbortSignal.timeout(60_000),
+    });
+    const espera = r.status === 429 ? esperaDoCloudflare(r.headers.get("retry-after"), tentativa) : 0;
+    if (espera) { await r.body?.cancel(); await new Promise((ok) => setTimeout(ok, espera)); continue; }
+    return await respostaDoRender(r);
+  }
+}
+
+async function respostaDoRender(r: Response): Promise<Uint8Array> {
   const tipo = r.headers.get("content-type") ?? "";
   if (r.ok && tipo.startsWith("image/")) return new Uint8Array(await r.arrayBuffer());
   const corpo = await r.text().catch(() => "");

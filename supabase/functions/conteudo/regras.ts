@@ -305,6 +305,12 @@ export function recortarLog(texto: string, hoje: string, dias = 60): string {
 }
 
 /** Contexto do cliente para a IA: nota central, Log recente e documentos, nessa ordem, até `limite` caracteres. */
+/** Quanto esperar num 429 do Cloudflare: o limite por minuto do plano grátis (1 captura a cada 10 s) pede poucos segundos; espera até 3 vezes. 0 = desistir (limite longo). */
+export function esperaDoCloudflare(retryAfter: string | null, tentativa: number): number {
+  const s = Number(retryAfter);
+  return tentativa < 3 && s > 0 && s <= 15 ? s * 1000 : 0;
+}
+
 /** Nota do kit pelo nome do arquivo, ignorando hífen, espaço e acento ("R-Salon-Design-System.md"). */
 export function notaDoKit(caminho: string): "design_system" | "tom_de_voz" | "pilares" | null {
   if (!caminho.toLowerCase().endsWith(".md")) return null;

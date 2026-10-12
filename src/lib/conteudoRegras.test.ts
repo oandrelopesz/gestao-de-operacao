@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   AGENDA_PADRAO, ARQUIVO_LOG, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre,
   faltaParaGerar, fontesDoCofre, fontFace, pesoDoNome, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
-  mudancasCofre, normalizarNome, notaDoKit, pilaresDaNota, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
+  esperaDoCloudflare, mudancasCofre, normalizarNome, notaDoKit, pilaresDaNota, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
   usosDeFotos, validarMolde, varianteDoNome,
 } from "../../supabase/functions/conteudo/regras.ts";
 import type {
@@ -317,4 +317,12 @@ test("fontesDoCofre: prefixo da família, sem itálico, um por peso (woff2 prime
   ]);
   assert.deepEqual(fontesDoCofre("Clash Display", [a("Anexos/ClashDisplay-Bold.woff2")]).map((f) => f.peso), [700]);
   assert.deepEqual(fontesDoCofre("Inter", [a("Anexos/Satoshi-Bold.woff2")]), []);
+});
+
+test("esperaDoCloudflare: espera curta do limite por minuto, desiste no limite longo ou depois de 3 vezes", () => {
+  assert.equal(esperaDoCloudflare("10", 0), 10_000);
+  assert.equal(esperaDoCloudflare("10", 2), 10_000);
+  assert.equal(esperaDoCloudflare("10", 3), 0);
+  assert.equal(esperaDoCloudflare("3600", 0), 0);
+  assert.equal(esperaDoCloudflare(null, 0), 0);
 });
