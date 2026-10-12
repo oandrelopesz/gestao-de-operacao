@@ -10,7 +10,7 @@ import {
 } from "../../supabase/functions/conteudo/regras.ts";
 
 export interface ClienteConteudo {
-  id: string; cliente_id: string; pasta_cofre: string | null; ig_conta_id: string | null; ativo: boolean; logos: Logo[];
+  id: string; cliente_id: string; pasta_cofre: string | null; ig_conta_id: string | null; ativo: boolean; oculto: boolean; logos: Logo[];
   tom_de_voz: string; design_system: string; fontes: Fonte[]; saude: boolean; ia_pode_pessoas: boolean; drive_url: string;
   drive_pastas: PastaDrive[]; pilares: Pilar[]; agenda: ItemAgenda[]; moldes: Moldes; created_at: string; updated_at: string;
   clientes: { nome: string } | null;
@@ -71,6 +71,21 @@ export async function desligarCliente(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Oculta ou mostra clientes: atualiza as linhas que já existem; ocultar cria a linha de quem ainda não tem. */
+export async function ocultarClientes(ids: string[], oculto: boolean, linhas: ClienteConteudo[]): Promise<void> {
+  const comLinha = new Set(linhas.map((l) => l.cliente_id));
+  const existentes = ids.filter((id) => comLinha.has(id));
+  const novos = ids.filter((id) => !comLinha.has(id));
+  if (existentes.length) {
+    const { error } = await clientesTab().update({ oculto, updated_at: new Date().toISOString() }).in("cliente_id", existentes);
+    if (error) throw error;
+  }
+  if (oculto && novos.length) {
+    const { error } = await clientesTab().insert(novos.map((cliente_id) => ({ cliente_id, oculto: true })));
+    if (error) throw error;
+  }
+}
+
 async function medidas(b: Blob): Promise<{ largura: number; altura: number }> {
   const img = await createImageBitmap(b);
   const m = { largura: img.width, altura: img.height };
@@ -99,6 +114,8 @@ export const cofrePastas = () => chamar<{ pastas: string[]; sincronizado_em: str
 export const cofreArquivos = (pasta: string) =>
   chamar<{ arquivos: { caminho: string; conteudo: string }[]; total: number; sincronizado_em: string | null }>({ acao: "cofre_ler", pasta });
 export const lerPastasDrive = (clienteId: string) => chamar<{ pastas: PastaDrive[] }>({ acao: "drive_pastas", cliente_id: clienteId });
+export const kitDoCofre = (clienteId: string) =>
+  chamar<{ kit: { fontes: number; logos: number; pilares: number; conta: boolean; drive: boolean; avisos: string[] } }>({ acao: "kit_do_cofre", cliente_id: clienteId });
 
 // ------------------------------------------------------------------ moldes
 
