@@ -26,7 +26,7 @@ import { ESQUEMA_AJUSTE, ESQUEMA_KIT, SYSTEM_KIT, promptAjuste } from "./prompts
 import { cloudflareConfigurado, resolverFonte } from "./render.ts";
 import {
   AGENDA_PADRAO, ErroHttp, LEGENDA_MAX, aplicarAlteracoes, casarConta, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre, faltaParaGerar, fontesDoCofre, linkDrive,
-  montarContexto, postsDaSemana, segundaDaSemana, varianteDoNome, type Alteracao, type Fonte, type Logo, type Pilar,
+  montarContexto, notaDoKit, postsDaSemana, segundaDaSemana, varianteDoNome, type Alteracao, type Fonte, type Logo, type Pilar,
 } from "./regras.ts";
 
 const cors = {
@@ -38,7 +38,6 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 const agora = () => new Date().toISOString();
 const texto = (v: unknown, max: number) => typeof v === "string" && v.length > 0 && v.length <= max;
-const DO_KIT = /design system|tom[\s_-]*de[\s_-]*voz/i;
 
 function chaveDoCofre(req: Request): boolean {
   const chave = Deno.env.get("COFRE_SYNC_KEY") ?? "";
@@ -50,16 +49,15 @@ function chaveDoCofre(req: Request): boolean {
 }
 
 async function cofreHashes(sb: any) {
-  const { data: ligados, error } = await sb.from("conteudo_clientes").select("pasta_cofre").not("pasta_cofre", "is", null);
-  if (error) throw new Error(error.message);
-  const pastas = [...new Set((ligados ?? []).map((x: any) => x.pasta_cofre as string))];
+  // Todas as pastas: qualquer cliente pode ser ligado e puxar o kit na hora
   const hashes: Record<string, Record<string, string>> = {};
-  if (pastas.length) {
-    const { data, error: e2 } = await sb.from("conteudo_cofre").select("pasta, caminho, hash").in("pasta", pastas);
-    if (e2) throw new Error(e2.message);
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await sb.from("conteudo_cofre").select("pasta, caminho, hash").neq("pasta", "").order("pasta").order("caminho").range(de, de + 999);
+    if (error) throw new Error(error.message);
     for (const r of data ?? []) (hashes[r.pasta] ??= {})[r.caminho] = r.hash;
+    if ((data ?? []).length < 1000) break;
   }
-  return { pastas, hashes };
+  return { pastas: Object.keys(hashes), hashes };
 }
 
 async function cofreSync(sb: any, corpo: any) {
@@ -106,7 +104,7 @@ async function cofreLer(sb: any, pasta: string | null) {
   if (e2) throw new Error(e2.message);
   const linhas = data ?? [];
   return {
-    arquivos: linhas.filter((l: any) => l.caminho.endsWith(".md") && !l.caminho.startsWith("Anexos/") && DO_KIT.test(l.caminho.split("/").pop() ?? "")).map((l: any) => ({ caminho: l.caminho, conteudo: l.conteudo })),
+    arquivos: linhas.filter((l: any) => notaDoKit(l.caminho)).map((l: any) => ({ caminho: l.caminho, conteudo: l.conteudo })),
     total: linhas.length,
     sincronizado_em,
   };
@@ -120,10 +118,9 @@ async function kitDoCofre(sb: any, clienteId: string, soFontes = false) {
   const { data: linhas, error: e2 } = await sb.from("conteudo_cofre").select("caminho, conteudo").eq("pasta", c.pasta_cofre);
   if (e2) throw new Error(e2.message);
   if (!linhas?.length) throw new ErroHttp(400, "O cofre deste cliente ainda não foi sincronizado.");
-  const notas = linhas.filter((l: any) => l.caminho.endsWith(".md") && !l.caminho.startsWith("Anexos/"));
-  const nota = (re: RegExp) => notas.find((l: any) => re.test((l.caminho.split("/").pop() ?? "").toLowerCase()));
-  const ds = nota(/design system/);
-  const tomNota = nota(/tom de voz/);
+  const notas = linhas.filter((l: any) => l.caminho.endsWith(".md"));
+  const ds = linhas.find((l: any) => notaDoKit(l.caminho) === "design_system");
+  const tomNota = linhas.find((l: any) => notaDoKit(l.caminho) === "tom_de_voz");
   // so_fontes: sem Claude, os papéis são as famílias que o cliente já tem
   const r = soFontes
     ? { tom_de_voz: "", fontes: (c.fontes ?? []).map((f: Fonte) => ({ familia: f.familia, reservas: [] as string[] })), pilares: [] as Pilar[], saude: false }
@@ -229,10 +226,15 @@ async function ajustar(sb: any, postId: string, pedido: string) {
   if (error) throw new Error(error.message);
   if (!post) throw new ErroHttp(404, "Post não encontrado.");
   if (post.status !== "aguardando") throw new ErroHttp(409, "O post não está aguardando aprovação.");
-  const { data: c, error: e2 } = await sb.from("conteudo_clientes").select("moldes, drive_pastas").eq("id", post.conteudo_cliente_id).single();
+  const { data: c, error: e2 } = await sb.from("conteudo_clientes").select("moldes, drive_pastas, pasta_cofre").eq("id", post.conteudo_cliente_id).single();
   if (e2) throw new Error(e2.message);
+  const { data: arquivos } = c.pasta_cofre ? await sb.from("conteudo_cofre").select("caminho, conteudo").eq("pasta", c.pasta_cofre) : { data: [] };
+  const contexto = montarContexto(arquivos ?? []);
   const m = promptAjuste({ laminas: post.laminas, legenda: post.legenda, moldes: c.moldes, pastas: c.drive_pastas ?? [], pedido });
-  const r = await gerarJson<{ resposta: string; alteracoes: Alteracao[] }>({ system: m.system, conteudo: m.user, esquema: ESQUEMA_AJUSTE, esforco: "low" });
+  const conteudo = contexto
+    ? [{ type: "text", text: `Contexto do cliente (cofre do Obsidian):\n\n${contexto}`, cache_control: { type: "ephemeral" } }, { type: "text", text: m.user }]
+    : m.user;
+  const r = await gerarJson<{ resposta: string; alteracoes: Alteracao[] }>({ system: m.system, conteudo, esquema: ESQUEMA_AJUSTE, esforco: "low" });
   const novo = aplicarAlteracoes(post.laminas, post.legenda, r.alteracoes);
   if (novo.legenda.length > LEGENDA_MAX) throw new ErroHttp(400, `A legenda ficaria com ${novo.legenda.length} caracteres (máximo ${LEGENDA_MAX}); peça uma mais curta.`);
   const remontar = novo.laminas.some((l) => !l.jpg_chave);

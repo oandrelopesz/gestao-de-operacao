@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   AGENDA_PADRAO, ARQUIVO_LOG, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre,
   faltaParaGerar, fontesDoCofre, fontFace, pesoDoNome, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
-  mudancasCofre, normalizarNome, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
+  mudancasCofre, normalizarNome, notaDoKit, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
   usosDeFotos, validarMolde, varianteDoNome,
 } from "../../supabase/functions/conteudo/regras.ts";
 import type {
@@ -86,14 +86,25 @@ test("recortarLog fica só com os últimos 60 dias", () => {
   assert.equal(recortarLog(log, "2026-10-12"), "### 2026-09-01\n- recente (memória)\n\n### 2026-10-10\n- novo (memória)");
 });
 
-test("montarContexto: nota central, Log, documentos; corta no limite", () => {
+test("montarContexto: raiz, documentos do negócio, Log e o resto; corta cada nota e o total", () => {
   const r = montarContexto([
-    { caminho: "Documentos/B.md", conteudo: "b" }, { caminho: ARQUIVO_LOG, conteudo: "log" },
-    { caminho: "Kobe.md", conteudo: "central" }, { caminho: "Documentos/A.md", conteudo: "a" },
+    { caminho: "Documentos/Dossie GBP.md", conteudo: "d" }, { caminho: ARQUIVO_LOG, conteudo: "log" },
+    { caminho: "Documentos/R-Salon-Personas.md", conteudo: "p" }, { caminho: "Kobe.md", conteudo: "central" },
+    { caminho: "Documentos/R-Salon-ICP.md", conteudo: "i" },
   ]);
-  assert.equal(r, "=== Kobe.md ===\ncentral\n\n=== Log (60 dias) ===\nlog\n\n=== Documentos/A.md ===\na\n\n=== Documentos/B.md ===\nb");
+  assert.equal(r, "=== Kobe.md ===\ncentral\n\n=== Documentos/R-Salon-ICP.md ===\ni\n\n=== Documentos/R-Salon-Personas.md ===\np\n\n=== Log (60 dias) ===\nlog\n\n=== Documentos/Dossie GBP.md ===\nd");
+  const grande = montarContexto([{ caminho: "X.md", conteudo: "a".repeat(70_000) }]);
+  assert.ok(grande.length < 61_000 && grande.endsWith("(nota cortada)"));
   assert.ok(montarContexto([{ caminho: "X.md", conteudo: "1234567890" }], 12).length <= 12);
   assert.equal(montarContexto([]), "");
+});
+
+test("notaDoKit acha design system e tom de voz com hífen, espaço ou acento", () => {
+  assert.equal(notaDoKit("Documentos/R-Salon-Design-System.md"), "design_system");
+  assert.equal(notaDoKit("Documentos/Design System (Kobe Growth).md"), "design_system");
+  assert.equal(notaDoKit("Documentos/Tom-de-Voz.md"), "tom_de_voz");
+  assert.equal(notaDoKit("Documentos/R-Salon-ICP.md"), null);
+  assert.equal(notaDoKit("Documentos/Design System.png"), null);
 });
 
 test("mudancasCofre envia novos e mudados, remove os que sumiram", () => {

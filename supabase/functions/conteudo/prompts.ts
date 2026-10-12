@@ -54,7 +54,7 @@ export const ESQUEMA_KIT = objeto({
   saude: { type: "boolean" },
 });
 
-export const SYSTEM_KIT = "Você monta o kit de marca de um cliente de agência para posts de Instagram, só com o que está no cofre do cliente. tom_de_voz: de 4 a 8 linhas práticas de como escrever para o público do cliente (vocabulário, nível de formalidade, o que evitar, frase da marca se houver). fontes: as famílias citadas no design system, na ordem título, texto e números, cada uma com as reservas que o próprio design system indicar; nunca invente fonte que o cofre não cita; sem design system com fonte, lista vazia. pilares: de 3 a 5 pilares de conteúdo para o Instagram, a partir do negócio, do público e do método do cliente, com uma descrição curta. saude: true só se o cliente for clínica, consultório, médico, dentista, estética médica ou outra área regulada pelo CFM ou pelo CFO.";
+export const SYSTEM_KIT = "Você monta o kit de marca de um cliente de agência para posts de Instagram, só com o que está no cofre do cliente; nunca invente informação que o cofre não traz. tom_de_voz: de 4 a 8 linhas práticas de como escrever para o público do cliente (vocabulário, nível de formalidade, o que evitar, frase da marca se houver). fontes: as famílias citadas no design system, na ordem título, texto e números, cada uma com as reservas que o próprio design system indicar; nunca invente fonte que o cofre não cita; sem design system com fonte, lista vazia. pilares: de 3 a 5 pilares de conteúdo para o Instagram, a partir do negócio, do público e do método do cliente, com uma descrição curta. saude: true só se o cliente for clínica, consultório, médico, dentista, estética médica ou outra área regulada pelo CFM ou pelo CFO.";
 
 export interface Mensagens { system: string; user: string }
 
@@ -104,7 +104,8 @@ export function promptTexto(o: {
 }): { system: string; pedido: string } {
   const system = [
     "Você é social media sênior e escreve posts de Instagram para o cliente do contexto, em português do Brasil, no tom de voz dele.",
-    "Use só fatos do contexto do cliente; nunca invente preço, número, depoimento, prêmio, prazo ou promessa.",
+    "Use só fatos do contexto do cliente. Nunca invente preço, valor, número, estatística, depoimento, nome de cliente ou de pessoa, prêmio, prazo, endereço, telefone, horário, serviço ou produto que o cliente não oferece, promoção ou promessa. Se faltar um dado, escreva sem ele.",
+    "Chamada para ação só com os canais de contato que aparecem no contexto (WhatsApp, link na bio, direct, telefone); sem canal no contexto, use \"chama no direct\".",
     "Respeite o limite de caracteres de cada campo e preencha todos os campos de texto do molde de cada lâmina, e só eles.",
     "Legenda: gancho na primeira linha, desenvolve o tema, fecha com chamada para ação e até 5 hashtags relevantes; até 2.200 caracteres.",
     ...(o.saude ? ["Cliente da área da saúde: siga as regras do CFM e do CFO. Sem promessa de resultado, cura, antes e depois, preço, promoção, desconto, brinde ou superlativo (o melhor, o único, número 1)."] : []),
@@ -132,6 +133,7 @@ export function promptTexto(o: {
 export function promptAjuste(o: { laminas: Lamina[]; legenda: string; moldes: Moldes; pastas: PastaDrive[]; pedido: string }): Mensagens {
   const system = [
     "Você ajusta um post de Instagram já montado, conforme o pedido do dono da agência. Mude só o que foi pedido.",
+    "Use só fatos do contexto do cliente. Se o pedido exigir um dado que não está no contexto (preço, número, endereço, telefone, horário, nome), não invente: não faça essa parte e diga em resposta qual dado faltou.",
     "Responda com a lista de alterações (os campos que não se aplicam ficam null):",
     "- campo: troca o texto de um campo de uma lâmina (lamina = número da lâmina, começando em 1; campo = nome do campo; valor = texto novo, dentro do limite);",
     "- imagem: troca a foto de uma lâmina (descricao = o que a nova foto deve mostrar; pasta_id = id da subpasta do Drive que combina, ou null);",

@@ -305,12 +305,30 @@ export function recortarLog(texto: string, hoje: string, dias = 60): string {
 }
 
 /** Contexto do cliente para a IA: nota central, Log recente e documentos, nessa ordem, até `limite` caracteres. */
-export function montarContexto(arquivos: { caminho: string; conteudo: string }[], limite = 100_000): string {
-  const peso = (c: string) => (c === ARQUIVO_LOG ? 1 : c.includes("/") ? 2 : 0);
+/** Nota do kit pelo nome do arquivo, ignorando hífen, espaço e acento ("R-Salon-Design-System.md"). */
+export function notaDoKit(caminho: string): "design_system" | "tom_de_voz" | null {
+  if (!caminho.toLowerCase().endsWith(".md")) return null;
+  const n = normalizarNome(caminho.split("/").pop() ?? "");
+  return n.includes("designsystem") ? "design_system" : n.includes("tomdevoz") ? "tom_de_voz" : null;
+}
+
+// Documentos que dizem quem é o cliente e o que ele vende vêm antes de dossiês, calendários e relatórios
+const DOC_DO_NEGOCIO = ["posicionamento", "contexto", "icp", "persona", "publico", "tomdevoz", "tema", "pauta", "preco", "tabela", "servico", "oferta", "produto", "direcaodearte", "designsystem", "marca", "briefing"];
+const NOTA_MAX = 60_000;
+
+/** Contexto do cliente para o Claude: notas da raiz, documentos do negócio, Log e o resto; cada nota até 60 mil caracteres. */
+export function montarContexto(arquivos: { caminho: string; conteudo: string }[], limite = 250_000): string {
+  const peso = (c: string) => {
+    if (c === ARQUIVO_LOG) return 2;
+    if (!c.includes("/")) return 0;
+    const n = normalizarNome(c.split("/").pop() ?? "");
+    return DOC_DO_NEGOCIO.some((k) => n.includes(k)) ? 1 : 3;
+  };
   const ordem = arquivos.filter((a) => !a.caminho.startsWith("Anexos/") && !ehFonteDoCofre(a.caminho)).sort((a, b) => peso(a.caminho) - peso(b.caminho) || a.caminho.localeCompare(b.caminho));
   let saida = "";
   for (const a of ordem) {
-    const bloco = `\n\n=== ${a.caminho} ===\n${a.conteudo.trim()}`;
+    const texto = a.conteudo.trim();
+    const bloco = `\n\n=== ${a.caminho} ===\n${texto.length > NOTA_MAX ? `${texto.slice(0, NOTA_MAX)}\n(nota cortada)` : texto}`;
     if (saida.length + bloco.length > limite) {
       saida += bloco.slice(0, Math.max(0, limite - saida.length));
       break;

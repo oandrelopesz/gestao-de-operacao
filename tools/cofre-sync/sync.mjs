@@ -1,5 +1,5 @@
 // Copia o cofre de clientes do Obsidian para a aba Conteúdo (spec docs/superpowers/specs/2026-10-12-conteudo-automatico-design.md).
-// Só lê o cofre. Envia, das pastas ligadas na aba, só o que mudou: nota central, Documentos/*.md o Log dos últimos 60 dias e as logos e fontes de Anexos/ e Fontes/ (binário, em base64).
+// Só lê o cofre. Envia, de todas as pastas de cliente, só o que mudou: notas .md da raiz, Documentos/*.md, o Log dos últimos 60 dias e as logos e fontes de Anexos/ e Fontes/ (binário, em base64).
 // Uso: node tools/cofre-sync/sync.mjs   (o Agendador de Tarefas do Windows roda de hora em hora)
 // Config (fora do repositório): %USERPROFILE%\.gestao\cofre-sync.json = { url, chave, cofre }
 import { createHash } from "node:crypto";
@@ -28,8 +28,9 @@ async function chamar(corpo) {
 function arquivosDaPasta(pasta) {
   const dir = join(CLIENTES, pasta);
   const saida = {};
-  const central = join(dir, `${pasta}.md`);
-  if (existsSync(central)) saida[`${pasta}.md`] = readFileSync(central, "utf8");
+  for (const f of readdirSync(dir)) {
+    if (f.toLowerCase().endsWith(".md") && f !== "Log.md" && statSync(join(dir, f)).isFile()) saida[f] = readFileSync(join(dir, f), "utf8");
+  }
   const log = join(dir, "Log.md");
   if (existsSync(log)) saida[ARQUIVO_LOG] = recortarLog(readFileSync(log, "utf8"), hoje);
   const docs = join(dir, "Documentos");
@@ -60,9 +61,9 @@ async function enviar() {
   lote = { acao: "cofre_sync", arquivos: [], remover: [] };
   tamanho = 0;
 }
-for (const pasta of remoto.pastas) {
-  if (!pastas.includes(pasta)) continue; // pasta renomeada ou apagada: a cópia fica até a pasta ser trocada na aba
-  const locais = arquivosDaPasta(pasta);
+for (const pasta of pastas) {
+  // nota acima de 1 milhão de caracteres a função recusa: fica de fora (senão seria reenviada toda hora)
+  const locais = Object.fromEntries(Object.entries(arquivosDaPasta(pasta)).filter(([, v]) => Buffer.isBuffer(v) || v.length <= 1_000_000));
   const hashes = Object.fromEntries(Object.entries(locais).map(([c, t]) => [c, hash(t)]));
   const { enviar: novos, remover } = mudancasCofre(hashes, remoto.hashes[pasta] ?? {});
   for (const caminho of remover) lote.remover.push({ pasta, caminho });
