@@ -501,3 +501,18 @@ export function laminasDaResposta(r: RespostaTexto, moldes: Moldes): Lamina[] {
     return lamina;
   });
 }
+
+/** Molde `tipo` aprovado em nova versão: lâminas desse tipo que têm todos os textos e a foto que ele pede voltam a montar (numeração refeita); null = nada a remontar. */
+export function remontarComMolde(laminas: Lamina[], tipo: TipoMolde, molde: Molde): Lamina[] | null {
+  const textos = molde.campos.filter((c) => c.tipo === "texto" && c.nome !== CAMPO_NUMERO).map((c) => c.nome);
+  const pedeFoto = molde.campos.some((c) => c.tipo === "imagem");
+  const temNumero = molde.campos.some((c) => c.nome === CAMPO_NUMERO);
+  let mudou = false;
+  const novas = laminas.map((l, i) => {
+    if (l.molde !== tipo || !textos.every((n) => (l.campos[n] ?? "").trim()) || (pedeFoto && !l.imagem?.chave)) return l;
+    mudou = true;
+    const campos = temNumero ? { ...l.campos, [CAMPO_NUMERO]: `${String(i + 1).padStart(2, "0")}/${String(laminas.length).padStart(2, "0")}` } : l.campos;
+    return { ...l, campos, jpg_chave: null };
+  });
+  return mudou ? novas : null;
+}

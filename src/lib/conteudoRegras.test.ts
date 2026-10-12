@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   AGENDA_PADRAO, ARQUIVO_LOG, DIRECAO_ARTE, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre,
   faltaParaGerar, fontesDoCofre, fontFace, pesoDoNome, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
-  esperaDoCloudflare, mudancasCofre, pilaresDaSemana, normalizarNome, notaDoKit, pilaresDaNota, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
+  esperaDoCloudflare, mudancasCofre, remontarComMolde, pilaresDaSemana, normalizarNome, notaDoKit, pilaresDaNota, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
   usosDeFotos, validarMolde, varianteDoNome,
 } from "../../supabase/functions/conteudo/regras.ts";
 import type {
@@ -187,6 +187,23 @@ test("numeração do carrossel sai do código, não da IA", () => {
   assert.deepEqual(conferirCampos([t30, n], { titulo: "A" }), []);
   const p = promptTexto({ formato: "carrossel", pilar: null, tema: null, temasRecentes: [], tomDeVoz: "", moldes: ms, pastas: [], saude: false });
   assert.ok(!p.pedido.includes("numero ("));
+});
+
+test("remontarComMolde: só remonta lâminas do tipo com todos os textos e a foto que o molde novo pede", () => {
+  const n: CampoMolde = { nome: "numero", tipo: "texto", max: 5, exemplo: "" };
+  const foto: CampoMolde = { nome: "foto", tipo: "imagem", max: 0, exemplo: "" };
+  const novo = molde([t30, n, foto]);
+  const ls: Lamina[] = [
+    { molde: "capa", campos: { titulo: "A" }, imagem: { descricao: "d", chave: "k" }, jpg_chave: "j1" },
+    { molde: "texto", campos: { titulo: "B" }, jpg_chave: "j2" },
+    { molde: "capa", campos: { titulo: "C" }, jpg_chave: "j3" },
+  ];
+  const r = remontarComMolde(ls, "capa", novo)!;
+  assert.equal(r[0].jpg_chave, null);
+  assert.equal(r[0].campos.numero, "01/03");
+  assert.equal(r[1].jpg_chave, "j2");
+  assert.equal(r[2].jpg_chave, "j3"); // sem foto: não remonta
+  assert.equal(remontarComMolde(ls, "capa", molde([{ ...t30, nome: "outro" }])), null);
 });
 
 test("promptTexto leva limites, tema fixo e subpastas", () => {

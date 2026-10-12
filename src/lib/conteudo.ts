@@ -5,7 +5,7 @@ import { cabecalhosDeAcesso } from "@/lib/googleDrive";
 import { normalizarFoto, normalizarLogo } from "@/lib/gmnImagem";
 import { enviarR2 } from "@/lib/r2";
 import {
-  instanteBrasilia, somarDias, type Fonte, type Formato, type ItemAgenda, type Lamina, type Logo, type Molde, type Moldes,
+  instanteBrasilia, remontarComMolde, somarDias, type Fonte, type Formato, type ItemAgenda, type Lamina, type Logo, type Molde, type Moldes,
   type PastaDrive, type Pilar, type StatusPost, type TipoMolde, type VarianteLogo,
 } from "../../supabase/functions/conteudo/regras.ts";
 
@@ -133,11 +133,23 @@ async function moldesAtuais(clienteId: string): Promise<Moldes> {
   return (data?.moldes ?? {}) as Moldes;
 }
 
-export async function aprovarMolde(clienteId: string, tipo: TipoMolde): Promise<void> {
+/** Aprova o molde e remonta com ele os posts do cliente que ainda esperam aprovação. Devolve quantos posts vão remontar. */
+export async function aprovarMolde(clienteId: string, tipo: TipoMolde): Promise<number> {
   const moldes = await moldesAtuais(clienteId);
   const m = moldes[tipo];
   if (!m) throw new Error("O molde não existe mais.");
   await salvarCliente(clienteId, { moldes: { ...moldes, [tipo]: { ...m, aprovado_em: new Date().toISOString() } } });
+  const { data, error } = await postsTab().select("id, laminas").eq("conteudo_cliente_id", clienteId).eq("status", "aguardando");
+  if (error) throw error;
+  let remontados = 0;
+  for (const p of data ?? []) {
+    const laminas = remontarComMolde(p.laminas as Lamina[], tipo, m);
+    if (!laminas) continue;
+    // Post mexido em outra aba nesse meio tempo fica como está
+    await mudarSe(p.id, "aguardando", { laminas, status: "montando" }).then(() => remontados++, () => {});
+  }
+  if (remontados) avancarFila();
+  return remontados;
 }
 
 /** O ajuste de layout de uma lâmina passa a valer no molde (próximos posts). O molde segue aprovado. */

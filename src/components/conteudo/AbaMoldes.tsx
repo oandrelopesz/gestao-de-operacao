@@ -45,9 +45,9 @@ export function AbaMoldes({ cliente, recarregar }: { cliente: ClienteConteudo; r
   }
   async function aprovar(t: TipoMolde) {
     try {
-      await aprovarMolde(cliente.id, t);
+      const remontados = await aprovarMolde(cliente.id, t);
       recarregar();
-      toast.success(`${ROTULO_MOLDE[t]} aprovado.`);
+      toast.success(`${ROTULO_MOLDE[t]} aprovado.${remontados ? ` ${remontados} post${remontados > 1 ? "s" : ""} aguardando aprovação vão ser remontados com ele.` : ""}`);
     } catch (e: any) {
       toast.error(e.message);
     }
