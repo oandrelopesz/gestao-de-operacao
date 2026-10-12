@@ -24,6 +24,7 @@ export function AbaMoldes({ cliente, recarregar }: { cliente: ClienteConteudo; r
         recarregar();
       } catch (e: any) {
         toast.error(`${ROTULO_MOLDE[t]}: ${e.message}`);
+        recarregar(); // o molde pode ter sido gravado mesmo com a prévia falhando
         break;
       }
     }
@@ -39,6 +40,7 @@ export function AbaMoldes({ cliente, recarregar }: { cliente: ClienteConteudo; r
       toast.success("Nova versão do molde pronta para aprovar.");
     } catch (e: any) {
       toast.error(e.message);
+      recarregar();
     } finally {
       setCriando(null);
     }

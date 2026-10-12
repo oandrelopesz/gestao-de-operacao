@@ -168,8 +168,12 @@ export async function usarAjusteNoMolde(clienteId: string, tipo: TipoMolde, css:
   const m = moldes[tipo];
   if (!m) throw new Error("O molde não existe mais.");
   const estilo = `<style>${css.replace(/<\/style/gi, "")}</style>`;
-  const html = /<\/head>/i.test(m.html) ? m.html.replace(/<\/head>/i, () => `${estilo}</head>`) : estilo + m.html;
-  await salvarCliente(clienteId, { moldes: { ...moldes, [tipo]: { ...m, html, versao: m.versao + 1 } } });
+  const comEstilo = (h: string) => (/<\/head>/i.test(h) ? h.replace(/<\/head>/i, () => `${estilo}</head>`) : estilo + h);
+  // Nova versão esperando aprovação: o post foi montado com a aprovada (anterior), é nela que o ajuste vale
+  const novo: Molde = !m.aprovado_em && m.anterior
+    ? { ...m, anterior: { ...m.anterior, html: comEstilo(m.anterior.html) } }
+    : { ...m, html: comEstilo(m.html), versao: m.versao + 1 };
+  await salvarCliente(clienteId, { moldes: { ...moldes, [tipo]: novo } });
 }
 
 // ------------------------------------------------------------------ posts
