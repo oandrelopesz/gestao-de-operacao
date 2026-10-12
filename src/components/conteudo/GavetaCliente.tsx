@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cofreArquivos, desligarCliente, haQuanto, type ClienteConteudo } from "@/lib/conteudo";
 import { AbaAgenda } from "./AbaAgenda";
 import { AbaKit } from "./AbaKit";
+import { AbaMoldes } from "./AbaMoldes";
 
 export function GavetaCliente({ cliente, fechar, recarregar }: { cliente: ClienteConteudo; fechar: () => void; recarregar: () => void }) {
   const [cofre, setCofre] = useState<string>("carregando...");
@@ -42,7 +43,7 @@ export function GavetaCliente({ cliente, fechar, recarregar }: { cliente: Client
           </TabsList>
           <TabsContent value="kit"><AbaKit cliente={cliente} recarregar={recarregar} /></TabsContent>
           <TabsContent value="agenda"><AbaAgenda cliente={cliente} recarregar={recarregar} /></TabsContent>
-          <TabsContent value="moldes"><p className="text-sm text-muted-foreground">Em breve.</p></TabsContent>
+          <TabsContent value="moldes"><AbaMoldes cliente={cliente} recarregar={recarregar} /></TabsContent>
         </Tabs>
         <div className="mt-8 border-t pt-4">
           {confirmar
