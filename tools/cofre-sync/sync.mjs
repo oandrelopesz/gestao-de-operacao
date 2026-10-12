@@ -62,8 +62,14 @@ async function enviar() {
   tamanho = 0;
 }
 for (const pasta of pastas) {
-  // nota acima de 1 milhão de caracteres a função recusa: fica de fora (senão seria reenviada toda hora)
-  const locais = Object.fromEntries(Object.entries(arquivosDaPasta(pasta)).filter(([, v]) => Buffer.isBuffer(v) || v.length <= 1_000_000));
+  // a função recusa nota acima de 1 milhão de caracteres e binário acima de 3 milhões de bytes (base64 passa de 4.000.000): ficam de fora e avisam no console (senão seriam reenviados toda hora)
+  const locais = Object.fromEntries(Object.entries(arquivosDaPasta(pasta)).filter(([caminho, v]) => {
+    const bin = Buffer.isBuffer(v);
+    const limite = bin ? 3_000_000 : 1_000_000;
+    if (v.length <= limite) return true;
+    console.log(`fora: ${pasta}/${caminho} (${(v.length / 1_000_000).toFixed(1)} MB, limite ${bin ? 3 : 1} MB)`);
+    return false;
+  }));
   const hashes = Object.fromEntries(Object.entries(locais).map(([c, t]) => [c, hash(t)]));
   const { enviar: novos, remover } = mudancasCofre(hashes, remoto.hashes[pasta] ?? {});
   for (const caminho of remover) lote.remover.push({ pasta, caminho });

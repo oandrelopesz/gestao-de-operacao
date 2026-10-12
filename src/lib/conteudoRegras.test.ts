@@ -4,7 +4,7 @@ import {
   AGENDA_PADRAO, ARQUIVO_LOG, DIRECAO_ARTE, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre,
   faltaParaGerar, fontesDoCofre, fontFace, pesoDoNome, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
   esperaDoCloudflare, mudancasCofre, remontarComMolde, pilaresDaSemana, normalizarNome, notaDoKit, pilaresDaNota, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
-  usosDeFotos, validarMolde, varianteDoNome,
+  usosDeFotos, validarMolde, varianteDoNome, moldesEmUso,
 } from "../../supabase/functions/conteudo/regras.ts";
 import type {
   Alteracao, CampoMolde, Lamina, Molde, Moldes, RespostaTexto, TipoMolde,
@@ -383,4 +383,49 @@ test("pilaresDaSemana reparte os pilares em rodízio entre os posts da semana", 
   assert.deepEqual(pilaresDaSemana(pilares, [], 4), ["A", "B", "C", "A"]);
   assert.deepEqual(pilaresDaSemana(pilares, ["A", "C"], 2), ["B", "C"]);
   assert.deepEqual(pilaresDaSemana([], ["A"], 2), [null, null]);
+});
+
+test("moldesEmUso: aprovado, senão o anterior aprovado, senão fora; faltaParaGerar usa isso", () => {
+  const mk = (aprovado_em: string | null, anterior?: Molde): Molde => ({ html: "x", campos: [], versao: 1, aprovado_em, previa_chave: null, ...(anterior ? { anterior } : {}) });
+  const ok = mk("2026-10-01");
+  const moldes: Moldes = { capa: ok, texto: mk(null, ok), foto: mk(null), cta: mk(null, mk(null, ok)) };
+  const uso = moldesEmUso(moldes);
+  assert.equal(uso.capa, ok);
+  assert.equal(uso.texto, ok);
+  assert.equal("foto" in uso, false);
+  assert.equal("cta" in uso, false);
+  const base: Parameters<typeof faltaParaGerar>[0] = { pasta_cofre: "K", ig_conta_id: "1", logos: [{ variante: "principal" } as never], moldes: { capa: mk(null, ok), texto: ok, foto: ok, cta: ok } };
+  assert.deepEqual(faltaParaGerar(base, "carrossel"), []);
+});
+
+test("varianteDoNome: logo para fundo claro/escuro e preto e branco", () => {
+  assert.equal(varianteDoNome("logo-para-fundo-claro.png"), "escura");
+  assert.equal(varianteDoNome("logo fundo branco.png"), "escura");
+  assert.equal(varianteDoNome("logo-lightbg.svg"), "escura");
+  assert.equal(varianteDoNome("logo-fundo-escuro.png"), "clara");
+  assert.equal(varianteDoNome("logo-fundo-preto.png"), "clara");
+  assert.equal(varianteDoNome("logo-darkbg.svg"), "clara");
+  assert.equal(varianteDoNome("logo-preto-e-branco.png"), "principal");
+  assert.equal(varianteDoNome("logo-monocromatica.png"), "principal");
+  assert.equal(varianteDoNome("logo-clara.png"), "clara");
+  assert.equal(varianteDoNome("logo-escura.png"), "escura");
+  assert.equal(varianteDoNome("logo-icone.png"), "icone");
+  assert.equal(varianteDoNome("logo.png"), "principal");
+});
+
+test("fontesDoCofre: o peso ignora o nome da família", () => {
+  const f = fontesDoCofre("Archivo Black", [
+    { caminho: "Fontes/ArchivoBlack-Regular.woff2", chave: "r" },
+    { caminho: "Fontes/ArchivoBlack-Bold.woff2", chave: "b" },
+  ]);
+  assert.deepEqual(f.map((x) => [x.peso, x.chave]), [[400, "r"], [700, "b"]]);
+});
+
+test("postsDaSemana: depoisDe descarta o que já passou", () => {
+  const ag = [{ dia: 1, hora: "09:00", formato: "carrossel" as const }, { dia: 3, hora: "12:00", formato: "estatico" as const }];
+  const todos = postsDaSemana("2026-10-12", ag);
+  assert.equal(todos.length, 2);
+  assert.equal(postsDaSemana("2026-10-12", ag, 0).length, 2);
+  const corte = Date.parse(todos[0].agendado_para);
+  assert.deepEqual(postsDaSemana("2026-10-12", ag, corte), [todos[1]]);
 });

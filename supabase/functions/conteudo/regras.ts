@@ -38,8 +38,19 @@ export interface PastaDrive { id: string; caminho: string; quantidade: number }
 export interface CampoMolde { nome: string; tipo: "texto" | "imagem" | "logo"; max: number; exemplo: string }
 /** Versão da direção de arte dos moldes: só moldes da versão atual servem de referência de estilo para os outros. */
 export const DIRECAO_ARTE = 2;
-export interface Molde { html: string; campos: CampoMolde[]; versao: number; aprovado_em: string | null; previa_chave: string | null; direcao?: number }
+export interface Molde { html: string; campos: CampoMolde[]; versao: number; aprovado_em: string | null; previa_chave: string | null; direcao?: number; /** Última versão aprovada, guardada enquanto uma nova espera aprovação. */ anterior?: Molde }
 export type Moldes = Partial<Record<TipoMolde, Molde>>;
+
+/** Moldes que valem para gerar: o aprovado; senão o anterior aprovado; senão o tipo fica de fora. */
+export function moldesEmUso(moldes: Moldes): Moldes {
+  const uso: Moldes = {};
+  for (const t of Object.keys(moldes) as TipoMolde[]) {
+    const m = moldes[t];
+    if (m?.aprovado_em) uso[t] = m;
+    else if (m?.anterior?.aprovado_em) uso[t] = m.anterior;
+  }
+  return uso;
+}
 export interface ImagemLamina {
   descricao: string;
   pasta_id?: string | null;
@@ -193,6 +204,9 @@ export function dimensoesImagem(bytes: Uint8Array): { largura: number; altura: n
 /** Variante da logo pelo nome do arquivo (clara, escura, ícone; senão principal). */
 export function varianteDoNome(nome: string): VarianteLogo {
   const n = normalizarNome(nome);
+  if (/fundoclaro|fundobranco|lightbg/.test(n)) return "escura";
+  if (/fundoescuro|fundopreto|darkbg/.test(n)) return "clara";
+  if (/pretoebranco|pretobranco|monocrom/.test(n)) return "principal";
   if (/clar|branc|negativ|white|light/.test(n)) return "clara";
   if (/escur|dark|pret|black/.test(n)) return "escura";
   if (/icone|icon|simbolo|symbol/.test(n)) return "icone";
@@ -234,7 +248,7 @@ export function fontesDoCofre(familia: string, arquivos: { caminho: string; chav
     if (!ehFonteDoCofre(a.caminho)) continue;
     const n = normalizarNome(nomeSem(a.caminho));
     if (!prefixo || !n.startsWith(prefixo) || n.includes("italic")) continue;
-    const peso = pesoDoNome(nomeSem(a.caminho));
+    const peso = pesoDoNome(n.slice(prefixo.length));
     const atual = porPeso.get(peso);
     if (!atual || ext(a.caminho) < ext(atual.caminho)) porPeso.set(peso, a);
   }
@@ -298,12 +312,13 @@ export function instanteBrasilia(dia: string, hora: string): string {
 }
 
 /** Posts da agenda na semana que começa na segunda `segunda`, em ordem de horário. */
-export function postsDaSemana(segunda: string, agenda: ItemAgenda[]): { origem_data: string; agendado_para: string; formato: Formato }[] {
+export function postsDaSemana(segunda: string, agenda: ItemAgenda[], depoisDe = 0): { origem_data: string; agendado_para: string; formato: Formato }[] {
   return agenda
     .map((a) => {
       const dia = somarDias(segunda, (a.dia + 6) % 7);
       return { origem_data: dia, agendado_para: instanteBrasilia(dia, a.hora), formato: a.formato };
     })
+    .filter((p) => Date.parse(p.agendado_para) > depoisDe)
     .sort((x, y) => x.agendado_para.localeCompare(y.agendado_para));
 }
 
@@ -438,7 +453,8 @@ export function faltaParaGerar(
   if (!c.ig_conta_id) falta.push("conta do Instagram");
   if (!c.pasta_cofre) falta.push("pasta do cofre");
   if (!c.logos.length) falta.push("logo");
-  const sem = MOLDES_DO_FORMATO[formato].filter((t) => !c.moldes[t]?.aprovado_em);
+  const uso = moldesEmUso(c.moldes);
+  const sem = MOLDES_DO_FORMATO[formato].filter((t) => !uso[t]);
   if (sem.length) falta.push(`moldes aprovados (${sem.map((t) => ROTULO_MOLDE[t]).join(", ")})`);
   return falta;
 }

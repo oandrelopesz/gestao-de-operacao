@@ -1,4 +1,4 @@
-// Subpastas do Drive do cliente (até 4 níveis e 60 pastas), com a quantidade de imagens de cada uma. A raiz vira "Geral".
+// Subpastas do Drive do cliente (até 4 níveis, 60 pastas com imagem, 80 visitadas ou 60 s), com a quantidade de imagens de cada uma. A raiz vira "Geral".
 // deno-lint-ignore-file no-explicit-any
 import { imagensDaPasta, tokenGoogle } from "../gmn/google.ts";
 import { idPastaDrive } from "../gmn/regras.ts";
@@ -25,10 +25,15 @@ export async function lerPastas(sb: any, link: string): Promise<PastaDrive[]> {
   if (!raiz) throw new ErroHttp(400, "Link da pasta do Drive não reconhecido.");
   const token = await tokenGoogle(sb);
   const saida: PastaDrive[] = [];
+  const inicio = Date.now();
+  let visitadas = 0;
+  const parar = () => visitadas >= 80 || Date.now() - inicio > 60_000 || saida.length >= 60;
   let nivel = [{ id: raiz, caminho: "Geral" }];
-  for (let i = 0; i < 4 && nivel.length && saida.length < 60; i++) {
+  for (let i = 0; i < 4 && nivel.length && !parar(); i++) {
     const proximo: { id: string; caminho: string }[] = [];
     for (const p of nivel) {
+      if (parar()) break;
+      visitadas++;
       const quantidade = (await imagensDaPasta(token, p.id)).length;
       if (quantidade) saida.push({ id: p.id, caminho: p.caminho, quantidade });
       for (const f of await listarPastas(token, p.id)) proximo.push({ id: f.id, caminho: i === 0 ? f.name : `${p.caminho} / ${f.name}` });
