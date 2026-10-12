@@ -2,8 +2,14 @@
 // Rodam no navegador e no `node --test`. A edge function `r2` repete a validação de chave, porque é
 // publicada sozinha e não importa código do app.
 
-/** Módulo do sistema → bucket onde os arquivos dele ficavam no Storage do Supabase. */
-export const MODULOS_R2 = { arquivos: "pdfs", notas: "notas", fluxogramas: "fluxogramas", instagram: "instagram" } as const;
+/** Módulo do sistema → bucket onde os arquivos dele ficavam no Storage do Supabase (a Central nunca teve bucket). */
+export const MODULOS_R2 = {
+  arquivos: "pdfs",
+  notas: "notas",
+  fluxogramas: "fluxogramas",
+  instagram: "instagram",
+  central: "central",
+} as const;
 export type ModuloR2 = keyof typeof MODULOS_R2;
 
 const TAMANHO_MAX_CHAVE = 512;
@@ -28,9 +34,14 @@ export function chaveR2(modulo: ModuloR2, caminho: string): string {
   return chave;
 }
 
-/** Endereço fixo de uma imagem de nota: a função `r2` redireciona para um link assinado novo a cada acesso. */
+/** Endereço fixo de um arquivo: a função `r2` redireciona para um link assinado novo a cada acesso. */
+export function urlFixaR2(supabaseUrl: string, modulo: ModuloR2, caminho: string): string {
+  return `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/r2?c=${encodeURIComponent(chaveR2(modulo, caminho))}`;
+}
+
+/** Endereço fixo de uma imagem de nota (vai dentro do documento da nota). */
 export function urlImagemNota(supabaseUrl: string, arquivo: string): string {
-  return `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/r2?c=${encodeURIComponent(chaveR2("notas", arquivo))}`;
+  return urlFixaR2(supabaseUrl, "notas", arquivo);
 }
 
 /**

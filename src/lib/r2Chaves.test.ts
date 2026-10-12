@@ -1,11 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MODULOS_R2, arquivoDaImagemNota, caminhoValido, chaveR2, urlImagemNota } from "./r2Chaves.ts";
+import { MODULOS_R2, arquivoDaImagemNota, caminhoValido, chaveR2, urlFixaR2, urlImagemNota } from "./r2Chaves.ts";
 
 const SB = "https://abc.supabase.co";
 
 test("MODULOS_R2 liga cada módulo ao bucket antigo do Supabase", () => {
-  assert.deepEqual(MODULOS_R2, { arquivos: "pdfs", notas: "notas", fluxogramas: "fluxogramas", instagram: "instagram" });
+  assert.deepEqual(MODULOS_R2, { arquivos: "pdfs", notas: "notas", fluxogramas: "fluxogramas", instagram: "instagram", central: "central" });
+});
+
+test("urlFixaR2 monta o endereço fixo com a chave codificada", () => {
+  assert.equal(
+    urlFixaR2("https://abc.supabase.co/", "central", "c1/20261012-101500-Logo Final.png"),
+    "https://abc.supabase.co/functions/v1/r2?c=central%2Fc1%2F20261012-101500-Logo%20Final.png",
+  );
 });
 
 test("caminhoValido aceita caminhos normais e recusa os perigosos", () => {

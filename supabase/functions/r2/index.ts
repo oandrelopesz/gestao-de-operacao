@@ -1,6 +1,6 @@
 // Arquivos do sistema no Cloudflare R2 (spec docs/superpowers/specs/2026-09-30-arquivos-r2-design.md).
 //   GET                                   -> { r2, bucket }                  secrets configurados e bucket respondendo?
-//   GET ?c=notas/<arquivo> | instagram/<arquivo> -> 302 para URL assinada  endereço fixo (imagens das notas, mídias do Instagram)
+//   GET ?c=notas/<arquivo> | instagram/<arquivo> | central/<arquivo> -> 302 para URL assinada  endereço fixo (imagens das notas, mídias do Instagram, Central de arquivos)
 //   POST { acao: "enviar", chave }        -> { url }                         URL assinada de PUT (15 min)
 //   POST { acao: "ler", chave }           -> { url } | 404                   URL assinada de GET (1 h)
 //   POST { acao: "apagar", chaves }       -> { apagados }
@@ -34,7 +34,7 @@ const env = (k: string) => Deno.env.get(k) || "";
 // ------------------------------------------------------------------ chaves
 
 /** Módulo do sistema → bucket onde os arquivos dele ficavam no Supabase (igual a src/lib/r2Chaves.ts). */
-const MODULOS: Record<string, string> = { arquivos: "pdfs", notas: "notas", fluxogramas: "fluxogramas", instagram: "instagram" };
+const MODULOS: Record<string, string> = { arquivos: "pdfs", notas: "notas", fluxogramas: "fluxogramas", instagram: "instagram", central: "central" };
 
 /** Mesma regra de src/lib/r2Chaves.ts (esta função é publicada sozinha e não importa código do app). */
 function chaveValida(chave: unknown): chave is string {
@@ -303,8 +303,8 @@ Deno.serve(async (req) => {
       const c = new URL(req.url).searchParams.get("c");
       if (!c) return json(await status());
       const chave = exigirChave(c);
-      // Notas (imagens no texto) e Instagram (miniaturas na tela e o link que a Meta baixa) têm endereço fixo
-      if (!chave.startsWith("notas/") && !chave.startsWith("instagram/")) throw new ErroHttp(403, "Só as imagens das notas e as mídias do Instagram têm endereço público.");
+      // Notas (imagens no texto), Instagram (miniaturas na tela e o link que a Meta baixa) e Central (miniaturas) têm endereço fixo
+      if (!chave.startsWith("notas/") && !chave.startsWith("instagram/") && !chave.startsWith("central/")) throw new ErroHttp(403, "Só as imagens das notas, as mídias do Instagram e a Central de arquivos têm endereço público.");
       return new Response(null, {
         status: 302,
         headers: { ...cors, Location: await assinar("GET", chave, 3600), "Cache-Control": "private, max-age=300" },

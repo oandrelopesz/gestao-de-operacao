@@ -20,9 +20,9 @@ Publicação: a função `r2` precisa ir ao ar (o `publicar.mjs` passa a publica
 
 ## Itens
 
-- [ ] X1 | files: supabase/functions/r2/index.ts | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/r2/index.ts | exec: haiku | `MODULOS` ganha `central: "central"`; o GET de endereço fixo aceita também `central/` (ajustar a mensagem do 403 e o comentário do topo)
-- [ ] X2 | files: src/lib/r2Chaves.ts,src/lib/r2Chaves.test.ts,src/lib/r2.ts | check: npm test && npx tsc --noEmit -p . | exec: haiku | `central` em MODULOS_R2 (+ teste), `urlFixaR2` em r2Chaves, `listarR2` e `apagarR2` em r2.ts
-- [ ] X3 | files: src/lib/centralRegras.ts,src/lib/centralRegras.test.ts | check: node --test src/lib/centralRegras.test.ts && npx tsc --noEmit -p . | exec: haiku | regras puras da Central, testes primeiro
+- [r] X1 | files: supabase/functions/r2/index.ts | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/r2/index.ts | exec: haiku | `MODULOS` ganha `central: "central"`; o GET de endereço fixo aceita também `central/` (ajustar a mensagem do 403 e o comentário do topo)
+- [r] X2 | files: src/lib/r2Chaves.ts,src/lib/r2Chaves.test.ts,src/lib/r2.ts | check: npm test && npx tsc --noEmit -p . | exec: haiku | `central` em MODULOS_R2 (+ teste), `urlFixaR2` em r2Chaves, `listarR2` e `apagarR2` em r2.ts
+- [r] X3 | files: src/lib/centralRegras.ts,src/lib/centralRegras.test.ts | check: node --test src/lib/centralRegras.test.ts && npx tsc --noEmit -p . | exec: haiku | regras puras da Central, testes primeiro
 - [ ] X4 | files: src/lib/central.ts | after: X2,X3 | check: npx tsc --noEmit -p . | exec: haiku | dados da Central (clientes, listar, enviar, baixar, apagar, miniatura)
 - [ ] X5 | files: src/routes/_authenticated/central.tsx,src/components/central/,src/lib/nav.tsx,src/routeTree.gen.ts | after: X4 | check: npx tsc --noEmit -p . | exec: sonnet | tela, rota e item no menu
 

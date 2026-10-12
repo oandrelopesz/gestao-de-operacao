@@ -2,7 +2,7 @@
 // Transição de 30 dias (até 30/10/2026): envio só para o R2; leitura no R2 com reserva no bucket antigo do
 // Supabase; apagar nos dois lados. Swipe file, Transcritor e Fireflies não usam este módulo.
 import { supabase } from "@/integrations/supabase/client";
-import { MODULOS_R2, chaveR2, urlImagemNota, type ModuloR2 } from "@/lib/r2Chaves";
+import { MODULOS_R2, chaveR2, urlFixaR2, urlImagemNota, type ModuloR2 } from "@/lib/r2Chaves";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const CHAVE_PUBLICA = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -108,7 +108,25 @@ export async function listarNosDois(modulo: ModuloR2, pasta: string): Promise<st
   return [...new Set([...noR2, ...noSupabase])];
 }
 
+/** Arquivos de um módulo só no R2 (sem bucket antigo, como a Central), caminhos relativos ao módulo. */
+export async function listarR2(modulo: ModuloR2): Promise<string[]> {
+  const { chaves } = await chamar<{ chaves: string[] }>({ acao: "listar", prefixo: `${modulo}/` });
+  return chaves.map((k) => k.slice(modulo.length + 1));
+}
+
+/** Apaga só no R2, em lotes de 1.000 (caminhos relativos ao módulo). */
+export async function apagarR2(modulo: ModuloR2, caminhos: string[]): Promise<void> {
+  for (let i = 0; i < caminhos.length; i += 1000) {
+    await chamar({ acao: "apagar", chaves: caminhos.slice(i, i + 1000).map((c) => chaveR2(modulo, c)) });
+  }
+}
+
 /** Endereço fixo de uma imagem de nota (vai dentro do documento da nota). */
 export function urlDaImagemNota(arquivo: string): string {
   return urlImagemNota(SUPABASE_URL, arquivo);
+}
+
+/** Endereço fixo de um arquivo do módulo (função `r2`). */
+export function urlFixa(modulo: ModuloR2, caminho: string): string {
+  return urlFixaR2(SUPABASE_URL, modulo, caminho);
 }
