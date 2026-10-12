@@ -1,12 +1,12 @@
 // Copia o cofre de clientes do Obsidian para a aba Conteúdo (spec docs/superpowers/specs/2026-10-12-conteudo-automatico-design.md).
-// Só lê o cofre. Envia, das pastas ligadas na aba, só o que mudou: nota central, Documentos/*.md e o Log dos últimos 60 dias.
+// Só lê o cofre. Envia, das pastas ligadas na aba, só o que mudou: nota central, Documentos/*.md o Log dos últimos 60 dias e as logos de Anexos/ (binário, em base64).
 // Uso: node tools/cofre-sync/sync.mjs   (o Agendador de Tarefas do Windows roda de hora em hora)
 // Config (fora do repositório): %USERPROFILE%\.gestao\cofre-sync.json = { url, chave, cofre }
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { ARQUIVO_LOG, mudancasCofre, recortarLog } from "../../supabase/functions/conteudo/regras.ts";
+import { ARQUIVO_LOG, ehLogoDoCofre, mudancasCofre, recortarLog } from "../../supabase/functions/conteudo/regras.ts";
 
 const cfg = JSON.parse(readFileSync(join(homedir(), ".gestao", "cofre-sync.json"), "utf8"));
 const CLIENTES = join(cfg.cofre, "01 Clientes");
@@ -36,6 +36,10 @@ function arquivosDaPasta(pasta) {
   if (existsSync(docs)) {
     for (const f of readdirSync(docs)) if (f.toLowerCase().endsWith(".md")) saida[`Documentos/${f}`] = readFileSync(join(docs, f), "utf8");
   }
+  const anexos = join(dir, "Anexos");
+  if (existsSync(anexos)) {
+    for (const f of readdirSync(anexos)) if (ehLogoDoCofre(`Anexos/${f}`)) saida[`Anexos/${f}`] = readFileSync(join(anexos, f)); // Buffer
+  }
   return saida;
 }
 
@@ -59,8 +63,10 @@ for (const pasta of remoto.pastas) {
   const { enviar: novos, remover } = mudancasCofre(hashes, remoto.hashes[pasta] ?? {});
   for (const caminho of remover) lote.remover.push({ pasta, caminho });
   for (const caminho of novos) {
-    lote.arquivos.push({ pasta, caminho, hash: hashes[caminho], conteudo: locais[caminho] });
-    tamanho += locais[caminho].length;
+    const bin = Buffer.isBuffer(locais[caminho]);
+    const conteudo = bin ? locais[caminho].toString("base64") : locais[caminho];
+    lote.arquivos.push({ pasta, caminho, hash: hashes[caminho], conteudo, ...(bin && { binario: true }) });
+    tamanho += conteudo.length;
     if (tamanho > LOTE_MAX) await enviar();
   }
 }
