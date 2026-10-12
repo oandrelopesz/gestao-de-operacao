@@ -27,7 +27,7 @@ import { ESQUEMA_AJUSTE, ESQUEMA_KIT, ESQUEMA_PILARES, SYSTEM_KIT, SYSTEM_PILARE
 import { cloudflareConfigurado, resolverFonte } from "./render.ts";
 import {
   AGENDA_PADRAO, ErroHttp, LEGENDA_MAX, aplicarAlteracoes, casarConta, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre, faltaParaGerar, fontesDoCofre, linkDrive,
-  montarContexto, notaDoKit, pilaresDaNota, postsDaSemana, segundaDaSemana, varianteDoNome, type Alteracao, type Fonte, type Logo, type Pilar,
+  montarContexto, notaDoKit, pilaresDaNota, pilaresDaSemana, postsDaSemana, segundaDaSemana, varianteDoNome, type Alteracao, type Fonte, type Logo, type Pilar,
 } from "./regras.ts";
 
 const cors = {
@@ -237,8 +237,11 @@ async function gerarSemana(sb: any, segunda: string, clienteId: string | null) {
     if (faltas.length) pulados.push({ cliente: nome, motivo: `falta ${faltas.join(", ")}` });
     const prontos = itens.filter((p) => !faltaParaGerar(c, p.formato).length);
     if (!prontos.length) continue;
+    // pilares repartidos aqui: os posts são escritos ao mesmo tempo e não se enxergam
+    const { data: recentes } = await sb.from("conteudo_posts").select("pilar").eq("conteudo_cliente_id", c.id).order("created_at", { ascending: false }).limit(30);
+    const pilares = pilaresDaSemana(c.pilares ?? [], (recentes ?? []).map((r: any) => r.pilar), prontos.length);
     const { data, error: e2 } = await sb.from("conteudo_posts")
-      .upsert(prontos.map((p) => ({ ...p, conteudo_cliente_id: c.id, status: "texto" })), { onConflict: "conteudo_cliente_id,origem_data", ignoreDuplicates: true })
+      .upsert(prontos.map((p, i) => ({ ...p, pilar: pilares[i], conteudo_cliente_id: c.id, status: "texto" })), { onConflict: "conteudo_cliente_id,origem_data", ignoreDuplicates: true })
       .select("id");
     if (e2) throw new Error(e2.message);
     criados += data?.length ?? 0;

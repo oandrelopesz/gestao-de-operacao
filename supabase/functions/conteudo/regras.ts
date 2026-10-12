@@ -264,6 +264,16 @@ export function proximoPilar(pilares: Pilar[], usados: (string | null)[]): Pilar
   return [...pilares].sort((a, b) => usados.indexOf(b.nome) - usados.indexOf(a.nome))[0];
 }
 
+/** Pilares dos n posts de uma semana, em rodízio a partir dos usados (mais recente primeiro). */
+export function pilaresDaSemana(pilares: Pilar[], usados: (string | null)[], n: number): (string | null)[] {
+  const fila = [...usados];
+  return Array.from({ length: n }, () => {
+    const p = proximoPilar(pilares, fila);
+    if (p) fila.unshift(p.nome);
+    return p?.nome ?? null;
+  });
+}
+
 export function somarDias(dia: string, n: number): string {
   const d = new Date(`${dia}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);

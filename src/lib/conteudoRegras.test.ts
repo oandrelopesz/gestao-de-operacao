@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   AGENDA_PADRAO, ARQUIVO_LOG, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre,
   faltaParaGerar, fontesDoCofre, fontFace, pesoDoNome, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
-  esperaDoCloudflare, mudancasCofre, normalizarNome, notaDoKit, pilaresDaNota, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
+  esperaDoCloudflare, mudancasCofre, pilaresDaSemana, normalizarNome, notaDoKit, pilaresDaNota, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
   usosDeFotos, validarMolde, varianteDoNome,
 } from "../../supabase/functions/conteudo/regras.ts";
 import type {
@@ -325,4 +325,11 @@ test("esperaDoCloudflare: espera curta do limite por minuto, desiste no limite l
   assert.equal(esperaDoCloudflare("10", 3), 0);
   assert.equal(esperaDoCloudflare("3600", 0), 0);
   assert.equal(esperaDoCloudflare(null, 0), 0);
+});
+
+test("pilaresDaSemana reparte os pilares em rodízio entre os posts da semana", () => {
+  const pilares = [{ nome: "A", descricao: "" }, { nome: "B", descricao: "" }, { nome: "C", descricao: "" }];
+  assert.deepEqual(pilaresDaSemana(pilares, [], 4), ["A", "B", "C", "A"]);
+  assert.deepEqual(pilaresDaSemana(pilares, ["A", "C"], 2), ["B", "C"]);
+  assert.deepEqual(pilaresDaSemana([], ["A"], 2), [null, null]);
 });
