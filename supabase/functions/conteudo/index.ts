@@ -4,7 +4,9 @@
 //   POST { acao: "cofre_hashes" }                (x-cofre-key) -> { pastas, hashes } pastas ligadas e hashes guardados
 //   POST { acao: "cofre_sync", pastas?, arquivos, remover } (x-cofre-key) -> { gravados, removidos }
 //   POST { acao: "cofre_ler", pasta? }                      -> { pastas, sincronizado_em } | { arquivos, total, sincronizado_em }
-//        com pasta: só os arquivos do kit (nome com "Design System" ou "tom de voz")
+//        com pasta: só as notas .md do kit (nome com "Design System" ou "tom de voz"), nunca Anexos/
+//   cofre_sync também aceita logos de Anexos/ com binario: true (base64 vai para o R2)
+//   POST { acao: "kit_do_cofre", cliente_id }               -> { kit }              monta fontes, logos, pilares, conta e Drive a partir do cofre
 //   POST { acao: "drive_pastas", cliente_id }               -> { pastas }           lê as subpastas do Drive e grava no cliente
 //   POST { acao: "molde", cliente_id, tipo }                -> { molde }            cria (ou refaz) um molde com prévia
 //   POST { acao: "molde_ajustar", cliente_id, tipo, pedido } -> { molde }           nova versão do molde pelo pedido
@@ -14,14 +16,18 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
 import { acessoLiberado } from "../gmn/acesso.ts";
-import { arquivosConfigurados } from "./arquivos.ts";
+import { decodeBase64 } from "jsr:@std/encoding@1/base64";
+import { arquivosConfigurados, guardar, ler } from "./arquivos.ts";
 import { claudeConfigurado, gerarJson } from "./claude.ts";
 import { lerPastas } from "./drive.ts";
 import { passo } from "./etapas.ts";
 import { gerarMolde } from "./moldes.ts";
-import { ESQUEMA_AJUSTE, promptAjuste } from "./prompts.ts";
-import { cloudflareConfigurado } from "./render.ts";
-import { ErroHttp, LEGENDA_MAX, aplicarAlteracoes, faltaParaGerar, postsDaSemana, segundaDaSemana, type Alteracao } from "./regras.ts";
+import { ESQUEMA_AJUSTE, ESQUEMA_KIT, SYSTEM_KIT, promptAjuste } from "./prompts.ts";
+import { cloudflareConfigurado, resolverFonte } from "./render.ts";
+import {
+  AGENDA_PADRAO, ErroHttp, LEGENDA_MAX, aplicarAlteracoes, casarConta, dimensoesImagem, ehLogoDoCofre, faltaParaGerar, linkDrive,
+  montarContexto, postsDaSemana, segundaDaSemana, varianteDoNome, type Alteracao, type Fonte, type Logo, type Pilar,
+} from "./regras.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -64,8 +70,18 @@ async function cofreSync(sb: any, corpo: any) {
       .upsert({ pasta: "", caminho: "__pastas__", hash: "", conteudo: JSON.stringify(pastas), atualizado_em: quando });
     if (error) throw new Error(error.message);
   }
-  const arquivos = (Array.isArray(corpo.arquivos) ? corpo.arquivos : [])
-    .filter((a: any) => texto(a?.pasta, 200) && texto(a?.caminho, 300) && texto(a?.hash, 128) && typeof a?.conteudo === "string" && a.conteudo.length <= 1_000_000)
+  const TIPOS: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", svg: "image/svg+xml" };
+  const validos = (Array.isArray(corpo.arquivos) ? corpo.arquivos : [])
+    .filter((a: any) => texto(a?.pasta, 200) && texto(a?.caminho, 300) && texto(a?.hash, 128) && typeof a?.conteudo === "string"
+      && (a.binario === true ? ehLogoDoCofre(a.caminho) && a.conteudo.length <= 4_000_000 : a.conteudo.length <= 1_000_000));
+  for (const a of validos) {
+    if (a.binario !== true) continue;
+    const ext = String(a.caminho.split(".").pop()).toLowerCase();
+    const chave = `instagram/conteudo/cofre/${a.hash.replace(/[^a-zA-Z0-9_-]/g, "")}.${ext}`;
+    await guardar(chave, decodeBase64(a.conteudo), TIPOS[ext] ?? "application/octet-stream");
+    a.conteudo = chave;
+  }
+  const arquivos = validos
     .map((a: any) => ({ pasta: a.pasta, caminho: a.caminho, hash: a.hash, conteudo: a.conteudo, atualizado_em: quando }));
   if (arquivos.length) {
     const { error } = await sb.from("conteudo_cofre").upsert(arquivos, { onConflict: "pasta,caminho" });
@@ -90,10 +106,69 @@ async function cofreLer(sb: any, pasta: string | null) {
   if (e2) throw new Error(e2.message);
   const linhas = data ?? [];
   return {
-    arquivos: linhas.filter((l: any) => DO_KIT.test(l.caminho.split("/").pop() ?? "")).map((l: any) => ({ caminho: l.caminho, conteudo: l.conteudo })),
+    arquivos: linhas.filter((l: any) => l.caminho.endsWith(".md") && !l.caminho.startsWith("Anexos/") && DO_KIT.test(l.caminho.split("/").pop() ?? "")).map((l: any) => ({ caminho: l.caminho, conteudo: l.conteudo })),
     total: linhas.length,
     sincronizado_em,
   };
+}
+
+async function kitDoCofre(sb: any, clienteId: string) {
+  const { data: c, error } = await sb.from("conteudo_clientes").select("*, clientes(nome)").eq("id", clienteId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!c) throw new ErroHttp(404, "Cliente não encontrado.");
+  if (!c.pasta_cofre) throw new ErroHttp(400, "Escolha a pasta do cofre deste cliente.");
+  const { data: linhas, error: e2 } = await sb.from("conteudo_cofre").select("caminho, conteudo").eq("pasta", c.pasta_cofre);
+  if (e2) throw new Error(e2.message);
+  if (!linhas?.length) throw new ErroHttp(400, "O cofre deste cliente ainda não foi sincronizado.");
+  const notas = linhas.filter((l: any) => l.caminho.endsWith(".md") && !l.caminho.startsWith("Anexos/"));
+  const nota = (re: RegExp) => notas.find((l: any) => re.test((l.caminho.split("/").pop() ?? "").toLowerCase()));
+  const ds = nota(/design system/);
+  const tomNota = nota(/tom de voz/);
+  const r = await gerarJson<{ tom_de_voz: string; fontes: { familia: string; reservas: string[] }[]; pilares: Pilar[]; saude: boolean }>({
+    system: SYSTEM_KIT, conteudo: montarContexto(linhas), esquema: ESQUEMA_KIT, esforco: "low", maxTokens: 4000,
+  });
+  const avisos: string[] = [];
+  const fontes: Fonte[] = [];
+  const vistas = new Set<string>();
+  for (const f of r.fontes ?? []) {
+    if (vistas.has(f.familia.toLowerCase())) continue;
+    vistas.add(f.familia.toLowerCase());
+    const ok = await resolverFonte(f.familia, f.reservas ?? []);
+    if (ok) fontes.push(ok); else avisos.push(`Fonte ${f.familia} não encontrada no Google nem no Fontshare`);
+  }
+  const logosDoCofre: Logo[] = [];
+  for (const l of linhas.filter((x: any) => ehLogoDoCofre(x.caminho))) {
+    const { bytes } = await ler(l.conteudo);
+    const d = dimensoesImagem(bytes) ?? { largura: 0, altura: 0 };
+    logosDoCofre.push({ variante: varianteDoNome(l.caminho.split("/").pop() ?? ""), chave: l.conteudo, ...d });
+  }
+  const variantes = new Set(logosDoCofre.map((l) => l.variante));
+  const logos = [...(c.logos ?? []).filter((l: Logo) => !variantes.has(l.variante)), ...logosDoCofre];
+  let conta = c.ig_conta_id ?? null;
+  if (!conta) {
+    const { data: contas, error: e3 } = await sb.from("ig_contas").select("id, usuario, nome").eq("ativa", true).eq("oculta", false);
+    if (e3) throw new Error(e3.message);
+    conta = casarConta(c.clientes?.nome ?? "", contas ?? []);
+  }
+  let drive = c.drive_url ?? "";
+  let pastasDrive = c.drive_pastas ?? [];
+  if (!drive.trim()) {
+    const achado = linkDrive(notas.map((l: any) => l.conteudo).join("\n"));
+    if (achado) {
+      drive = achado;
+      try { pastasDrive = await lerPastas(sb, achado); } catch (e: any) { avisos.push(`Drive: ${e?.message ?? e}`); }
+    }
+  }
+  const pilares = r.pilares?.length ? r.pilares : c.pilares ?? [];
+  const { error: e4 } = await sb.from("conteudo_clientes").update({
+    design_system: ds ? ds.conteudo : c.design_system,
+    tom_de_voz: tomNota ? tomNota.conteudo : r.tom_de_voz,
+    fontes: fontes.length ? fontes : c.fontes ?? [],
+    pilares, saude: !!r.saude, logos, ig_conta_id: conta, drive_url: drive, drive_pastas: pastasDrive,
+    agenda: c.agenda?.length ? c.agenda : AGENDA_PADRAO, updated_at: agora(),
+  }).eq("id", c.id);
+  if (e4) throw new Error(e4.message);
+  return { kit: { fontes: fontes.length, logos: logosDoCofre.length, pilares: r.pilares?.length ?? 0, conta: !!conta, drive: !!drive.trim(), avisos } };
 }
 
 async function drivePastas(sb: any, clienteId: string) {
@@ -111,7 +186,7 @@ async function gerarSemana(sb: any, segunda: string, clienteId: string | null) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(segunda) || segundaDaSemana(segunda) !== segunda) {
     throw new ErroHttp(400, "Informe a segunda-feira da semana (AAAA-MM-DD).");
   }
-  let q = sb.from("conteudo_clientes").select("*, clientes(nome)");
+  let q = sb.from("conteudo_clientes").select("*, clientes(nome)").eq("oculto", false);
   if (clienteId) q = q.eq("id", clienteId);
   const { data: clientes, error } = await q;
   if (error) throw new Error(error.message);
@@ -120,10 +195,7 @@ async function gerarSemana(sb: any, segunda: string, clienteId: string | null) {
   for (const c of clientes ?? []) {
     const nome = c.clientes?.nome ?? "Cliente";
     const itens = postsDaSemana(segunda, c.agenda ?? []);
-    if (!itens.length) {
-      pulados.push({ cliente: nome, motivo: "sem dias na agenda" });
-      continue;
-    }
+    if (!itens.length) continue;
     const faltas = [...new Set(itens.flatMap((p) => faltaParaGerar(c, p.formato)))];
     if (faltas.length) pulados.push({ cliente: nome, motivo: `falta ${faltas.join(", ")}` });
     const prontos = itens.filter((p) => !faltaParaGerar(c, p.formato).length);
@@ -182,6 +254,7 @@ Deno.serve(async (req) => {
       case "cofre_hashes": return json(await cofreHashes(sb));
       case "cofre_sync": return json(await cofreSync(sb, corpo));
       case "cofre_ler": return json(await cofreLer(sb, corpo.pasta ? String(corpo.pasta) : null));
+      case "kit_do_cofre": return json(await kitDoCofre(sb, String(corpo.cliente_id ?? "")));
       case "drive_pastas": return json(await drivePastas(sb, String(corpo.cliente_id ?? "")));
       case "molde": return json({ molde: await gerarMolde(sb, String(corpo.cliente_id ?? ""), corpo.tipo) });
       case "molde_ajustar": {
