@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  ARQUIVO_LOG, aplicarAlteracoes, conferirCampos, conferirEstrutura, faltaParaGerar, fontFace, htmlParaRender,
-  instanteBrasilia, laminasDaResposta, montarContexto, motivosDoTexto, mudancasCofre, postsDaSemana, preencherMolde,
-  proximoPilar, recortarLog, segundaDaSemana, usosDeFotos, validarMolde,
+  AGENDA_PADRAO, ARQUIVO_LOG, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehLogoDoCofre,
+  faltaParaGerar, fontFace, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
+  mudancasCofre, normalizarNome, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
+  usosDeFotos, validarMolde, varianteDoNome,
 } from "../../supabase/functions/conteudo/regras.ts";
 import type {
   Alteracao, CampoMolde, Lamina, Molde, Moldes, RespostaTexto, TipoMolde,
@@ -193,4 +194,58 @@ test("esquema do texto pede tema, legenda e lâminas", () => {
 test("preencherMolde e htmlParaRender: nome herdado do Object e '$&' no CSS não quebram", () => {
   assert.equal(preencherMolde("{{constructor}}|{{__proto__}}", [], {}), "|");
   assert.ok(htmlParaRender("<html><head></head><body></body></html>", { cssFontes: "", ajusteCss: "a::after{content:'$&'}" }).includes("content:'$&'"));
+});
+
+test("normalizarNome e slugFontshare", () => {
+  assert.equal(normalizarNome("Kobe Growth (teste)"), "kobegrowthteste");
+  assert.equal(normalizarNome("Clínica Ação"), "clinicaacao");
+  assert.equal(slugFontshare("Clash Display"), "clash-display");
+  assert.equal(slugFontshare("  Açaí  --Sans! "), "acai-sans");
+});
+
+test("dimensoesImagem lê PNG, JPEG e SVG; outro formato dá null", () => {
+  const png = new Uint8Array(24);
+  png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  png.set([0, 0, 0x04, 0x38], 16); // 1080
+  png.set([0, 0, 0x05, 0x46], 20); // 1350
+  assert.deepEqual(dimensoesImagem(png), { largura: 1080, altura: 1350 });
+  // JPEG: SOI, APP0 (segmento de 16 bytes), SOF0 com altura 200 e largura 600
+  const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0xc8, 0x02, 0x58, 0x03]);
+  assert.deepEqual(dimensoesImagem(jpg), { largura: 600, altura: 200 });
+  const enc = (s: string): Uint8Array => new TextEncoder().encode(s);
+  assert.deepEqual(dimensoesImagem(enc('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100"></svg>')), { largura: 300, altura: 100 });
+  assert.deepEqual(dimensoesImagem(enc('<svg width="120px" height="40" viewBox="0 0 1 1"></svg>')), { largura: 120, altura: 40 });
+  assert.equal(dimensoesImagem(enc("texto qualquer")), null);
+  assert.equal(dimensoesImagem(new Uint8Array(3)), null);
+});
+
+test("varianteDoNome e ehLogoDoCofre", () => {
+  assert.equal(varianteDoNome("Logo Branca.png"), "clara");
+  assert.equal(varianteDoNome("logo-white.svg"), "clara");
+  assert.equal(varianteDoNome("logo_preta.png"), "escura");
+  assert.equal(varianteDoNome("logo-dark.png"), "escura");
+  assert.equal(varianteDoNome("logo ícone.png"), "icone");
+  assert.equal(varianteDoNome("logo.png"), "principal");
+  assert.equal(ehLogoDoCofre("Anexos/Logo Kobe.PNG"), true);
+  assert.equal(ehLogoDoCofre("Anexos/logo.svg"), true);
+  assert.equal(ehLogoDoCofre("Anexos/foto.png"), false);
+  assert.equal(ehLogoDoCofre("Anexos/sub/logo.png"), false);
+  assert.equal(ehLogoDoCofre("Outra/logo.png"), false);
+  assert.equal(ehLogoDoCofre("Anexos/logo.pdf"), false);
+});
+
+test("casarConta: uma candidata casa, zero ou duas não", () => {
+  const contas = [{ id: "1", usuario: "kobegrowth", nome: "Kobe Growth" }, { id: "2", usuario: "outra", nome: "Outra Marca" }];
+  assert.equal(casarConta("Kobe Growth (teste)", contas), "1");
+  assert.equal(casarConta("Marca Inexistente", contas), null);
+  assert.equal(casarConta("Outra", [...contas, { id: "3", usuario: "outra.oficial", nome: "Outra Oficial" }]), null);
+  assert.equal(casarConta("ab", contas), null);
+});
+
+test("linkDrive, AGENDA_PADRAO e montarContexto sem Anexos", () => {
+  assert.equal(linkDrive("fotos em https://drive.google.com/drive/u/1/folders/AbC_12-x?usp=sharing e mais"), "https://drive.google.com/drive/u/1/folders/AbC_12-x");
+  assert.equal(linkDrive("https://drive.google.com/drive/folders/XYZ"), "https://drive.google.com/drive/folders/XYZ");
+  assert.equal(linkDrive("sem link"), null);
+  assert.deepEqual(AGENDA_PADRAO.map((a) => [a.dia, a.hora, a.formato]), [[1, "09:00", "carrossel"], [3, "12:00", "estatico"], [5, "18:00", "carrossel"]]);
+  assert.equal(montarContexto([{ caminho: "Anexos/logo.png", conteudo: "k/abc.png" }, { caminho: "Kobe.md", conteudo: "central" }]), "=== Kobe.md ===\ncentral");
 });

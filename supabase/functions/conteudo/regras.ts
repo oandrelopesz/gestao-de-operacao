@@ -30,7 +30,7 @@ export const ARQUIVO_LOG = "Log (60 dias)";
 export const LEGENDA_MAX = 2200;
 
 export interface Logo { variante: VarianteLogo; chave: string; largura: number; altura: number }
-export interface Fonte { familia: string; origem: "google" | "arquivo"; chave?: string; peso?: number }
+export interface Fonte { familia: string; origem: "google" | "fontshare" | "arquivo"; chave?: string; peso?: number }
 export interface Pilar { nome: string; descricao: string }
 /** dia: 0 = domingo ... 6 = sábado (como no GMN); hora "HH:MM" de Brasília. */
 export interface ItemAgenda { dia: number; hora: string; formato: Formato }
@@ -143,6 +143,82 @@ export function validarMolde(tipo: TipoMolde, html: string, campos: CampoMolde[]
   return motivos;
 }
 
+/** Minúsculas, sem acento, só [a-z0-9]: "Kobe Growth (teste)" vira "kobegrowthteste". */
+export function normalizarNome(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** Nome da família no Fontshare: "Clash Display" vira "clash-display". */
+export function slugFontshare(familia: string): string {
+  return familia.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+/** Largura e altura de PNG, JPEG ou SVG; outro formato (ou arquivo cortado) dá null. */
+export function dimensoesImagem(bytes: Uint8Array): { largura: number; altura: number } | null {
+  const u16 = (i: number) => (bytes[i] << 8) | bytes[i + 1];
+  const u32 = (i: number) => ((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]) >>> 0;
+  if (bytes.length >= 24 && u32(0) === 0x89504e47 && u32(4) === 0x0d0a1a0a) return { largura: u32(16), altura: u32(20) };
+  if (bytes.length > 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    let i = 2;
+    while (i + 8 < bytes.length) {
+      if (bytes[i] !== 0xff) return null;
+      const m = bytes[i + 1];
+      if (m === 0xff) { i++; continue; }
+      if ((m >= 0xc0 && m <= 0xc3) || (m >= 0xc5 && m <= 0xc7) || (m >= 0xc9 && m <= 0xcb) || (m >= 0xcd && m <= 0xcf)) {
+        return { largura: u16(i + 7), altura: u16(i + 5) };
+      }
+      i += m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7) ? 2 : 2 + u16(i + 2);
+    }
+    return null;
+  }
+  const tag = /<svg[^>]*>/i.exec(new TextDecoder().decode(bytes.subarray(0, 4096)));
+  if (!tag) return null;
+  const num = (re: RegExp) => {
+    const m = re.exec(tag[0]);
+    return m ? Number(m[1]) : NaN;
+  };
+  const l = num(/\swidth\s*=\s*["']\s*([\d.]+)(?:px)?\s*["']/i);
+  const a = num(/\sheight\s*=\s*["']\s*([\d.]+)(?:px)?\s*["']/i);
+  if (l > 0 && a > 0) return { largura: l, altura: a };
+  const vb = /viewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*["']/i.exec(tag[0]);
+  return vb && Number(vb[1]) > 0 && Number(vb[2]) > 0 ? { largura: Number(vb[1]), altura: Number(vb[2]) } : null;
+}
+
+/** Variante da logo pelo nome do arquivo (clara, escura, ícone; senão principal). */
+export function varianteDoNome(nome: string): VarianteLogo {
+  const n = normalizarNome(nome);
+  if (/clar|branc|negativ|white|light/.test(n)) return "clara";
+  if (/escur|dark|pret|black/.test(n)) return "escura";
+  if (/icone|icon|simbolo|symbol/.test(n)) return "icone";
+  return "principal";
+}
+
+/** Imagem de logo na pasta Anexos do cofre (o nome do arquivo tem "logo"). */
+export function ehLogoDoCofre(caminho: string): boolean {
+  return /^Anexos\/[^/]*logo[^/]*\.(png|jpe?g|webp|svg)$/i.test(caminho);
+}
+
+/** Id da conta do Instagram do cliente pelo nome; só se houver exatamente uma candidata. */
+export function casarConta(nomeCliente: string, contas: { id: string; usuario: string; nome: string }[]): string | null {
+  const n = normalizarNome(nomeCliente);
+  if (n.length < 3) return null;
+  const candidatas = contas.filter((c) => {
+    const u = normalizarNome(c.usuario);
+    return u.includes(n) || normalizarNome(c.nome).includes(n) || (u.length >= 4 && n.includes(u));
+  });
+  return candidatas.length === 1 ? candidatas[0].id : null;
+}
+
+/** Primeiro link de pasta do Google Drive do texto. */
+export function linkDrive(texto: string): string | null {
+  return /https:\/\/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/[\w-]+/.exec(texto)?.[0] ?? null;
+}
+
+/** Agenda de quem ainda não tem: segunda 09:00 carrossel, quarta 12:00 estático, sexta 18:00 carrossel. */
+export const AGENDA_PADRAO: ItemAgenda[] = [
+  { dia: 1, hora: "09:00", formato: "carrossel" }, { dia: 3, hora: "12:00", formato: "estatico" }, { dia: 5, hora: "18:00", formato: "carrossel" },
+];
+
 /** Pilar da vez: o primeiro nunca usado; senão o usado há mais tempo. `usados`: do post mais novo para o mais velho. */
 export function proximoPilar(pilares: Pilar[], usados: (string | null)[]): Pilar | null {
   if (!pilares.length) return null;
@@ -194,7 +270,7 @@ export function recortarLog(texto: string, hoje: string, dias = 60): string {
 /** Contexto do cliente para a IA: nota central, Log recente e documentos, nessa ordem, até `limite` caracteres. */
 export function montarContexto(arquivos: { caminho: string; conteudo: string }[], limite = 100_000): string {
   const peso = (c: string) => (c === ARQUIVO_LOG ? 1 : c.includes("/") ? 2 : 0);
-  const ordem = [...arquivos].sort((a, b) => peso(a.caminho) - peso(b.caminho) || a.caminho.localeCompare(b.caminho));
+  const ordem = arquivos.filter((a) => !a.caminho.startsWith("Anexos/")).sort((a, b) => peso(a.caminho) - peso(b.caminho) || a.caminho.localeCompare(b.caminho));
   let saida = "";
   for (const a of ordem) {
     const bloco = `\n\n=== ${a.caminho} ===\n${a.conteudo.trim()}`;
