@@ -13,7 +13,7 @@ import { carregarRecursos, montarLamina } from "./montagem.ts";
 import { ESQUEMA_ESCOLHA, ESQUEMA_TEXTO, SYSTEM_ESCOLHA, pedidoEscolha, promptImagem, promptTexto } from "./prompts.ts";
 import { LimiteCloudflare, renderizar } from "./render.ts";
 import {
-  CAMPO_FOTO, MOLDES_DO_FORMATO, laminasDaResposta, montarContexto, motivosDoTexto, proximoPilar, usosDeFotos,
+  CAMPO_FOTO, MOLDES_DO_FORMATO, laminasDaResposta, moldesEmUso, montarContexto, motivosDoTexto, proximoPilar, usosDeFotos,
   type Formato, type Lamina, type Molde, type RespostaTexto, type StatusPost,
 } from "./regras.ts";
 
@@ -24,10 +24,10 @@ const msg = (e: any) => String(e?.message ?? e);
 const livre = () => `processando_desde.is.null,processando_desde.lt."${new Date(Date.now() - TRAVA_MS).toISOString()}"`;
 
 export async function passo(sb: any): Promise<{ posts: { id: string; status: string; erro?: string }[] }> {
-  const { data, error } = await sb.from("conteudo_posts").select("id, status")
+  const { data, error } = await sb.from("conteudo_posts").select("id, status, tentativas")
     .in("status", ["texto", "imagens", "montando"]).or(livre()).order("created_at").limit(3);
   if (error) throw new Error(error.message);
-  const feitos = await Promise.all((data ?? []).map((p: any) => avancar(sb, p.id, p.status)));
+  const feitos = await Promise.all((data ?? []).map((p: any) => avancar(sb, p.id, p.status, p.tentativas ?? 0)));
   return { posts: feitos.filter((x) => x !== null) as { id: string; status: string; erro?: string }[] };
 }
 
@@ -36,26 +36,35 @@ async function gravar(sb: any, id: string, status: string, campos: Record<string
   if (error) throw new Error(error.message);
 }
 
-async function avancar(sb: any, id: string, status: StatusPost): Promise<{ id: string; status: string; erro?: string } | null> {
-  const { data: post } = await sb.from("conteudo_posts").update({ processando_desde: new Date().toISOString() })
+async function avancar(sb: any, id: string, status: StatusPost, tentativas: number): Promise<{ id: string; status: string; erro?: string } | null> {
+  // A tentativa conta já na trava: função derrubada por tempo (sem passar pelo catch) não refaz o post para sempre
+  if (tentativas >= MAX_TENTATIVAS) {
+    const erro = "A etapa não terminou em 3 tentativas (a função passou do tempo).";
+    const { data: preso } = await sb.from("conteudo_posts")
+      .update({ status: "erro", erro_etapa: status, erro, processando_desde: null, updated_at: new Date().toISOString() })
+      .eq("id", id).eq("status", status).or(livre()).select("id").maybeSingle();
+    return preso ? { id, status: "erro", erro } : null;
+  }
+  const { data: post } = await sb.from("conteudo_posts").update({ processando_desde: new Date().toISOString(), tentativas: tentativas + 1 })
     .eq("id", id).eq("status", status).or(livre()).select("*").maybeSingle();
   if (!post) return null; // outra passada pegou primeiro
   try {
     const { data: cliente, error } = await sb.from("conteudo_clientes").select("*").eq("id", post.conteudo_cliente_id).single();
     if (error) throw new Error(error.message);
-    const campos = status === "texto" ? await etapaTexto(sb, post, cliente)
-      : status === "imagens" ? await etapaImagens(sb, post, cliente)
-      : await etapaMontagem(sb, post, cliente);
+    const c = { ...cliente, moldes: moldesEmUso(cliente.moldes ?? {}) };
+    const campos = status === "texto" ? await etapaTexto(sb, post, c)
+      : status === "imagens" ? await etapaImagens(sb, post, c)
+      : await etapaMontagem(sb, post, c);
     await gravar(sb, id, status, { ...campos, processando_desde: null, tentativas: 0, erro: null, erro_etapa: null });
     return { id, status: String(campos.status) };
   } catch (e) {
     console.error("conteudo", status, id, e);
     // Limite do Cloudflare: não conta tentativa; a trava (processando_desde) segura o post por 10 minutos
     if (e instanceof LimiteCloudflare) {
-      await gravar(sb, id, status, { aviso: msg(e) });
+      await gravar(sb, id, status, { aviso: msg(e), tentativas: post.tentativas - 1 });
       return { id, status, erro: msg(e) };
     }
-    const tentativas = (post.tentativas ?? 0) + 1;
+    const tentativas = post.tentativas; // já somada na trava
     const fim = tentativas >= MAX_TENTATIVAS;
     await gravar(sb, id, status, fim
       ? { status: "erro", erro_etapa: status, erro: msg(e), tentativas, processando_desde: null }

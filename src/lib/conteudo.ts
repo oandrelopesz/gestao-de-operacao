@@ -56,9 +56,17 @@ export async function fetchClientes(): Promise<ClienteConteudo[]> {
   return (data ?? []) as ClienteConteudo[];
 }
 
-export async function ligarCliente(v: { cliente_id: string; pasta_cofre: string | null; ig_conta_id: string | null; ativo?: boolean }): Promise<void> {
-  const { error } = await clientesTab().insert([v]);
+export async function ligarCliente(v: { cliente_id: string; pasta_cofre: string | null; ig_conta_id: string | null; ativo?: boolean }): Promise<string> {
+  const { data, error } = await clientesTab().insert([v]).select("id").single();
   if (error) throw error;
+  return data.id as string;
+}
+
+/** Lê a lista atual no banco antes de mudar, para dois envios seguidos não apagarem um ao outro. */
+export async function mudarLista<K extends "logos" | "fontes">(clienteId: string, campo: K, fn: (atual: ClienteConteudo[K]) => ClienteConteudo[K]): Promise<void> {
+  const { data, error } = await clientesTab().select(campo).eq("id", clienteId).single();
+  if (error) throw error;
+  await salvarCliente(clienteId, { [campo]: fn((data?.[campo] ?? []) as ClienteConteudo[K]) });
 }
 
 export async function salvarCliente(id: string, campos: CamposCliente): Promise<void> {
@@ -138,12 +146,14 @@ export async function aprovarMolde(clienteId: string, tipo: TipoMolde): Promise<
   const moldes = await moldesAtuais(clienteId);
   const m = moldes[tipo];
   if (!m) throw new Error("O molde não existe mais.");
-  await salvarCliente(clienteId, { moldes: { ...moldes, [tipo]: { ...m, aprovado_em: new Date().toISOString() } } });
+  const { anterior: _, ...resto } = m;
+  const aprovado: Molde = { ...resto, aprovado_em: new Date().toISOString() };
+  await salvarCliente(clienteId, { moldes: { ...moldes, [tipo]: aprovado } });
   const { data, error } = await postsTab().select("id, laminas").eq("conteudo_cliente_id", clienteId).eq("status", "aguardando");
   if (error) throw error;
   let remontados = 0;
   for (const p of data ?? []) {
-    const laminas = remontarComMolde(p.laminas as Lamina[], tipo, m);
+    const laminas = remontarComMolde(p.laminas as Lamina[], tipo, aprovado);
     if (!laminas) continue;
     // Post mexido em outra aba nesse meio tempo fica como está
     await mudarSe(p.id, "aguardando", { laminas, status: "montando" }).then(() => remontados++, () => {});
@@ -207,7 +217,11 @@ async function mudarSe(id: string, de: StatusPost, campos: Record<string, unknow
   if (!data?.length) throw new Error("O post mudou enquanto você mexia nele; abra de novo.");
 }
 
-export const descartarPost = (id: string) => mudarSe(id, "aguardando", { status: "descartado" });
+/** Descarta e libera o dia da agenda (origem_data null) para "Gerar a semana" recriar. */
+export async function descartarPost(post: { id: string; status: StatusPost }): Promise<void> {
+  if (post.status !== "aguardando" && post.status !== "erro") throw new Error("Só dá para descartar post aguardando ou com erro.");
+  await mudarSe(post.id, post.status, { status: "descartado", origem_data: null });
+}
 export const trocarData = (id: string, quando: string) => mudarSe(id, "aguardando", { agendado_para: quando });
 
 export async function trocarFormato(post: PostConteudo, formato: Formato): Promise<void> {

@@ -27,7 +27,7 @@ import { ESQUEMA_AJUSTE, ESQUEMA_KIT, ESQUEMA_PILARES, SYSTEM_KIT, SYSTEM_PILARE
 import { cloudflareConfigurado, resolverFonte } from "./render.ts";
 import {
   AGENDA_PADRAO, ErroHttp, LEGENDA_MAX, aplicarAlteracoes, casarConta, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre, faltaParaGerar, fontesDoCofre, linkDrive,
-  montarContexto, notaDoKit, pilaresDaNota, pilaresDaSemana, postsDaSemana, segundaDaSemana, varianteDoNome, type Alteracao, type Fonte, type Logo, type Pilar,
+  montarContexto, moldesEmUso, notaDoKit, pilaresDaNota, pilaresDaSemana, postsDaSemana, segundaDaSemana, varianteDoNome, type Alteracao, type Fonte, type Logo, type Pilar,
 } from "./regras.ts";
 
 const cors = {
@@ -122,6 +122,7 @@ async function kitDoCofre(sb: any, clienteId: string, soFontes = false) {
   const notas = linhas.filter((l: any) => l.caminho.endsWith(".md"));
   const ds = linhas.find((l: any) => notaDoKit(l.caminho) === "design_system");
   const tomNota = linhas.find((l: any) => notaDoKit(l.caminho) === "tom_de_voz");
+  if (soFontes && !c.fontes?.length) throw new ErroHttp(400, 'Este cliente ainda não tem fontes: use "Puxar tudo do cofre", que lê as fontes do design system.');
   // so_fontes: sem Claude, os papéis são as famílias que o cliente já tem
   const r = soFontes
     ? { tom_de_voz: "", fontes: (c.fontes ?? []).map((f: Fonte) => ({ familia: f.familia, reservas: [] as string[] })), saude: false }
@@ -178,7 +179,7 @@ async function kitDoCofre(sb: any, clienteId: string, soFontes = false) {
     design_system: ds ? ds.conteudo : c.design_system,
     tom_de_voz: tomNota ? tomNota.conteudo : r.tom_de_voz,
     fontes: fontes.length ? fontes : c.fontes ?? [],
-    pilares, saude: !!r.saude, logos, ig_conta_id: conta, drive_url: drive, drive_pastas: pastasDrive,
+    pilares, saude: c.saude || !!r.saude, logos, ig_conta_id: conta, drive_url: drive, drive_pastas: pastasDrive,
     agenda: c.agenda?.length ? c.agenda : AGENDA_PADRAO, updated_at: agora(),
   }).eq("id", c.id);
   if (e4) throw new Error(e4.message);
@@ -231,7 +232,7 @@ async function gerarSemana(sb: any, segunda: string, clienteId: string | null) {
   const pulados: { cliente: string; motivo: string }[] = [];
   for (const c of clientes ?? []) {
     const nome = c.clientes?.nome ?? "Cliente";
-    const itens = postsDaSemana(segunda, c.agenda ?? []);
+    const itens = postsDaSemana(segunda, c.agenda ?? [], Date.now() + 60 * 60_000);
     if (!itens.length) continue;
     const faltas = [...new Set(itens.flatMap((p) => faltaParaGerar(c, p.formato)))];
     if (faltas.length) pulados.push({ cliente: nome, motivo: `falta ${faltas.join(", ")}` });
@@ -259,7 +260,7 @@ async function ajustar(sb: any, postId: string, pedido: string) {
   if (e2) throw new Error(e2.message);
   const { data: arquivos } = c.pasta_cofre ? await sb.from("conteudo_cofre").select("caminho, conteudo").eq("pasta", c.pasta_cofre) : { data: [] };
   const contexto = montarContexto(arquivos ?? []);
-  const m = promptAjuste({ laminas: post.laminas, legenda: post.legenda, moldes: c.moldes, pastas: c.drive_pastas ?? [], pedido });
+  const m = promptAjuste({ laminas: post.laminas, legenda: post.legenda, moldes: moldesEmUso(c.moldes ?? {}), pastas: c.drive_pastas ?? [], pedido });
   const conteudo = contexto
     ? [{ type: "text", text: `Contexto do cliente (cofre do Obsidian):\n\n${contexto}`, cache_control: { type: "ephemeral" } }, { type: "text", text: m.user }]
     : m.user;

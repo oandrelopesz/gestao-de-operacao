@@ -72,12 +72,16 @@ export function AbaMoldes({ cliente, recarregar }: { cliente: ClienteConteudo; r
               <CardContent className="space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{ROTULO_MOLDE[t]}</span>
-                  {m && <Badge variant={m.aprovado_em ? "secondary" : "outline"}>{m.aprovado_em ? `Aprovado (v${m.versao})` : `Aguardando aprovação (v${m.versao})`}</Badge>}
+                  {m && (m.anterior
+                    ? <Badge variant="outline">{`Nova versão aguardando aprovação (v${m.versao}); a v${m.anterior.versao} segue em uso`}</Badge>
+                    : <Badge variant={m.aprovado_em ? "secondary" : "outline"}>{m.aprovado_em ? `Aprovado (v${m.versao})` : `Aguardando aprovação (v${m.versao})`}</Badge>)}
                 </div>
                 {m?.previa_chave && criando !== t
                   ? <img src={urlArquivo(m.previa_chave)} alt={`Prévia: ${ROTULO_MOLDE[t]}`} className="aspect-[4/5] w-full rounded border object-cover" />
-                  : <div className="flex aspect-[4/5] w-full items-center justify-center rounded border bg-muted text-sm text-muted-foreground">
-                      {criando === t ? <Loader2 className="h-5 w-5 animate-spin" /> : "Ainda não criado"}
+                  : <div className="flex aspect-[4/5] w-full items-center justify-center rounded border bg-muted px-2 text-center text-sm text-muted-foreground">
+                      {criando === t
+                        ? <Loader2 className="h-5 w-5 animate-spin" />
+                        : !m ? "Ainda não criado" : "Prévia não gerada. Clique em Refazer (sem custo de IA)."}
                     </div>}
                 {m && (
                   <div className="flex flex-wrap gap-2">
