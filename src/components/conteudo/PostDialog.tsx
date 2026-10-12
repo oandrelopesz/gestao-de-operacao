@@ -118,7 +118,7 @@ export function PostDialog({ post, cliente, fechar }: { post: PostConteudo; clie
 
             <section className="space-y-1">
               <Label>Legenda ({legenda.length}/{LEGENDA_MAX})</Label>
-              <Textarea rows={8} value={legenda} disabled={!aguardando} onChange={(e) => setLegenda(e.target.value)} />
+              <Textarea rows={8} maxLength={LEGENDA_MAX} value={legenda} disabled={!aguardando} onChange={(e) => setLegenda(e.target.value)} />
             </section>
             {aguardando && editado && (
               <Button onClick={() => fazer("textos", () => salvarTextos(post, laminas, legenda), "Alterações salvas.")} disabled={!!ocupado}>{girando("textos")}Salvar alterações</Button>

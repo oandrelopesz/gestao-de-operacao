@@ -93,7 +93,7 @@ export function escaparHtml(s: string): string {
 export function preencherMolde(html: string, campos: CampoMolde[], valores: Record<string, string>): string {
   const tipos = new Map(campos.map((c) => [c.nome, c.tipo]));
   return html.replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (_, nome: string) => {
-    const v = valores[nome] ?? "";
+    const v = typeof valores[nome] === "string" ? valores[nome] : ""; // "constructor" e afins não são campos
     const tipo = tipos.get(nome) ?? (NOME_LOGO.test(nome) ? "logo" : "texto");
     if (tipo === "texto") return escaparHtml(v).replace(/\r?\n/g, "<br>");
     return /^(data:image\/|https:\/\/)/.test(v) ? escaparHtml(v) : "";
@@ -275,8 +275,8 @@ export function htmlParaRender(html: string, o: { cssFontes: string; ajusteCss?:
   const cabeca = `${base}<style>${o.cssFontes}</style>${ajuste}`;
   const pronto = `<script>Promise.all([document.fonts.ready,...Array.from(document.images).map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r}))]).then(()=>document.body.setAttribute("data-pronto","1"))</script>`;
   let doc = /<html[\s>]/i.test(html) ? html : `<!doctype html><html><head></head><body>${html}</body></html>`;
-  doc = /<\/head>/i.test(doc) ? doc.replace(/<\/head>/i, `${cabeca}</head>`) : doc.replace(/<body[^>]*>/i, (m) => `${m}${cabeca}`);
-  return /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, `${pronto}</body>`) : doc + pronto;
+  doc = /<\/head>/i.test(doc) ? doc.replace(/<\/head>/i, () => `${cabeca}</head>`) : doc.replace(/<body[^>]*>/i, (m) => `${m}${cabeca}`);
+  return /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, () => `${pronto}</body>`) : doc + pronto;
 }
 
 const FORMATO_FONTE: Record<string, [string, string]> = {

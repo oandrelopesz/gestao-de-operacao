@@ -125,7 +125,7 @@ export async function usarAjusteNoMolde(clienteId: string, tipo: TipoMolde, css:
   const m = moldes[tipo];
   if (!m) throw new Error("O molde não existe mais.");
   const estilo = `<style>${css.replace(/<\/style/gi, "")}</style>`;
-  const html = /<\/head>/i.test(m.html) ? m.html.replace(/<\/head>/i, `${estilo}</head>`) : estilo + m.html;
+  const html = /<\/head>/i.test(m.html) ? m.html.replace(/<\/head>/i, () => `${estilo}</head>`) : estilo + m.html;
   await salvarCliente(clienteId, { moldes: { ...moldes, [tipo]: { ...m, html, versao: m.versao + 1 } } });
 }
 

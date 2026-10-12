@@ -189,3 +189,8 @@ test("promptAjuste numera as lâminas a partir de 1", () => {
 test("esquema do texto pede tema, legenda e lâminas", () => {
   assert.deepEqual(ESQUEMA_TEXTO.required, ["tema", "legenda", "laminas"]);
 });
+
+test("preencherMolde e htmlParaRender: nome herdado do Object e '$&' no CSS não quebram", () => {
+  assert.equal(preencherMolde("{{constructor}}|{{__proto__}}", [], {}), "|");
+  assert.ok(htmlParaRender("<html><head></head><body></body></html>", { cssFontes: "", ajusteCss: "a::after{content:'$&'}" }).includes("content:'$&'"));
+});

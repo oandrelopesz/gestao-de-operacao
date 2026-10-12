@@ -67,7 +67,8 @@ async function etapaTexto(sb: any, post: any, c: any): Promise<Record<string, un
   const formato = post.formato as Formato;
   const sem = MOLDES_DO_FORMATO[formato].filter((t) => !c.moldes?.[t]?.aprovado_em);
   if (sem.length) throw new Error(`Faltam moldes aprovados: ${sem.join(", ")}.`);
-  const { data: arquivos, error } = await sb.from("conteudo_cofre").select("caminho, conteudo").eq("pasta", c.pasta_cofre ?? "");
+  if (!c.pasta_cofre) throw new Error("O cliente não tem pasta do cofre ligada.");
+  const { data: arquivos, error } = await sb.from("conteudo_cofre").select("caminho, conteudo").eq("pasta", c.pasta_cofre);
   if (error) throw new Error(error.message);
   const contexto = montarContexto(arquivos ?? []);
   if (!contexto) throw new Error("O cofre deste cliente ainda não foi sincronizado.");
@@ -189,5 +190,6 @@ async function etapaMontagem(sb: any, post: any, c: any): Promise<Record<string,
     laminas[i] = { ...l, jpg_chave: chave };
     await gravar(sb, post.id, "montando", { laminas });
   }
-  return { status: "aguardando", laminas };
+  // o aviso do limite do Cloudflare não vale mais depois que a montagem terminou
+  return { status: "aguardando", laminas, aviso: String(post.aviso ?? "").startsWith("Limite do Cloudflare") ? null : post.aviso };
 }

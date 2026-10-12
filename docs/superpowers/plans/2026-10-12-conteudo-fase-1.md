@@ -250,22 +250,27 @@ import {
   instanteBrasilia, laminasDaResposta, montarContexto, motivosDoTexto, mudancasCofre, postsDaSemana, preencherMolde,
   proximoPilar, recortarLog, segundaDaSemana, usosDeFotos, validarMolde,
 } from "../../supabase/functions/conteudo/regras.ts";
+import type {
+  Alteracao, CampoMolde, Lamina, Molde, Moldes, RespostaTexto, TipoMolde,
+} from "../../supabase/functions/conteudo/regras.ts";
 import { motivosSaude } from "../../supabase/functions/gmn/regras.ts";
 
-const campos = [
+const campos: CampoMolde[] = [
   { nome: "titulo", tipo: "texto", max: 20, exemplo: "" },
   { nome: "foto", tipo: "imagem", max: 0, exemplo: "" },
 ];
-const alt = (a) => ({ alvo: "campo", lamina: null, campo: null, valor: null, descricao: null, pasta_id: null, ajuste_css: null, ...a });
-const molde = (c, aprovado = true) => ({ html: "", campos: c, versao: 1, aprovado_em: aprovado ? "2026-10-12T00:00:00Z" : null, previa_chave: null });
-const t30 = { nome: "titulo", tipo: "texto", max: 30, exemplo: "" };
-const moldesC = {
+const alt = (a: Partial<Alteracao>): Alteracao =>
+  ({ alvo: "campo", lamina: null, campo: null, valor: null, descricao: null, pasta_id: null, ajuste_css: null, ...a });
+const molde = (c: CampoMolde[], aprovado = true): Molde =>
+  ({ html: "", campos: c, versao: 1, aprovado_em: aprovado ? "2026-10-12T00:00:00Z" : null, previa_chave: null });
+const t30: CampoMolde = { nome: "titulo", tipo: "texto", max: 30, exemplo: "" };
+const moldesC: Moldes = {
   capa: molde([t30]),
   texto: molde([t30, { nome: "texto", tipo: "texto", max: 200, exemplo: "" }]),
   foto: molde([t30, { nome: "texto", tipo: "texto", max: 200, exemplo: "" }, { nome: "foto", tipo: "imagem", max: 0, exemplo: "" }]),
   cta: molde([t30]),
 };
-const lam = (m, c, imagem_descricao = null) =>
+const lam = (m: TipoMolde, c: Record<string, string>, imagem_descricao: string | null = null): RespostaTexto["laminas"][number] =>
   ({ molde: m, campos: Object.entries(c).map(([nome, valor]) => ({ nome, valor })), imagem_descricao, pasta_id: null });
 
 test("preencherMolde escapa texto, quebra linha e só aceita imagem data: ou https:", () => {
@@ -292,7 +297,7 @@ test("conferirEstrutura do carrossel e do estático", () => {
 });
 
 test("validarMolde", () => {
-  const ok = [{ nome: "titulo", tipo: "texto", max: 60, exemplo: "Oi" }, { nome: "logo_clara", tipo: "logo", max: 0, exemplo: "" }];
+  const ok: CampoMolde[] = [{ nome: "titulo", tipo: "texto", max: 60, exemplo: "Oi" }, { nome: "logo_clara", tipo: "logo", max: 0, exemplo: "" }];
   assert.deepEqual(validarMolde("capa", '<html><body><h1>{{titulo}}</h1><img src="{{logo_clara}}"></body></html>', ok, ["clara"]), []);
   assert.deepEqual(validarMolde("capa", '<h1>{{titulo}}</h1><img src="{{logo_clara}}">', ok, ["escura"]), ["logo logo_clara não existe no kit"]);
   assert.ok(validarMolde("texto", "<h1>{{titulo}}</h1>", [ok[0]], []).includes("falta o campo texto"));
@@ -339,7 +344,7 @@ test("mudancasCofre envia novos e mudados, remove os que sumiram", () => {
 });
 
 test("aplicarAlteracoes mexe só no pedido e não altera o original", () => {
-  const laminas = [
+  const laminas: Lamina[] = [
     { molde: "capa", campos: { titulo: "A" }, jpg_chave: "k1" },
     { molde: "texto", campos: { titulo: "B", texto: "b" }, jpg_chave: "k2" },
     { molde: "cta", campos: { titulo: "C" }, jpg_chave: "k3" },
@@ -368,7 +373,7 @@ test("usosDeFotos guarda o uso mais recente de cada foto do Drive", () => {
 });
 
 test("faltaParaGerar", () => {
-  const base = { pasta_cofre: "Kobe Growth", ig_conta_id: "1", logos: [{ variante: "principal", chave: "k", largura: 1, altura: 1 }],
+  const base: Parameters<typeof faltaParaGerar>[0] = { pasta_cofre: "Kobe Growth", ig_conta_id: "1", logos: [{ variante: "principal", chave: "k", largura: 1, altura: 1 }],
     moldes: { capa: molde([]), texto: molde([]), foto: molde([]), cta: molde([], false) } };
   assert.deepEqual(faltaParaGerar(base, "carrossel"), ["moldes aprovados (CTA final)"]);
   assert.deepEqual(faltaParaGerar({ ...base, ig_conta_id: null, logos: [] }, "estatico"), ["conta do Instagram", "logo", "moldes aprovados (Post estático)"]);
@@ -388,7 +393,7 @@ test("fontFace embute a fonte com o peso", () => {
 });
 
 test("motivosDoTexto confere estrutura, limites, legenda e saúde", () => {
-  const r = { tema: "t", legenda: "Legenda", laminas: [lam("capa", { titulo: "Oi" }), lam("texto", { titulo: "A", texto: "b" }),
+  const r: RespostaTexto = { tema: "t", legenda: "Legenda", laminas: [lam("capa", { titulo: "Oi" }), lam("texto", { titulo: "A", texto: "b" }),
     lam("texto", { titulo: "A", texto: "b" }), lam("texto", { titulo: "A", texto: "100% garantido" }), lam("cta", { titulo: "Fale" })] };
   assert.deepEqual(motivosDoTexto(r, "carrossel", { moldes: moldesC, saude: false }), []);
   assert.ok(motivosDoTexto(r, "carrossel", { moldes: moldesC, saude: true }).some((m) => m.startsWith("saúde:")));
@@ -2572,7 +2577,7 @@ export function AbaKit({ cliente, recarregar }: { cliente: ClienteConteudo; reca
         <DialogContent>
           <DialogHeader><DialogTitle>Escolha a nota do cofre</DialogTitle></DialogHeader>
           <div className="space-y-2">
-            {cofre?.arquivos.map((a) => (
+            {cofre && cofre.arquivos.map((a) => (
               <Button key={a.caminho} variant="outline" className="w-full justify-start"
                 onClick={() => { setF({ ...f, [cofre.destino]: a.conteudo }); setCofre(null); }}>{a.caminho}</Button>
             ))}
@@ -3395,3 +3400,25 @@ git push
 - [ ] **Step 1: Nota do módulo** no formato das outras de `_knowledge/modulos/` (Para que serve, Como funciona, Dados, Código, Testes reais, Armadilhas, Pendências, Referências), com: fila e trava, moldes, cofre agendado (tarefa "Gestao - Sincronizar cofre", log em `%USERPROFILE%\.gestao\cofre-sync.log`), secrets (só nomes), custos medidos no teste e a Fase 2 pendente.
 - [ ] **Step 2: Estado, histórico, frentes, banco, deploy e decisão** atualizados; sem chave, sem travessão, WikiLinks só para notas que existem.
 - [ ] **Step 3: Memória** `conteudo-automatico.md` atualizada (estado da Fase 1).
+
+---
+
+## Itens de execução (Jev)
+
+Cada item copia o código do plano acima, sem mudar (a Task e os Steps indicados). O `tsc` cobre o projeto inteiro, por isso os itens da tela andam em fila.
+
+- [r] C1 | files: supabase/migrations/20261012120000_conteudo.sql | check: node --env-file=.env -e "for (const t of ['conteudo_clientes','conteudo_posts','conteudo_cofre']) fetch(process.env.VITE_SUPABASE_URL+'/rest/v1/'+t+'?select=*&limit=1',{headers:{apikey:process.env.VITE_SUPABASE_PUBLISHABLE_KEY}}).then(r=>console.log(t,r.status))" | exec: sonnet | Task 1 inteira: criar a migration (Step 1), aplicar com db push no banco de produção (Step 2; se o verificador barrar, parar e reportar) e conferir que as 3 tabelas respondem 200 (Step 3); commit (Step 4)
+- [r] C2 | files: supabase/functions/conteudo/regras.ts,supabase/functions/gmn/regras.ts,src/lib/conteudoRegras.test.ts | check: node --test src/lib/conteudoRegras.test.ts | exec: haiku | Task 2 inteira: testes, motivosSaude no GMN, regras.ts; rodar também npm test; commit
+- [r] C3 | files: supabase/functions/conteudo/prompts.ts,src/lib/conteudoRegras.test.ts | after: C2 | check: node --test src/lib/conteudoRegras.test.ts | exec: haiku | Task 3 inteira: acrescentar os testes dos prompts e criar prompts.ts; commit
+- [r] C4 | files: supabase/functions/gmn/openai.ts,supabase/functions/conteudo/arquivos.ts,supabase/functions/conteudo/claude.ts | after: C2 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/claude.ts supabase/functions/conteudo/arquivos.ts supabase/functions/gmn/index.ts | exec: haiku | Task 4 Steps 1 a 3: gerarImagem com tamanho e formato opcionais, arquivos.ts e claude.ts; commit só desses 3 arquivos
+- [r] C5 | files: supabase/functions/conteudo/render.ts,supabase/functions/conteudo/drive.ts,supabase/functions/conteudo/montagem.ts | after: C4 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/montagem.ts supabase/functions/conteudo/drive.ts | exec: haiku | Task 4 Steps 4 a 6: render.ts, drive.ts e montagem.ts; rodar npm test; commit só desses 3 arquivos
+- [r] C6 | files: supabase/functions/conteudo/etapas.ts | after: C3,C5 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/etapas.ts | exec: sonnet | Task 5 inteira: a fila (passo) com texto, imagens e montagem; commit
+- [r] C7 | files: supabase/functions/conteudo/moldes.ts,supabase/functions/conteudo/index.ts,supabase/config.toml | after: C6 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/index.ts | exec: sonnet | Task 6 inteira: moldes.ts, roteador index.ts e verify_jwt false no config.toml; commit
+- [r] C8 | files: tools/cofre-sync/sync.mjs | after: C2 | check: node --check tools/cofre-sync/sync.mjs | exec: sonnet | Task 7: script do cofre (não rodar: a função ainda não está no ar); commit
+- [r] C9 | files: src/lib/conteudo.ts | after: C3 | check: npx tsc --noEmit -p . | exec: haiku | Task 8: camada de dados da tela; commit
+- [r] C10 | files: src/components/conteudo/Clientes.tsx,src/components/conteudo/GavetaCliente.tsx,src/components/conteudo/AbaKit.tsx,src/components/conteudo/AbaAgenda.tsx | after: C9 | check: npx tsc --noEmit -p . | exec: haiku | Task 9 Steps 2 a 5: Clientes, gaveta, Kit da marca, Pilares e agenda; commit só desses 4 arquivos
+- [r] C11 | files: src/routes/_authenticated/conteudo.tsx,src/lib/nav.tsx,src/routeTree.gen.ts | after: C10 | check: npx tsc --noEmit -p . | exec: haiku | Task 9 Steps 1, 6 e 7: página da rota, item no menu e rota no routeTree.gen.ts à mão (não rodar o gerador); git diff do routeTree só com linhas do Conteúdo; commit só desses 3 arquivos
+- [r] C12 | files: src/components/conteudo/AbaMoldes.tsx,src/components/conteudo/GavetaCliente.tsx | after: C11 | check: npx tsc --noEmit -p . | exec: haiku | Task 10 inteira: AbaMoldes e ligar na gaveta; commit
+- [r] C13 | files: src/components/conteudo/Semana.tsx,src/components/conteudo/PostDialog.tsx,src/routes/_authenticated/conteudo.tsx | after: C12 | check: npx tsc --noEmit -p . | exec: sonnet | Task 11 Steps 1 a 3 e 5: visão da semana, o post e ligar na página; rodar npm test; commit (a conferência no navegador fica com a sessão principal)
+- [ ] C14 | after: C1,C7,C8,C13 | check: curl -s https://uajusldnvzgakffofkhl.supabase.co/functions/v1/conteudo | exec: opus | Task 12: chaves, secrets, publicação da função e do site, cofre agendado e teste real com a Kobe (sessão principal)
+- [ ] C15 | after: C14 | exec: sonnet | Task 13: registro no cofre e na memória (sessão principal)

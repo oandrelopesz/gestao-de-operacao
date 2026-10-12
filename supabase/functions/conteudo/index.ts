@@ -21,7 +21,7 @@ import { passo } from "./etapas.ts";
 import { gerarMolde } from "./moldes.ts";
 import { ESQUEMA_AJUSTE, promptAjuste } from "./prompts.ts";
 import { cloudflareConfigurado } from "./render.ts";
-import { ErroHttp, aplicarAlteracoes, faltaParaGerar, postsDaSemana, segundaDaSemana, type Alteracao } from "./regras.ts";
+import { ErroHttp, LEGENDA_MAX, aplicarAlteracoes, faltaParaGerar, postsDaSemana, segundaDaSemana, type Alteracao } from "./regras.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -148,6 +148,7 @@ async function ajustar(sb: any, postId: string, pedido: string) {
   const m = promptAjuste({ laminas: post.laminas, legenda: post.legenda, moldes: c.moldes, pastas: c.drive_pastas ?? [], pedido });
   const r = await gerarJson<{ resposta: string; alteracoes: Alteracao[] }>({ system: m.system, conteudo: m.user, esquema: ESQUEMA_AJUSTE, esforco: "low" });
   const novo = aplicarAlteracoes(post.laminas, post.legenda, r.alteracoes);
+  if (novo.legenda.length > LEGENDA_MAX) throw new ErroHttp(400, `A legenda ficaria com ${novo.legenda.length} caracteres (máximo ${LEGENDA_MAX}); peça uma mais curta.`);
   const remontar = novo.laminas.some((l) => !l.jpg_chave);
   const status = novo.imagens ? "imagens" : remontar ? "montando" : "aguardando";
   const pedidos = [...(post.pedidos ?? []), { texto: pedido.trim(), em: agora(), resultado: r.resposta }];
