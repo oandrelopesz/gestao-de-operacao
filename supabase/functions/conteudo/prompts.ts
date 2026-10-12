@@ -44,6 +44,18 @@ export const ESQUEMA_AJUSTE = objeto({
 
 export const ESQUEMA_ESCOLHA = objeto({ escolhida: { type: "integer" } });
 
+export const ESQUEMA_KIT = objeto({
+  tom_de_voz: { type: "string" },
+  fontes: {
+    type: "array",
+    items: objeto({ familia: { type: "string" }, reservas: { type: "array", items: { type: "string" } } }),
+  },
+  pilares: { type: "array", items: objeto({ nome: { type: "string" }, descricao: { type: "string" } }) },
+  saude: { type: "boolean" },
+});
+
+export const SYSTEM_KIT = "Você monta o kit de marca de um cliente de agência para posts de Instagram, só com o que está no cofre do cliente. tom_de_voz: de 4 a 8 linhas práticas de como escrever para o público do cliente (vocabulário, nível de formalidade, o que evitar, frase da marca se houver). fontes: as famílias citadas no design system, na ordem título, texto e números, cada uma com as reservas que o próprio design system indicar; nunca invente fonte que o cofre não cita; sem design system com fonte, lista vazia. pilares: de 3 a 5 pilares de conteúdo para o Instagram, a partir do negócio, do público e do método do cliente, com uma descrição curta. saude: true só se o cliente for clínica, consultório, médico, dentista, estética médica ou outra área regulada pelo CFM ou pelo CFO.";
+
 export interface Mensagens { system: string; user: string }
 
 const REGRAS_TIPO: Record<TipoMolde, string> = {

@@ -10,7 +10,7 @@ import type {
   Alteracao, CampoMolde, Lamina, Molde, Moldes, RespostaTexto, TipoMolde,
 } from "../../supabase/functions/conteudo/regras.ts";
 import { motivosSaude } from "../../supabase/functions/gmn/regras.ts";
-import { ESQUEMA_TEXTO, promptAjuste, promptMolde, promptTexto } from "../../supabase/functions/conteudo/prompts.ts";
+import { ESQUEMA_KIT, ESQUEMA_TEXTO, promptAjuste, promptMolde, promptTexto } from "../../supabase/functions/conteudo/prompts.ts";
 
 const campos: CampoMolde[] = [
   { nome: "titulo", tipo: "texto", max: 20, exemplo: "" },
@@ -248,4 +248,8 @@ test("linkDrive, AGENDA_PADRAO e montarContexto sem Anexos", () => {
   assert.equal(linkDrive("sem link"), null);
   assert.deepEqual(AGENDA_PADRAO.map((a) => [a.dia, a.hora, a.formato]), [[1, "09:00", "carrossel"], [3, "12:00", "estatico"], [5, "18:00", "carrossel"]]);
   assert.equal(montarContexto([{ caminho: "Anexos/logo.png", conteudo: "k/abc.png" }, { caminho: "Kobe.md", conteudo: "central" }]), "=== Kobe.md ===\ncentral");
+});
+
+test("ESQUEMA_KIT exige tom_de_voz, fontes, pilares e saude", () => {
+  assert.deepEqual(ESQUEMA_KIT.required, ["tom_de_voz", "fontes", "pilares", "saude"]);
 });
