@@ -17,7 +17,7 @@ import {
 } from "@/lib/conteudo";
 import { HORARIOS } from "../../../supabase/functions/gmn/regras.ts";
 import {
-  LEGENDA_MAX, ROTULO_FORMATO, ROTULO_STATUS, faltaParaGerar, instanteBrasilia, type Formato,
+  LEGENDA_MAX, ROTULO_FORMATO, ROTULO_STATUS, faltaParaGerar, instanteBrasilia, moldesEmUso, type Formato,
 } from "../../../supabase/functions/conteudo/regras.ts";
 import { horaDe } from "./Semana";
 
@@ -39,7 +39,7 @@ export function PostDialog({ post, cliente, fechar }: { post: PostConteudo; clie
 
   const aguardando = post.status === "aguardando";
   const l = laminas[i];
-  const molde = l && cliente ? cliente.moldes[l.molde] : undefined;
+  const molde = l && cliente ? moldesEmUso(cliente.moldes)[l.molde] : undefined;
   const camposTexto = molde?.campos.filter((c) => c.tipo === "texto") ?? [];
   const aceitaFoto = !!l && (l.molde === "texto" || !!molde?.campos.some((c) => c.tipo === "imagem"));
   const editado = legenda !== post.legenda || JSON.stringify(laminas) !== JSON.stringify(post.laminas);
@@ -60,6 +60,11 @@ export function PostDialog({ post, cliente, fechar }: { post: PostConteudo; clie
   }
   const quando = () => instanteBrasilia(dia, hora);
   const girando = (nome: string) => ocupado === nome && <Loader2 className="mr-1 h-4 w-4 animate-spin" />;
+  // Primeiro clique pede confirmação; o segundo descarta (aguardando ou erro)
+  function descartar() {
+    if (confirmar !== "descartar") { setConfirmar("descartar"); return; }
+    fazer("descartar", async () => { await descartarPost(post); fechar(); }, "Post descartado.");
+  }
 
   return (
     <Dialog open onOpenChange={(v) => !v && fechar()}>
@@ -165,10 +170,9 @@ export function PostDialog({ post, cliente, fechar }: { post: PostConteudo; clie
                 }}>
                   {confirmar === "formato" ? `Clique de novo: refazer como ${ROTULO_FORMATO[outro].toLowerCase()}` : `Trocar para ${ROTULO_FORMATO[outro].toLowerCase()}`}
                 </Button>
-                <Button variant="outline" className="text-destructive" disabled={!!ocupado} onClick={() => {
-                  if (confirmar !== "descartar") { setConfirmar("descartar"); return; }
-                  fazer("descartar", async () => { await descartarPost(post.id); fechar(); }, "Post descartado.");
-                }}>{confirmar === "descartar" ? "Clique de novo para descartar" : "Descartar"}</Button>
+                <Button variant="outline" className="text-destructive" disabled={!!ocupado} onClick={descartar}>
+                  {confirmar === "descartar" ? "Clique de novo para descartar" : "Descartar"}
+                </Button>
                 <Button disabled={!!ocupado || post.laminas.some((x) => !x.jpg_chave)}
                   onClick={() => fazer("aprovar", async () => {
                     if (editado) throw new Error("Salve as alterações antes de aprovar.");
@@ -180,7 +184,14 @@ export function PostDialog({ post, cliente, fechar }: { post: PostConteudo; clie
               </section>
             )}
 
-            {post.status === "erro" && <Button disabled={!!ocupado} onClick={() => fazer("tentar", () => tentarDeNovo(post), "Tentando de novo.")}>Tentar de novo</Button>}
+            {post.status === "erro" && (
+              <section className="flex flex-wrap gap-2 border-t pt-4">
+                <Button disabled={!!ocupado} onClick={() => fazer("tentar", () => tentarDeNovo(post), "Tentando de novo.")}>Tentar de novo</Button>
+                <Button variant="outline" className="text-destructive" disabled={!!ocupado} onClick={descartar}>
+                  {confirmar === "descartar" ? "Clique de novo para descartar" : "Descartar"}
+                </Button>
+              </section>
+            )}
             {post.status === "aprovado" && (
               <p className="text-sm text-emerald-600">Aprovado e agendado para {new Date(post.agendado_para).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}. Acompanhe na aba Instagram.</p>
             )}

@@ -77,10 +77,10 @@ export function Clientes({ clientes, recarregar }: { clientes: ClienteConteudo[]
   async function configurar(i: Item, ativo: boolean) {
     const pastas = await cofrePastas().then((r) => r.pastas).catch(() => [] as string[]);
     const n = normalizarNome(i.nome);
-    await ligarCliente({ cliente_id: i.cliente_id, pasta_cofre: pastas.find((p) => normalizarNome(p) === n) ?? null, ig_conta_id: null, ativo });
+    const id = await ligarCliente({ cliente_id: i.cliente_id, pasta_cofre: pastas.find((p) => normalizarNome(p) === n) ?? null, ig_conta_id: null, ativo });
     const aviso = toast.loading("Puxando o kit do cofre...");
     try {
-      await kitDoCofre(i.cliente_id);
+      await kitDoCofre(id);
       toast.dismiss(aviso);
     } catch (e: any) {
       toast.error(e.message, { id: aviso });
@@ -139,7 +139,7 @@ export function Clientes({ clientes, recarregar }: { clientes: ClienteConteudo[]
                     : "Pronto para gerar"}
                 </div>
               </div>
-              {i.linha?.ativo && !falta.length && <Badge variant="secondary" className="hidden sm:inline-flex">Gera toda semana</Badge>}
+              {i.linha?.ativo && !falta.length && <Badge variant="secondary" className="hidden sm:inline-flex">Entra no Gerar a semana</Badge>}
               <span onClick={(e) => e.stopPropagation()} className="flex items-center">
                 <Switch checked={!!i.linha?.ativo} disabled={ocupado} onCheckedChange={(v) => ligar(i, v)}
                   aria-label={`${i.linha?.ativo ? "Desligar" : "Ligar"} ${i.nome}`} />

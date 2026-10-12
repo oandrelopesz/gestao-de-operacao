@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ACEITA_IMAGENS } from "@/lib/gmnImagem";
 import { fetchContas, type ContaInstagram } from "@/lib/instagram";
 import {
-  cofreArquivos, cofrePastas, enviarFonte, enviarLogo, kitDoCofre, lerPastasDrive, salvarCliente, urlArquivo, type ClienteConteudo,
+  cofreArquivos, cofrePastas, enviarFonte, enviarLogo, kitDoCofre, lerPastasDrive, mudarLista, salvarCliente, urlArquivo, type ClienteConteudo,
 } from "@/lib/conteudo";
 import { ROTULO_VARIANTE, VARIANTES_LOGO, type VarianteLogo } from "../../../supabase/functions/conteudo/regras.ts";
 import { Campo } from "./Clientes";
@@ -30,13 +30,14 @@ export function AbaKit({ cliente, recarregar }: { cliente: ClienteConteudo; reca
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [google, setGoogle] = useState("");
   const [arquivoFonte, setArquivoFonte] = useState({ familia: "", peso: "400" });
-  // Rascunho volta ao salvo ao trocar de cliente ou quando o texto salvo muda (o kit do cofre grava por fora)
-  useEffect(() => { setF(formDe(cliente)); }, [cliente.id, cliente.design_system, cliente.tom_de_voz]);
+  // Rascunho volta ao salvo ao trocar de cliente ou quando qualquer campo salvo muda (o kit do cofre grava por fora)
+  const salvo = JSON.stringify(formDe(cliente));
+  useEffect(() => { setF(formDe(cliente)); }, [cliente.id, salvo]);
   useEffect(() => {
     cofrePastas().then((r) => setPastas(r.pastas)).catch(() => {});
     fetchContas().then((cs) => setContas(cs.filter((c) => c.ativa))).catch(() => {});
   }, []);
-  const mudou = JSON.stringify(f) !== JSON.stringify(formDe(cliente));
+  const mudou = JSON.stringify(f) !== salvo;
 
   async function fazer(nome: string, acao: () => Promise<unknown>, ok?: string) {
     setOcupado(nome);
@@ -53,31 +54,35 @@ export function AbaKit({ cliente, recarregar }: { cliente: ClienteConteudo; reca
   const salvar = () => fazer("salvar", () => salvarCliente(cliente.id, { ...f, pasta_cofre: f.pasta_cofre || null, ig_conta_id: f.ig_conta_id || null }), "Kit salvo.");
   const trocarLogo = (v: VarianteLogo, arquivo: File) => fazer(`logo-${v}`, async () => {
     const logo = await enviarLogo(cliente.id, v, arquivo);
-    await salvarCliente(cliente.id, { logos: [...cliente.logos.filter((l) => l.variante !== v), logo] });
+    await mudarLista(cliente.id, "logos", (atual) => [...atual.filter((l) => l.variante !== v), logo]);
   }, "Logo enviada.");
-  const removerLogo = (v: VarianteLogo) => fazer(`logo-${v}`, () => salvarCliente(cliente.id, { logos: cliente.logos.filter((l) => l.variante !== v) }));
+  const removerLogo = (v: VarianteLogo) => fazer(`logo-${v}`, () => mudarLista(cliente.id, "logos", (atual) => atual.filter((l) => l.variante !== v)));
   const addGoogle = () => fazer("fonte", async () => {
-    await salvarCliente(cliente.id, { fontes: [...cliente.fontes, { familia: google.trim(), origem: "google" }] });
+    await mudarLista(cliente.id, "fontes", (atual) => [...atual, { familia: google.trim(), origem: "google" }]);
     setGoogle("");
   });
   const addArquivo = (arquivo: File) => fazer("fonte", async () => {
     const fonte = await enviarFonte(cliente.id, arquivo, arquivoFonte.familia, Number(arquivoFonte.peso));
-    await salvarCliente(cliente.id, { fontes: [...cliente.fontes, fonte] });
+    await mudarLista(cliente.id, "fontes", (atual) => [...atual, fonte]);
     setArquivoFonte({ familia: "", peso: "400" });
   }, "Fonte enviada.");
-  const removerFonte = (i: number) => fazer("fonte", () => salvarCliente(cliente.id, { fontes: cliente.fontes.filter((_, j) => j !== i) }));
+  const removerFonte = (i: number) => fazer("fonte", () => mudarLista(cliente.id, "fontes", (atual) => atual.filter((_, j) => j !== i)));
   const puxar = (destino: "tom_de_voz" | "design_system") => fazer("cofre", async () => {
     if (!f.pasta_cofre) throw new Error("Escolha a pasta do cofre antes.");
     const r = await cofreArquivos(f.pasta_cofre);
     if (!r.arquivos.length) throw new Error("O cofre deste cliente não tem nota de design system nem de tom de voz.");
     setCofre({ destino, arquivos: r.arquivos });
   });
+  // O kit do cofre lê a pasta do banco: grava a escolhida antes, se ainda não foi salva
+  const salvarPasta = async () => { if (f.pasta_cofre && f.pasta_cofre !== (cliente.pasta_cofre ?? "")) await salvarCliente(cliente.id, { pasta_cofre: f.pasta_cofre }); };
   const puxarTudo = () => fazer("tudo", async () => {
+    await salvarPasta();
     const { kit } = await kitDoCofre(cliente.id);
     toast.success(`Kit puxado: ${kit.fontes} fontes, ${kit.logos} logos, ${kit.pilares} pilares${kit.conta ? ", conta do Instagram" : ""}${kit.drive ? ", Drive" : ""}.`);
     kit.avisos.forEach((a) => toast.warning(a));
   });
   const puxarFontes = () => fazer("fontes", async () => {
+    await salvarPasta();
     const { kit } = await kitDoCofre(cliente.id, true);
     toast.success("Fontes atualizadas do cofre.");
     kit.avisos.forEach((a) => toast.warning(a));
