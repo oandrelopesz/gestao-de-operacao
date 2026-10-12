@@ -204,6 +204,7 @@ test("promptMolde manda direção de arte, padrão de imagem e regra de que o co
   assert.ok(m.user.includes("luz natural fria"));
   assert.ok(/vencem|vence/.test(m.system));
   assert.ok(m.system.includes("01/"));
+  assert.ok(m.system.includes("word-spacing"));
   assert.ok(DIRECAO_ARTE >= 2);
 });
 

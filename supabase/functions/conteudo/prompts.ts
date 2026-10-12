@@ -86,6 +86,7 @@ const SYSTEM_MOLDE = [
   "- Layout editorial: grade assimétrica, margens generosas (pelo menos 64 px), alinhamento à esquerda por padrão, hierarquia clara com no máximo 3 tamanhos de texto e respiro de verdade.",
   "- Detalhes de carrossel profissional nas lâminas de carrossel: numeração discreta (ex.: 01/06, num campo de texto se precisar), indicação de arrastar na capa e o @ ou a marca num canto fixo.",
   "- Foto: o mesmo tratamento em todos os moldes (sobreposição na cor da marca, duotone, moldura ou recorte), para as fotos parecerem do mesmo ensaio.",
+  "- Legibilidade: as palavras do título nunca podem grudar. Fontes display com espaço estreito (como Clash Display) pedem letter-spacing de no máximo -0.01em e word-spacing de pelo menos 0.1em. Texto sobre foto sempre com contraste garantido.",
   "- Evite o que denuncia IA ou template: tudo centralizado, brilho plástico, 3D, glow, emoji, degradê roxo e azul genérico, ícones de banco de imagens, cards arredondados com sombra forte, excesso de elementos.",
 ].join("\n");
 
