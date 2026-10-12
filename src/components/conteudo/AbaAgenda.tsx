@@ -1,12 +1,12 @@
 // Pilares (temas em rodízio) e agenda da semana do cliente: dia, horário e formato.
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { FolderSync, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { salvarCliente, type ClienteConteudo } from "@/lib/conteudo";
+import { pilaresDoCofre, salvarCliente, type ClienteConteudo } from "@/lib/conteudo";
 import { DIAS_CURTOS, HORARIOS } from "../../../supabase/functions/gmn/regras.ts";
 import { ROTULO_FORMATO, type Formato, type ItemAgenda, type Pilar } from "../../../supabase/functions/conteudo/regras.ts";
 
@@ -16,12 +16,27 @@ export function AbaAgenda({ cliente, recarregar }: { cliente: ClienteConteudo; r
   const [pilares, setPilares] = useState<Pilar[]>(cliente.pilares);
   const [agenda, setAgenda] = useState<ItemAgenda[]>(cliente.agenda);
   const [salvando, setSalvando] = useState(false);
+  const [puxando, setPuxando] = useState(false);
   useEffect(() => { setPilares(cliente.pilares); setAgenda(cliente.agenda); }, [cliente.id]);
   const item = (dia: number) => agenda.find((a) => a.dia === dia);
   const mudar = (dia: number, parcial: Partial<ItemAgenda> | null) => setAgenda((atual) =>
     parcial === null ? atual.filter((a) => a.dia !== dia)
       : atual.some((a) => a.dia === dia) ? atual.map((a) => (a.dia === dia ? { ...a, ...parcial } : a))
       : [...atual, { dia, hora: "09:00", formato: "carrossel", ...parcial }]);
+
+  async function puxarPilares() {
+    setPuxando(true);
+    try {
+      const r = await pilaresDoCofre(cliente.id);
+      setPilares(r.pilares);
+      toast.success(r.origem === "nota" ? `Pilares copiados de ${r.nota?.split("/").pop()}.` : "Pilares montados pela IA a partir do cofre. Revise e ajuste se quiser.");
+      recarregar();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setPuxando(false);
+    }
+  }
 
   async function salvar() {
     const limpos = pilares.map((p) => ({ nome: p.nome.trim(), descricao: p.descricao.trim() })).filter((p) => p.nome);
@@ -41,7 +56,12 @@ export function AbaAgenda({ cliente, recarregar }: { cliente: ClienteConteudo; r
   return (
     <div className="space-y-6">
       <section className="space-y-2">
-        <h3 className="text-sm font-medium">Pilares (a IA escolhe os temas dentro deles, em rodízio)</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium">Pilares (a IA escolhe os temas dentro deles, em rodízio)</h3>
+          <Button variant="ghost" size="sm" onClick={puxarPilares} disabled={puxando || !cliente.pasta_cofre}>
+            {puxando ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FolderSync className="mr-1 h-4 w-4" />}Puxar pilares do cofre
+          </Button>
+        </div>
         {pilares.map((p, i) => (
           <div key={i} className="flex gap-2">
             <Input className="w-40" placeholder="Nome (ex.: Dica)" value={p.nome} onChange={(e) => setPilares(pilares.map((x, j) => (j === i ? { ...x, nome: e.target.value } : x)))} />

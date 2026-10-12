@@ -7,6 +7,7 @@
 //        com pasta: só as notas .md do kit (nome com "Design System" ou "tom de voz"), nunca Anexos/
 //   cofre_sync também aceita logos de Anexos/ com binario: true (base64 vai para o R2)
 //   POST { acao: "kit_do_cofre", cliente_id, so_fontes? }             -> { kit }              monta fontes, logos, pilares, conta e Drive a partir do cofre
+//   POST { acao: "pilares_do_cofre", cliente_id }          -> { pilares, origem, nota } da nota de pilares ou, sem ela, montados pela IA
 //   POST { acao: "drive_pastas", cliente_id }               -> { pastas }           lê as subpastas do Drive e grava no cliente
 //   POST { acao: "molde", cliente_id, tipo }                -> { molde }            cria (ou refaz) um molde com prévia
 //   POST { acao: "molde_ajustar", cliente_id, tipo, pedido } -> { molde }           nova versão do molde pelo pedido
@@ -22,11 +23,11 @@ import { claudeConfigurado, gerarJson } from "./claude.ts";
 import { lerPastas } from "./drive.ts";
 import { passo } from "./etapas.ts";
 import { gerarMolde } from "./moldes.ts";
-import { ESQUEMA_AJUSTE, ESQUEMA_KIT, SYSTEM_KIT, promptAjuste } from "./prompts.ts";
+import { ESQUEMA_AJUSTE, ESQUEMA_KIT, ESQUEMA_PILARES, SYSTEM_KIT, SYSTEM_PILARES, promptAjuste } from "./prompts.ts";
 import { cloudflareConfigurado, resolverFonte } from "./render.ts";
 import {
   AGENDA_PADRAO, ErroHttp, LEGENDA_MAX, aplicarAlteracoes, casarConta, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre, faltaParaGerar, fontesDoCofre, linkDrive,
-  montarContexto, notaDoKit, postsDaSemana, segundaDaSemana, varianteDoNome, type Alteracao, type Fonte, type Logo, type Pilar,
+  montarContexto, notaDoKit, pilaresDaNota, postsDaSemana, segundaDaSemana, varianteDoNome, type Alteracao, type Fonte, type Logo, type Pilar,
 } from "./regras.ts";
 
 const cors = {
@@ -123,8 +124,8 @@ async function kitDoCofre(sb: any, clienteId: string, soFontes = false) {
   const tomNota = linhas.find((l: any) => notaDoKit(l.caminho) === "tom_de_voz");
   // so_fontes: sem Claude, os papéis são as famílias que o cliente já tem
   const r = soFontes
-    ? { tom_de_voz: "", fontes: (c.fontes ?? []).map((f: Fonte) => ({ familia: f.familia, reservas: [] as string[] })), pilares: [] as Pilar[], saude: false }
-    : await gerarJson<{ tom_de_voz: string; fontes: { familia: string; reservas: string[] }[]; pilares: Pilar[]; saude: boolean }>({
+    ? { tom_de_voz: "", fontes: (c.fontes ?? []).map((f: Fonte) => ({ familia: f.familia, reservas: [] as string[] })), saude: false }
+    : await gerarJson<{ tom_de_voz: string; fontes: { familia: string; reservas: string[] }[]; saude: boolean }>({
       system: SYSTEM_KIT, conteudo: montarContexto(linhas), esquema: ESQUEMA_KIT, esforco: "low", maxTokens: 4000,
     });
   const avisos: string[] = [];
@@ -170,7 +171,9 @@ async function kitDoCofre(sb: any, clienteId: string, soFontes = false) {
       try { pastasDrive = await lerPastas(sb, achado); } catch (e: any) { avisos.push(`Drive: ${e?.message ?? e}`); }
     }
   }
-  const pilares = r.pilares?.length ? r.pilares : c.pilares ?? [];
+  const notaPilares = linhas.find((l: any) => notaDoKit(l.caminho) === "pilares");
+  const daNota = notaPilares ? pilaresDaNota(notaPilares.conteudo) : [];
+  const pilares = daNota.length ? daNota : c.pilares ?? [];
   const { error: e4 } = await sb.from("conteudo_clientes").update({
     design_system: ds ? ds.conteudo : c.design_system,
     tom_de_voz: tomNota ? tomNota.conteudo : r.tom_de_voz,
@@ -179,7 +182,30 @@ async function kitDoCofre(sb: any, clienteId: string, soFontes = false) {
     agenda: c.agenda?.length ? c.agenda : AGENDA_PADRAO, updated_at: agora(),
   }).eq("id", c.id);
   if (e4) throw new Error(e4.message);
-  return { kit: { fontes: fontes.length, logos: logosDoCofre.length, pilares: r.pilares?.length ?? 0, conta: !!conta, drive: !!drive.trim(), avisos } };
+  return { kit: { fontes: fontes.length, logos: logosDoCofre.length, pilares: daNota.length, conta: !!conta, drive: !!drive.trim(), avisos } };
+}
+
+/** Botão "Puxar pilares do cofre": a nota de pilares, se houver; senão a IA monta a partir do cofre. */
+async function pilaresDoCofre(sb: any, clienteId: string) {
+  const { data: c, error } = await sb.from("conteudo_clientes").select("id, pasta_cofre").eq("id", clienteId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!c) throw new ErroHttp(404, "Cliente não encontrado.");
+  if (!c.pasta_cofre) throw new ErroHttp(400, "Escolha a pasta do cofre deste cliente.");
+  const { data: linhas, error: e2 } = await sb.from("conteudo_cofre").select("caminho, conteudo").eq("pasta", c.pasta_cofre);
+  if (e2) throw new Error(e2.message);
+  const nota = (linhas ?? []).find((l: any) => notaDoKit(l.caminho) === "pilares");
+  let pilares: Pilar[] = nota ? pilaresDaNota(nota.conteudo) : [];
+  const origem = pilares.length ? "nota" : "ia";
+  if (!pilares.length) {
+    const contexto = montarContexto(linhas ?? []);
+    if (!contexto) throw new ErroHttp(400, "O cofre deste cliente ainda não foi sincronizado.");
+    const r = await gerarJson<{ pilares: Pilar[] }>({ system: SYSTEM_PILARES, conteudo: contexto, esquema: ESQUEMA_PILARES, esforco: "low", maxTokens: 4000 });
+    pilares = (r.pilares ?? []).filter((p) => p.nome?.trim()).slice(0, 6);
+  }
+  if (!pilares.length) throw new ErroHttp(400, "O cofre não trouxe informação suficiente para montar pilares.");
+  const { error: e3 } = await sb.from("conteudo_clientes").update({ pilares, updated_at: agora() }).eq("id", c.id);
+  if (e3) throw new Error(e3.message);
+  return { pilares, origem, nota: nota?.caminho ?? null };
 }
 
 async function drivePastas(sb: any, clienteId: string) {
@@ -271,6 +297,7 @@ Deno.serve(async (req) => {
       case "cofre_sync": return json(await cofreSync(sb, corpo));
       case "cofre_ler": return json(await cofreLer(sb, corpo.pasta ? String(corpo.pasta) : null));
       case "kit_do_cofre": return json(await kitDoCofre(sb, String(corpo.cliente_id ?? ""), corpo.so_fontes === true));
+      case "pilares_do_cofre": return json(await pilaresDoCofre(sb, String(corpo.cliente_id ?? "")));
       case "drive_pastas": return json(await drivePastas(sb, String(corpo.cliente_id ?? "")));
       case "molde": return json({ molde: await gerarMolde(sb, String(corpo.cliente_id ?? ""), corpo.tipo) });
       case "molde_ajustar": {

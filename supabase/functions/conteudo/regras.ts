@@ -306,14 +306,29 @@ export function recortarLog(texto: string, hoje: string, dias = 60): string {
 
 /** Contexto do cliente para a IA: nota central, Log recente e documentos, nessa ordem, até `limite` caracteres. */
 /** Nota do kit pelo nome do arquivo, ignorando hífen, espaço e acento ("R-Salon-Design-System.md"). */
-export function notaDoKit(caminho: string): "design_system" | "tom_de_voz" | null {
+export function notaDoKit(caminho: string): "design_system" | "tom_de_voz" | "pilares" | null {
   if (!caminho.toLowerCase().endsWith(".md")) return null;
   const n = normalizarNome(caminho.split("/").pop() ?? "");
-  return n.includes("designsystem") ? "design_system" : n.includes("tomdevoz") ? "tom_de_voz" : null;
+  return n.includes("designsystem") ? "design_system" : n.includes("tomdevoz") ? "tom_de_voz" : n.includes("pilar") ? "pilares" : null;
+}
+
+/** Pilares da nota "Pilares de Conteúdo" do cofre: cada "## " é um pilar; a descrição é a linha "Descrição:" ou o primeiro parágrafo. Sem IA. */
+export function pilaresDaNota(md: string): Pilar[] {
+  const pilares: Pilar[] = [];
+  for (const bloco of md.split(/^## /m).slice(1)) {
+    const [titulo, ...resto] = bloco.split("\n");
+    const nome = titulo.replace(/^(pilar\s*)?\d*\s*[:.)\-–]?\s*/i, "").trim();
+    if (!nome || pilares.some((p) => p.nome.toLowerCase() === nome.toLowerCase())) continue;
+    const linhas = resto.map((l) => l.trim()).filter(Boolean);
+    const rotulada = linhas.find((l) => /^descri[cç][aã]o\s*:/i.test(l));
+    const descricao = rotulada ? rotulada.replace(/^descri[cç][aã]o\s*:\s*/i, "") : linhas.find((l) => !/^[-*#>]|^\w[\w\s]*:\s*$/.test(l)) ?? "";
+    pilares.push({ nome, descricao: descricao.trim() });
+  }
+  return pilares;
 }
 
 // Documentos que dizem quem é o cliente e o que ele vende vêm antes de dossiês, calendários e relatórios
-const DOC_DO_NEGOCIO = ["posicionamento", "contexto", "icp", "persona", "publico", "tomdevoz", "tema", "pauta", "preco", "tabela", "servico", "oferta", "produto", "direcaodearte", "designsystem", "marca", "briefing"];
+const DOC_DO_NEGOCIO = ["pilar", "posicionamento", "contexto", "icp", "persona", "publico", "tomdevoz", "tema", "pauta", "preco", "tabela", "servico", "oferta", "produto", "direcaodearte", "designsystem", "marca", "briefing"];
 const NOTA_MAX = 60_000;
 
 /** Contexto do cliente para o Claude: notas da raiz, documentos do negócio, Log e o resto; cada nota até 60 mil caracteres. */

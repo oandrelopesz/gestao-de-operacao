@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import {
   AGENDA_PADRAO, ARQUIVO_LOG, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre,
   faltaParaGerar, fontesDoCofre, fontFace, pesoDoNome, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
-  mudancasCofre, normalizarNome, notaDoKit, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
+  mudancasCofre, normalizarNome, notaDoKit, pilaresDaNota, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
   usosDeFotos, validarMolde, varianteDoNome,
 } from "../../supabase/functions/conteudo/regras.ts";
 import type {
   Alteracao, CampoMolde, Lamina, Molde, Moldes, RespostaTexto, TipoMolde,
 } from "../../supabase/functions/conteudo/regras.ts";
 import { motivosSaude } from "../../supabase/functions/gmn/regras.ts";
-import { ESQUEMA_KIT, ESQUEMA_TEXTO, promptAjuste, promptMolde, promptTexto } from "../../supabase/functions/conteudo/prompts.ts";
+import { ESQUEMA_KIT, ESQUEMA_PILARES, ESQUEMA_TEXTO, promptAjuste, promptMolde, promptTexto } from "../../supabase/functions/conteudo/prompts.ts";
 
 const campos: CampoMolde[] = [
   { nome: "titulo", tipo: "texto", max: 20, exemplo: "" },
@@ -261,8 +261,27 @@ test("linkDrive, AGENDA_PADRAO e montarContexto sem Anexos", () => {
   assert.equal(montarContexto([{ caminho: "Anexos/logo.png", conteudo: "k/abc.png" }, { caminho: "Kobe.md", conteudo: "central" }]), "=== Kobe.md ===\ncentral");
 });
 
-test("ESQUEMA_KIT exige tom_de_voz, fontes, pilares e saude", () => {
-  assert.deepEqual(ESQUEMA_KIT.required, ["tom_de_voz", "fontes", "pilares", "saude"]);
+test("ESQUEMA_KIT exige tom_de_voz, fontes e saude (pilares só pelo botão)", () => {
+  assert.deepEqual(ESQUEMA_KIT.required, ["tom_de_voz", "fontes", "saude"]);
+  assert.deepEqual(ESQUEMA_PILARES.required, ["pilares"]);
+});
+
+test("pilaresDaNota lê os ## da nota de pilares, com a descrição", () => {
+  const md = [
+    "# Pilares de Conteúdo - R Salon", "", "Base: [[R-Salon-ICP]]", "",
+    "## Pilar 1: Bastidores do salão", "Descrição: o dia a dia da equipe e dos atendimentos.", "Temas:", "- Montagem", "",
+    "## 2. Cuidados com o cabelo", "", "Dicas práticas de cuidado em casa entre uma visita e outra.", "",
+    "## Prova social",
+    "## Bastidores do salão", "Descrição: repetido, fica de fora.",
+  ].join("\n");
+  assert.deepEqual(pilaresDaNota(md), [
+    { nome: "Bastidores do salão", descricao: "o dia a dia da equipe e dos atendimentos." },
+    { nome: "Cuidados com o cabelo", descricao: "Dicas práticas de cuidado em casa entre uma visita e outra." },
+    { nome: "Prova social", descricao: "" },
+  ]);
+  assert.deepEqual(pilaresDaNota("# Só título\ntexto"), []);
+  assert.equal(notaDoKit("Documentos/Pilares de Conteúdo - R Salon.md"), "pilares");
+  assert.equal(notaDoKit("Documentos/R-Salon-Biblioteca-de-Temas.md"), null);
 });
 
 test("ehFonteDoCofre aceita fontes de Anexos/ e Fontes/ e recusa subpasta e outras extensões", () => {

@@ -50,11 +50,16 @@ export const ESQUEMA_KIT = objeto({
     type: "array",
     items: objeto({ familia: { type: "string" }, reservas: { type: "array", items: { type: "string" } } }),
   },
-  pilares: { type: "array", items: objeto({ nome: { type: "string" }, descricao: { type: "string" } }) },
   saude: { type: "boolean" },
 });
 
-export const SYSTEM_KIT = "Você monta o kit de marca de um cliente de agência para posts de Instagram, só com o que está no cofre do cliente; nunca invente informação que o cofre não traz. tom_de_voz: de 4 a 8 linhas práticas de como escrever para o público do cliente (vocabulário, nível de formalidade, o que evitar, frase da marca se houver). fontes: as famílias citadas no design system, na ordem título, texto e números, cada uma com as reservas que o próprio design system indicar; nunca invente fonte que o cofre não cita; sem design system com fonte, lista vazia. pilares: de 3 a 5 pilares de conteúdo para o Instagram, a partir do negócio, do público e do método do cliente, com uma descrição curta. saude: true só se o cliente for clínica, consultório, médico, dentista, estética médica ou outra área regulada pelo CFM ou pelo CFO.";
+export const ESQUEMA_PILARES = objeto({
+  pilares: { type: "array", items: objeto({ nome: { type: "string" }, descricao: { type: "string" } }) },
+});
+
+export const SYSTEM_PILARES = "Você define os pilares de conteúdo do Instagram de um cliente de agência, só com o que está no cofre do cliente (negócio, serviços, público, personas, posicionamento, temas já mapeados). De 3 a 5 pilares, cada um com nome curto (até 4 palavras) e descrição de uma frase dizendo o que entra nele, com exemplos de temas tirados do cofre. Nunca invente serviço, produto, número, promoção ou público que o cofre não traz; se o cofre já tiver pilares ou uma biblioteca de temas, parta deles.";
+
+export const SYSTEM_KIT = "Você monta o kit de marca de um cliente de agência para posts de Instagram, só com o que está no cofre do cliente; nunca invente informação que o cofre não traz. tom_de_voz: de 4 a 8 linhas práticas de como escrever para o público do cliente (vocabulário, nível de formalidade, o que evitar, frase da marca se houver). fontes: as famílias citadas no design system, na ordem título, texto e números, cada uma com as reservas que o próprio design system indicar; nunca invente fonte que o cofre não cita; sem design system com fonte, lista vazia. saude: true só se o cliente for clínica, consultório, médico, dentista, estética médica ou outra área regulada pelo CFM ou pelo CFO.";
 
 export interface Mensagens { system: string; user: string }
 
