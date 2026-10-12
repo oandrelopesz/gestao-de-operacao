@@ -1,5 +1,6 @@
 // Um post da semana: lâminas em tamanho real, legenda e as ações (aprovar, pedir mudança, editar, trocar dia ou formato,
-// descartar, tentar de novo). A tela só mexe no post em "aguardando" (ou em "erro", para tentar de novo).
+// descartar, tentar de novo, cancelar a aprovação). A tela mexe no post em "aguardando", em "erro" (tentar de novo ou
+// descartar) e em "aprovado" (cancelar a aprovação, que tira da agenda do Instagram e volta para "aguardando").
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
@@ -12,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { hojeBrasilia } from "@/lib/entrega";
 import { ACEITA_IMAGENS } from "@/lib/gmnImagem";
 import {
-  aprovarPost, descartarPost, pedirMudanca, salvarTextos, tentarDeNovo, trocarData, trocarFormato, trocarFoto, urlArquivo,
+  aprovarPost, cancelarAprovacao, descartarPost, pedirMudanca, salvarTextos, tentarDeNovo, trocarData, trocarFormato, trocarFoto, urlArquivo,
   usarAjusteNoMolde, type ClienteConteudo, type PostConteudo,
 } from "@/lib/conteudo";
 import { HORARIOS } from "../../../supabase/functions/gmn/regras.ts";
@@ -193,7 +194,13 @@ export function PostDialog({ post, cliente, fechar }: { post: PostConteudo; clie
               </section>
             )}
             {post.status === "aprovado" && (
-              <p className="text-sm text-emerald-600">Aprovado e agendado para {new Date(post.agendado_para).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}. Acompanhe na aba Instagram.</p>
+              <section className="space-y-2 border-t pt-4">
+                <p className="text-sm text-emerald-600">Aprovado e agendado para {new Date(post.agendado_para).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}. Acompanhe na aba Instagram.</p>
+                <Button variant="outline" disabled={!!ocupado} onClick={() => {
+                  if (confirmar !== "cancelar") { setConfirmar("cancelar"); return; }
+                  fazer("cancelar", async () => { await cancelarAprovacao(post); fechar(); }, "Aprovação cancelada: o post voltou para aguardando aprovação e saiu da agenda do Instagram.");
+                }}>{girando("cancelar")}{confirmar === "cancelar" ? "Clique de novo para cancelar a aprovação" : "Cancelar aprovação"}</Button>
+              </section>
             )}
           </div>
         </div>

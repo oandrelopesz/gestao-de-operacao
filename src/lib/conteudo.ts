@@ -226,6 +226,23 @@ export async function descartarPost(post: { id: string; status: StatusPost }): P
   if (post.status !== "aguardando" && post.status !== "erro") throw new Error("Só dá para descartar post aguardando ou com erro.");
   await mudarSe(post.id, post.status, { status: "descartado", origem_data: null });
 }
+/**
+ * Desfaz a aprovação: apaga o agendamento do Instagram (só se ainda não começou a ser enviado) e o post volta para
+ * "aguardando". A condição de status no delete é a trava: o relógio do Instagram não pega o post no meio.
+ */
+export async function cancelarAprovacao(post: { id: string; status: StatusPost; ig_post_id: string | null }): Promise<void> {
+  if (post.status !== "aprovado") throw new Error("Só dá para cancelar a aprovação de um post aprovado.");
+  if (post.ig_post_id) {
+    const { data, error } = await supabase.from("ig_posts").delete().eq("id", post.ig_post_id)
+      .in("status", ["agendado", "erro", "cancelado"]).select("id");
+    if (error) throw error;
+    if (!data?.length) {
+      const { data: ainda } = await supabase.from("ig_posts").select("id").eq("id", post.ig_post_id).maybeSingle();
+      if (ainda) throw new Error("Este post já começou a ser enviado ao Instagram e não dá mais para cancelar a aprovação.");
+    }
+  }
+  await mudarSe(post.id, "aprovado", { status: "aguardando", ig_post_id: null });
+}
 export const trocarData = (id: string, quando: string) => mudarSe(id, "aguardando", { agendado_para: quando });
 
 export async function trocarFormato(post: PostConteudo, formato: Formato): Promise<void> {
