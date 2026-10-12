@@ -38,6 +38,8 @@ export function Semana({ clientes }: { clientes: ClienteConteudo[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segunda]);
   const nomes = useMemo(() => new Map(clientes.map((c) => [c.id, c.clientes?.nome ?? "Cliente"])), [clientes]);
+  // listas de escolha: sem os ocultos, em ordem alfabética
+  const escolhas = useMemo(() => clientes.filter((c) => !c.oculto).sort((a, b) => (a.clientes?.nome ?? "").localeCompare(b.clientes?.nome ?? "", "pt-BR")), [clientes]);
   const dias = Array.from({ length: 7 }, (_, i) => somarDias(segunda, i));
   const visiveis = (posts ?? []).filter((p) => filtro === TODOS || p.conteudo_cliente_id === filtro);
   const post = posts?.find((p) => p.id === aberto) ?? null;
@@ -65,7 +67,7 @@ export function Semana({ clientes }: { clientes: ClienteConteudo[] }) {
           <SelectTrigger className="w-48" aria-label="Filtrar por cliente"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value={TODOS}>Todos os clientes</SelectItem>
-            {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.clientes?.nome ?? "Cliente"}</SelectItem>)}
+            {escolhas.map((c) => <SelectItem key={c.id} value={c.id}>{c.clientes?.nome ?? "Cliente"}</SelectItem>)}
           </SelectContent>
         </Select>
         <div className="flex gap-2 sm:ml-auto">
@@ -91,7 +93,7 @@ export function Semana({ clientes }: { clientes: ClienteConteudo[] }) {
         </div>
       )}
       {post && <PostDialog post={post} cliente={clientes.find((c) => c.id === post.conteudo_cliente_id) ?? null} fechar={() => setAberto(null)} />}
-      <NovoPost aberto={novo} fechar={() => setNovo(false)} clientes={clientes} segunda={segunda} />
+      <NovoPost aberto={novo} fechar={() => setNovo(false)} clientes={escolhas} segunda={segunda} />
     </div>
   );
 }
