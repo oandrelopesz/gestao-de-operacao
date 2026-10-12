@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { FolderSync, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { pilaresDoCofre, salvarCliente, type ClienteConteudo } from "@/lib/conteudo";
@@ -63,9 +64,11 @@ export function AbaAgenda({ cliente, recarregar }: { cliente: ClienteConteudo; r
           </Button>
         </div>
         {pilares.map((p, i) => (
-          <div key={i} className="flex gap-2">
-            <Input className="w-40" placeholder="Nome (ex.: Dica)" value={p.nome} onChange={(e) => setPilares(pilares.map((x, j) => (j === i ? { ...x, nome: e.target.value } : x)))} />
-            <Input placeholder="Descrição curta" value={p.descricao} onChange={(e) => setPilares(pilares.map((x, j) => (j === i ? { ...x, descricao: e.target.value } : x)))} />
+          <div key={i} className="flex gap-2 rounded-md border p-2">
+            <div className="flex-1 space-y-1">
+              <Input placeholder="Nome (ex.: Dica)" value={p.nome} onChange={(e) => setPilares(pilares.map((x, j) => (j === i ? { ...x, nome: e.target.value } : x)))} />
+              <Textarea rows={2} placeholder="Descrição: o que entra neste pilar" value={p.descricao} onChange={(e) => setPilares(pilares.map((x, j) => (j === i ? { ...x, descricao: e.target.value } : x)))} />
+            </div>
             <Button variant="ghost" size="icon" aria-label={`Remover pilar ${p.nome || i + 1}`} onClick={() => setPilares(pilares.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
           </div>
         ))}
