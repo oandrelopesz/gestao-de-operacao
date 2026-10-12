@@ -157,8 +157,8 @@ export function avancarFila(): void {
   fetch(FUNCAO, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "passo" }) }).catch(() => {});
 }
 
-export async function gerarSemana(segunda: string, clienteId?: string): Promise<{ criados: number; pulados: { cliente: string; motivo: string }[] }> {
-  const r = await chamar<{ criados: number; pulados: { cliente: string; motivo: string }[] }>({ acao: "semana", segunda, cliente_id: clienteId ?? null });
+export async function gerarSemana(segunda: string, clienteId?: string): Promise<{ criados: number; pulados: { cliente: string; motivo: string }[]; clientes: number }> {
+  const r = await chamar<{ criados: number; pulados: { cliente: string; motivo: string }[]; clientes: number }>({ acao: "semana", segunda, cliente_id: clienteId ?? null });
   if (r.criados) avancarFila();
   return r;
 }

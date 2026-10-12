@@ -48,7 +48,8 @@ export function Semana({ clientes }: { clientes: ClienteConteudo[] }) {
     setGerando(true);
     try {
       const r = await gerarSemana(segunda, filtro === TODOS ? undefined : filtro);
-      toast.success(r.criados ? `${r.criados} ${r.criados === 1 ? "post na fila" : "posts na fila"}. Eles aparecem aqui quando ficarem prontos.` : "Nenhum post novo: os dias da agenda já têm post.");
+      if (!r.clientes) toast.warning("Nenhum cliente ligado. Ligue a chave do cliente na área Clientes.");
+      else toast.success(r.criados ? `${r.criados} ${r.criados === 1 ? "post na fila" : "posts na fila"}. Eles aparecem aqui quando ficarem prontos.` : "Nenhum post novo: os dias da agenda já têm post.");
       for (const p of r.pulados) toast.warning(`${p.cliente}: ${p.motivo}`);
     } catch (e: any) {
       toast.error(e.message);

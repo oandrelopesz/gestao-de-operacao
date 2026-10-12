@@ -243,7 +243,7 @@ async function gerarSemana(sb: any, segunda: string, clienteId: string | null) {
     if (e2) throw new Error(e2.message);
     criados += data?.length ?? 0;
   }
-  return { criados, pulados };
+  return { criados, pulados, clientes: (clientes ?? []).length };
 }
 
 async function ajustar(sb: any, postId: string, pedido: string) {
