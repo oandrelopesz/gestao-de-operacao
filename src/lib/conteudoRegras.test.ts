@@ -9,6 +9,7 @@ import type {
   Alteracao, CampoMolde, Lamina, Molde, Moldes, RespostaTexto, TipoMolde,
 } from "../../supabase/functions/conteudo/regras.ts";
 import { motivosSaude } from "../../supabase/functions/gmn/regras.ts";
+import { ESQUEMA_TEXTO, promptAjuste, promptMolde, promptTexto } from "../../supabase/functions/conteudo/prompts.ts";
 
 const campos: CampoMolde[] = [
   { nome: "titulo", tipo: "texto", max: 20, exemplo: "" },
@@ -160,4 +161,31 @@ test("laminasDaResposta marca a foto como pendente, com o título como reserva d
   assert.deepEqual(ls[0].imagem, { descricao: "Salão", pasta_id: null, pendente: true });
   assert.equal(ls[1].imagem, undefined);
   assert.equal(ls[0].jpg_chave, null);
+});
+
+test("promptTexto leva limites, tema fixo e subpastas", () => {
+  const p = promptTexto({ formato: "carrossel", pilar: { nome: "Dica", descricao: "ensina" }, tema: "Buffet em julho", temasRecentes: ["x"],
+    tomDeVoz: "direto", moldes: moldesC, pastas: [{ id: "p1", caminho: "Espaço", quantidade: 3 }], saude: false });
+  assert.ok(p.pedido.includes("titulo (até 30 caracteres)"));
+  assert.ok(p.pedido.includes('Use exatamente este tema: "Buffet em julho"'));
+  assert.ok(p.pedido.includes('id "p1"'));
+  assert.ok(!p.system.includes("CFM"));
+  assert.ok(promptTexto({ formato: "estatico", pilar: null, tema: null, temasRecentes: [], tomDeVoz: "", moldes: { estatico: molde([t30]) }, pastas: [], saude: true }).system.includes("CFM"));
+});
+
+test("promptMolde cobra os campos do tipo e manda os moldes já criados", () => {
+  const m = promptMolde({ tipo: "foto", designSystem: "azul", tomDeVoz: "", logos: [{ variante: "clara", chave: "k", largura: 600, altura: 200 }],
+    fontes: [{ familia: "Satoshi", origem: "google" }], outros: [{ tipo: "capa", html: "<h1>capa</h1>" }] });
+  assert.ok(m.user.includes("titulo, texto, foto"));
+  assert.ok(m.user.includes("logo_clara"));
+  assert.ok(m.user.includes("<h1>capa</h1>"));
+});
+
+test("promptAjuste numera as lâminas a partir de 1", () => {
+  const m = promptAjuste({ laminas: [{ molde: "capa", campos: { titulo: "Oi" }, jpg_chave: "k" }], legenda: "L", moldes: moldesC, pastas: [], pedido: "mais curto" });
+  assert.ok(m.user.includes('1. capa: titulo = "Oi" (até 30)'));
+});
+
+test("esquema do texto pede tema, legenda e lâminas", () => {
+  assert.deepEqual(ESQUEMA_TEXTO.required, ["tema", "legenda", "laminas"]);
 });
