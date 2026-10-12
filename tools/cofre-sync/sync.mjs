@@ -1,12 +1,12 @@
 // Copia o cofre de clientes do Obsidian para a aba Conteúdo (spec docs/superpowers/specs/2026-10-12-conteudo-automatico-design.md).
-// Só lê o cofre. Envia, das pastas ligadas na aba, só o que mudou: nota central, Documentos/*.md o Log dos últimos 60 dias e as logos de Anexos/ (binário, em base64).
+// Só lê o cofre. Envia, das pastas ligadas na aba, só o que mudou: nota central, Documentos/*.md o Log dos últimos 60 dias e as logos e fontes de Anexos/ e Fontes/ (binário, em base64).
 // Uso: node tools/cofre-sync/sync.mjs   (o Agendador de Tarefas do Windows roda de hora em hora)
 // Config (fora do repositório): %USERPROFILE%\.gestao\cofre-sync.json = { url, chave, cofre }
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { ARQUIVO_LOG, ehLogoDoCofre, mudancasCofre, recortarLog } from "../../supabase/functions/conteudo/regras.ts";
+import { ARQUIVO_LOG, ehFonteDoCofre, ehLogoDoCofre, mudancasCofre, recortarLog } from "../../supabase/functions/conteudo/regras.ts";
 
 const cfg = JSON.parse(readFileSync(join(homedir(), ".gestao", "cofre-sync.json"), "utf8"));
 const CLIENTES = join(cfg.cofre, "01 Clientes");
@@ -38,7 +38,11 @@ function arquivosDaPasta(pasta) {
   }
   const anexos = join(dir, "Anexos");
   if (existsSync(anexos)) {
-    for (const f of readdirSync(anexos)) if (ehLogoDoCofre(`Anexos/${f}`)) saida[`Anexos/${f}`] = readFileSync(join(anexos, f)); // Buffer
+    for (const f of readdirSync(anexos)) if (ehLogoDoCofre(`Anexos/${f}`) || ehFonteDoCofre(`Anexos/${f}`)) saida[`Anexos/${f}`] = readFileSync(join(anexos, f)); // Buffer
+  }
+  const fontes = join(dir, "Fontes");
+  if (existsSync(fontes)) {
+    for (const f of readdirSync(fontes)) if (ehFonteDoCofre(`Fontes/${f}`)) saida[`Fontes/${f}`] = readFileSync(join(fontes, f)); // Buffer
   }
   return saida;
 }
