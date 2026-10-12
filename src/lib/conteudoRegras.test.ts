@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  AGENDA_PADRAO, ARQUIVO_LOG, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehLogoDoCofre,
-  faltaParaGerar, fontFace, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
+  AGENDA_PADRAO, ARQUIVO_LOG, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre,
+  faltaParaGerar, fontesDoCofre, fontFace, pesoDoNome, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
   mudancasCofre, normalizarNome, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
   usosDeFotos, validarMolde, varianteDoNome,
 } from "../../supabase/functions/conteudo/regras.ts";
@@ -252,4 +252,39 @@ test("linkDrive, AGENDA_PADRAO e montarContexto sem Anexos", () => {
 
 test("ESQUEMA_KIT exige tom_de_voz, fontes, pilares e saude", () => {
   assert.deepEqual(ESQUEMA_KIT.required, ["tom_de_voz", "fontes", "pilares", "saude"]);
+});
+
+test("ehFonteDoCofre aceita fontes de Anexos/ e Fontes/ e recusa subpasta e outras extensões", () => {
+  for (const e of ["woff2", "woff", "ttf", "otf", "WOFF2"]) {
+    assert.equal(ehFonteDoCofre(`Anexos/Satoshi-Bold.${e}`), true);
+    assert.equal(ehFonteDoCofre(`Fontes/Satoshi-Bold.${e}`), true);
+  }
+  assert.equal(ehFonteDoCofre("Anexos/sub/Satoshi.ttf"), false);
+  assert.equal(ehFonteDoCofre("Outra/Satoshi.ttf"), false);
+  assert.equal(ehFonteDoCofre("Anexos/Satoshi.png"), false);
+  assert.equal(ehFonteDoCofre("Fontes/Satoshi.eot"), false);
+});
+
+test("pesoDoNome: ordem certa entre extra, semi e simples", () => {
+  const casos: [string, number][] = [
+    ["Satoshi-Thin", 100], ["Satoshi-ExtraLight", 200], ["Satoshi-Light", 300], ["Satoshi-Regular", 400], ["Satoshi", 400],
+    ["Satoshi-Medium", 500], ["Satoshi-SemiBold", 600], ["Satoshi-Bold", 700], ["Satoshi-ExtraBold", 800], ["Satoshi-Black", 900],
+    ["Clash Display Semi Bold", 600], ["Clash Display Extra-Bold", 800],
+  ];
+  for (const [nome, peso] of casos) assert.equal(pesoDoNome(nome), peso, nome);
+});
+
+test("fontesDoCofre: prefixo da família, sem itálico, um por peso (woff2 primeiro), em ordem de peso", () => {
+  const a = (caminho: string) => ({ caminho, chave: `k/${caminho}` });
+  const r = fontesDoCofre("Satoshi", [
+    a("Anexos/Satoshi-Bold.ttf"), a("Anexos/Satoshi-Bold.woff2"), a("Fontes/Satoshi-Light.otf"), a("Anexos/Satoshi-Regular.woff"),
+    a("Anexos/Satoshi-BoldItalic.woff2"), a("Anexos/Outra-Regular.woff2"), a("Anexos/Satoshi-Medium.png"), a("Anexos/sub/Satoshi-Black.woff2"),
+  ]);
+  assert.deepEqual(r, [
+    { familia: "Satoshi", origem: "arquivo", chave: "k/Fontes/Satoshi-Light.otf", peso: 300 },
+    { familia: "Satoshi", origem: "arquivo", chave: "k/Anexos/Satoshi-Regular.woff", peso: 400 },
+    { familia: "Satoshi", origem: "arquivo", chave: "k/Anexos/Satoshi-Bold.woff2", peso: 700 },
+  ]);
+  assert.deepEqual(fontesDoCofre("Clash Display", [a("Anexos/ClashDisplay-Bold.woff2")]).map((f) => f.peso), [700]);
+  assert.deepEqual(fontesDoCofre("Inter", [a("Anexos/Satoshi-Bold.woff2")]), []);
 });

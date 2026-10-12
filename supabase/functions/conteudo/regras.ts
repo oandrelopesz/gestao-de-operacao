@@ -198,6 +198,43 @@ export function ehLogoDoCofre(caminho: string): boolean {
   return /^Anexos\/[^/]*logo[^/]*\.(png|jpe?g|webp|svg)$/i.test(caminho);
 }
 
+/** Arquivo de fonte na pasta Anexos ou Fontes do cofre. */
+export function ehFonteDoCofre(caminho: string): boolean {
+  return /^(Anexos|Fontes)\/[^/]+\.(woff2|woff|ttf|otf)$/i.test(caminho);
+}
+
+/** Peso pelo nome do arquivo ("Satoshi-SemiBold" vira 600); sem pista, 400. A ordem importa: extra e semi antes de light e bold. */
+export function pesoDoNome(nome: string): number {
+  const n = normalizarNome(nome);
+  if (/thin|hairline/.test(n)) return 100;
+  if (/extralight|ultralight/.test(n)) return 200;
+  if (/light/.test(n)) return 300;
+  if (/medium/.test(n)) return 500;
+  if (/semibold|demibold/.test(n)) return 600;
+  if (/extrabold|ultrabold/.test(n)) return 800;
+  if (/black|heavy/.test(n)) return 900;
+  if (/bold/.test(n)) return 700;
+  return 400;
+}
+
+/** Fontes da família entre os arquivos do cofre: sem itálico, um arquivo por peso (woff2 primeiro), em ordem de peso. */
+export function fontesDoCofre(familia: string, arquivos: { caminho: string; chave: string }[]): Fonte[] {
+  const prefixo = normalizarNome(familia);
+  const ordemExt = ["woff2", "woff", "ttf", "otf"];
+  const ext = (c: string) => ordemExt.indexOf((c.split(".").pop() ?? "").toLowerCase());
+  const nomeSem = (c: string) => (c.split("/").pop() ?? "").replace(/\.[^.]+$/, "");
+  const porPeso = new Map<number, { caminho: string; chave: string }>();
+  for (const a of arquivos) {
+    if (!ehFonteDoCofre(a.caminho)) continue;
+    const n = normalizarNome(nomeSem(a.caminho));
+    if (!prefixo || !n.startsWith(prefixo) || n.includes("italic")) continue;
+    const peso = pesoDoNome(nomeSem(a.caminho));
+    const atual = porPeso.get(peso);
+    if (!atual || ext(a.caminho) < ext(atual.caminho)) porPeso.set(peso, a);
+  }
+  return [...porPeso.entries()].sort((x, y) => x[0] - y[0]).map(([peso, a]) => ({ familia, origem: "arquivo", chave: a.chave, peso }));
+}
+
 /** Id da conta do Instagram do cliente pelo nome; só se houver exatamente uma candidata. */
 export function casarConta(nomeCliente: string, contas: { id: string; usuario: string; nome: string }[]): string | null {
   const n = normalizarNome(nomeCliente);
