@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clientes } from "@/components/conteudo/Clientes";
+import { Semana } from "@/components/conteudo/Semana";
 import { fetchClientes, type ClienteConteudo } from "@/lib/conteudo";
 
 export const Route = createFileRoute("/_authenticated/conteudo")({ component: ConteudoPage });
@@ -21,7 +22,7 @@ function ConteudoPage() {
           <TabsTrigger value="semana">Semana</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
         </TabsList>
-        <TabsContent value="semana"><p className="text-sm text-muted-foreground">Em breve.</p></TabsContent>
+        <TabsContent value="semana"><Semana clientes={clientes ?? []} /></TabsContent>
         <TabsContent value="clientes"><Clientes clientes={clientes} recarregar={carregar} /></TabsContent>
       </Tabs>
     </div>
