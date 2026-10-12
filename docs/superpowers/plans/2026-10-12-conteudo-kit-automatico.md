@@ -72,12 +72,41 @@ Base: Fase 1 (`docs/superpowers/plans/2026-10-12-conteudo-fase-1.md`, spec `docs
 
 ## Itens de execução (Jev)
 
-- [ ] K1 | files: supabase/migrations/20261012180000_conteudo_oculto.sql | check: node --env-file=.env -e "fetch(process.env.VITE_SUPABASE_URL+'/rest/v1/conteudo_clientes?select=oculto&limit=1',{headers:{apikey:process.env.VITE_SUPABASE_PUBLISHABLE_KEY}}).then(r=>console.log(r.status))" | exec: sonnet | Migration idempotente: ALTER TABLE public.conteudo_clientes ADD COLUMN IF NOT EXISTS oculto boolean NOT NULL DEFAULT false; aplicar com o mesmo db push da Task 1 do plano da Fase 1 (conferir antes com migration list que só ela está pendente); o check deve dar 200
-- [ ] K2 | files: supabase/functions/conteudo/regras.ts,src/lib/conteudoRegras.test.ts | check: node --test src/lib/conteudoRegras.test.ts | exec: sonnet | Contratos de regras.ts acima, com os testes; rodar também npm test e npx tsc --noEmit -p .
-- [ ] K3 | files: supabase/functions/conteudo/prompts.ts,src/lib/conteudoRegras.test.ts | after: K2 | check: node --test src/lib/conteudoRegras.test.ts | exec: haiku | Contrato de prompts.ts acima (ESQUEMA_KIT, SYSTEM_KIT) e o teste do esquema; rodar também npx tsc --noEmit -p .
-- [ ] K4 | files: supabase/functions/conteudo/render.ts,supabase/functions/conteudo/montagem.ts | after: K2 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/montagem.ts | exec: sonnet | Contrato de render.ts e montagem.ts acima (cssFontshare, resolverFonte, fontshare no carregarRecursos), conferindo o Fontshare de verdade com curl
-- [ ] K5 | files: supabase/functions/conteudo/index.ts | after: K3,K4 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/index.ts | exec: sonnet | Contrato de index.ts acima (cofre_sync binário, kit_do_cofre, semana sem ocultos e sem aviso de quem não tem agenda)
-- [ ] K6 | files: tools/cofre-sync/sync.mjs | after: K2 | check: node --check tools/cofre-sync/sync.mjs | exec: sonnet | Contrato do script acima (logos de Anexos em binário); não rodar o script
-- [ ] K7 | files: src/lib/conteudo.ts | after: K3 | check: npx tsc --noEmit -p . | exec: haiku | Contrato de src/lib/conteudo.ts acima (oculto, kitDoCofre, ocultarClientes)
-- [ ] K8 | files: src/components/conteudo/Clientes.tsx,src/components/conteudo/AbaKit.tsx | after: K7 | check: npx tsc --noEmit -p . | exec: sonnet | Contrato da tela acima (lista com busca, ocultar um a um e em massa, ligar ao abrir com kit do cofre, Puxar tudo do cofre, fontes só leitura com ajuste à mão escondido); rodar também npm test
+- [r] K1 | files: supabase/migrations/20261012180000_conteudo_oculto.sql | check: node --env-file=.env -e "fetch(process.env.VITE_SUPABASE_URL+'/rest/v1/conteudo_clientes?select=oculto&limit=1',{headers:{apikey:process.env.VITE_SUPABASE_PUBLISHABLE_KEY}}).then(r=>console.log(r.status))" | exec: sonnet | Migration idempotente: ALTER TABLE public.conteudo_clientes ADD COLUMN IF NOT EXISTS oculto boolean NOT NULL DEFAULT false; aplicar com o mesmo db push da Task 1 do plano da Fase 1 (conferir antes com migration list que só ela está pendente); o check deve dar 200
+- [r] K2 | files: supabase/functions/conteudo/regras.ts,src/lib/conteudoRegras.test.ts | check: node --test src/lib/conteudoRegras.test.ts | exec: sonnet | Contratos de regras.ts acima, com os testes; rodar também npm test e npx tsc --noEmit -p .
+- [r] K3 | files: supabase/functions/conteudo/prompts.ts,src/lib/conteudoRegras.test.ts | after: K2 | check: node --test src/lib/conteudoRegras.test.ts | exec: haiku | Contrato de prompts.ts acima (ESQUEMA_KIT, SYSTEM_KIT) e o teste do esquema; rodar também npx tsc --noEmit -p .
+- [r] K4 | files: supabase/functions/conteudo/render.ts,supabase/functions/conteudo/montagem.ts | after: K2 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/montagem.ts | exec: sonnet | Contrato de render.ts e montagem.ts acima (cssFontshare, resolverFonte, fontshare no carregarRecursos), conferindo o Fontshare de verdade com curl
+- [r] K5 | files: supabase/functions/conteudo/index.ts | after: K3,K4 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/index.ts | exec: sonnet | Contrato de index.ts acima (cofre_sync binário, kit_do_cofre, semana sem ocultos e sem aviso de quem não tem agenda)
+- [r] K6 | files: tools/cofre-sync/sync.mjs | after: K2 | check: node --check tools/cofre-sync/sync.mjs | exec: sonnet | Contrato do script acima (logos de Anexos em binário); não rodar o script
+- [r] K7 | files: src/lib/conteudo.ts | after: K3 | check: npx tsc --noEmit -p . | exec: haiku | Contrato de src/lib/conteudo.ts acima (oculto, kitDoCofre, ocultarClientes)
+- [r] K8 | files: src/components/conteudo/Clientes.tsx,src/components/conteudo/AbaKit.tsx | after: K7 | check: npx tsc --noEmit -p . | exec: sonnet | Contrato da tela acima (lista com busca, ocultar um a um e em massa, ligar ao abrir com kit do cofre, Puxar tudo do cofre, fontes só leitura com ajuste à mão escondido); rodar também npm test
 - [ ] K9 | after: K1,K5,K6,K8 | check: curl -s https://uajusldnvzgakffofkhl.supabase.co/functions/v1/conteudo | exec: opus | Sessão principal: publicar a função, rodar o script do cofre, "Puxar tudo do cofre" na Kobe, conferir fontes Clash Display e Satoshi e a logo, push do site e teste real
+
+---
+
+## Adendo: arquivos de fonte do cofre (pedido do André, 12/10/2026)
+
+"Coloque a opção das fontes também serem puxadas direto do cofre." Leitura: (1) arquivos de fonte que estiverem na pasta do cliente no cofre são enviados e usados antes do Google e do Fontshare (serve para fonte própria); (2) botão "Puxar do cofre" na seção de fontes do Kit, que atualiza só as fontes.
+
+### Contratos
+
+- `regras.ts` (F1):
+  - `ehFonteDoCofre(caminho: string): boolean`: `/^(Anexos|Fontes)\/[^/]+\.(woff2|woff|ttf|otf)$/i`.
+  - `pesoDoNome(nome: string): number`: pelo nome normalizado (minúsculas, sem acento, sem separadores): `thin` ou `hairline` 100; `extralight` ou `ultralight` 200; `light` 300; `medium` 500; `semibold` ou `demibold` 600; `extrabold` ou `ultrabold` 800; `black` ou `heavy` 900; `bold` 700; senão 400. Testar na ordem certa (extralight antes de light, semibold e extrabold antes de bold).
+  - `fontesDoCofre(familia: string, arquivos: { caminho: string; chave: string }[]): Fonte[]`: arquivos com `ehFonteDoCofre` cujo nome (sem extensão, `normalizarNome`) começa com `normalizarNome(familia)` e não contém `italic`; cada um vira `{ familia, origem: "arquivo", chave, peso: pesoDoNome(nome) }`, sem repetir peso (fica o primeiro, preferindo woff2, depois woff, ttf, otf), em ordem de peso.
+  - Testes para os três.
+- `tools/cofre-sync/sync.mjs` (F2): além das logos, envia em binário os arquivos que passam em `ehFonteDoCofre`, olhando `Anexos/` e `Fontes/`.
+- `index.ts` (F3):
+  - `cofre_sync`: aceita binário também quando `ehFonteDoCofre(caminho)` (tipos `font/woff2`, `font/woff`, `font/ttf`, `font/otf`), mesmo limite e mesma pasta no R2.
+  - `kit_do_cofre`: para cada nome na ordem `[familia, ...reservas]`, primeiro `fontesDoCofre(nome, linhas com chave)` (se vier algo, usa todos os pesos e para), depois `resolverFonte(nome, [])`. Mantém o aviso de fonte não encontrada.
+  - `kit_do_cofre` aceita `so_fontes: true`: faz o mesmo cálculo, mas grava só `fontes` (e `updated_at`).
+- Tela (F4):
+  - `src/lib/conteudo.ts`: `kitDoCofre(clienteId: string, soFontes = false)` manda `so_fontes`.
+  - `AbaKit.tsx`: botão "Puxar do cofre" no cabeçalho da seção Fontes (ícone `FolderSync`, como os outros), que chama `kitDoCofre(cliente.id, true)`, mostra os avisos e recarrega; a lista mostra "arquivo do cofre" quando a chave começa com `instagram/conteudo/cofre/`.
+
+### Itens
+
+- [ ] F1 | files: supabase/functions/conteudo/regras.ts,src/lib/conteudoRegras.test.ts | check: node --test src/lib/conteudoRegras.test.ts | exec: sonnet | Contrato do adendo para regras.ts (ehFonteDoCofre, pesoDoNome, fontesDoCofre) com testes; rodar também npm test e npx tsc --noEmit -p .
+- [ ] F2 | files: tools/cofre-sync/sync.mjs | after: F1 | check: node --check tools/cofre-sync/sync.mjs | exec: haiku | Contrato do adendo para o script (fontes de Anexos/ e Fontes/ em binário); não rodar o script
+- [ ] F3 | files: supabase/functions/conteudo/index.ts | after: F1 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/index.ts | exec: sonnet | Contrato do adendo para index.ts (cofre_sync com fontes, kit_do_cofre com arquivos do cofre primeiro e so_fontes)
+- [ ] F4 | files: src/lib/conteudo.ts,src/components/conteudo/AbaKit.tsx | after: F3,K8 | check: npx tsc --noEmit -p . | exec: haiku | Contrato do adendo para a tela (kitDoCofre com soFontes, botão Puxar do cofre nas fontes, rótulo arquivo do cofre)
