@@ -26,6 +26,7 @@ import { Route as AuthenticatedNotasRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated/livros'
 import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
 import { Route as AuthenticatedInstagramRouteImport } from './routes/_authenticated/instagram'
+import { Route as AuthenticatedConteudoRouteImport } from './routes/_authenticated/conteudo'
 import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
 import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenticated/habilidades'
 import { Route as AuthenticatedGmnRouteImport } from './routes/_authenticated/gmn'
@@ -126,6 +127,11 @@ const AuthenticatedLinksRoute = AuthenticatedLinksRouteImport.update({
 const AuthenticatedInstagramRoute = AuthenticatedInstagramRouteImport.update({
   id: '/instagram',
   path: '/instagram',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedConteudoRoute = AuthenticatedConteudoRouteImport.update({
+  id: '/conteudo',
+  path: '/conteudo',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedIdeiasRoute = AuthenticatedIdeiasRouteImport.update({
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/habilidades': typeof AuthenticatedHabilidadesRoute
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/instagram': typeof AuthenticatedInstagramRoute
+  '/conteudo': typeof AuthenticatedConteudoRoute
   '/links': typeof AuthenticatedLinksRoute
   '/livros': typeof AuthenticatedLivrosRoute
   '/notas': typeof AuthenticatedNotasRoute
@@ -265,6 +272,7 @@ export interface FileRoutesByTo {
   '/habilidades': typeof AuthenticatedHabilidadesRoute
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/instagram': typeof AuthenticatedInstagramRoute
+  '/conteudo': typeof AuthenticatedConteudoRoute
   '/links': typeof AuthenticatedLinksRoute
   '/livros': typeof AuthenticatedLivrosRoute
   '/notas': typeof AuthenticatedNotasRoute
@@ -301,6 +309,7 @@ export interface FileRoutesById {
   '/_authenticated/habilidades': typeof AuthenticatedHabilidadesRoute
   '/_authenticated/ideias': typeof AuthenticatedIdeiasRoute
   '/_authenticated/instagram': typeof AuthenticatedInstagramRoute
+  '/_authenticated/conteudo': typeof AuthenticatedConteudoRoute
   '/_authenticated/links': typeof AuthenticatedLinksRoute
   '/_authenticated/livros': typeof AuthenticatedLivrosRoute
   '/_authenticated/notas': typeof AuthenticatedNotasRoute
@@ -338,6 +347,7 @@ export interface FileRouteTypes {
     | '/habilidades'
     | '/ideias'
     | '/instagram'
+    | '/conteudo'
     | '/links'
     | '/livros'
     | '/notas'
@@ -371,6 +381,7 @@ export interface FileRouteTypes {
     | '/habilidades'
     | '/ideias'
     | '/instagram'
+    | '/conteudo'
     | '/links'
     | '/livros'
     | '/notas'
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/_authenticated/habilidades'
     | '/_authenticated/ideias'
     | '/_authenticated/instagram'
+    | '/_authenticated/conteudo'
     | '/_authenticated/links'
     | '/_authenticated/livros'
     | '/_authenticated/notas'
@@ -550,6 +562,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInstagramRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/conteudo': {
+      id: '/_authenticated/conteudo'
+      path: '/conteudo'
+      fullPath: '/conteudo'
+      preLoaderRoute: typeof AuthenticatedConteudoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/ideias': {
       id: '/_authenticated/ideias'
       path: '/ideias'
@@ -681,6 +700,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedHabilidadesRoute: typeof AuthenticatedHabilidadesRoute
   AuthenticatedIdeiasRoute: typeof AuthenticatedIdeiasRoute
   AuthenticatedInstagramRoute: typeof AuthenticatedInstagramRoute
+  AuthenticatedConteudoRoute: typeof AuthenticatedConteudoRoute
   AuthenticatedLinksRoute: typeof AuthenticatedLinksRoute
   AuthenticatedLivrosRoute: typeof AuthenticatedLivrosRoute
   AuthenticatedNotasRoute: typeof AuthenticatedNotasRoute
@@ -714,6 +734,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedHabilidadesRoute: AuthenticatedHabilidadesRoute,
   AuthenticatedIdeiasRoute: AuthenticatedIdeiasRoute,
   AuthenticatedInstagramRoute: AuthenticatedInstagramRoute,
+  AuthenticatedConteudoRoute: AuthenticatedConteudoRoute,
   AuthenticatedLinksRoute: AuthenticatedLinksRoute,
   AuthenticatedLivrosRoute: AuthenticatedLivrosRoute,
   AuthenticatedNotasRoute: AuthenticatedNotasRoute,

@@ -27,6 +27,7 @@ import {
   NotebookPen,
   MapPin,
   Instagram,
+  Sparkles,
 } from "lucide-react";
 
 export interface NavLink {
@@ -52,6 +53,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
       { label: "NPS de Clientes", icon: <MessageSquare size={17} />, to: "/nps", palavras: ["satisfação", "pesquisa", "avaliação"] },
       { label: "Dados internos", icon: <Inbox size={17} />, to: "/dados-internos", palavras: ["briefing", "contrato", "catálogo", "formulários", "respostas", "drive", "e-commerce"] },
       { label: "Instagram", icon: <Instagram size={17} />, to: "/instagram", palavras: ["instagram", "posts", "reels", "carrossel", "agendar", "business suite", "meta", "redes sociais"] },
+      { label: "Conteúdo", icon: <Sparkles size={17} />, to: "/conteudo", palavras: ["conteúdo", "posts", "carrossel", "design", "aprovação", "semana", "social media", "ia"] },
       { label: "Google Meu Negócio", icon: <MapPin size={17} />, to: "/gmn", palavras: ["gmn", "google", "perfil da empresa", "posts", "seo local", "google business"] },
     ],
   },
