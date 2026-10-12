@@ -1,17 +1,19 @@
-// Aba Conteúdo, área Clientes: os clientes ligados, o que falta em cada um e o "Ligar cliente".
-import { useEffect, useState, type ReactNode } from "react";
+// Aba Conteúdo, área Clientes: todos os clientes, o que falta em cada um, ocultar um a um ou em massa.
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus } from "lucide-react";
+import { Eye, EyeOff, Loader2, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { MensagemBusca } from "@/components/MensagemBusca";
+import { useBusca } from "@/lib/useBusca";
 import { fetchClientesOpcoes, type ClienteOpcao } from "@/lib/gmn";
 import { fetchContas, type ContaInstagram } from "@/lib/instagram";
-import { cofrePastas, ligarCliente, type ClienteConteudo } from "@/lib/conteudo";
-import { faltaParaGerar, type Formato } from "../../../supabase/functions/conteudo/regras.ts";
+import { cofrePastas, kitDoCofre, ligarCliente, ocultarClientes, salvarCliente, type ClienteConteudo } from "@/lib/conteudo";
+import { faltaParaGerar, normalizarNome, type Formato } from "../../../supabase/functions/conteudo/regras.ts";
 import { GavetaCliente } from "./GavetaCliente";
 
 export function Campo({ rotulo, children }: { rotulo: string; children: ReactNode }) {
@@ -26,97 +28,148 @@ export function faltaDoCliente(c: ClienteConteudo): string[] {
   return [...falta];
 }
 
-export function Clientes({ clientes, recarregar }: { clientes: ClienteConteudo[] | null; recarregar: () => void }) {
-  const [ligar, setLigar] = useState(false);
-  const [aberto, setAberto] = useState<string | null>(null);
-  if (!clientes) return <Loader2 className="h-5 w-5 animate-spin" />;
-  const cliente = clientes.find((c) => c.id === aberto) ?? null;
-  return (
-    <div className="space-y-3">
-      <Button onClick={() => setLigar(true)}><Plus className="mr-1 h-4 w-4" />Ligar cliente</Button>
-      {!clientes.length && <p className="text-sm text-muted-foreground">Nenhum cliente ligado ainda.</p>}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {clientes.map((c) => {
-          const falta = faltaDoCliente(c);
-          return (
-            <Card key={c.id} role="button" tabIndex={0} className="cursor-pointer hover:bg-muted/50"
-              onClick={() => setAberto(c.id)} onKeyDown={(e) => e.key === "Enter" && setAberto(c.id)}>
-              <CardContent className="space-y-2 p-4">
-                <div className="font-medium">{c.clientes?.nome ?? "Cliente"}</div>
-                <div className="text-xs text-muted-foreground">{c.agenda.length} {c.agenda.length === 1 ? "post" : "posts"} por semana</div>
-                {falta.length ? <p className="text-xs text-amber-600">Falta: {falta.join(", ")}</p> : <Badge variant="secondary">Pronto para gerar</Badge>}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-      <LigarCliente aberto={ligar} fechar={() => setLigar(false)} ligados={clientes.map((c) => c.cliente_id)}
-        aoLigar={() => { setLigar(false); recarregar(); }} />
-      {cliente && <GavetaCliente cliente={cliente} fechar={() => setAberto(null)} recarregar={recarregar} />}
-    </div>
-  );
-}
+interface Item { cliente_id: string; nome: string; linha: ClienteConteudo | null }
 
-function LigarCliente({ aberto, fechar, ligados, aoLigar }: { aberto: boolean; fechar: () => void; ligados: string[]; aoLigar: () => void }) {
+export function Clientes({ clientes, recarregar }: { clientes: ClienteConteudo[] | null; recarregar: () => void }) {
   const [opcoes, setOpcoes] = useState<ClienteOpcao[]>([]);
-  const [pastas, setPastas] = useState<string[]>([]);
   const [contas, setContas] = useState<ContaInstagram[]>([]);
-  const [clienteId, setClienteId] = useState("");
-  const [pasta, setPasta] = useState("");
-  const [conta, setConta] = useState("");
-  const [salvando, setSalvando] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [ocultos, setOcultos] = useState(false);
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const [aberto, setAberto] = useState<string | null>(null); // cliente_id: a linha pode chegar depois do recarregar
+  const [ocupado, setOcupado] = useState(false);
   useEffect(() => {
-    if (!aberto) return;
-    setClienteId(""); setPasta(""); setConta("");
     fetchClientesOpcoes().then(setOpcoes).catch((e) => toast.error(e.message));
-    cofrePastas().then((r) => setPastas(r.pastas)).catch((e) => toast.error(`Cofre: ${e.message}`));
-    fetchContas().then((cs) => setContas(cs.filter((c) => c.ativa))).catch((e) => toast.error(e.message));
-  }, [aberto]);
-  const livres = opcoes.filter((o) => !ligados.includes(o.id));
-  function escolherCliente(id: string) {
-    setClienteId(id);
-    const nome = livres.find((o) => o.id === id)?.nome.toLowerCase();
-    const igual = pastas.find((p) => p.toLowerCase() === nome);
-    if (igual) setPasta(igual);
+    fetchContas().then(setContas).catch((e) => toast.error(e.message));
+  }, []);
+
+  const itens = useMemo<Item[]>(() => {
+    const porId = new Map((clientes ?? []).map((c) => [c.cliente_id, c]));
+    const lista: Item[] = opcoes.map((o) => ({ cliente_id: o.id, nome: o.nome, linha: porId.get(o.id) ?? null }));
+    const ids = new Set(opcoes.map((o) => o.id));
+    for (const c of clientes ?? []) if (!ids.has(c.cliente_id)) lista.push({ cliente_id: c.cliente_id, nome: c.clientes?.nome ?? "Cliente", linha: c });
+    return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [opcoes, clientes]);
+  const doModo = useMemo(() => itens.filter((i) => !!i.linha?.oculto === ocultos), [itens, ocultos]);
+  const resultado = useBusca(doModo, busca, (i) => [i.nome]);
+  const visiveis = resultado.itens;
+
+  if (!clientes) return <Loader2 className="h-5 w-5 animate-spin" />;
+  const linhaAberta = aberto ? clientes.find((c) => c.cliente_id === aberto) ?? null : null;
+  const contaDe = (l: ClienteConteudo | null) => contas.find((c) => c.id === l?.ig_conta_id);
+
+  function alternar(id: string) {
+    setMarcados((m) => { const n = new Set(m); if (!n.delete(id)) n.add(id); return n; });
   }
-  async function salvar() {
-    setSalvando(true);
+  async function ocultar(ids: string[], valor: boolean) {
+    setOcupado(true);
     try {
-      await ligarCliente({ cliente_id: clienteId, pasta_cofre: pasta || null, ig_conta_id: conta || null });
-      toast.success("Cliente ligado.");
-      aoLigar();
+      await ocultarClientes(ids, valor, clientes ?? []);
+      setMarcados(new Set());
+      recarregar();
     } catch (e: any) {
       toast.error(e.message);
     } finally {
-      setSalvando(false);
+      setOcupado(false);
     }
   }
+  /** Cria a linha do cliente (pasta do cofre pelo nome) e puxa o kit. */
+  async function configurar(i: Item, ativo: boolean) {
+    const pastas = await cofrePastas().then((r) => r.pastas).catch(() => [] as string[]);
+    const n = normalizarNome(i.nome);
+    await ligarCliente({ cliente_id: i.cliente_id, pasta_cofre: pastas.find((p) => normalizarNome(p) === n) ?? null, ig_conta_id: null, ativo });
+    const aviso = toast.loading("Puxando o kit do cofre...");
+    try {
+      await kitDoCofre(i.cliente_id);
+      toast.dismiss(aviso);
+    } catch (e: any) {
+      toast.error(e.message, { id: aviso });
+    }
+  }
+  async function executar(fn: () => Promise<void>) {
+    setOcupado(true);
+    try {
+      await fn();
+      recarregar();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setOcupado(false);
+    }
+  }
+  function abrir(i: Item) {
+    if (i.linha) setAberto(i.cliente_id);
+    else executar(async () => { await configurar(i, false); setAberto(i.cliente_id); });
+  }
+  function ligar(i: Item, ativo: boolean) {
+    executar(() => (i.linha ? salvarCliente(i.linha.id, { ativo }) : configurar(i, ativo)));
+  }
+
   return (
-    <Dialog open={aberto} onOpenChange={(v) => !v && fechar()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Ligar cliente</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <Campo rotulo="Cliente">
-            <Select value={clienteId} onValueChange={escolherCliente}>
-              <SelectTrigger><SelectValue placeholder="Escolha o cliente" /></SelectTrigger>
-              <SelectContent>{livres.map((o) => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}</SelectContent>
-            </Select>
-          </Campo>
-          <Campo rotulo="Pasta no cofre de clientes">
-            <Select value={pasta} onValueChange={setPasta}>
-              <SelectTrigger><SelectValue placeholder={pastas.length ? "Escolha a pasta" : "Cofre ainda não sincronizado"} /></SelectTrigger>
-              <SelectContent>{pastas.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-            </Select>
-          </Campo>
-          <Campo rotulo="Conta do Instagram">
-            <Select value={conta} onValueChange={setConta}>
-              <SelectTrigger><SelectValue placeholder="Escolha a conta" /></SelectTrigger>
-              <SelectContent>{contas.map((c) => <SelectItem key={c.id} value={c.id}>@{c.usuario}</SelectItem>)}</SelectContent>
-            </Select>
-          </Campo>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-xs">
+          <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input className="pl-8" placeholder="Buscar cliente" aria-label="Buscar cliente" value={busca} onChange={(e) => setBusca(e.target.value)} />
         </div>
-        <DialogFooter><Button disabled={!clienteId || salvando} onClick={salvar}>{salvando && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Ligar</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <label className="flex items-center gap-2 text-sm">
+          <Switch checked={ocultos} onCheckedChange={(v) => { setOcultos(v); setMarcados(new Set()); }} />Mostrar ocultos
+        </label>
+      </div>
+      <MensagemBusca resultado={resultado} />
+      {!visiveis.length && !busca && <p className="text-sm text-muted-foreground">{ocultos ? "Nenhum cliente oculto." : "Nenhum cliente."}</p>}
+      <div className="divide-y rounded-lg border">
+        {visiveis.map((i) => {
+          const falta = i.linha ? faltaDoCliente(i.linha) : [];
+          const conta = contaDe(i.linha);
+          return (
+            <div key={i.cliente_id} role="button" tabIndex={0} className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-muted/50"
+              onClick={() => !ocupado && abrir(i)}
+              onKeyDown={(e) => e.target === e.currentTarget && e.key === "Enter" && !ocupado && abrir(i)}>
+              <span onClick={(e) => e.stopPropagation()}>
+                <Checkbox checked={marcados.has(i.cliente_id)} onCheckedChange={() => alternar(i.cliente_id)} aria-label={`Selecionar ${i.nome}`} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{i.nome}</div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {conta ? `@${conta.usuario}` : "Sem conta do Instagram"}
+                  {" · "}
+                  {!i.linha ? "Ainda não configurado"
+                    : falta.length ? <span className="text-amber-600">Falta: {falta.join(", ")}</span>
+                    : "Pronto para gerar"}
+                </div>
+              </div>
+              {i.linha?.ativo && !falta.length && <Badge variant="secondary" className="hidden sm:inline-flex">Gera toda semana</Badge>}
+              <span onClick={(e) => e.stopPropagation()} className="flex items-center">
+                <Switch checked={!!i.linha?.ativo} disabled={ocupado} onCheckedChange={(v) => ligar(i, v)}
+                  aria-label={`${i.linha?.ativo ? "Desligar" : "Ligar"} ${i.nome}`} />
+              </span>
+              <Button variant="ghost" size="icon" disabled={ocupado} aria-label={`${i.linha?.oculto ? "Mostrar" : "Ocultar"} ${i.nome}`}
+                onClick={(e) => { e.stopPropagation(); ocultar([i.cliente_id], !i.linha?.oculto); }}>
+                {i.linha?.oculto ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+      {marcados.size > 0 && (
+        <div className="fixed bottom-5 left-1/2 z-40 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-popover px-3 py-2 shadow-xl">
+            <span className="text-sm font-semibold">{marcados.size} {marcados.size === 1 ? "selecionado" : "selecionados"}</span>
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              {marcados.size < visiveis.length && (
+                <Button size="sm" variant="ghost" className="h-8 text-xs" disabled={ocupado}
+                  onClick={() => setMarcados(new Set(visiveis.map((i) => i.cliente_id)))}>Selecionar todos ({visiveis.length})</Button>
+              )}
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" disabled={ocupado} onClick={() => ocultar([...marcados], !ocultos)}>
+                {ocultos ? <Eye size={13} /> : <EyeOff size={13} />}{ocultos ? "Mostrar" : "Ocultar"}
+              </Button>
+              <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" onClick={() => setMarcados(new Set())}><X size={13} />Limpar</Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {linhaAberta && <GavetaCliente cliente={linhaAberta} fechar={() => setAberto(null)} recarregar={recarregar} />}
+    </div>
   );
 }

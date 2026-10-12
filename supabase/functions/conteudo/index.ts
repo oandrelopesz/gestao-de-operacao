@@ -187,7 +187,7 @@ async function gerarSemana(sb: any, segunda: string, clienteId: string | null) {
     throw new ErroHttp(400, "Informe a segunda-feira da semana (AAAA-MM-DD).");
   }
   let q = sb.from("conteudo_clientes").select("*, clientes(nome)").eq("oculto", false);
-  if (clienteId) q = q.eq("id", clienteId);
+  q = clienteId ? q.eq("id", clienteId) : q.eq("ativo", true); // só os ligados; um cliente pedido gera mesmo desligado
   const { data: clientes, error } = await q;
   if (error) throw new Error(error.message);
   let criados = 0;

@@ -56,7 +56,7 @@ export async function fetchClientes(): Promise<ClienteConteudo[]> {
   return (data ?? []) as ClienteConteudo[];
 }
 
-export async function ligarCliente(v: { cliente_id: string; pasta_cofre: string | null; ig_conta_id: string | null }): Promise<void> {
+export async function ligarCliente(v: { cliente_id: string; pasta_cofre: string | null; ig_conta_id: string | null; ativo?: boolean }): Promise<void> {
   const { error } = await clientesTab().insert([v]);
   if (error) throw error;
 }

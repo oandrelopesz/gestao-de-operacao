@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ACEITA_IMAGENS } from "@/lib/gmnImagem";
 import { fetchContas, type ContaInstagram } from "@/lib/instagram";
 import {
-  cofreArquivos, cofrePastas, enviarFonte, enviarLogo, lerPastasDrive, salvarCliente, urlArquivo, type ClienteConteudo,
+  cofreArquivos, cofrePastas, enviarFonte, enviarLogo, kitDoCofre, lerPastasDrive, salvarCliente, urlArquivo, type ClienteConteudo,
 } from "@/lib/conteudo";
 import { ROTULO_VARIANTE, VARIANTES_LOGO, type VarianteLogo } from "../../../supabase/functions/conteudo/regras.ts";
 import { Campo } from "./Clientes";
@@ -30,8 +30,8 @@ export function AbaKit({ cliente, recarregar }: { cliente: ClienteConteudo; reca
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [google, setGoogle] = useState("");
   const [arquivoFonte, setArquivoFonte] = useState({ familia: "", peso: "400" });
-  // Rascunho só reinicia ao trocar de cliente (logo e fonte gravam sozinhas e não podem apagar o que está sendo digitado)
-  useEffect(() => { setF(formDe(cliente)); }, [cliente.id]);
+  // Rascunho volta ao salvo ao trocar de cliente ou quando o texto salvo muda (o kit do cofre grava por fora)
+  useEffect(() => { setF(formDe(cliente)); }, [cliente.id, cliente.design_system, cliente.tom_de_voz]);
   useEffect(() => {
     cofrePastas().then((r) => setPastas(r.pastas)).catch(() => {});
     fetchContas().then((cs) => setContas(cs.filter((c) => c.ativa))).catch(() => {});
@@ -72,7 +72,12 @@ export function AbaKit({ cliente, recarregar }: { cliente: ClienteConteudo; reca
     if (!r.arquivos.length) throw new Error("O cofre deste cliente não tem nota de design system nem de tom de voz.");
     setCofre({ destino, arquivos: r.arquivos });
   });
-  const lerDrive = () => fazer("drive", async () => {
+  const puxarTudo = () => fazer("tudo", async () => {
+    const { kit } = await kitDoCofre(cliente.id);
+    toast.success(`Kit puxado: ${kit.fontes} fontes, ${kit.logos} logos, ${kit.pilares} pilares${kit.conta ? ", conta do Instagram" : ""}${kit.drive ? ", Drive" : ""}.`);
+    kit.avisos.forEach((a) => toast.warning(a));
+  });
+  const lerDrive =() => fazer("drive", async () => {
     await salvarCliente(cliente.id, { drive_url: f.drive_url.trim() });
     const r = await lerPastasDrive(cliente.id);
     toast.success(`${r.pastas.length} ${r.pastas.length === 1 ? "pasta com imagens" : "pastas com imagens"}.`);
@@ -80,6 +85,9 @@ export function AbaKit({ cliente, recarregar }: { cliente: ClienteConteudo; reca
 
   return (
     <div className="space-y-6">
+      <Button variant="outline" onClick={puxarTudo} disabled={!!ocupado}>
+        {ocupado === "tudo" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FolderSync className="mr-1 h-4 w-4" />}Puxar tudo do cofre
+      </Button>
       <section className="grid gap-3 sm:grid-cols-2">
         <Campo rotulo="Pasta no cofre de clientes">
           <Select value={f.pasta_cofre} onValueChange={(v) => setF({ ...f, pasta_cofre: v })}>
@@ -143,11 +151,13 @@ export function AbaKit({ cliente, recarregar }: { cliente: ClienteConteudo; reca
         <h3 className="text-sm font-medium">Fontes</h3>
         {cliente.fontes.map((fonte, i) => (
           <div key={`${fonte.familia}-${i}`} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
-            <span>{fonte.familia}{fonte.peso ? ` ${fonte.peso}` : ""} ({fonte.origem === "google" ? "Google Fonts" : "arquivo"})</span>
+            <span>{fonte.familia}{fonte.peso ? ` ${fonte.peso}` : ""} ({fonte.origem === "google" ? "Google Fonts" : fonte.origem === "fontshare" ? "Fontshare" : "arquivo"})</span>
             <Button variant="ghost" size="icon" aria-label={`Remover fonte ${fonte.familia}`} onClick={() => removerFonte(i)}><Trash2 className="h-4 w-4" /></Button>
           </div>
         ))}
-        <div className="flex flex-wrap items-end gap-2">
+        <details className="space-y-2">
+        <summary className="cursor-pointer text-sm text-muted-foreground">Ajustar fontes à mão</summary>
+        <div className="flex flex-wrap items-end gap-2 pt-2">
           <Campo rotulo="Do Google Fonts"><Input placeholder="Ex.: Space Grotesk" value={google} onChange={(e) => setGoogle(e.target.value)} /></Campo>
           <Button variant="outline" disabled={!google.trim() || !!ocupado} onClick={addGoogle}>Adicionar</Button>
         </div>
@@ -166,6 +176,7 @@ export function AbaKit({ cliente, recarregar }: { cliente: ClienteConteudo; reca
             </label>
           </Button>
         </div>
+        </details>
       </section>
 
       <section className="space-y-2">
