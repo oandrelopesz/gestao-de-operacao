@@ -307,7 +307,7 @@ export function recortarLog(texto: string, hoje: string, dias = 60): string {
 /** Contexto do cliente para a IA: nota central, Log recente e documentos, nessa ordem, até `limite` caracteres. */
 export function montarContexto(arquivos: { caminho: string; conteudo: string }[], limite = 100_000): string {
   const peso = (c: string) => (c === ARQUIVO_LOG ? 1 : c.includes("/") ? 2 : 0);
-  const ordem = arquivos.filter((a) => !a.caminho.startsWith("Anexos/")).sort((a, b) => peso(a.caminho) - peso(b.caminho) || a.caminho.localeCompare(b.caminho));
+  const ordem = arquivos.filter((a) => !a.caminho.startsWith("Anexos/") && !ehFonteDoCofre(a.caminho)).sort((a, b) => peso(a.caminho) - peso(b.caminho) || a.caminho.localeCompare(b.caminho));
   let saida = "";
   for (const a of ordem) {
     const bloco = `\n\n=== ${a.caminho} ===\n${a.conteudo.trim()}`;

@@ -6,7 +6,7 @@
 //   POST { acao: "cofre_ler", pasta? }                      -> { pastas, sincronizado_em } | { arquivos, total, sincronizado_em }
 //        com pasta: só as notas .md do kit (nome com "Design System" ou "tom de voz"), nunca Anexos/
 //   cofre_sync também aceita logos de Anexos/ com binario: true (base64 vai para o R2)
-//   POST { acao: "kit_do_cofre", cliente_id }               -> { kit }              monta fontes, logos, pilares, conta e Drive a partir do cofre
+//   POST { acao: "kit_do_cofre", cliente_id, so_fontes? }             -> { kit }              monta fontes, logos, pilares, conta e Drive a partir do cofre
 //   POST { acao: "drive_pastas", cliente_id }               -> { pastas }           lê as subpastas do Drive e grava no cliente
 //   POST { acao: "molde", cliente_id, tipo }                -> { molde }            cria (ou refaz) um molde com prévia
 //   POST { acao: "molde_ajustar", cliente_id, tipo, pedido } -> { molde }           nova versão do molde pelo pedido
@@ -25,7 +25,7 @@ import { gerarMolde } from "./moldes.ts";
 import { ESQUEMA_AJUSTE, ESQUEMA_KIT, SYSTEM_KIT, promptAjuste } from "./prompts.ts";
 import { cloudflareConfigurado, resolverFonte } from "./render.ts";
 import {
-  AGENDA_PADRAO, ErroHttp, LEGENDA_MAX, aplicarAlteracoes, casarConta, dimensoesImagem, ehLogoDoCofre, faltaParaGerar, linkDrive,
+  AGENDA_PADRAO, ErroHttp, LEGENDA_MAX, aplicarAlteracoes, casarConta, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre, faltaParaGerar, fontesDoCofre, linkDrive,
   montarContexto, postsDaSemana, segundaDaSemana, varianteDoNome, type Alteracao, type Fonte, type Logo, type Pilar,
 } from "./regras.ts";
 
@@ -70,10 +70,10 @@ async function cofreSync(sb: any, corpo: any) {
       .upsert({ pasta: "", caminho: "__pastas__", hash: "", conteudo: JSON.stringify(pastas), atualizado_em: quando });
     if (error) throw new Error(error.message);
   }
-  const TIPOS: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", svg: "image/svg+xml" };
+  const TIPOS: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", svg: "image/svg+xml", woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf", otf: "font/otf" };
   const validos = (Array.isArray(corpo.arquivos) ? corpo.arquivos : [])
     .filter((a: any) => texto(a?.pasta, 200) && texto(a?.caminho, 300) && texto(a?.hash, 128) && typeof a?.conteudo === "string"
-      && (a.binario === true ? ehLogoDoCofre(a.caminho) && a.conteudo.length <= 4_000_000 : a.conteudo.length <= 1_000_000));
+      && (a.binario === true ? (ehLogoDoCofre(a.caminho) || ehFonteDoCofre(a.caminho)) && a.conteudo.length <= 4_000_000 : a.conteudo.length <= 1_000_000));
   for (const a of validos) {
     if (a.binario !== true) continue;
     const ext = String(a.caminho.split(".").pop()).toLowerCase();
@@ -112,7 +112,7 @@ async function cofreLer(sb: any, pasta: string | null) {
   };
 }
 
-async function kitDoCofre(sb: any, clienteId: string) {
+async function kitDoCofre(sb: any, clienteId: string, soFontes = false) {
   const { data: c, error } = await sb.from("conteudo_clientes").select("*, clientes(nome)").eq("id", clienteId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!c) throw new ErroHttp(404, "Cliente não encontrado.");
@@ -124,17 +124,31 @@ async function kitDoCofre(sb: any, clienteId: string) {
   const nota = (re: RegExp) => notas.find((l: any) => re.test((l.caminho.split("/").pop() ?? "").toLowerCase()));
   const ds = nota(/design system/);
   const tomNota = nota(/tom de voz/);
-  const r = await gerarJson<{ tom_de_voz: string; fontes: { familia: string; reservas: string[] }[]; pilares: Pilar[]; saude: boolean }>({
-    system: SYSTEM_KIT, conteudo: montarContexto(linhas), esquema: ESQUEMA_KIT, esforco: "low", maxTokens: 4000,
-  });
+  // so_fontes: sem Claude, os papéis são as famílias que o cliente já tem
+  const r = soFontes
+    ? { tom_de_voz: "", fontes: (c.fontes ?? []).map((f: Fonte) => ({ familia: f.familia, reservas: [] as string[] })), pilares: [] as Pilar[], saude: false }
+    : await gerarJson<{ tom_de_voz: string; fontes: { familia: string; reservas: string[] }[]; pilares: Pilar[]; saude: boolean }>({
+      system: SYSTEM_KIT, conteudo: montarContexto(linhas), esquema: ESQUEMA_KIT, esforco: "low", maxTokens: 4000,
+    });
   const avisos: string[] = [];
   const fontes: Fonte[] = [];
   const vistas = new Set<string>();
+  const arquivosFonte = linhas.filter((l: any) => ehFonteDoCofre(l.caminho)).map((l: any) => ({ caminho: l.caminho, chave: l.conteudo }));
   for (const f of r.fontes ?? []) {
     if (vistas.has(f.familia.toLowerCase())) continue;
     vistas.add(f.familia.toLowerCase());
-    const ok = await resolverFonte(f.familia, f.reservas ?? []);
-    if (ok) fontes.push(ok); else avisos.push(`Fonte ${f.familia} não encontrada no Google nem no Fontshare`);
+    let achou: Fonte[] = [];
+    for (const nome of [f.familia, ...(f.reservas ?? [])]) {
+      achou = fontesDoCofre(nome, arquivosFonte);
+      if (!achou.length) { const ok = await resolverFonte(nome, []); if (ok) achou = [ok]; }
+      if (achou.length) break;
+    }
+    if (achou.length) fontes.push(...achou); else avisos.push(`Fonte ${f.familia} não encontrada no Google nem no Fontshare`);
+  }
+  if (soFontes) {
+    const { error: e5 } = await sb.from("conteudo_clientes").update({ fontes: fontes.length ? fontes : c.fontes ?? [], updated_at: agora() }).eq("id", c.id);
+    if (e5) throw new Error(e5.message);
+    return { kit: { fontes: fontes.length, avisos } };
   }
   const logosDoCofre: Logo[] = [];
   for (const l of linhas.filter((x: any) => ehLogoDoCofre(x.caminho))) {
@@ -254,7 +268,7 @@ Deno.serve(async (req) => {
       case "cofre_hashes": return json(await cofreHashes(sb));
       case "cofre_sync": return json(await cofreSync(sb, corpo));
       case "cofre_ler": return json(await cofreLer(sb, corpo.pasta ? String(corpo.pasta) : null));
-      case "kit_do_cofre": return json(await kitDoCofre(sb, String(corpo.cliente_id ?? "")));
+      case "kit_do_cofre": return json(await kitDoCofre(sb, String(corpo.cliente_id ?? ""), corpo.so_fontes === true));
       case "drive_pastas": return json(await drivePastas(sb, String(corpo.cliente_id ?? "")));
       case "molde": return json({ molde: await gerarMolde(sb, String(corpo.cliente_id ?? ""), corpo.tipo) });
       case "molde_ajustar": {

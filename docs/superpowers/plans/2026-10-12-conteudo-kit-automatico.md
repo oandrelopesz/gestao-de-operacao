@@ -107,6 +107,6 @@ Base: Fase 1 (`docs/superpowers/plans/2026-10-12-conteudo-fase-1.md`, spec `docs
 ### Itens
 
 - [r] F1 | files: supabase/functions/conteudo/regras.ts,src/lib/conteudoRegras.test.ts | check: node --test src/lib/conteudoRegras.test.ts | exec: sonnet | Contrato do adendo para regras.ts (ehFonteDoCofre, pesoDoNome, fontesDoCofre) com testes; rodar também npm test e npx tsc --noEmit -p .
-- [ ] F2 | files: tools/cofre-sync/sync.mjs | after: F1 | check: node --check tools/cofre-sync/sync.mjs | exec: haiku | Contrato do adendo para o script (fontes de Anexos/ e Fontes/ em binário); não rodar o script
-- [ ] F3 | files: supabase/functions/conteudo/index.ts | after: F1 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/index.ts | exec: sonnet | Contrato do adendo para index.ts (cofre_sync com fontes, kit_do_cofre com arquivos do cofre primeiro e so_fontes)
+- [r] F2 | files: tools/cofre-sync/sync.mjs | after: F1 | check: node --check tools/cofre-sync/sync.mjs | exec: haiku | Contrato do adendo para o script (fontes de Anexos/ e Fontes/ em binário); não rodar o script
+- [r] F3 | files: supabase/functions/conteudo/index.ts | after: F1 | check: npx -y deno@2 check --node-modules-dir=none --no-lock supabase/functions/conteudo/index.ts | exec: sonnet | Contrato do adendo para index.ts (cofre_sync com fontes, kit_do_cofre com arquivos do cofre primeiro e so_fontes)
 - [ ] F4 | files: src/lib/conteudo.ts,src/components/conteudo/AbaKit.tsx | after: F3,K8 | check: npx tsc --noEmit -p . | exec: haiku | Contrato do adendo para a tela (kitDoCofre com soFontes, botão Puxar do cofre nas fontes, rótulo arquivo do cofre)
