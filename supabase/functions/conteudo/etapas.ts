@@ -8,6 +8,7 @@ import { gerarImagem } from "../gmn/openai.ts";
 import { ordemDeTentativa } from "../gmn/regras.ts";
 import { dataUri, guardar } from "./arquivos.ts";
 import { gerarJson } from "./claude.ts";
+import { notasDeArte } from "./moldes.ts";
 import { carregarRecursos, montarLamina } from "./montagem.ts";
 import { ESQUEMA_ESCOLHA, ESQUEMA_TEXTO, SYSTEM_ESCOLHA, pedidoEscolha, promptImagem, promptTexto } from "./prompts.ts";
 import { LimiteCloudflare, renderizar } from "./render.ts";
@@ -146,6 +147,7 @@ async function etapaImagens(sb: any, post: any, c: any): Promise<Record<string, 
   const laminas: Lamina[] = post.laminas;
   const usos = await usosDoCliente(sb, c.id);
   let aviso: string | null = post.aviso;
+  let padrao: string | undefined; // padrão de imagem do cofre, lido só se alguma foto for gerada por IA
   for (let i = 0; i < laminas.length; i++) {
     const l = laminas[i];
     if (!l.imagem?.pendente) continue;
@@ -157,7 +159,8 @@ async function etapaImagens(sb: any, post: any, c: any): Promise<Record<string, 
     if (drive) laminas[i] = { ...l, imagem: { ...l.imagem, pendente: false, origem: "drive", ...drive }, jpg_chave: null };
     else {
       try {
-        const b64 = await gerarImagem(promptImagem(l.imagem.descricao, c.ia_pode_pessoas), undefined, { size: "1024x1536", formato: "jpeg" });
+        padrao ??= c.pasta_cofre ? (await notasDeArte(sb, c.pasta_cofre)).padraoDeImagem ?? "" : "";
+        const b64 = await gerarImagem(promptImagem(l.imagem.descricao, c.ia_pode_pessoas, padrao), undefined, { size: "1024x1536", formato: "jpeg" });
         const chave = `instagram/conteudo/ia/${crypto.randomUUID()}.jpg`;
         await guardar(chave, decodeBase64(b64), "image/jpeg");
         laminas[i] = { ...l, imagem: { ...l.imagem, pendente: false, origem: "ia", chave }, jpg_chave: null };

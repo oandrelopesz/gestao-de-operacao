@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  AGENDA_PADRAO, ARQUIVO_LOG, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre,
+  AGENDA_PADRAO, ARQUIVO_LOG, DIRECAO_ARTE, aplicarAlteracoes, casarConta, conferirCampos, conferirEstrutura, dimensoesImagem, ehFonteDoCofre, ehLogoDoCofre,
   faltaParaGerar, fontesDoCofre, fontFace, pesoDoNome, htmlParaRender, instanteBrasilia, laminasDaResposta, linkDrive, montarContexto, motivosDoTexto,
   esperaDoCloudflare, mudancasCofre, pilaresDaSemana, normalizarNome, notaDoKit, pilaresDaNota, postsDaSemana, preencherMolde, proximoPilar, recortarLog, segundaDaSemana, slugFontshare,
   usosDeFotos, validarMolde, varianteDoNome,
@@ -10,7 +10,7 @@ import type {
   Alteracao, CampoMolde, Lamina, Molde, Moldes, RespostaTexto, TipoMolde,
 } from "../../supabase/functions/conteudo/regras.ts";
 import { motivosSaude } from "../../supabase/functions/gmn/regras.ts";
-import { ESQUEMA_KIT, ESQUEMA_PILARES, ESQUEMA_TEXTO, promptAjuste, promptMolde, promptTexto } from "../../supabase/functions/conteudo/prompts.ts";
+import { ESQUEMA_KIT, ESQUEMA_PILARES, ESQUEMA_TEXTO, promptAjuste, promptImagem, promptMolde, promptTexto } from "../../supabase/functions/conteudo/prompts.ts";
 
 const campos: CampoMolde[] = [
   { nome: "titulo", tipo: "texto", max: 20, exemplo: "" },
@@ -105,6 +105,10 @@ test("notaDoKit acha design system e tom de voz com hífen, espaço ou acento", 
   assert.equal(notaDoKit("Documentos/Tom-de-Voz.md"), "tom_de_voz");
   assert.equal(notaDoKit("Documentos/R-Salon-ICP.md"), null);
   assert.equal(notaDoKit("Documentos/Design System.png"), null);
+  assert.equal(notaDoKit("Documentos/R-Salon-Direcao-de-Arte-dos-Posts.md"), "direcao_de_arte");
+  assert.equal(notaDoKit("Documentos/Direção de Arte (Kobe).md"), "direcao_de_arte");
+  assert.equal(notaDoKit("Documentos/R-Salon-Padrao-de-Geracao-de-Imagem-IA.md"), "padrao_de_imagem");
+  assert.equal(notaDoKit("Documentos/Padrão de Fotos.md"), "padrao_de_imagem");
 });
 
 test("mudancasCofre envia novos e mudados, remove os que sumiram", () => {
@@ -191,6 +195,24 @@ test("promptMolde cobra os campos do tipo e manda os moldes já criados", () => 
   assert.ok(m.user.includes("titulo, texto, foto"));
   assert.ok(m.user.includes("logo_clara"));
   assert.ok(m.user.includes("<h1>capa</h1>"));
+});
+
+test("promptMolde manda direção de arte, padrão de imagem e regra de que o cofre vence", () => {
+  const m = promptMolde({ tipo: "capa", designSystem: "azul", tomDeVoz: "", logos: [], fontes: [], outros: [],
+    direcaoDeArte: "vazio como luxo", padraoDeImagem: "luz natural fria" });
+  assert.ok(m.user.includes("vazio como luxo"));
+  assert.ok(m.user.includes("luz natural fria"));
+  assert.ok(/vencem|vence/.test(m.system));
+  assert.ok(m.system.includes("01/"));
+  assert.ok(DIRECAO_ARTE >= 2);
+});
+
+test("promptImagem pede foto editorial e usa o padrão do cliente sem virar pôster", () => {
+  const sem = promptImagem("salão decorado", false);
+  assert.ok(/editorial/i.test(sem) && sem.includes("Sem pessoas"));
+  const com = promptImagem("salão decorado", true, "x".repeat(20_000));
+  assert.ok(com.length < 9_000);
+  assert.ok(/só a fotografia/i.test(com));
 });
 
 test("promptAjuste numera as lâminas a partir de 1", () => {

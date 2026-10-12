@@ -36,7 +36,9 @@ export interface Pilar { nome: string; descricao: string }
 export interface ItemAgenda { dia: number; hora: string; formato: Formato }
 export interface PastaDrive { id: string; caminho: string; quantidade: number }
 export interface CampoMolde { nome: string; tipo: "texto" | "imagem" | "logo"; max: number; exemplo: string }
-export interface Molde { html: string; campos: CampoMolde[]; versao: number; aprovado_em: string | null; previa_chave: string | null }
+/** Versão da direção de arte dos moldes: só moldes da versão atual servem de referência de estilo para os outros. */
+export const DIRECAO_ARTE = 2;
+export interface Molde { html: string; campos: CampoMolde[]; versao: number; aprovado_em: string | null; previa_chave: string | null; direcao?: number }
 export type Moldes = Partial<Record<TipoMolde, Molde>>;
 export interface ImagemLamina {
   descricao: string;
@@ -321,11 +323,18 @@ export function esperaDoCloudflare(retryAfter: string | null, tentativa: number)
   return tentativa < 3 && s > 0 && s <= 15 ? s * 1000 : 0;
 }
 
+export type NotaDoKit = "design_system" | "tom_de_voz" | "pilares" | "direcao_de_arte" | "padrao_de_imagem";
+
 /** Nota do kit pelo nome do arquivo, ignorando hífen, espaço e acento ("R-Salon-Design-System.md"). */
-export function notaDoKit(caminho: string): "design_system" | "tom_de_voz" | "pilares" | null {
+export function notaDoKit(caminho: string): NotaDoKit | null {
   if (!caminho.toLowerCase().endsWith(".md")) return null;
   const n = normalizarNome(caminho.split("/").pop() ?? "");
-  return n.includes("designsystem") ? "design_system" : n.includes("tomdevoz") ? "tom_de_voz" : n.includes("pilar") ? "pilares" : null;
+  if (n.includes("designsystem")) return "design_system";
+  if (n.includes("tomdevoz")) return "tom_de_voz";
+  if (n.includes("pilar")) return "pilares";
+  if (n.includes("direcaodearte")) return "direcao_de_arte";
+  if (n.includes("padrao") && (n.includes("imagem") || n.includes("foto"))) return "padrao_de_imagem";
+  return null;
 }
 
 /** Pilares da nota "Pilares de Conteúdo" do cofre: cada "## " é um pilar; a descrição é a linha "Descrição:" ou o primeiro parágrafo. Sem IA. */

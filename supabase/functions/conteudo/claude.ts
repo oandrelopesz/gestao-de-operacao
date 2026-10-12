@@ -8,7 +8,7 @@ export const claudeConfigurado = () => !!Deno.env.get("ANTHROPIC_API_KEY");
 
 function api(): Anthropic {
   if (!claudeConfigurado()) throw new Error("Falta o secret ANTHROPIC_API_KEY.");
-  return (cliente ??= new Anthropic({ maxRetries: 1, timeout: 120_000 }));
+  return (cliente ??= new Anthropic({ maxRetries: 1, timeout: 140_000 }));
 }
 
 const modelo = () => Deno.env.get("CLAUDE_MODELO") || "claude-sonnet-5-5";
@@ -25,10 +25,10 @@ function erroClaude(e: any): Error {
 
 /** `conteudo`: texto ou blocos (texto com cache_control, imagens em base64). Devolve o JSON já lido. */
 export async function gerarJson<T>(o: {
-  system: string; conteudo: string | any[]; esquema: object; esforco: "low" | "medium" | "high"; maxTokens?: number;
+  system: string; conteudo: string | any[]; esquema: object; esforco: "low" | "medium" | "high"; maxTokens?: number; modelo?: string;
 }): Promise<T> {
   const params: any = {
-    model: modelo(),
+    model: o.modelo ?? modelo(),
     max_tokens: o.maxTokens ?? 16000,
     system: o.system,
     messages: [{ role: "user", content: o.conteudo }],

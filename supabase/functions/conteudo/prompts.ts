@@ -72,18 +72,26 @@ const REGRAS_TIPO: Record<TipoMolde, string> = {
 };
 
 const SYSTEM_MOLDE = [
-  "Você é diretor de arte e escreve moldes de posts de Instagram em HTML e CSS.",
+  "Você é diretor de arte sênior de uma agência premiada e escreve moldes de posts de Instagram em HTML e CSS. O molde é a identidade fixa do feed do cliente: tem de parecer feito por um designer de marca, nunca gerado por IA nem tirado de template.",
   `Cada molde é um documento HTML completo de exatamente ${LARGURA}x${ALTURA} px (retrato 4:5), com o CSS dentro de <style>. Sem JavaScript e sem carregar nada de fora: sem links, @import, url() externa ou imagens de outros sites.`,
   "Siga o design system do cliente à risca: cores, tipografia, espaçamento, elementos gráficos e as regras de logo e de foto.",
   "Marque o que muda a cada post com {{nome}}: textos, a foto ({{foto}}, sempre como src de <img> com object-fit: cover) e as logos ({{logo_principal}}, {{logo_icone}}, {{logo_clara}}, {{logo_escura}}; só as variantes disponíveis, sempre como src de <img>, sem distorcer, recortar nem recolorir).",
   "O texto precisa caber sempre: dê a cada campo de texto um limite de caracteres (max) e use tamanhos de fonte que comportem esse limite; em último caso, corte linhas com line-clamp.",
   "Use só as famílias de fonte informadas, pelo nome (font-family), com uma fonte genérica de reserva.",
   "Em cada campo, dê um exemplo realista em português do Brasil, dentro do limite. Campos de imagem e de logo têm max 0 e exemplo vazio.",
+  "",
+  "Direção de arte padrão. Os documentos do cliente (design system, direção de arte, padrão de imagem) vencem: se eles proibirem algo daqui (degradê, textura, sombra, sobreposição), não use; se pedirem estilo plano e minimalista, faça plano e minimalista com o mesmo cuidado.",
+  "- Assinatura visual: tire do design system um motivo gráfico próprio da marca (um traço, um recorte, uma forma da logo, um padrão) e desenhe em SVG inline; repita esse motivo em todos os moldes do cliente.",
+  "- Profundidade: trabalhe em camadas (fundo, forma, foto, texto), com contraste forte de escala entre título e texto. Quando a marca permitir: degradê nas cores dela, granulação leve (SVG com feTurbulence em data URI) e sombras suaves.",
+  "- Layout editorial: grade assimétrica, margens generosas (pelo menos 64 px), alinhamento à esquerda por padrão, hierarquia clara com no máximo 3 tamanhos de texto e respiro de verdade.",
+  "- Detalhes de carrossel profissional nas lâminas de carrossel: numeração discreta (ex.: 01/06, num campo de texto se precisar), indicação de arrastar na capa e o @ ou a marca num canto fixo.",
+  "- Foto: o mesmo tratamento em todos os moldes (sobreposição na cor da marca, duotone, moldura ou recorte), para as fotos parecerem do mesmo ensaio.",
+  "- Evite o que denuncia IA ou template: tudo centralizado, brilho plástico, 3D, glow, emoji, degradê roxo e azul genérico, ícones de banco de imagens, cards arredondados com sombra forte, excesso de elementos.",
 ].join("\n");
 
 export function promptMolde(o: {
   tipo: TipoMolde; designSystem: string; tomDeVoz: string; logos: Logo[]; fontes: Fonte[];
-  outros: { tipo: TipoMolde; html: string }[]; atual?: Molde; pedido?: string;
+  outros: { tipo: TipoMolde; html: string }[]; atual?: Molde; pedido?: string; direcaoDeArte?: string; padraoDeImagem?: string;
 }): Mensagens {
   const partes = [
     `Molde: ${o.tipo} (${ROTULO_MOLDE[o.tipo]}): ${REGRAS_TIPO[o.tipo]}`,
@@ -92,6 +100,8 @@ export function promptMolde(o: {
     `Fontes: ${o.fontes.length ? o.fontes.map((f) => `${f.familia}${f.peso ? ` ${f.peso}` : ""}`).join(", ") : "nenhuma informada; use as do design system com reserva sans-serif"}.`,
     `Design system do cliente:\n${o.designSystem.trim()}`,
   ];
+  if (o.direcaoDeArte?.trim()) partes.push(`Direção de arte dos posts do cliente:\n${o.direcaoDeArte.trim()}`);
+  if (o.padraoDeImagem?.trim()) partes.push(`Padrão de imagem do cliente (use para o tratamento de foto e o clima; ignore o que for sobre ferramenta de IA):\n${o.padraoDeImagem.trim()}`);
   if (o.tomDeVoz.trim()) partes.push(`Tom de voz (para os exemplos):\n${o.tomDeVoz.trim()}`);
   if (o.outros.length) partes.push(`Moldes já criados deste cliente (mantenha o mesmo estilo):\n${o.outros.map((m) => `### ${m.tipo}\n${m.html}`).join("\n\n")}`);
   if (o.atual && o.pedido) {
@@ -168,6 +178,12 @@ export function pedidoEscolha(descricao: string, n: number): string {
   return `Estas são ${n} fotos, na ordem (índices de 0 a ${n - 1}). Qual combina com: "${descricao}"? Responda o índice da que combina melhor, ou -1 se nenhuma servir (sem relação com a descrição, borrada, escura, com texto grande por cima ou com pessoas em situação constrangedora).`;
 }
 
-export function promptImagem(descricao: string, pessoas: boolean): string {
-  return `Foto realista para um post de Instagram, em retrato: ${descricao}. ${pessoas ? "" : "Sem pessoas. "}Sem texto, letras, números, logos ou marca d'água. Luz natural, composição limpa, com área livre para texto por cima.`;
+const PADRAO_IMAGEM_MAX = 6_000;
+
+/** Pedido da foto para a IA de imagem. O padrão de imagem do cliente entra como referência; as regras do fim vencem (é só a foto, sem texto). */
+export function promptImagem(descricao: string, pessoas: boolean, padrao = ""): string {
+  const ref = padrao.trim()
+    ? `Referência visual do cliente (use só o que vale para a fotografia: luz, cor, cenário, pessoas, clima; ignore layout, texto e tipografia):\n${padrao.trim().slice(0, PADRAO_IMAGEM_MAX)}\n\n`
+    : "";
+  return `${ref}Fotografia editorial real para um post de Instagram, em retrato: ${descricao}. ${pessoas ? "Pessoas comuns e naturais, sem pose de banco de imagens, pele com textura real. " : "Sem pessoas. "}Luz natural, granulação leve de câmera, cores fiéis, sem aspecto de render, sem brilho plástico, sem perfeição artificial. Composição com área livre para texto por cima. É só a fotografia: sem texto, letras, números, logos, molduras, marca d'água ou elementos de design.`;
 }
