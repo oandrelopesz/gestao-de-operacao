@@ -89,14 +89,16 @@ export async function gerarJson<T>(
 }
 
 /**
- * PNG gerado pela OpenAI (paisagem), em base64, como a OpenAI devolveu. Sempre sem a logo: ela é aplicada depois, por
- * cima, pela função (compor.ts), para nunca ser redesenhada. PNG porque a composição lê PNG sem biblioteca.
+ * Imagem gerada pela OpenAI, em base64, como a OpenAI devolveu. Padrão: PNG paisagem, sempre sem a logo (o GMN aplica a
+ * logo depois, por cima, em compor.ts, para nunca ser redesenhada). A aba Conteúdo pede retrato em JPEG.
  */
-export async function gerarImagem(prompt: string, total?: AbortSignal): Promise<string> {
+export async function gerarImagem(
+  prompt: string, total?: AbortSignal, o: { size?: string; formato?: "png" | "jpeg" } = {},
+): Promise<string> {
   const model = Deno.env.get("OPENAI_MODELO_IMAGEM") || "gpt-image-1";
   // quality "medium": o padrão ("auto") pode sair em "high", mais lento e caro.
   const d = await chamar("/images/generations", {
-    model, prompt, size: "1536x1024", quality: "medium", n: 1, output_format: "png",
+    model, prompt, size: o.size ?? "1536x1024", quality: "medium", n: 1, output_format: o.formato ?? "png",
   }, PRAZO.imagem, total, "imagem");
   const b64 = d?.data?.[0]?.b64_json;
   if (!b64 || typeof b64 !== "string") throw new Error("OpenAI não devolveu a imagem.");
