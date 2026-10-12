@@ -179,6 +179,16 @@ test("laminasDaResposta marca a foto como pendente, com o título como reserva d
   assert.equal(ls[0].jpg_chave, null);
 });
 
+test("numeração do carrossel sai do código, não da IA", () => {
+  const n: CampoMolde = { nome: "numero", tipo: "texto", max: 5, exemplo: "01/06" };
+  const ms: Moldes = { capa: molde([t30, n]), texto: molde([t30, n]), foto: molde([t30]), cta: molde([t30]) };
+  const ls = laminasDaResposta({ tema: "t", legenda: "l", laminas: [lam("capa", { titulo: "A" }), lam("texto", { titulo: "B" }), lam("cta", { titulo: "C" })] }, ms);
+  assert.deepEqual(ls.map((l) => l.campos.numero), ["01/03", "02/03", undefined]);
+  assert.deepEqual(conferirCampos([t30, n], { titulo: "A" }), []);
+  const p = promptTexto({ formato: "carrossel", pilar: null, tema: null, temasRecentes: [], tomDeVoz: "", moldes: ms, pastas: [], saude: false });
+  assert.ok(!p.pedido.includes("numero ("));
+});
+
 test("promptTexto leva limites, tema fixo e subpastas", () => {
   const p = promptTexto({ formato: "carrossel", pilar: { nome: "Dica", descricao: "ensina" }, tema: "Buffet em julho", temasRecentes: ["x"],
     tomDeVoz: "direto", moldes: moldesC, pastas: [{ id: "p1", caminho: "Espaço", quantidade: 3 }], saude: false });

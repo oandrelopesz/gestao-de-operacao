@@ -1,6 +1,6 @@
 // Aba Conteúdo: o que vai para o Claude e os esquemas JSON das respostas (saída estruturada). Puro, sem rede.
 import {
-  ALTURA, CAMPOS_OBRIGATORIOS, LARGURA, MOLDES_DO_FORMATO, ROTULO_MOLDE, ROTULO_VARIANTE,
+  ALTURA, CAMPOS_OBRIGATORIOS, CAMPO_NUMERO, LARGURA, MOLDES_DO_FORMATO, ROTULO_MOLDE, ROTULO_VARIANTE,
   type Fonte, type Formato, type Lamina, type Logo, type Molde, type Moldes, type PastaDrive, type Pilar, type TipoMolde,
 } from "./regras.ts";
 
@@ -84,7 +84,7 @@ const SYSTEM_MOLDE = [
   "- Assinatura visual: tire do design system um motivo gráfico próprio da marca (um traço, um recorte, uma forma da logo, um padrão) e desenhe em SVG inline; repita esse motivo em todos os moldes do cliente.",
   "- Profundidade: trabalhe em camadas (fundo, forma, foto, texto), com contraste forte de escala entre título e texto. Quando a marca permitir: degradê nas cores dela, granulação leve (SVG com feTurbulence em data URI) e sombras suaves.",
   "- Layout editorial: grade assimétrica, margens generosas (pelo menos 64 px), alinhamento à esquerda por padrão, hierarquia clara com no máximo 3 tamanhos de texto e respiro de verdade.",
-  "- Detalhes de carrossel profissional nas lâminas de carrossel: numeração discreta (ex.: 01/06, num campo de texto se precisar), indicação de arrastar na capa e o @ ou a marca num canto fixo.",
+  "- Detalhes de carrossel profissional nas lâminas de carrossel: numeração discreta no campo {{numero}} (o sistema preenche com 01/06, 02/06...), indicação de arrastar na capa e o @ ou a marca num canto fixo.",
   "- Foto: o mesmo tratamento em todos os moldes (sobreposição na cor da marca, duotone, moldura ou recorte), para as fotos parecerem do mesmo ensaio.",
   "- Legibilidade: as palavras do título nunca podem grudar. Fontes display com espaço estreito (como Clash Display) pedem letter-spacing de no máximo -0.01em e word-spacing de pelo menos 0.1em. Texto sobre foto sempre com contraste garantido.",
   "- Evite o que denuncia IA ou template: tudo centralizado, brilho plástico, 3D, glow, emoji, degradê roxo e azul genérico, ícones de banco de imagens, cards arredondados com sombra forte, excesso de elementos.",
@@ -112,7 +112,7 @@ export function promptMolde(o: {
 }
 
 const descreverCampos = (m: Molde) =>
-  m.campos.filter((c) => c.tipo === "texto").map((c) => `${c.nome} (até ${c.max} caracteres)`).join(", ");
+  m.campos.filter((c) => c.tipo === "texto" && c.nome !== CAMPO_NUMERO).map((c) => `${c.nome} (até ${c.max} caracteres)`).join(", ");
 
 export function promptTexto(o: {
   formato: Formato; pilar: Pilar | null; tema: string | null; temasRecentes: string[]; tomDeVoz: string;

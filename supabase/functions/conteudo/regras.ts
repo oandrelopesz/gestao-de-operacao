@@ -103,10 +103,13 @@ export function preencherMolde(html: string, campos: CampoMolde[], valores: Reco
 }
 
 /** Motivos para recusar os textos de uma lâmina: campo de texto vazio ou acima do limite do molde. */
+/** Campo de texto que o sistema preenche com a posição da lâmina no carrossel (01/06); a IA não escreve. */
+export const CAMPO_NUMERO = "numero";
+
 export function conferirCampos(campos: CampoMolde[], valores: Record<string, string>): string[] {
   const motivos: string[] = [];
   for (const c of campos) {
-    if (c.tipo !== "texto") continue;
+    if (c.tipo !== "texto" || c.nome === CAMPO_NUMERO) continue;
     const v = (valores[c.nome] ?? "").trim();
     if (!v) motivos.push(`${c.nome}: vazio`);
     else if (v.length > c.max) motivos.push(`${c.nome}: ${v.length} caracteres (máximo ${c.max})`);
@@ -487,8 +490,10 @@ export function motivosDoTexto(r: RespostaTexto, formato: Formato, c: { moldes: 
 
 /** Lâminas a partir da resposta da IA: molde com foto sempre ganha imagem pendente (descrição ou, na falta, o título). */
 export function laminasDaResposta(r: RespostaTexto, moldes: Moldes): Lamina[] {
-  return r.laminas.map((l) => {
+  const dois = (n: number) => String(n).padStart(2, "0");
+  return r.laminas.map((l, i) => {
     const campos = Object.fromEntries(l.campos.map((x) => [x.nome, x.valor]));
+    if (moldes[l.molde]?.campos.some((c) => c.nome === CAMPO_NUMERO)) campos[CAMPO_NUMERO] = `${dois(i + 1)}/${dois(r.laminas.length)}`;
     const temFoto = !!moldes[l.molde]?.campos.some((c) => c.tipo === "imagem");
     const lamina: Lamina = { molde: l.molde, campos, jpg_chave: null };
     if (temFoto) lamina.imagem = { descricao: l.imagem_descricao?.trim() || campos.titulo || "foto do negócio", pasta_id: l.pasta_id, pendente: true };
