@@ -135,6 +135,12 @@ export function checarTexto(
   return { ok: motivos.length === 0, motivos };
 }
 
+/** Só as regras do CFM/CFO (sem tamanho, telefone ou link), para os textos de outras abas. */
+export function motivosSaude(texto: string): string[] {
+  const n = semAcento(texto);
+  return REGRAS_SAUDE.filter((r) => r.re.test(n)).map((r) => r.motivo);
+}
+
 // ------------------------------------------------------------------ imagem, agenda e links
 
 /** Imagem nunca usada (na ordem recebida) ou a usada há mais tempo. `usos`: ref → ISO do último uso. */
