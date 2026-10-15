@@ -293,6 +293,17 @@ function CartaoCanal({ canal, entrada, r, aberto, onAjustes, onMudar, onRemover,
           </div>
         </div>
 
+        {canal.perfil && (
+          <div className="space-y-1">
+            <Label className="text-xs">Nome do perfil ({canal.perfil.rotulo})</Label>
+            <Input
+              className="h-9 text-sm" placeholder={canal.perfil.placeholder}
+              value={entrada.perfil} onChange={(e) => onMudar({ perfil: e.target.value })}
+            />
+            <p className="text-[11px] text-muted-foreground">Vai no utm_content e no nome da UTM guardada, para saber de qual perfil o clique veio.</p>
+          </div>
+        )}
+
         {ok && (
           <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
             <span className="font-medium text-muted-foreground">Captura:</span>
@@ -307,7 +318,7 @@ function CartaoCanal({ canal, entrada, r, aberto, onAjustes, onMudar, onRemover,
           <div className="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
             <SeletorComOutro rotulo="Origem (utm_source)" valor={entrada.source} onChange={(v) => onMudar({ source: v })} opcoes={canal.sources} />
             <SeletorComOutro rotulo="Mídia (utm_medium)" valor={entrada.medium} onChange={(v) => onMudar({ medium: v })} opcoes={MEDIUMS} />
-            {(["campaign", "term", "content"] as NomeSlot[]).map((n) => (
+            {(["campaign", "term", "content"] as NomeSlot[]).filter((n) => !(n === "content" && canal.perfil)).map((n) => (
               <EditorSlot
                 key={n} canal={canal} nome={n} valor={entrada[n]}
                 onChange={(v) => onMudar({ [n]: v } as Partial<Entrada>)}

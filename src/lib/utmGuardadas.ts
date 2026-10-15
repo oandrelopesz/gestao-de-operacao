@@ -1,7 +1,7 @@
 // Gerador de UTM: UTM guardadas por cliente (tabela utms).
 // O types.ts gerado ainda não conhece a tabela nova: por isso `as any` no `.from(...)`.
 import { supabase } from "@/integrations/supabase/client";
-import { nomeDaUtm, type ResultadoUtm } from "@/lib/utm";
+import type { ResultadoUtm } from "@/lib/utm";
 import { normalizarUrl } from "@/lib/linksTexto";
 
 export interface NovaUtm {
@@ -60,7 +60,7 @@ export function novaDeResultado(r: ResultadoUtm, clienteId: string, urlBase: str
   return {
     cliente_id: clienteId,
     canal: r.canalId,
-    nome: nomeDaUtm(r.canalNome, r.campos.utm_campaign),
+    nome: r.nome,
     url_base: r.semLink ? "" : (normalizarUrl(urlBase) ?? urlBase),
     url_final: final,
     destino: r.destino,

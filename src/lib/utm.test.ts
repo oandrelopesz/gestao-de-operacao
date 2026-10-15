@@ -72,9 +72,21 @@ test("link sem caminho ganha a barra antes do ?, http gera aviso", () => {
   assert.ok(!r.dinamico);
 });
 
-test("bios do Instagram separam pessoal e profissional pelo utm_content", () => {
-  assert.match(gerarUtm(entradaPadrao("ig_bio_pessoal", "https://a.com.br")).parametros, /utm_content=bio_pessoal$/);
-  assert.match(gerarUtm(entradaPadrao("ig_bio_profissional", "https://a.com.br")).parametros, /utm_content=bio_profissional$/);
+test("bios do Instagram pedem o nome do perfil, que vai no utm_content e no nome da UTM", () => {
+  const sem = gerarUtm(entradaPadrao("ig_bio_pessoal", "https://a.com.br"));
+  assert.equal(sem.erros.length, 1);
+  assert.match(sem.erros[0], /nome do dono/);
+  assert.match(gerarUtm(entradaPadrao("ig_bio_profissional", "https://a.com.br")).erros[0], /nome da empresa/);
+
+  const pessoal = gerarUtm({ ...entradaPadrao("ig_bio_pessoal", "https://a.com.br"), perfil: "André Lopes" });
+  assert.deepEqual(pessoal.erros, []);
+  assert.match(pessoal.parametros, /utm_content=bio_andre_lopes$/);
+  assert.equal(pessoal.nome, "Instagram (André Lopes)");
+
+  const empresa = gerarUtm({ ...entradaPadrao("ig_bio_profissional", "https://a.com.br"), perfil: "Clínica Sorriso" });
+  assert.match(empresa.parametros, /utm_source=instagram&utm_medium=social&utm_campaign=bio&utm_content=bio_clinica_sorriso/);
+  assert.equal(empresa.nome, "Instagram (Clínica Sorriso)");
+  assert.notEqual(pessoal.linkCompleto, empresa.linkCompleto);
 });
 
 test("origem e mídia digitadas são limpas, variáveis digitadas ficam intactas", () => {
@@ -215,6 +227,7 @@ test("catálogo: ids únicos, padrões existem e nenhum valor quebra a URL", () 
     for (const n of ["campaign", "term", "content"] as const) {
       if (c[n].padrao === "fixo") e[n] = { modo: "fixo", texto: "Teste Valor" };
     }
+    if (c.perfil) e.perfil = "Teste Perfil";
     const r = gerarUtm(e);
     assert.deepEqual(r.erros, [], `${c.id}: padrão gera erro`);
     assert.ok(!/\s|\?|#/.test(r.parametros), `${c.id}: parâmetros com caractere proibido`);

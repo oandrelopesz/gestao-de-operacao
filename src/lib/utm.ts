@@ -79,6 +79,8 @@ export interface Entrada {
   url: string;
   /** Tipo de destino (DESTINOS): sem link, a url é ignorada e só os parâmetros saem */
   destino: string;
+  /** Nome do perfil (só nos canais com perfil, como a bio do Instagram): vai no utm_content */
+  perfil: string;
   source: string;
   medium: string;
   campaign: EscolhaSlot;
@@ -91,7 +93,7 @@ export function entradaPadrao(canalId: string, url = ""): Entrada {
   const c = canalPorId(canalId);
   if (!c) throw new Error(`Canal desconhecido: ${canalId}`);
   return {
-    canalId, url, destino: "site", source: c.source, medium: c.medium, incluirIds: true,
+    canalId, url, destino: "site", perfil: "", source: c.source, medium: c.medium, incluirIds: true,
     campaign: { modo: c.campaign.padrao, texto: "" },
     term: { modo: c.term.padrao, texto: "" },
     content: { modo: c.content.padrao, texto: "" },
@@ -115,6 +117,8 @@ export interface ResultadoUtm {
   /** Destino sem link (mensagens, formulário nativo): só os parâmetros */
   semLink: boolean;
   destino: string;
+  /** Nome sugerido para guardar: canal e campanha, ou "Instagram (nome do perfil)" nas bios */
+  nome: string;
   /** O que cada dado de campanha captura: variável da plataforma, texto fixo ou nada; e se os IDs entraram */
   captura: { campaign: Captura; term: Captura; content: Captura; ids: boolean };
   /** O que foi escolhido em cada dado: "Nome da campanha", "ID do anúncio"... (vazio se texto fixo ou não usado) */
@@ -150,7 +154,7 @@ export function gerarUtm(e: Entrada): ResultadoUtm {
   const vazio = { utm_source: "", utm_medium: "", utm_campaign: "", utm_content: "", utm_term: "" };
   const base: ResultadoUtm = {
     canalId: e.canalId, canalNome: canal?.nome ?? e.canalId, erros: [], avisos: [], campos: vazio,
-    parametros: "", linkCompleto: null, modeloGoogle: null, dinamico: false, semLink, destino: e.destino,
+    parametros: "", linkCompleto: null, modeloGoogle: null, dinamico: false, semLink, destino: e.destino, nome: canal?.nome ?? e.canalId,
     captura: { campaign: "ausente", term: "ausente", content: "ausente", ids: false },
     escolhas: { campaign: "", term: "", content: "" },
   };
@@ -159,13 +163,14 @@ export function gerarUtm(e: Entrada): ResultadoUtm {
   const source = livre(e.source);
   const medium = livre(e.medium);
   const campaign = valorDoSlot(canal, "campaign", e.campaign);
-  const content = valorDoSlot(canal, "content", e.content);
+  const content = canal.perfil ? canal.perfil.prefixo + limpar(e.perfil) : valorDoSlot(canal, "content", e.content);
   const term = valorDoSlot(canal, "term", e.term);
 
   const erros: string[] = [];
   if (!source) erros.push("Escolha a origem (utm_source).");
   if (!medium) erros.push("Escolha a mídia (utm_medium).");
   if (!campaign) erros.push("Digite o nome da campanha.");
+  if (canal.perfil && !limpar(e.perfil)) erros.push(`Digite o ${canal.perfil.rotulo}: sem ele não dá para saber de qual perfil o clique veio.`);
   // Texto fixo vazio em conjunto ou anúncio deixaria o dado sumir sem ninguém perceber
   for (const [n, v] of [["term", term], ["content", content]] as const) {
     if (e[n].modo === "fixo" && !v) erros.push(`Digite o valor de ${canal[n].rotulo.toLowerCase()} ou escolha "Não usar".`);
@@ -202,6 +207,7 @@ export function gerarUtm(e: Entrada): ResultadoUtm {
   };
   return {
     ...base, avisos, parametros, linkCompleto,
+    nome: canal.perfil ? `${canal.perfil.nomeBase} (${e.perfil.trim()})` : nomeDaUtm(canal.nome, campaign),
     escolhas: { campaign: rotulo("campaign"), term: rotulo("term"), content: rotulo("content") },
     campos: { utm_source: source, utm_medium: medium, utm_campaign: campaign, utm_content: content, utm_term: term },
     modeloGoogle: canal.modeloGoogle ? `{lpurl}?${parametros}` : null,

@@ -29,6 +29,8 @@ export interface Canal {
   nota?: string;
   /** Gera também o modelo de acompanhamento `{lpurl}?...` (Google) */
   modeloGoogle?: boolean;
+  /** Pede o nome do perfil (obrigatório): vai no utm_content como `prefixo + nome` e dá nome à UTM guardada */
+  perfil?: { rotulo: string; placeholder: string; nomeBase: string; prefixo: string };
 }
 
 export const MEDIUMS: OpcaoTexto[] = [
@@ -326,7 +328,8 @@ export const CANAIS: Canal[] = [
     medium: "social",
     campaign: slot("Campanha", "bio", [op("bio", "Bio", "bio", "link fixo da bio do perfil")]),
     term: SO_FIXO("Termo", "nenhum"),
-    content: slot("Perfil", "pessoal", [op("pessoal", "Bio pessoal", "bio_pessoal", "separa o perfil pessoal do profissional")]),
+    content: SO_FIXO("Perfil", "nenhum"),
+    perfil: { rotulo: "nome do dono", placeholder: "Ex.: André Lopes", nomeBase: "Instagram", prefixo: "bio_" },
     ids: { extras: [] },
     onde: "Instagram, Editar perfil, Links. Cole o link completo.",
     primeiro: "link",
@@ -338,7 +341,8 @@ export const CANAIS: Canal[] = [
     medium: "social",
     campaign: slot("Campanha", "bio", [op("bio", "Bio", "bio", "link fixo da bio do perfil")]),
     term: SO_FIXO("Termo", "nenhum"),
-    content: slot("Perfil", "profissional", [op("profissional", "Bio profissional", "bio_profissional", "separa o perfil profissional do pessoal")]),
+    content: SO_FIXO("Perfil", "nenhum"),
+    perfil: { rotulo: "nome da empresa", placeholder: "Ex.: Clínica Sorriso", nomeBase: "Instagram", prefixo: "bio_" },
     ids: { extras: [] },
     onde: "Instagram, Editar perfil, Links. Cole o link completo.",
     primeiro: "link",
