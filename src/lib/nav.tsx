@@ -29,6 +29,7 @@ import {
   MapPin,
   Instagram,
   Sparkles,
+  Tags,
 } from "lucide-react";
 
 export interface NavLink {
@@ -82,6 +83,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
       { label: "Fireflies", icon: <NotebookPen size={17} />, to: "/fireflies", palavras: ["reuniões gravadas", "reunião gravada", "gravações", "atas", "resumos"] },
       { label: "Swipe file", icon: <Images size={17} />, to: "/swipe", palavras: ["referências", "criativos", "anúncios salvos", "inspiração"] },
       { label: "Links", icon: <Link2 size={17} />, to: "/links", palavras: ["favoritos", "urls", "sites"] },
+      { label: "Gerador de UTM", icon: <Tags size={17} />, to: "/utm", palavras: ["utm", "utms", "rastreamento", "tracking", "link rastreável", "parâmetros", "campanha", "origem", "ga4"] },
       { label: "Notas", icon: <StickyNote size={17} />, to: "/notas", palavras: ["anotações", "bloco de notas"] },
       { label: "Arquivos", icon: <FileText size={17} />, to: "/arquivos", palavras: ["pdf", "documentos", "drive", "pdfs"] },
       { label: "Central de arquivos", icon: <FolderOpen size={17} />, to: "/central", palavras: ["fotos", "logos", "logo", "imagens", "marca", "clientes", "banco de imagens"] },

@@ -45,6 +45,8 @@ export const CACHE_KEYS = {
   ideiasCategorias: "ideias.categorias",
   links: "links.lista",
   linksTemas: "links.temas",
+  utms: "utm.lista",
+  utmClientes: "utm.clientes",
   notas: "notas.lista",
   notasTemas: "notas.temas",
   verDepois: "ver-depois",

@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedVerDepoisRouteImport } from './routes/_authenticated/ver-depois'
+import { Route as AuthenticatedUtmRouteImport } from './routes/_authenticated/utm'
 import { Route as AuthenticatedTranscritorRouteImport } from './routes/_authenticated/transcritor'
 import { Route as AuthenticatedSwipeRouteImport } from './routes/_authenticated/swipe'
 import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
@@ -26,7 +27,6 @@ import { Route as AuthenticatedNotasRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated/livros'
 import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
 import { Route as AuthenticatedInstagramRouteImport } from './routes/_authenticated/instagram'
-import { Route as AuthenticatedConteudoRouteImport } from './routes/_authenticated/conteudo'
 import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
 import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenticated/habilidades'
 import { Route as AuthenticatedGmnRouteImport } from './routes/_authenticated/gmn'
@@ -36,6 +36,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedDadosInternosRouteImport } from './routes/_authenticated/dados-internos'
 import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated/cursos'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
+import { Route as AuthenticatedConteudoRouteImport } from './routes/_authenticated/conteudo'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 import { Route as AuthenticatedCentralRouteImport } from './routes/_authenticated/central'
 import { Route as AuthenticatedArquivosRouteImport } from './routes/_authenticated/arquivos'
@@ -67,6 +68,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedVerDepoisRoute = AuthenticatedVerDepoisRouteImport.update({
   id: '/ver-depois',
   path: '/ver-depois',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedUtmRoute = AuthenticatedUtmRouteImport.update({
+  id: '/utm',
+  path: '/utm',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedTranscritorRoute =
@@ -130,11 +136,6 @@ const AuthenticatedInstagramRoute = AuthenticatedInstagramRouteImport.update({
   path: '/instagram',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedConteudoRoute = AuthenticatedConteudoRouteImport.update({
-  id: '/conteudo',
-  path: '/conteudo',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedIdeiasRoute = AuthenticatedIdeiasRouteImport.update({
   id: '/ideias',
   path: '/ideias',
@@ -180,6 +181,11 @@ const AuthenticatedCursosRoute = AuthenticatedCursosRouteImport.update({
 const AuthenticatedCrmRoute = AuthenticatedCrmRouteImport.update({
   id: '/crm',
   path: '/crm',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedConteudoRoute = AuthenticatedConteudoRouteImport.update({
+  id: '/conteudo',
+  path: '/conteudo',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
@@ -232,9 +238,10 @@ export interface FileRoutesByFullPath {
   '/acessos': typeof AuthenticatedAcessosRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/agenda': typeof AuthenticatedAgendaRoute
-  '/central': typeof AuthenticatedCentralRoute
   '/arquivos': typeof AuthenticatedArquivosRoute
+  '/central': typeof AuthenticatedCentralRoute
   '/clientes': typeof AuthenticatedClientesRoute
+  '/conteudo': typeof AuthenticatedConteudoRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/cursos': typeof AuthenticatedCursosRoute
   '/dados-internos': typeof AuthenticatedDadosInternosRoute
@@ -245,7 +252,6 @@ export interface FileRoutesByFullPath {
   '/habilidades': typeof AuthenticatedHabilidadesRoute
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/instagram': typeof AuthenticatedInstagramRoute
-  '/conteudo': typeof AuthenticatedConteudoRoute
   '/links': typeof AuthenticatedLinksRoute
   '/livros': typeof AuthenticatedLivrosRoute
   '/notas': typeof AuthenticatedNotasRoute
@@ -257,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/saldo': typeof AuthenticatedSaldoRoute
   '/swipe': typeof AuthenticatedSwipeRoute
   '/transcritor': typeof AuthenticatedTranscritorRoute
+  '/utm': typeof AuthenticatedUtmRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/fluxogramas/$id': typeof AuthenticatedFluxogramasIdRoute
   '/fluxogramas/': typeof AuthenticatedFluxogramasIndexRoute
@@ -267,9 +274,10 @@ export interface FileRoutesByTo {
   '/acessos': typeof AuthenticatedAcessosRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/agenda': typeof AuthenticatedAgendaRoute
-  '/central': typeof AuthenticatedCentralRoute
   '/arquivos': typeof AuthenticatedArquivosRoute
+  '/central': typeof AuthenticatedCentralRoute
   '/clientes': typeof AuthenticatedClientesRoute
+  '/conteudo': typeof AuthenticatedConteudoRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/cursos': typeof AuthenticatedCursosRoute
   '/dados-internos': typeof AuthenticatedDadosInternosRoute
@@ -280,7 +288,6 @@ export interface FileRoutesByTo {
   '/habilidades': typeof AuthenticatedHabilidadesRoute
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/instagram': typeof AuthenticatedInstagramRoute
-  '/conteudo': typeof AuthenticatedConteudoRoute
   '/links': typeof AuthenticatedLinksRoute
   '/livros': typeof AuthenticatedLivrosRoute
   '/notas': typeof AuthenticatedNotasRoute
@@ -292,6 +299,7 @@ export interface FileRoutesByTo {
   '/saldo': typeof AuthenticatedSaldoRoute
   '/swipe': typeof AuthenticatedSwipeRoute
   '/transcritor': typeof AuthenticatedTranscritorRoute
+  '/utm': typeof AuthenticatedUtmRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/': typeof AuthenticatedIndexRoute
   '/fluxogramas/$id': typeof AuthenticatedFluxogramasIdRoute
@@ -305,9 +313,10 @@ export interface FileRoutesById {
   '/_authenticated/acessos': typeof AuthenticatedAcessosRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
-  '/_authenticated/central': typeof AuthenticatedCentralRoute
   '/_authenticated/arquivos': typeof AuthenticatedArquivosRoute
+  '/_authenticated/central': typeof AuthenticatedCentralRoute
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
+  '/_authenticated/conteudo': typeof AuthenticatedConteudoRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/cursos': typeof AuthenticatedCursosRoute
   '/_authenticated/dados-internos': typeof AuthenticatedDadosInternosRoute
@@ -318,7 +327,6 @@ export interface FileRoutesById {
   '/_authenticated/habilidades': typeof AuthenticatedHabilidadesRoute
   '/_authenticated/ideias': typeof AuthenticatedIdeiasRoute
   '/_authenticated/instagram': typeof AuthenticatedInstagramRoute
-  '/_authenticated/conteudo': typeof AuthenticatedConteudoRoute
   '/_authenticated/links': typeof AuthenticatedLinksRoute
   '/_authenticated/livros': typeof AuthenticatedLivrosRoute
   '/_authenticated/notas': typeof AuthenticatedNotasRoute
@@ -330,6 +338,7 @@ export interface FileRoutesById {
   '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
   '/_authenticated/swipe': typeof AuthenticatedSwipeRoute
   '/_authenticated/transcritor': typeof AuthenticatedTranscritorRoute
+  '/_authenticated/utm': typeof AuthenticatedUtmRoute
   '/_authenticated/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/fluxogramas/$id': typeof AuthenticatedFluxogramasIdRoute
@@ -344,9 +353,10 @@ export interface FileRouteTypes {
     | '/acessos'
     | '/admin'
     | '/agenda'
-    | '/central'
     | '/arquivos'
+    | '/central'
     | '/clientes'
+    | '/conteudo'
     | '/crm'
     | '/cursos'
     | '/dados-internos'
@@ -357,7 +367,6 @@ export interface FileRouteTypes {
     | '/habilidades'
     | '/ideias'
     | '/instagram'
-    | '/conteudo'
     | '/links'
     | '/livros'
     | '/notas'
@@ -369,6 +378,7 @@ export interface FileRouteTypes {
     | '/saldo'
     | '/swipe'
     | '/transcritor'
+    | '/utm'
     | '/ver-depois'
     | '/fluxogramas/$id'
     | '/fluxogramas/'
@@ -379,9 +389,10 @@ export interface FileRouteTypes {
     | '/acessos'
     | '/admin'
     | '/agenda'
-    | '/central'
     | '/arquivos'
+    | '/central'
     | '/clientes'
+    | '/conteudo'
     | '/crm'
     | '/cursos'
     | '/dados-internos'
@@ -392,7 +403,6 @@ export interface FileRouteTypes {
     | '/habilidades'
     | '/ideias'
     | '/instagram'
-    | '/conteudo'
     | '/links'
     | '/livros'
     | '/notas'
@@ -404,6 +414,7 @@ export interface FileRouteTypes {
     | '/saldo'
     | '/swipe'
     | '/transcritor'
+    | '/utm'
     | '/ver-depois'
     | '/'
     | '/fluxogramas/$id'
@@ -416,9 +427,10 @@ export interface FileRouteTypes {
     | '/_authenticated/acessos'
     | '/_authenticated/admin'
     | '/_authenticated/agenda'
-    | '/_authenticated/central'
     | '/_authenticated/arquivos'
+    | '/_authenticated/central'
     | '/_authenticated/clientes'
+    | '/_authenticated/conteudo'
     | '/_authenticated/crm'
     | '/_authenticated/cursos'
     | '/_authenticated/dados-internos'
@@ -429,7 +441,6 @@ export interface FileRouteTypes {
     | '/_authenticated/habilidades'
     | '/_authenticated/ideias'
     | '/_authenticated/instagram'
-    | '/_authenticated/conteudo'
     | '/_authenticated/links'
     | '/_authenticated/livros'
     | '/_authenticated/notas'
@@ -441,6 +452,7 @@ export interface FileRouteTypes {
     | '/_authenticated/saldo'
     | '/_authenticated/swipe'
     | '/_authenticated/transcritor'
+    | '/_authenticated/utm'
     | '/_authenticated/ver-depois'
     | '/_authenticated/'
     | '/_authenticated/fluxogramas/$id'
@@ -488,6 +500,13 @@ declare module '@tanstack/react-router' {
       path: '/ver-depois'
       fullPath: '/ver-depois'
       preLoaderRoute: typeof AuthenticatedVerDepoisRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/utm': {
+      id: '/_authenticated/utm'
+      path: '/utm'
+      fullPath: '/utm'
+      preLoaderRoute: typeof AuthenticatedUtmRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/transcritor': {
@@ -574,13 +593,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInstagramRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/conteudo': {
-      id: '/_authenticated/conteudo'
-      path: '/conteudo'
-      fullPath: '/conteudo'
-      preLoaderRoute: typeof AuthenticatedConteudoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/ideias': {
       id: '/_authenticated/ideias'
       path: '/ideias'
@@ -642,6 +654,13 @@ declare module '@tanstack/react-router' {
       path: '/crm'
       fullPath: '/crm'
       preLoaderRoute: typeof AuthenticatedCrmRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/conteudo': {
+      id: '/_authenticated/conteudo'
+      path: '/conteudo'
+      fullPath: '/conteudo'
+      preLoaderRoute: typeof AuthenticatedConteudoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/clientes': {
@@ -707,9 +726,10 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAcessosRoute: typeof AuthenticatedAcessosRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
-  AuthenticatedCentralRoute: typeof AuthenticatedCentralRoute
   AuthenticatedArquivosRoute: typeof AuthenticatedArquivosRoute
+  AuthenticatedCentralRoute: typeof AuthenticatedCentralRoute
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
+  AuthenticatedConteudoRoute: typeof AuthenticatedConteudoRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedCursosRoute: typeof AuthenticatedCursosRoute
   AuthenticatedDadosInternosRoute: typeof AuthenticatedDadosInternosRoute
@@ -720,7 +740,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedHabilidadesRoute: typeof AuthenticatedHabilidadesRoute
   AuthenticatedIdeiasRoute: typeof AuthenticatedIdeiasRoute
   AuthenticatedInstagramRoute: typeof AuthenticatedInstagramRoute
-  AuthenticatedConteudoRoute: typeof AuthenticatedConteudoRoute
   AuthenticatedLinksRoute: typeof AuthenticatedLinksRoute
   AuthenticatedLivrosRoute: typeof AuthenticatedLivrosRoute
   AuthenticatedNotasRoute: typeof AuthenticatedNotasRoute
@@ -732,6 +751,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
   AuthenticatedSwipeRoute: typeof AuthenticatedSwipeRoute
   AuthenticatedTranscritorRoute: typeof AuthenticatedTranscritorRoute
+  AuthenticatedUtmRoute: typeof AuthenticatedUtmRoute
   AuthenticatedVerDepoisRoute: typeof AuthenticatedVerDepoisRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedFluxogramasIdRoute: typeof AuthenticatedFluxogramasIdRoute
@@ -742,9 +762,10 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAcessosRoute: AuthenticatedAcessosRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAgendaRoute: AuthenticatedAgendaRoute,
-  AuthenticatedCentralRoute: AuthenticatedCentralRoute,
   AuthenticatedArquivosRoute: AuthenticatedArquivosRoute,
+  AuthenticatedCentralRoute: AuthenticatedCentralRoute,
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
+  AuthenticatedConteudoRoute: AuthenticatedConteudoRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedCursosRoute: AuthenticatedCursosRoute,
   AuthenticatedDadosInternosRoute: AuthenticatedDadosInternosRoute,
@@ -755,7 +776,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedHabilidadesRoute: AuthenticatedHabilidadesRoute,
   AuthenticatedIdeiasRoute: AuthenticatedIdeiasRoute,
   AuthenticatedInstagramRoute: AuthenticatedInstagramRoute,
-  AuthenticatedConteudoRoute: AuthenticatedConteudoRoute,
   AuthenticatedLinksRoute: AuthenticatedLinksRoute,
   AuthenticatedLivrosRoute: AuthenticatedLivrosRoute,
   AuthenticatedNotasRoute: AuthenticatedNotasRoute,
@@ -767,6 +787,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,
   AuthenticatedSwipeRoute: AuthenticatedSwipeRoute,
   AuthenticatedTranscritorRoute: AuthenticatedTranscritorRoute,
+  AuthenticatedUtmRoute: AuthenticatedUtmRoute,
   AuthenticatedVerDepoisRoute: AuthenticatedVerDepoisRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedFluxogramasIdRoute: AuthenticatedFluxogramasIdRoute,
