@@ -9,6 +9,7 @@ import { fetchPastas } from "@/lib/central";
 import { fetchUtms, traduzErroUtm, type UtmGuardada } from "@/lib/utmGuardadas";
 import { GeradorUtm } from "@/components/utm/GeradorUtm";
 import { GuardadasUtm } from "@/components/utm/GuardadasUtm";
+import { AjudaUtm } from "@/components/utm/AjudaUtm";
 
 // Gerador de UTM: ?aba=guardadas abre a subaba das guardadas e &cliente=<id> abre o cliente.
 export const Route = createFileRoute("/_authenticated/utm")({
@@ -61,6 +62,7 @@ function UtmPage() {
           <h1 className="text-2xl font-bold tracking-tight">Gerador de UTM</h1>
           <p className="text-sm text-muted-foreground">Links rastreáveis prontos para colar em cada plataforma, por cliente</p>
         </div>
+        <div className="ml-auto"><AjudaUtm /></div>
       </div>
 
       {erro && <Card className="border-destructive/40"><CardContent className="p-4 text-sm text-destructive">{erro}</CardContent></Card>}
