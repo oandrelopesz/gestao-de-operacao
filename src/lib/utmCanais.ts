@@ -92,7 +92,7 @@ export const CANAIS: Canal[] = [
     source: "google",
     sources: [src("google", "Google Ads: Pesquisa, Display e Performance Max")],
     medium: "cpc",
-    campaign: slot("Campanha", "fixo", [
+    campaign: slot("Campanha", "id", [
       op("id", "ID da campanha", "{campaignid}", "o Google preenche com o número da campanha"),
     ]),
     term: slot("Palavra-chave ou grupo", "keyword", [
@@ -106,14 +106,14 @@ export const CANAIS: Canal[] = [
     onde: "Google Ads, na campanha, Configurações, Opções de URL da campanha, campo Sufixo do URL final. Cole sem o ponto de interrogação.",
     primeiro: "parametros",
     modeloGoogle: true,
-    nota: "O Google não tem variável com o nome da campanha nem do grupo, só IDs. Digite o nome da campanha e use os IDs para cruzar depois. Deixe a marcação automática (gclid) ligada.",
+    nota: "O Google não tem variável com o nome da campanha nem do grupo, só IDs: a UTM captura o ID da campanha, do grupo e do anúncio. Com a conta do Google Ads vinculada ao GA4 e a marcação automática (gclid) ligada, o GA4 mostra o nome da campanha. Se preferir digitar o nome, troque a campanha para Texto fixo em Ajustes.",
   },
   {
     id: "youtube", nome: "YouTube Ads (via Google Ads)", grupo: "pago",
     source: "youtube",
     sources: [src("youtube", "anúncio exibido no YouTube")],
     medium: "cpv",
-    campaign: slot("Campanha", "fixo", [
+    campaign: slot("Campanha", "id", [
       op("id", "ID da campanha", "{campaignid}", "o Google preenche com o número da campanha"),
     ]),
     term: slot("Local do anúncio ou grupo", "placement", [
@@ -127,7 +127,7 @@ export const CANAIS: Canal[] = [
     onde: "Google Ads, na campanha de vídeo, Configurações, Opções de URL da campanha, campo Sufixo do URL final. Cole sem o ponto de interrogação.",
     primeiro: "parametros",
     modeloGoogle: true,
-    nota: "Mesma regra do Google Ads: variáveis só com IDs, então digite o nome da campanha.",
+    nota: "Mesma regra do Google Ads: só IDs. Com a conta vinculada ao GA4 e a marcação automática ligada, o GA4 mostra o nome da campanha.",
   },
   {
     id: "tiktok", nome: "TikTok Ads", grupo: "pago",
@@ -262,7 +262,7 @@ export const CANAIS: Canal[] = [
     source: "chatgpt",
     sources: [src("chatgpt", "anúncio dentro do ChatGPT")],
     medium: "cpc",
-    campaign: slot("Campanha", "fixo", [
+    campaign: slot("Campanha", "id", [
       op("id", "ID da campanha", "{campaign_id}", "a OpenAI preenche com o número da campanha"),
     ]),
     term: slot("Grupo de anúncios", "id", [
@@ -274,7 +274,7 @@ export const CANAIS: Canal[] = [
     ids: { utmId: "{campaign_id}", extras: [["adgroup_id", "{ad_group_id}"], ["ad_id", "{ad_id}"]] },
     onde: "Painel do ChatGPT Ads, em Editar campanha, campo Landing page query parameters. Cole sem o ponto de interrogação.",
     primeiro: "parametros",
-    nota: "A OpenAI só oferece variáveis de ID, não de nome: digite o nome da campanha. É um recurso novo, confira se o seu painel aceita as variáveis com chaves antes de subir o anúncio. Parâmetro no nível do anúncio vale mais que o da campanha.",
+    nota: "A OpenAI só oferece variáveis de ID, não de nome: a UTM captura os IDs da campanha, do grupo e do anúncio, e o nome vem do cruzamento com o relatório da plataforma. Se preferir digitar o nome, troque a campanha para Texto fixo em Ajustes. É um recurso novo, confira se o seu painel aceita as variáveis com chaves antes de subir o anúncio. Parâmetro no nível do anúncio vale mais que o da campanha.",
   },
   {
     id: "organico_busca", nome: "Busca orgânica (Google, Bing e outros)", grupo: "organico",

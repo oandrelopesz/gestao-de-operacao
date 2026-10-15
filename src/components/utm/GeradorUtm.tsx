@@ -43,7 +43,6 @@ function Passo({ n, titulo, children }: { n: number; titulo: string; children: R
 export function GeradorUtm({ clientes, clienteId, onCliente, utms, onGuardou }: Props) {
   const [url, setUrl] = useState("");
   const [destino, setDestino] = useState("site");
-  const [campanha, setCampanha] = useState("");
   const [selecionados, setSelecionados] = useState<string[]>([]);
   const [entradas, setEntradas] = useState<Record<string, Entrada>>({});
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
@@ -58,7 +57,6 @@ export function GeradorUtm({ clientes, clienteId, onCliente, utms, onGuardou }: 
       if (s) {
         if (typeof s.url === "string") setUrl(s.url);
         if (DESTINOS.some((d) => d.id === s.destino)) setDestino(s.destino);
-        if (typeof s.campanha === "string") setCampanha(s.campanha);
         if (Array.isArray(s.canais)) setSelecionados(CANAIS.map((c) => c.id).filter((id) => s.canais.includes(id)));
         if (typeof s.cliente === "string") clienteSalvo.current = s.cliente;
       }
@@ -73,9 +71,9 @@ export function GeradorUtm({ clientes, clienteId, onCliente, utms, onGuardou }: 
   useEffect(() => {
     if (!pronto) return;
     try {
-      localStorage.setItem(CHAVE_FORM, JSON.stringify({ url, destino, campanha, canais: selecionados, cliente: clienteId || clienteSalvo.current }));
+      localStorage.setItem(CHAVE_FORM, JSON.stringify({ url, destino, canais: selecionados, cliente: clienteId || clienteSalvo.current }));
     } catch { /* sem armazenamento: tudo bem */ }
-  }, [pronto, url, destino, campanha, selecionados, clienteId]);
+  }, [pronto, url, destino, selecionados, clienteId]);
 
   const destinoAtual = destinoPorId(destino);
   const semLink = !!destinoAtual && !destinoAtual.comLink;
@@ -87,18 +85,13 @@ export function GeradorUtm({ clientes, clienteId, onCliente, utms, onGuardou }: 
   const alternarAjustes = (id: string) =>
     setAbertos((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
-  // A campanha digitada à esquerda vale para todo canal que pede texto, a menos que o canal tenha o seu próprio
   const itens: Item[] = useMemo(
     () =>
       selecionados.map((id) => {
-        const base = entradas[id] ?? entradaPadrao(id);
-        const entrada: Entrada = {
-          ...base, url, destino,
-          campaign: { ...base.campaign, texto: base.campaign.texto !== "" ? base.campaign.texto : campanha },
-        };
+        const entrada: Entrada = { ...(entradas[id] ?? entradaPadrao(id)), url, destino };
         return { canal: canalPorId(id)!, entrada, r: gerarUtm(entrada) };
       }),
-    [selecionados, entradas, url, destino, campanha],
+    [selecionados, entradas, url, destino],
   );
 
   const urlsDoCliente = useMemo(
@@ -161,17 +154,10 @@ export function GeradorUtm({ clientes, clienteId, onCliente, utms, onGuardou }: 
             )}
           </Passo>
 
-          <Passo n={2} titulo="Campanha">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Nome da campanha</Label>
-              <Input className="h-9 text-sm" placeholder="Ex.: Black Friday 2026" value={campanha} onChange={(e) => setCampanha(e.target.value)} />
-              <p className="text-[11px] text-muted-foreground">
-                Usado nos canais que pedem o nome digitado. Vira minúsculo, sem acento e com _ (black_friday_2026). Nos canais com variável, a plataforma preenche sozinha.
-              </p>
-            </div>
-          </Passo>
-
-          <Passo n={3} titulo="Onde o link vai ser usado">
+          <Passo n={2} titulo="Onde o link vai ser usado">
+            <p className="-mt-1 text-[11px] text-muted-foreground">
+              Não precisa digitar o nome da campanha: a plataforma preenche campanha, conjunto e anúncio sozinha quando o clique acontece.
+            </p>
             <div className="flex flex-wrap gap-1.5">
               <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSelecionados(CANAIS.filter((c) => c.grupo === "pago").map((c) => c.id))}>Todos os pagos</Button>
               <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSelecionados(CANAIS.map((c) => c.id))}>Todos</Button>
@@ -220,7 +206,7 @@ export function GeradorUtm({ clientes, clienteId, onCliente, utms, onGuardou }: 
             </div>
             {itens.map(({ canal, entrada, r }) => (
               <CartaoCanal
-                key={canal.id} canal={canal} entrada={entrada} r={r} campanhaGlobal={campanha}
+                key={canal.id} canal={canal} entrada={entrada} r={r}
                 aberto={abertos.has(canal.id)} onAjustes={() => alternarAjustes(canal.id)}
                 onMudar={(m) => atualizar(canal.id, m)} onRemover={() => alternar(canal.id)}
                 guardada={jaGuardada(r)} guardando={guardando} onGuardar={() => guardar([{ canal, entrada, r }])}
@@ -241,21 +227,23 @@ const ESTILO_CAPTURA: Record<Captura, string> = {
 };
 const TEXTO_CAPTURA: Record<Captura, string> = { dinamico: "automático", fixo: "texto fixo", ausente: "não captura" };
 
-function ChipCaptura({ rotulo, estado, naoUsa }: { rotulo: string; estado: Captura; naoUsa?: boolean }) {
+function ChipCaptura({ rotulo, estado, naoUsa, detalhe }: { rotulo: string; estado: Captura; naoUsa?: boolean; detalhe?: string }) {
   return (
     <span className={cn("rounded-full px-2 py-0.5 font-medium", naoUsa ? "bg-muted text-muted-foreground" : ESTILO_CAPTURA[estado])}>
-      {rotulo}: {naoUsa ? "não usa" : TEXTO_CAPTURA[estado]}
+      {rotulo}: {naoUsa ? "não usa" : estado === "dinamico" && detalhe ? detalhe : TEXTO_CAPTURA[estado]}
     </span>
   );
 }
 
-function CartaoCanal({ canal, entrada, r, campanhaGlobal, aberto, onAjustes, onMudar, onRemover, guardada, guardando, onGuardar, notaDestino }: {
-  canal: Canal; entrada: Entrada; r: ResultadoUtm; campanhaGlobal: string;
+function CartaoCanal({ canal, entrada, r, aberto, onAjustes, onMudar, onRemover, guardada, guardando, onGuardar, notaDestino }: {
+  canal: Canal; entrada: Entrada; r: ResultadoUtm;
   aberto: boolean; onAjustes: () => void; onMudar: (m: Partial<Entrada>) => void; onRemover: () => void;
   guardada: boolean; guardando: boolean; onGuardar: () => void; notaDestino?: string;
 }) {
   const temIds = !!canal.ids.utmId || canal.ids.extras.length > 0;
   const ok = r.erros.length === 0;
+  // Canal sem variável (X) pede texto digitado: os ajustes já abrem para não passar batido
+  const abrir = aberto || (["campaign", "term", "content"] as NomeSlot[]).some((n) => entrada[n].modo === "fixo" && canal[n].opcoes.length === 0);
   const botaoGuardar = (
     <Button size="sm" variant={guardada ? "ghost" : "secondary"} className="h-auto min-h-8 gap-1.5 text-xs" disabled={guardando || guardada || !ok || !(r.linkCompleto || r.semLink)} onClick={onGuardar}>
       {guardada ? <Check size={13} /> : <Save size={13} />} {guardada ? "Guardada" : "Guardar"}
@@ -309,19 +297,19 @@ function CartaoCanal({ canal, entrada, r, campanhaGlobal, aberto, onAjustes, onM
           <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
             <span className="font-medium text-muted-foreground">Captura:</span>
             {(["campaign", "term", "content"] as NomeSlot[]).map((n) => (
-              <ChipCaptura key={n} rotulo={canal[n].rotulo} estado={r.captura[n]} naoUsa={r.captura[n] === "ausente" && canal[n].opcoes.length === 0} />
+              <ChipCaptura key={n} rotulo={canal[n].rotulo} estado={r.captura[n]} detalhe={r.escolhas[n]} naoUsa={r.captura[n] === "ausente" && canal[n].opcoes.length === 0} />
             ))}
             {temIds && <ChipCaptura rotulo="IDs" estado={r.captura.ids ? "dinamico" : "ausente"} />}
           </div>
         )}
 
-        {aberto && (
+        {abrir && (
           <div className="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
             <SeletorComOutro rotulo="Origem (utm_source)" valor={entrada.source} onChange={(v) => onMudar({ source: v })} opcoes={canal.sources} />
             <SeletorComOutro rotulo="Mídia (utm_medium)" valor={entrada.medium} onChange={(v) => onMudar({ medium: v })} opcoes={MEDIUMS} />
             {(["campaign", "term", "content"] as NomeSlot[]).map((n) => (
               <EditorSlot
-                key={n} canal={canal} nome={n} valor={entrada[n]} campanhaGlobal={campanhaGlobal}
+                key={n} canal={canal} nome={n} valor={entrada[n]}
                 onChange={(v) => onMudar({ [n]: v } as Partial<Entrada>)}
               />
             ))}
@@ -365,8 +353,8 @@ function CartaoCanal({ canal, entrada, r, campanhaGlobal, aberto, onAjustes, onM
   );
 }
 
-function EditorSlot({ canal, nome, valor, campanhaGlobal, onChange }: {
-  canal: Canal; nome: NomeSlot; valor: EscolhaSlot; campanhaGlobal: string; onChange: (v: EscolhaSlot) => void;
+function EditorSlot({ canal, nome, valor, onChange }: {
+  canal: Canal; nome: NomeSlot; valor: EscolhaSlot; onChange: (v: EscolhaSlot) => void;
 }) {
   const opcoes = opcoesDoSlot(canal, nome).map((o) => ({
     valor: o.id, rotulo: o.rotulo, explicacao: o.valor ? `${o.valor}: ${o.explicacao}` : o.explicacao,
@@ -377,7 +365,7 @@ function EditorSlot({ canal, nome, valor, campanhaGlobal, onChange }: {
       {valor.modo === "fixo" && (
         <Input
           className="h-9 text-sm"
-          placeholder={nome === "campaign" && campanhaGlobal ? `Usando: ${campanhaGlobal}. Digite para mudar só aqui` : "Digite o valor"}
+          placeholder={nome === "campaign" ? "Ex.: Black Friday 2026" : "Digite o valor"}
           value={valor.texto} onChange={(e) => onChange({ ...valor, texto: e.target.value })}
         />
       )}

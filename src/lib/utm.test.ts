@@ -34,21 +34,19 @@ test("Meta: origem fixa e sem IDs", () => {
   assert.equal(r.linkCompleto, `https://site.com.br/lp?${r.parametros}`);
 });
 
-test("Google Ads: nome da campanha digitado, IDs nos extras e modelo de acompanhamento", () => {
-  const e = entradaPadrao("google_ads");
-  e.campaign = { modo: "fixo", texto: "Black Friday 2026" };
-  const r = gerarUtm(e);
+test("Google Ads: sem digitar nada captura os IDs, com extras e modelo de acompanhamento", () => {
+  const r = gerarUtm(entradaPadrao("google_ads"));
   assert.deepEqual(r.erros, []);
   assert.equal(
     r.parametros,
-    "utm_source=google&utm_medium=cpc&utm_campaign=black_friday_2026&utm_content={creative}&utm_term={keyword}&utm_id={campaignid}&adgroup_id={adgroupid}&network={network}&device={device}&matchtype={matchtype}",
+    "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={creative}&utm_term={keyword}&utm_id={campaignid}&adgroup_id={adgroupid}&network={network}&device={device}&matchtype={matchtype}",
   );
   assert.equal(r.modeloGoogle, `{lpurl}?${r.parametros}`);
 });
 
 test("campanha vazia, link inválido e canal sem nome de campanha geram erro e nenhum parâmetro", () => {
-  const sem = gerarUtm(entradaPadrao("google_ads"));
-  assert.deepEqual(sem.erros, ["Digite o nome da campanha."]);
+  const sem = gerarUtm(entradaPadrao("x"));
+  assert.equal(sem.erros[0], "Digite o nome da campanha.");
   assert.equal(sem.parametros, "");
   const e = entradaPadrao("tiktok", "isso não é link");
   assert.deepEqual(gerarUtm(e).erros, ["O link de destino não parece válido."]);
@@ -56,12 +54,11 @@ test("campanha vazia, link inválido e canal sem nome de campanha geram erro e n
 
 test("link: mantém query e âncora, troca UTM antiga e avisa", () => {
   const e = entradaPadrao("google_ads", "site.com/lp?x=1&utm_source=velho&utm_foo=2#topo");
-  e.campaign = { modo: "fixo", texto: "Oferta" };
   e.incluirIds = false;
   const r = gerarUtm(e);
   assert.equal(
     r.linkCompleto,
-    "https://site.com/lp?x=1&utm_source=google&utm_medium=cpc&utm_campaign=oferta&utm_content={creative}&utm_term={keyword}#topo",
+    "https://site.com/lp?x=1&utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={creative}&utm_term={keyword}#topo",
   );
   // Sem IDs há o aviso de captura; o da UTM antiga vem junto
   assert.equal(r.avisos.length, 2);
@@ -169,9 +166,15 @@ test("captura: mostra o que cada dado vira e avisa quando a plataforma preencher
   assert.equal(r.captura.ids, false);
   assert.equal(r.avisos.length, 2);
   assert.match(r.avisos[0], /mesmo valor/);
+  assert.equal(padrao.escolhas.campaign, "Nome da campanha");
+  assert.equal(padrao.escolhas.content, "Nome do anúncio");
   const g = entradaPadrao("google_ads");
-  g.campaign = { modo: "fixo", texto: "c" };
   assert.deepEqual(gerarUtm(g).avisos, []);
+  assert.equal(gerarUtm(g).escolhas.campaign, "ID da campanha");
+  g.campaign = { modo: "fixo", texto: "Black Friday 2026" };
+  const gf = gerarUtm(g);
+  assert.match(gf.parametros, /utm_campaign=black_friday_2026&/);
+  assert.equal(gf.avisos.length, 1);
 });
 
 test("destino sem link (mensagens, formulário nativo): só parâmetros, ignora o link", () => {

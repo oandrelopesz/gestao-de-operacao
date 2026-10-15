@@ -117,6 +117,8 @@ export interface ResultadoUtm {
   destino: string;
   /** O que cada dado de campanha captura: variável da plataforma, texto fixo ou nada; e se os IDs entraram */
   captura: { campaign: Captura; term: Captura; content: Captura; ids: boolean };
+  /** O que foi escolhido em cada dado: "Nome da campanha", "ID do anúncio"... (vazio se texto fixo ou não usado) */
+  escolhas: { campaign: string; term: string; content: string };
 }
 
 function valorDoSlot(canal: Canal, nome: NomeSlot, esc: EscolhaSlot): string {
@@ -150,6 +152,7 @@ export function gerarUtm(e: Entrada): ResultadoUtm {
     canalId: e.canalId, canalNome: canal?.nome ?? e.canalId, erros: [], avisos: [], campos: vazio,
     parametros: "", linkCompleto: null, modeloGoogle: null, dinamico: false, semLink, destino: e.destino,
     captura: { campaign: "ausente", term: "ausente", content: "ausente", ids: false },
+    escolhas: { campaign: "", term: "", content: "" },
   };
   if (!canal) return { ...base, erros: ["Canal desconhecido."] };
 
@@ -193,8 +196,13 @@ export function gerarUtm(e: Entrada): ResultadoUtm {
     if (/^http:\/\//i.test(url)) avisos.push("O link usa http e não https. Confira se o site abre com https.");
   }
 
+  const rotulo = (n: NomeSlot) => {
+    const o = opcoesDoSlot(canal, n).find((x) => x.id === e[n].modo);
+    return o && ehMacro(o.valor) ? o.rotulo : "";
+  };
   return {
     ...base, avisos, parametros, linkCompleto,
+    escolhas: { campaign: rotulo("campaign"), term: rotulo("term"), content: rotulo("content") },
     campos: { utm_source: source, utm_medium: medium, utm_campaign: campaign, utm_content: content, utm_term: term },
     modeloGoogle: canal.modeloGoogle ? `{lpurl}?${parametros}` : null,
     dinamico: ehMacro(parametros),
