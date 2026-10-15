@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ehMacro, entradaPadrao, gerarUtm, lerUtm, limpar, nomeDaUtm, sugerirCanal } from "./utm.ts";
-import { CANAIS, MEDIUMS, opcoesDoSlot } from "./utmCanais.ts";
+import { checarParametros, ehMacro, entradaPadrao, gerarUtm, lerUtm, limpar, linkDeTeste, nomeDaUtm, sugerirCanal } from "./utm.ts";
+import { CANAIS, DESTINOS, MEDIUMS, canalPorId, opcoesDoSlot } from "./utmCanais.ts";
 
 test("limpar: minúsculo, sem acento, _ entre palavras, hífen colado", () => {
   assert.equal(limpar("  Black Friday 2026! "), "black_friday_2026");
@@ -41,7 +41,7 @@ test("Google Ads: nome da campanha digitado, IDs nos extras e modelo de acompanh
   assert.deepEqual(r.erros, []);
   assert.equal(
     r.parametros,
-    "utm_source=google&utm_medium=cpc&utm_campaign=black_friday_2026&utm_content={creative}&utm_term={keyword}&utm_id={campaignid}&adgroup_id={adgroupid}&network={network}&device={device}",
+    "utm_source=google&utm_medium=cpc&utm_campaign=black_friday_2026&utm_content={creative}&utm_term={keyword}&utm_id={campaignid}&adgroup_id={adgroupid}&network={network}&device={device}&matchtype={matchtype}",
   );
   assert.equal(r.modeloGoogle, `{lpurl}?${r.parametros}`);
 });
@@ -63,8 +63,9 @@ test("link: mantém query e âncora, troca UTM antiga e avisa", () => {
     r.linkCompleto,
     "https://site.com/lp?x=1&utm_source=google&utm_medium=cpc&utm_campaign=oferta&utm_content={creative}&utm_term={keyword}#topo",
   );
-  assert.equal(r.avisos.length, 1);
-  assert.match(r.avisos[0], /utm_source, utm_foo/);
+  // Sem IDs há o aviso de captura; o da UTM antiga vem junto
+  assert.equal(r.avisos.length, 2);
+  assert.ok(r.avisos.some((a) => /utm_source, utm_foo/.test(a)));
 });
 
 test("link sem caminho ganha a barra antes do ?, http gera aviso", () => {
@@ -128,6 +129,68 @@ test("sugerirCanal pela origem", () => {
   assert.equal(sugerirCanal("newsletter", "email"), null);
 });
 
+test("checarParametros: pega parâmetro quebrado, repetido, faltando e chave desparelhada", () => {
+  const c = canalPorId("meta")!;
+  assert.deepEqual(checarParametros("utm_source=a&utm_medium=b&utm_campaign=c", c), { erros: [], avisos: [] });
+  assert.deepEqual(checarParametros("utm_source=a&utm_medium=&utm_campaign=c", c).erros, ["Parâmetro quebrado: utm_medium="]);
+  assert.match(checarParametros("utm_source=a&utm_source=b&utm_medium=m&utm_campaign=c", c).erros[0], /repetido: utm_source/);
+  assert.deepEqual(checarParametros("utm_source=a&utm_medium=b", c).erros, ["Falta utm_campaign."]);
+  assert.match(checarParametros("utm_source={{a&utm_medium=b&utm_campaign=c", c).erros[0], /desparelhadas/);
+  assert.equal(checarParametros("utm_source=a&utm_medium=b&utm_campaign={{foo.bar}}", c).avisos.length, 1);
+});
+
+test("linkDeTeste troca as variáveis por valores de teste", () => {
+  assert.equal(
+    linkDeTeste("https://a.com/?utm_campaign={{campaign.name}}&utm_term=__AID_NAME__&x={keyword}"),
+    "https://a.com/?utm_campaign=teste_campaign.name&utm_term=teste_aid_name&x=teste_keyword",
+  );
+});
+
+test("texto fixo vazio em conjunto ou anúncio é erro; no X os dois precisam ser digitados", () => {
+  const e = entradaPadrao("x", "https://a.com.br");
+  e.campaign = { modo: "fixo", texto: "c" };
+  assert.equal(gerarUtm(e).erros.length, 2);
+  e.term = { modo: "nenhum", texto: "" };
+  e.content = { modo: "fixo", texto: "Promo A" };
+  const r = gerarUtm(e);
+  assert.deepEqual(r.erros, []);
+  assert.equal(r.parametros, "utm_source=twitter&utm_medium=paid_social&utm_campaign=c&utm_content=promo_a");
+});
+
+test("captura: mostra o que cada dado vira e avisa quando a plataforma preencheria sozinha", () => {
+  const padrao = gerarUtm(entradaPadrao("meta"));
+  assert.deepEqual(padrao.captura, { campaign: "dinamico", term: "dinamico", content: "dinamico", ids: true });
+  assert.deepEqual(padrao.avisos, []);
+  const e = entradaPadrao("meta");
+  e.content = { modo: "fixo", texto: "x" };
+  e.incluirIds = false;
+  const r = gerarUtm(e);
+  assert.equal(r.captura.content, "fixo");
+  assert.equal(r.captura.ids, false);
+  assert.equal(r.avisos.length, 2);
+  assert.match(r.avisos[0], /mesmo valor/);
+  const g = entradaPadrao("google_ads");
+  g.campaign = { modo: "fixo", texto: "c" };
+  assert.deepEqual(gerarUtm(g).avisos, []);
+});
+
+test("destino sem link (mensagens, formulário nativo): só parâmetros, ignora o link", () => {
+  const e = { ...entradaPadrao("meta", "isso não é link"), destino: "mensagens" };
+  const r = gerarUtm(e);
+  assert.deepEqual(r.erros, []);
+  assert.ok(r.semLink);
+  assert.equal(r.linkCompleto, null);
+  assert.match(r.parametros, /^utm_source=\{\{site_source_name\}\}&utm_medium=paid_social/);
+  assert.equal(gerarUtm({ ...e, destino: "lp", url: "https://a.com.br" }).semLink, false);
+  assert.deepEqual(gerarUtm({ ...e, destino: "lp" }).erros, ["O link de destino não parece válido."]);
+});
+
+test("destinos: ids únicos, o padrão existe e quem não tem link explica o porquê", () => {
+  assert.equal(new Set(DESTINOS.map((d) => d.id)).size, DESTINOS.length);
+  assert.ok(DESTINOS.some((d) => d.id === entradaPadrao("meta").destino));
+  for (const d of DESTINOS.filter((x) => !x.comLink)) assert.ok(d.nota, `${d.id}: falta a nota`);
+});
+
 test("catálogo: ids únicos, padrões existem e nenhum valor quebra a URL", () => {
   assert.equal(new Set(CANAIS.map((c) => c.id)).size, CANAIS.length);
   const mediums = new Set(MEDIUMS.map((m) => m.valor));
@@ -146,7 +209,9 @@ test("catálogo: ids únicos, padrões existem e nenhum valor quebra a URL", () 
       assert.match(`${k}=${v}`, /^[a-z_]+=[^\s?&#=]+$/, `${c.id}: ${k}`);
     }
     const e = entradaPadrao(c.id, "https://a.com.br/pagina");
-    e.campaign = c.campaign.padrao === "fixo" ? { modo: "fixo", texto: "Teste Campanha" } : e.campaign;
+    for (const n of ["campaign", "term", "content"] as const) {
+      if (c[n].padrao === "fixo") e[n] = { modo: "fixo", texto: "Teste Valor" };
+    }
     const r = gerarUtm(e);
     assert.deepEqual(r.erros, [], `${c.id}: padrão gera erro`);
     assert.ok(!/\s|\?|#/.test(r.parametros), `${c.id}: parâmetros com caractere proibido`);

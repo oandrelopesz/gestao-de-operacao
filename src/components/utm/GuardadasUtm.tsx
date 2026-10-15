@@ -13,11 +13,12 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { buscar } from "@/lib/search";
-import { CANAIS, canalPorId } from "@/lib/utmCanais";
+import { CANAIS, canalPorId, destinoPorId } from "@/lib/utmCanais";
 import { lerUtm, nomeDaUtm, sugerirCanal } from "@/lib/utm";
 import { excluirUtms, guardarUtms, traduzErroUtm, type UtmGuardada } from "@/lib/utmGuardadas";
 import { MensagemBusca } from "@/components/MensagemBusca";
 import { LinhaCopiar } from "./UtmPecas";
+import { SeletorCliente } from "./SeletorCliente";
 
 interface Props {
   utms: UtmGuardada[];
@@ -118,6 +119,7 @@ export function GuardadasUtm({ utms, clientes, carregando, clienteId, onAbrir, o
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">{nomeCanal(u.canal)}</span>
                         <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-muted-foreground">{u.utm_source} / {u.utm_medium}</span>
+                        {u.destino && destinoPorId(u.destino) && <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">destino: {destinoPorId(u.destino)!.nome}</span>}
                         {u.origem === "manual" && <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">adicionada na mão</span>}
                         <span className="text-muted-foreground">{new Date(u.created_at).toLocaleDateString("pt-BR")}</span>
                       </div>
@@ -127,8 +129,15 @@ export function GuardadasUtm({ utms, clientes, carregando, clienteId, onAbrir, o
                       title="Excluir" aria-label="Excluir" onClick={() => setParaExcluir([u.id])}
                     ><Trash2 size={14} /></Button>
                   </div>
-                  <LinhaCopiar titulo="Link completo" texto={u.url_final} destaque />
-                  {u.parametros && <LinhaCopiar titulo="Só os parâmetros" texto={u.parametros} />}
+                  {/* Destino sem link (mensagens, formulário nativo): só existem os parâmetros */}
+                  {u.destino && destinoPorId(u.destino)?.comLink === false ? (
+                    <LinhaCopiar titulo="Só os parâmetros" texto={u.parametros || u.url_final} destaque />
+                  ) : (
+                    <>
+                      <LinhaCopiar titulo="Link completo" texto={u.url_final} destaque />
+                      {u.parametros && <LinhaCopiar titulo="Só os parâmetros" texto={u.parametros} />}
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -204,7 +213,7 @@ function AdicionarExistente({ aberto, onFechar, clientes, clienteIdFixo, onSalvo
     setSalvando(true);
     try {
       await guardarUtms([{
-        cliente_id: clienteAtual, canal: canalAtual, nome: nomeAtual, url_base: lida.base, url_final: lida.url,
+        cliente_id: clienteAtual, canal: canalAtual, nome: nomeAtual, url_base: lida.base, url_final: lida.url, destino: null,
         parametros: lida.parametros, utm_source: lida.source, utm_medium: lida.medium, utm_campaign: lida.campaign,
         utm_content: lida.content, utm_term: lida.term, origem: "manual",
       }]);
@@ -226,10 +235,7 @@ function AdicionarExistente({ aberto, onFechar, clientes, clienteIdFixo, onSalvo
           {!clienteIdFixo && (
             <div className="space-y-1.5">
               <Label className="text-xs">Cliente</Label>
-              <Select value={cliente || undefined} onValueChange={setCliente}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Escolha o cliente" /></SelectTrigger>
-                <SelectContent className="max-h-72">{clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-              </Select>
+              <SeletorCliente clientes={clientes} valor={cliente} onChange={setCliente} />
             </div>
           )}
           <div className="space-y-1.5">

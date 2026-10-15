@@ -102,7 +102,7 @@ export const CANAIS: Canal[] = [
     content: slot("Anúncio", "id", [
       op("id", "ID do anúncio", "{creative}", "o Google preenche com o número do anúncio"),
     ]),
-    ids: { utmId: "{campaignid}", extras: [["adgroup_id", "{adgroupid}"], ["network", "{network}"], ["device", "{device}"]] },
+    ids: { utmId: "{campaignid}", extras: [["adgroup_id", "{adgroupid}"], ["network", "{network}"], ["device", "{device}"], ["matchtype", "{matchtype}"]] },
     onde: "Google Ads, na campanha, Configurações, Opções de URL da campanha, campo Sufixo do URL final. Cole sem o ponto de interrogação.",
     primeiro: "parametros",
     modeloGoogle: true,
@@ -204,12 +204,12 @@ export const CANAIS: Canal[] = [
     ],
     medium: "paid_social",
     campaign: SO_FIXO("Campanha"),
-    term: SO_FIXO("Grupo de anúncios", "nenhum"),
-    content: SO_FIXO("Anúncio", "nenhum"),
+    term: SO_FIXO("Grupo de anúncios"),
+    content: SO_FIXO("Anúncio"),
     ids: { extras: [] },
     onde: "X Ads, no anúncio, campo URL do site. Cole o link completo.",
     primeiro: "link",
-    nota: "O X não tem variáveis dinâmicas. Gere um link por anúncio e digite o nome do grupo e do anúncio.",
+    nota: "O X não tem variáveis dinâmicas, então o nome do grupo e do anúncio precisam ser digitados para não se perderem. Gere um link por anúncio.",
   },
   {
     id: "taboola", nome: "Taboola", grupo: "pago",
@@ -346,6 +346,30 @@ export const CANAIS: Canal[] = [
 ];
 
 export const canalPorId = (id: string): Canal | undefined => CANAIS.find((c) => c.id === id);
+
+/** Para onde o clique leva. Sem link (mensagens, formulário nativo): só os parâmetros são gerados. */
+export interface Destino { id: string; nome: string; explicacao: string; comLink: boolean; nota?: string }
+
+export const DESTINOS: Destino[] = [
+  { id: "site", nome: "Site", explicacao: "uma página do site do cliente, como início, serviços ou sobre", comLink: true },
+  { id: "lp", nome: "Landing page", explicacao: "página feita para converter uma campanha só, com um objetivo único", comLink: true },
+  { id: "loja", nome: "Loja ou produto", explicacao: "loja online, página de produto ou carrinho", comLink: true },
+  { id: "perfil", nome: "Perfil ou página em rede social", explicacao: "perfil do Instagram, página do Facebook, canal do YouTube e parecidos", comLink: true },
+  { id: "app", nome: "Aplicativo", explicacao: "página do app na App Store ou no Google Play", comLink: true },
+  {
+    id: "mensagens", nome: "Mensagens", comLink: false,
+    explicacao: "anúncio que abre uma conversa no WhatsApp, Direct ou Messenger, sem link de site",
+    nota: "Anúncio que abre conversa não tem link de site, então só os parâmetros são gerados. Confira se o tipo de anúncio aceita parâmetros de URL. A UTM só chega ao CRM se a ferramenta de rastreio da conversa ler esses parâmetros.",
+  },
+  {
+    id: "formulario", nome: "Formulário nativo", comLink: false,
+    explicacao: "formulário da própria plataforma, como o de cadastro da Meta ou do LinkedIn, sem sair dela",
+    nota: "Formulário nativo não leva a pessoa ao seu site, então só os parâmetros são gerados. Eles servem para identificar a origem nos relatórios e na integração com o CRM. Confira se o tipo de anúncio aceita parâmetros de URL.",
+  },
+  { id: "outro", nome: "Outro", explicacao: "qualquer outro endereço de destino com link", comLink: true },
+];
+
+export const destinoPorId = (id: string): Destino | undefined => DESTINOS.find((d) => d.id === id);
 
 /** Opções do dropdown de um slot: as variáveis do canal + texto fixo + (menos na campanha) não usar. */
 export function opcoesDoSlot(canal: Canal, nome: NomeSlot): OpcaoSlot[] {

@@ -1,7 +1,7 @@
 // Regras puras do Gerador de UTM: limpeza dos valores, montagem dos parâmetros e do link, leitura de um link com UTM.
 // Sem dependências do navegador: roda no app e no `node --test`.
 import { normalizarUrl } from "./linksTexto.ts";
-import { canalPorId, opcoesDoSlot, type Canal, type NomeSlot } from "./utmCanais.ts";
+import { canalPorId, destinoPorId, opcoesDoSlot, type Canal, type NomeSlot } from "./utmCanais.ts";
 
 /** Variável da plataforma, como {{campaign.name}}, {campaignid} ou __AID_NAME__: nunca é limpa nem codificada. */
 export const ehMacro = (v: string): boolean => /\{[^{}]+\}|__[A-Z0-9_]+__/.test(v);
@@ -19,10 +19,66 @@ export function limpar(texto: string): string {
 
 const livre = (v: string): string => (ehMacro(v.trim()) ? v.trim() : limpar(v));
 
+const MACRO = /\{\{[^{}]+\}\}|\{[^{}]+\}|__[A-Z0-9_]+__/g;
+
+/** Como um dado de campanha entra no link: variável da plataforma, texto digitado ou fora. */
+export type Captura = "dinamico" | "fixo" | "ausente";
+const capturaDe = (v: string): Captura => (!v ? "ausente" : ehMacro(v) ? "dinamico" : "fixo");
+
+function macrosDoCanal(canal: Canal): Set<string> {
+  const s = new Set<string>();
+  const add = (v: string) => { for (const m of v.match(MACRO) ?? []) s.add(m); };
+  canal.sources.forEach((o) => add(o.valor));
+  for (const n of ["campaign", "term", "content"] as const) canal[n].opcoes.forEach((o) => add(o.valor));
+  if (canal.ids.utmId) add(canal.ids.utmId);
+  canal.ids.extras.forEach(([, v]) => add(v));
+  return s;
+}
+
+/** Rede de segurança: confere o texto final antes de liberar a cópia. Erro bloqueia; aviso só alerta. */
+export function checarParametros(parametros: string, canal: Canal): { erros: string[]; avisos: string[] } {
+  const erros: string[] = [];
+  const avisos: string[] = [];
+  const chaves = new Set<string>();
+  for (const p of parametros.split("&")) {
+    const k = p.split("=")[0].toLowerCase();
+    if (!/^[A-Za-z0-9_]+=[^\s?&#=]+$/.test(p)) { erros.push(`Parâmetro quebrado: ${p || "(vazio)"}`); chaves.add(k); continue; }
+    if (chaves.has(k)) erros.push(`Parâmetro repetido: ${k}`);
+    chaves.add(k);
+  }
+  for (const k of ["utm_source", "utm_medium", "utm_campaign"]) if (!chaves.has(k)) erros.push(`Falta ${k}.`);
+  if ((parametros.match(/\{/g) ?? []).length !== (parametros.match(/\}/g) ?? []).length) {
+    erros.push("As chaves { } da variável estão desparelhadas.");
+  }
+  const conhecidas = macrosDoCanal(canal);
+  const estranhas = [...new Set((parametros.match(MACRO) ?? []).filter((m) => !conhecidas.has(m)))];
+  if (estranhas.length) avisos.push(`Variável fora do catálogo de ${canal.nome}: ${estranhas.join(", ")}. Confira o nome na documentação da plataforma.`);
+  if (parametros.length > 1500) avisos.push("Os parâmetros ficaram longos: algumas plataformas cortam links acima de 2.000 caracteres.");
+  return { erros, avisos };
+}
+
+/** Avisa quando a plataforma preencheria um dado sozinha e a escolha atual o deixa igual ou de fora. */
+function avisosDeCaptura(canal: Canal, e: Entrada): string[] {
+  const out: string[] = [];
+  for (const n of ["campaign", "term", "content"] as const) {
+    const slot = canal[n];
+    const modo = e[n].modo;
+    if (modo === slot.padrao || !slot.opcoes.some((o) => ehMacro(o.valor))) continue;
+    if (modo === "fixo") out.push(`${slot.rotulo}: com texto fixo, todos os anúncios saem com o mesmo valor, e ${canal.nome} consegue preencher esse dado sozinha.`);
+    if (modo === "nenhum") out.push(`${slot.rotulo}: fica fora do link, e ${canal.nome} consegue preencher esse dado sozinha.`);
+  }
+  if (!e.incluirIds && (canal.ids.utmId || canal.ids.extras.length)) {
+    out.push("Sem os IDs fica mais difícil cruzar o link com o relatório da plataforma e com o CRM.");
+  }
+  return out;
+}
+
 export interface EscolhaSlot { modo: string; texto: string }
 export interface Entrada {
   canalId: string;
   url: string;
+  /** Tipo de destino (DESTINOS): sem link, a url é ignorada e só os parâmetros saem */
+  destino: string;
   source: string;
   medium: string;
   campaign: EscolhaSlot;
@@ -35,7 +91,7 @@ export function entradaPadrao(canalId: string, url = ""): Entrada {
   const c = canalPorId(canalId);
   if (!c) throw new Error(`Canal desconhecido: ${canalId}`);
   return {
-    canalId, url, source: c.source, medium: c.medium, incluirIds: true,
+    canalId, url, destino: "site", source: c.source, medium: c.medium, incluirIds: true,
     campaign: { modo: c.campaign.padrao, texto: "" },
     term: { modo: c.term.padrao, texto: "" },
     content: { modo: c.content.padrao, texto: "" },
@@ -56,6 +112,11 @@ export interface ResultadoUtm {
   modeloGoogle: string | null;
   /** Tem variáveis da plataforma (o link de teste não as preenche) */
   dinamico: boolean;
+  /** Destino sem link (mensagens, formulário nativo): só os parâmetros */
+  semLink: boolean;
+  destino: string;
+  /** O que cada dado de campanha captura: variável da plataforma, texto fixo ou nada; e se os IDs entraram */
+  captura: { campaign: Captura; term: Captura; content: Captura; ids: boolean };
 }
 
 function valorDoSlot(canal: Canal, nome: NomeSlot, esc: EscolhaSlot): string {
@@ -82,10 +143,13 @@ function anexar(url: string, parametros: string): { link: string; trocados: stri
 
 export function gerarUtm(e: Entrada): ResultadoUtm {
   const canal = canalPorId(e.canalId);
+  const dest = destinoPorId(e.destino);
+  const semLink = !!dest && !dest.comLink;
   const vazio = { utm_source: "", utm_medium: "", utm_campaign: "", utm_content: "", utm_term: "" };
   const base: ResultadoUtm = {
     canalId: e.canalId, canalNome: canal?.nome ?? e.canalId, erros: [], avisos: [], campos: vazio,
-    parametros: "", linkCompleto: null, modeloGoogle: null, dinamico: false,
+    parametros: "", linkCompleto: null, modeloGoogle: null, dinamico: false, semLink, destino: e.destino,
+    captura: { campaign: "ausente", term: "ausente", content: "ausente", ids: false },
   };
   if (!canal) return { ...base, erros: ["Canal desconhecido."] };
 
@@ -99,7 +163,11 @@ export function gerarUtm(e: Entrada): ResultadoUtm {
   if (!source) erros.push("Escolha a origem (utm_source).");
   if (!medium) erros.push("Escolha a mídia (utm_medium).");
   if (!campaign) erros.push("Digite o nome da campanha.");
-  const urlTexto = e.url.trim();
+  // Texto fixo vazio em conjunto ou anúncio deixaria o dado sumir sem ninguém perceber
+  for (const [n, v] of [["term", term], ["content", content]] as const) {
+    if (e[n].modo === "fixo" && !v) erros.push(`Digite o valor de ${canal[n].rotulo.toLowerCase()} ou escolha "Não usar".`);
+  }
+  const urlTexto = semLink ? "" : e.url.trim();
   const url = urlTexto ? normalizarUrl(urlTexto) : null;
   if (urlTexto && !url) erros.push("O link de destino não parece válido.");
   if (erros.length) return { ...base, erros };
@@ -113,7 +181,9 @@ export function gerarUtm(e: Entrada): ResultadoUtm {
   }
   const parametros = pares.map(([k, v]) => `${k}=${v}`).join("&");
 
-  const avisos: string[] = [];
+  const checagem = checarParametros(parametros, canal);
+  if (checagem.erros.length) return { ...base, erros: checagem.erros };
+  const avisos: string[] = [...checagem.avisos, ...avisosDeCaptura(canal, e)];
   let linkCompleto: string | null = null;
   if (url) {
     const r = anexar(url, parametros);
@@ -128,6 +198,10 @@ export function gerarUtm(e: Entrada): ResultadoUtm {
     campos: { utm_source: source, utm_medium: medium, utm_campaign: campaign, utm_content: content, utm_term: term },
     modeloGoogle: canal.modeloGoogle ? `{lpurl}?${parametros}` : null,
     dinamico: ehMacro(parametros),
+    captura: {
+      campaign: capturaDe(campaign), term: capturaDe(term), content: capturaDe(content),
+      ids: e.incluirIds && (!!canal.ids.utmId || canal.ids.extras.length > 0),
+    },
   };
 }
 
@@ -188,4 +262,9 @@ export function sugerirCanal(source: string, medium: string): string | null {
 /** Nome automático de uma UTM guardada: canal e, quando a campanha é um texto (não variável), o nome dela. */
 export function nomeDaUtm(canalNome: string, campaign: string): string {
   return campaign && !ehMacro(campaign) ? `${canalNome} · ${campaign}` : canalNome;
+}
+
+/** Troca cada variável da plataforma por um valor de teste (teste_campaign.name), para abrir o link e conferir no GA4. */
+export function linkDeTeste(link: string): string {
+  return link.replace(MACRO, (m) => `teste_${limpar(m.replace(/^[{_]+|[}_]+$/g, ""))}`);
 }

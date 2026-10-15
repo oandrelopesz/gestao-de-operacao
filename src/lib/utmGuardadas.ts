@@ -9,7 +9,10 @@ export interface NovaUtm {
   canal: string | null;
   nome: string;
   url_base: string;
+  /** Link completo; nos destinos sem link (mensagens, formulário nativo) guarda os parâmetros */
   url_final: string;
+  /** Tipo de destino (DESTINOS); nulo nas adicionadas na mão */
+  destino: string | null;
   parametros: string;
   utm_source: string;
   utm_medium: string;
@@ -52,13 +55,15 @@ export async function excluirUtms(ids: string[]): Promise<void> {
 
 /** Resultado do gerador → linha da tabela. `null` quando falta o link de destino (nada a guardar). */
 export function novaDeResultado(r: ResultadoUtm, clienteId: string, urlBase: string): NovaUtm | null {
-  if (r.erros.length || !r.linkCompleto) return null;
+  const final = r.linkCompleto ?? (r.semLink ? r.parametros : null);
+  if (r.erros.length || !final) return null;
   return {
     cliente_id: clienteId,
     canal: r.canalId,
     nome: nomeDaUtm(r.canalNome, r.campos.utm_campaign),
-    url_base: normalizarUrl(urlBase) ?? urlBase,
-    url_final: r.linkCompleto,
+    url_base: r.semLink ? "" : (normalizarUrl(urlBase) ?? urlBase),
+    url_final: final,
+    destino: r.destino,
     parametros: r.parametros,
     utm_source: r.campos.utm_source,
     utm_medium: r.campos.utm_medium,
