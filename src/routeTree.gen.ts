@@ -38,6 +38,7 @@ import { Route as AuthenticatedCursosRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedConteudoRouteImport } from './routes/_authenticated/conteudo'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
+import { Route as AuthenticatedChurnRouteImport } from './routes/_authenticated/churn'
 import { Route as AuthenticatedCentralRouteImport } from './routes/_authenticated/central'
 import { Route as AuthenticatedArquivosRouteImport } from './routes/_authenticated/arquivos'
 import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
@@ -193,6 +194,11 @@ const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
   path: '/clientes',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedChurnRoute = AuthenticatedChurnRouteImport.update({
+  id: '/churn',
+  path: '/churn',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedCentralRoute = AuthenticatedCentralRouteImport.update({
   id: '/central',
   path: '/central',
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/agenda': typeof AuthenticatedAgendaRoute
   '/arquivos': typeof AuthenticatedArquivosRoute
   '/central': typeof AuthenticatedCentralRoute
+  '/churn': typeof AuthenticatedChurnRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/conteudo': typeof AuthenticatedConteudoRoute
   '/crm': typeof AuthenticatedCrmRoute
@@ -276,6 +283,7 @@ export interface FileRoutesByTo {
   '/agenda': typeof AuthenticatedAgendaRoute
   '/arquivos': typeof AuthenticatedArquivosRoute
   '/central': typeof AuthenticatedCentralRoute
+  '/churn': typeof AuthenticatedChurnRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/conteudo': typeof AuthenticatedConteudoRoute
   '/crm': typeof AuthenticatedCrmRoute
@@ -315,6 +323,7 @@ export interface FileRoutesById {
   '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
   '/_authenticated/arquivos': typeof AuthenticatedArquivosRoute
   '/_authenticated/central': typeof AuthenticatedCentralRoute
+  '/_authenticated/churn': typeof AuthenticatedChurnRoute
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/conteudo': typeof AuthenticatedConteudoRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
@@ -355,6 +364,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/arquivos'
     | '/central'
+    | '/churn'
     | '/clientes'
     | '/conteudo'
     | '/crm'
@@ -391,6 +401,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/arquivos'
     | '/central'
+    | '/churn'
     | '/clientes'
     | '/conteudo'
     | '/crm'
@@ -429,6 +440,7 @@ export interface FileRouteTypes {
     | '/_authenticated/agenda'
     | '/_authenticated/arquivos'
     | '/_authenticated/central'
+    | '/_authenticated/churn'
     | '/_authenticated/clientes'
     | '/_authenticated/conteudo'
     | '/_authenticated/crm'
@@ -670,6 +682,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/churn': {
+      id: '/_authenticated/churn'
+      path: '/churn'
+      fullPath: '/churn'
+      preLoaderRoute: typeof AuthenticatedChurnRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/central': {
       id: '/_authenticated/central'
       path: '/central'
@@ -728,6 +747,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
   AuthenticatedArquivosRoute: typeof AuthenticatedArquivosRoute
   AuthenticatedCentralRoute: typeof AuthenticatedCentralRoute
+  AuthenticatedChurnRoute: typeof AuthenticatedChurnRoute
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedConteudoRoute: typeof AuthenticatedConteudoRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
@@ -764,6 +784,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAgendaRoute: AuthenticatedAgendaRoute,
   AuthenticatedArquivosRoute: AuthenticatedArquivosRoute,
   AuthenticatedCentralRoute: AuthenticatedCentralRoute,
+  AuthenticatedChurnRoute: AuthenticatedChurnRoute,
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedConteudoRoute: AuthenticatedConteudoRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,

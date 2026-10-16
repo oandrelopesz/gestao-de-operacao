@@ -32,3 +32,21 @@ export function churnDoMes(
     l.pct = l.base > 0 ? l.churns / l.base : null;
   return { total, porAgencia };
 }
+
+export type ClienteChurnContrato = {
+  status_operacional: string;
+  churn_efeito_imediato?: boolean | null;
+  contrato_ate?: string | null;
+};
+
+/** Hoje em Brasília (AAAA-MM-DD), o mesmo dia que o banco usa para churn_em. */
+export const hojeBrasilia = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+
+/**
+ * O churn já valeu? Efeito imediato, sem data de contrato ou contrato vencido: sim (sai de Clientes Ativos e do Saldo).
+ * Com contrato em vigor o cliente continua nos ativos até o dia seguinte à data. Mesma regra do WHERE de saldo_ads_view.
+ */
+export function churnEncerrado(c: ClienteChurnContrato, hoje = hojeBrasilia()): boolean {
+  if (c.status_operacional !== "churn") return false;
+  return !!c.churn_efeito_imediato || !c.contrato_ate || c.contrato_ate < hoje;
+}

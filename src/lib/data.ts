@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { parseOperacoesResumo } from "@/lib/clientes";
 import { formatMoeda } from "@/lib/moedas";
+import { churnEncerrado } from "@/lib/churn";
 import { categoriaDoScore } from "@/lib/nps";
 import { fetchDemandaColunas } from "@/lib/demandaColunas";
 import { fetchCursoCategorias } from "@/lib/cursoCategorias";
@@ -26,6 +27,7 @@ export const CACHE_KEYS = {
   clientesLite: "clientes-lite",
   colunas: "demanda-colunas",
   clientesView: "clientes-view",
+  clientesChurn: "clientes-churn",
   saldo: "saldo",
   acessos: "acessos",
   financeiro: "financeiro",
@@ -98,7 +100,9 @@ async function buscarClientesView(arquivado: boolean) {
     .select("cliente_id, plataformas, verba_diaria_calc, ativo, operacao_nome, moeda");
   if (saldosError) console.warn("Erro ao buscar saldos para enriquecimento:", saldosError);
 
-  return ((data as any[]) || []).map((cli) => {
+  // Churn que já valeu mora na aba Clientes em Churn; com contrato em vigor o cliente segue aqui até a data
+  const lista = ((data as any[]) || []).filter((cli) => !churnEncerrado(cli));
+  return lista.map((cli) => {
     const cliSaldos = (saldos || []).filter((s) => s.cliente_id === cli.id && s.ativo !== false);
     const operacoes = parseOperacoesResumo(cli.operacoes);
     // Resumo por plataforma (na moeda da operação); com mais de uma operação, prefixa o nome dela
@@ -130,6 +134,17 @@ export function loadClientesView() {
 /** Clientes arquivados, para a opção "Mostrar arquivados" (fora do cache dos ativos) */
 export function loadClientesArquivados() {
   return buscarClientesView(true);
+}
+
+/** Clientes em churn que já saíram (efeito imediato ou contrato vencido), arquivados ou não, do mais recente ao mais antigo */
+export async function loadClientesChurn() {
+  const { data, error } = await supabase
+    .from("clientes_view" as any)
+    .select("*")
+    .eq("status_operacional", "churn")
+    .order("churn_em", { ascending: false, nullsFirst: false });
+  if (error) throw error;
+  return ((data as any[]) || []).filter((cli) => churnEncerrado(cli));
 }
 
 export async function loadSaldo() {

@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Lightbulb,
   Users,
+  UserMinus,
   Wallet,
   MessageSquare,
   DollarSign,
@@ -63,6 +64,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     title: "Comercial",
     links: [
       { label: "Clientes Ativos", icon: <Users size={17} />, to: "/clientes", palavras: ["carteira", "contas"] },
+      { label: "Clientes em Churn", icon: <UserMinus size={17} />, to: "/churn", palavras: ["cancelados", "saíram", "perdidos", "encerrados", "churn"] },
       { label: "CRM", icon: <Target size={17} />, to: "/crm", palavras: ["prospecção", "leads", "funil", "vendas", "pipeline", "comercial"] },
     ],
   },

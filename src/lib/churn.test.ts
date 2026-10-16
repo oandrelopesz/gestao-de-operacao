@@ -52,3 +52,16 @@ test("arquivado sai da base, mas o churn do mês dele continua contando", () => 
 test("sem clientes, % é nulo", () => {
   assert.deepEqual(churnDoMes([], "2026-10").total, { churns: 0, base: 0, pct: null });
 });
+
+import { churnEncerrado } from "./churn.ts";
+
+test("churn só sai dos ativos quando valeu: imediato, sem data ou contrato vencido", () => {
+  const hoje = "2026-10-15";
+  const e = (o: object) => churnEncerrado({ status_operacional: "churn", ...o }, hoje);
+  assert.equal(e({ churn_efeito_imediato: true, contrato_ate: "2026-12-01" }), true);
+  assert.equal(e({}), true);
+  assert.equal(e({ contrato_ate: "2026-10-14" }), true);
+  assert.equal(e({ contrato_ate: "2026-10-15" }), false);
+  assert.equal(e({ contrato_ate: "2026-11-30" }), false);
+  assert.equal(churnEncerrado({ status_operacional: "ativo", churn_efeito_imediato: true }, hoje), false);
+});
