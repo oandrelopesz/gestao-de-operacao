@@ -15,8 +15,8 @@ const aviso = (p: Partial<AvisoFormulario> & { id: string }): AvisoFormulario =>
 });
 
 test("formulários: ordem das sub-abas, dos botões e ids", () => {
-  assert.deepEqual(FORMULARIOS.map((f) => f.aba), ["Dados para contrato", "Briefing – Negócios", "Briefing – Estratégia", "Catálogos – E-Commerce"]);
-  assert.deepEqual(ORDEM_BOTOES, ["contrato", "estrategia", "negocios", "catalogo"]);
+  assert.deepEqual(FORMULARIOS.map((f) => f.aba), ["Dados para contrato", "Briefing – Negócios", "Briefing – Estratégia", "Briefing – Site/LP", "Catálogos – E-Commerce"]);
+  assert.deepEqual(ORDEM_BOTOES, ["contrato", "estrategia", "site-lp", "negocios", "catalogo"]);
   assert.equal(FORMULARIOS.find((f) => f.id === "catalogo")?.pastaId, "1oLF5CdjoFhHotF9JYbykqiumUUy82fKm");
   assert.equal(ehFormularioId("negocios"), true);
   assert.equal(ehFormularioId("outro"), false);
@@ -102,7 +102,7 @@ test("aba inicial: primeira com novidade (ordem das sub-abas), senão a última 
   assert.equal(abaInicial([aviso({ id: "1", formulario: "catalogo" }), aviso({ id: "2", formulario: "negocios" })], "contrato"), "negocios");
   assert.equal(abaInicial([], "estrategia"), "estrategia");
   assert.equal(abaInicial([], null), "contrato");
-  assert.deepEqual(contarPorFormulario([aviso({ id: "1" }), aviso({ id: "2" }), aviso({ id: "3", formulario: "catalogo" })]), { contrato: 0, negocios: 2, estrategia: 0, catalogo: 1 });
+  assert.deepEqual(contarPorFormulario([aviso({ id: "1" }), aviso({ id: "2" }), aviso({ id: "3", formulario: "catalogo" })]), { contrato: 0, negocios: 2, estrategia: 0, "site-lp": 0, catalogo: 1 });
 });
 
 test("modo de visualização", () => {
@@ -146,4 +146,11 @@ test("caminhos do .zip: pastas, repetidos, Doc/Planilha convertidos e tipos sem 
   assert.equal(nomeDoProduto("Camiseta - 01.jpg"), "Camiseta");
   assert.equal(nomeDoProduto("Caneca.png"), "Caneca");
   assert.equal(nomeDoProduto("Kit - Verão - 12.webp"), "Kit - Verão");
+});
+
+test("site-lp: sub-aba logo após Estratégia, é briefing e tem pasta própria", () => {
+  assert.equal(ehFormularioId("site-lp"), true);
+  assert.equal(FORMULARIOS.find((f) => f.id === "site-lp")?.pastaId, "1_ZKIiib3Gclb19aYX7C-ZD_RZRZ2RZQ4");
+  assert.equal(rotuloDoItem(item({ id: "x", name: "ACME - 2026-10-16 15-26-20.txt" }), "site-lp").titulo, "ACME");
+  assert.equal(contarPorFormulario([aviso({ id: "1", formulario: "site-lp" })])["site-lp"], 1);
 });

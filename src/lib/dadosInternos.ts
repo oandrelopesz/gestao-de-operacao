@@ -2,7 +2,7 @@
 // (nome e data do briefing, selo "Novo", modo de visualização, formatos de download e caminhos do .zip).
 // Sem dependências: roda no navegador e no `node --test`.
 
-export type FormularioId = "contrato" | "negocios" | "estrategia" | "catalogo";
+export type FormularioId = "contrato" | "negocios" | "estrategia" | "site-lp" | "catalogo";
 
 export interface Formulario {
   id: FormularioId;
@@ -22,11 +22,12 @@ export const FORMULARIOS: Formulario[] = [
   { id: "contrato", aba: "Dados para contrato", botao: "Contrato", link: "https://contrato.andrelopes.digital/", pastaId: "1YmeAImZbMPZn-ulPNdmPBovEI5spME9w", pastaNome: "Dados de contrato" },
   { id: "negocios", aba: "Briefing – Negócios", botao: "Negócios", link: "https://negocios.andrelopes.digital/", pastaId: "1DhKMgqex14a-RuMof3Jht5Jx7nEQDYuP", pastaNome: "Negócios" },
   { id: "estrategia", aba: "Briefing – Estratégia", botao: "Estratégia", link: "https://estrategia.andrelopes.digital/", pastaId: "1gH_-_h9Al1jSiO2zzPSh9gbwhkpR6ZIZ", pastaNome: "Estratégia" },
+  { id: "site-lp", aba: "Briefing – Site/LP", botao: "Site/LP", link: "https://site-lp.andrelopes.digital/", pastaId: "1_ZKIiib3Gclb19aYX7C-ZD_RZRZ2RZQ4", pastaNome: "Site/LP" },
   { id: "catalogo", aba: "Catálogos – E-Commerce", botao: "Catálogo", link: "https://catalogo.andrelopes.digital/", pastaId: "1oLF5CdjoFhHotF9JYbykqiumUUy82fKm", pastaNome: "E-Commerce" },
 ];
 
 /** Ordem dos botões de copiar link no topo da aba. */
-export const ORDEM_BOTOES: FormularioId[] = ["contrato", "estrategia", "negocios", "catalogo"];
+export const ORDEM_BOTOES: FormularioId[] = ["contrato", "estrategia", "site-lp", "negocios", "catalogo"];
 
 export function formularioPorId(id: FormularioId): Formulario {
   return FORMULARIOS.find((f) => f.id === id) ?? FORMULARIOS[0];
@@ -117,7 +118,7 @@ export function formatarDataHora(d: Date): string {
   return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
 }
 
-const ehBriefing = (f: FormularioId) => f === "negocios" || f === "estrategia";
+const ehBriefing = (f: FormularioId) => f === "negocios" || f === "estrategia" || f === "site-lp";
 
 /** Título e data que a lista mostra para um item. */
 export function rotuloDoItem(i: ItemDrive, formulario: FormularioId): { titulo: string; data: Date } {
@@ -180,7 +181,7 @@ export function abaInicial(naoVistos: AvisoFormulario[], ultima: FormularioId | 
 }
 
 export function contarPorFormulario(avisos: AvisoFormulario[]): Record<FormularioId, number> {
-  const c: Record<FormularioId, number> = { contrato: 0, negocios: 0, estrategia: 0, catalogo: 0 };
+  const c: Record<FormularioId, number> = { contrato: 0, negocios: 0, estrategia: 0, "site-lp": 0, catalogo: 0 };
   for (const a of avisos) if (!a.visto_em && a.formulario in c) c[a.formulario]++;
   return c;
 }
