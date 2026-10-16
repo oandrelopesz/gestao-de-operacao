@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Inbox, Loader2, X } from "lucide-react";
+import { CheckCheck, Inbox, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -118,7 +118,14 @@ function DadosInternosPage() {
             <p className="text-sm text-muted-foreground">Respostas dos formulários, direto do Drive. Somente leitura.</p>
           </div>
         </div>
-        <BotoesLinks />
+        <div className="flex flex-wrap items-center gap-2">
+          {naoVistos.length > 0 && (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => marcarTodosVistos().then(() => toast.success("Notificações limpas")).catch(() => toast.error("Não consegui limpar as notificações"))}>
+              <CheckCheck size={14} /> Limpar notificações ({naoVistos.length})
+            </Button>
+          )}
+          <BotoesLinks />
+        </div>
       </div>
 
       <Tabs value={aba} onValueChange={(v) => { if (ehFormularioId(v)) void navigate({ search: { aba: v } }); }}>

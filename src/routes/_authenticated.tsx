@@ -18,7 +18,8 @@ import { depoisDoLoad, emLotes, esperarOcioso, pausa } from "@/lib/aquecimento";
 import { getConfig } from "@/lib/appConfig";
 import { aplicarMenu, type MenuConfig } from "@/lib/menuConfig";
 import { NAV_GROUPS } from "@/lib/nav";
-import { useAvisosFormularios } from "@/lib/formulariosEnvios";
+import { toast } from "sonner";
+import { marcarTodosVistos, useAvisosFormularios } from "@/lib/formulariosEnvios";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -243,7 +244,7 @@ function AuthenticatedLayout() {
             </Button>
           </div>
 
-          <NavLateral grupos={grupos} onNavegar={fecharMenuCelular} onAbrirMenu={abrirMenu} contadores={contadoresMenu} />
+          <NavLateral grupos={grupos} onNavegar={fecharMenuCelular} onAbrirMenu={abrirMenu} contadores={contadoresMenu} onLimparContador={() => { marcarTodosVistos().catch(() => toast.error("Não consegui limpar as notificações")); }} />
 
           <div className="p-3 border-t border-sidebar-border">
             <div className="flex items-center gap-3 px-2 py-1.5 rounded-lg">

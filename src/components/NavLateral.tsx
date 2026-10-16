@@ -34,18 +34,26 @@ interface NavLateralProps {
   onAbrirMenu?: () => void;
   /** Número ao lado do link (ex.: respostas não vistas em "/dados-internos") */
   contadores?: Record<string, number>;
+  /** Clique no número: limpa as notificações daquele link */
+  onLimparContador?: (to: string) => void;
 }
 
-function Contador({ n }: { n?: number }) {
+function Contador({ n, onLimpar }: { n?: number; onLimpar?: () => void }) {
   if (!n) return null;
   return (
-    <span aria-label={`${n} novos`} className="ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-4 tabular-nums text-primary-foreground">
+    <span
+      role={onLimpar ? "button" : undefined}
+      title={onLimpar ? "Clique para limpar as notificações" : undefined}
+      aria-label={`${n} novos${onLimpar ? ", clique para limpar" : ""}`}
+      onClick={onLimpar ? (e) => { e.preventDefault(); e.stopPropagation(); onLimpar(); } : undefined}
+      className={cn("ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-4 tabular-nums text-primary-foreground", onLimpar && "cursor-pointer hover:bg-destructive")}
+    >
       {n > 99 ? "99+" : n}
     </span>
   );
 }
 
-export function NavLateral({ grupos, onNavegar, onAbrirMenu, contadores }: NavLateralProps) {
+export function NavLateral({ grupos, onNavegar, onAbrirMenu, contadores, onLimparContador }: NavLateralProps) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [busca, setBusca] = useState("");
@@ -175,7 +183,7 @@ export function NavLateral({ grupos, onNavegar, onAbrirMenu, contadores }: NavLa
                       {link.icon}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{link.label}</span>
-                    <Contador n={contadores?.[link.to]} />
+                    <Contador n={contadores?.[link.to]} onLimpar={onLimparContador && contadores?.[link.to] ? () => onLimparContador(link.to) : undefined} />
                     <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">{link.grupo}</span>
                   </Link>
                 ))
@@ -222,7 +230,7 @@ export function NavLateral({ grupos, onNavegar, onAbrirMenu, contadores }: NavLa
                           {link.icon}
                         </span>
                         <span className="min-w-0 flex-1 truncate">{link.label}</span>
-                        <Contador n={contadores?.[link.to]} />
+                        <Contador n={contadores?.[link.to]} onLimpar={onLimparContador && contadores?.[link.to] ? () => onLimparContador(link.to) : undefined} />
                       </Link>
                     ))}
                   </div>

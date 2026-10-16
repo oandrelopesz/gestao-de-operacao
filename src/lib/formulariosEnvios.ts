@@ -19,8 +19,11 @@ export async function marcarVistos(ids: string[]): Promise<void> {
   if (error) throw error;
 }
 
-export async function marcarTodosVistos(formulario: FormularioId): Promise<void> {
-  const { error } = await tabela().update({ visto_em: new Date().toISOString() }).eq("formulario", formulario).is("visto_em", null);
+/** Sem argumento limpa todos os formulários (botão "Limpar notificações"). */
+export async function marcarTodosVistos(formulario?: FormularioId): Promise<void> {
+  let q = tabela().update({ visto_em: new Date().toISOString() }).is("visto_em", null);
+  if (formulario) q = q.eq("formulario", formulario);
+  const { error } = await q;
   if (error) throw error;
 }
 
