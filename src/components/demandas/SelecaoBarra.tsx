@@ -98,7 +98,7 @@ export function SelecaoBarra({
             </Button>
           )}
 
-          <ClientePicker clientes={clientes} clienteIdAtual={null} onEscolher={onCliente} align="end">
+          <ClientePicker clientes={clientes} clienteIdAtual={null} variosClientes onEscolher={onCliente} align="end">
             <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" disabled={semSelecao || ocupado}>
               <User size={13} /> Cliente
             </Button>

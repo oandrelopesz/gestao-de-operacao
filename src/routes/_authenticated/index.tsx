@@ -79,6 +79,7 @@ import {
 import { ehEsquemaDesatualizado, recarregarUmaVez } from "@/lib/recuperacaoErro";
 import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
 import { SelecaoBarra } from "@/components/demandas/SelecaoBarra";
+import { clientesDaDemanda } from "@/lib/clientesDaDemanda";
 import type { DonoDemanda } from "@/components/demandas/ClientePicker";
 import { montarCopiaDemanda, colunaDaCopia, proximaOrdem } from "@/lib/demandaCopia";
 import { useBusca } from "@/lib/useBusca";
@@ -739,8 +740,11 @@ function DemandasPage() {
       ? "Pessoal"
       : valor.agencia_id
         ? `${agenciaLabelOf(valor.agencia_id)} (agência)`
-        : valor.cliente_id ? clientes.find((c) => c.id === valor.cliente_id)?.nome ?? "cliente" : "sem cliente";
-    toast.success(`${n} ${n === 1 ? "demanda" : "demandas"} → ${nome}${total > n ? ` (${total - n} de onboarding mantidas)` : ""}`);
+        : valor.cliente_id
+          ? clientesDaDemanda(valor).map((id) => clientes.find((c) => c.id === id)?.nome ?? "cliente").join(" + ")
+          : "sem cliente";
+    // id fixo: marcar vários clientes em sequência atualiza o mesmo aviso em vez de empilhar
+    toast.success(`${n} ${n === 1 ? "demanda" : "demandas"} → ${nome}${total > n ? ` (${total - n} de onboarding mantidas)` : ""}`, { id: "cliente-massa" });
   };
 
   const entregaSelecionadas = async (prazo: string | null) => {
