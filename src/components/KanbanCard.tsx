@@ -110,6 +110,11 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
   // Faixa da agência no topo do card: a demanda da própria agência ou a agência do cliente (cor do cadastro)
   const agenciaId = !demanda.pessoal ? demanda.agencia_id || demanda.clientes?.agencia : undefined;
   const agenciaHex = agenciaId ? metaAgencia(agenciaId)?.hex : undefined;
+  // Demanda de vários clientes: a faixa se divide, uma parte (com a cor) para cada agência dos clientes, sem repetir
+  const idsClientes = clientesDaDemanda(demanda);
+  const agenciasDivididas = !demanda.pessoal && idsClientes.length > 1
+    ? [...new Set(idsClientes.map((id) => clientes?.find((c) => c.id === id)?.agencia ?? (id === demanda.cliente_id ? demanda.clientes?.agencia : undefined)).filter((a): a is string => !!a))]
+    : [];
 
   // Get preview of description (first 2 lines)
   const descriptionPreview = demanda.descricao ? demanda.descricao.split('\n').slice(0, 2).join('\n') : "";
@@ -176,15 +181,36 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
           onEdit(demanda);
         }}
       >
-        {agenciaId && (
+        {agenciasDivididas.length > 1 ? (
           <div
-            title={`Agência: ${labelAgencia(agenciaId)}`}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider border-b border-border/50 bg-muted/40 text-muted-foreground"
-            style={agenciaHex ? { color: agenciaHex, backgroundColor: `${agenciaHex}14`, borderBottomColor: `${agenciaHex}33` } : undefined}
+            title={`Agências: ${agenciasDivididas.map(labelAgencia).join(", ")}`}
+            className="flex border-b border-border/50 bg-muted/40"
           >
-            <Building2 size={11} className="shrink-0" />
-            <span className="truncate">{labelAgencia(agenciaId)}</span>
+            {agenciasDivididas.map((id, i) => {
+              const hex = metaAgencia(id)?.hex;
+              return (
+                <div
+                  key={id}
+                  className={cn("flex min-w-0 flex-1 items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground", i > 0 && "border-l")}
+                  style={hex ? { color: hex, backgroundColor: `${hex}14`, borderLeftColor: `${hex}55`, boxShadow: `inset 0 -2px 0 ${hex}` } : undefined}
+                >
+                  <Building2 size={11} className="shrink-0" />
+                  <span className="truncate">{labelAgencia(id)}</span>
+                </div>
+              );
+            })}
           </div>
+        ) : (
+          (agenciasDivididas[0] ?? agenciaId) && (
+            <div
+              title={`Agência: ${labelAgencia(agenciasDivididas[0] ?? agenciaId)}`}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider border-b border-border/50 bg-muted/40 text-muted-foreground"
+              style={(() => { const h = metaAgencia(agenciasDivididas[0] ?? agenciaId)?.hex; return h ? { color: h, backgroundColor: `${h}14`, borderBottomColor: `${h}33` } : undefined; })()}
+            >
+              <Building2 size={11} className="shrink-0" />
+              <span className="truncate">{labelAgencia(agenciasDivididas[0] ?? agenciaId)}</span>
+            </div>
+          )
         )}
         <div className="p-2.5 space-y-1.5 relative">
           <div className="flex items-start justify-between gap-2">

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/command";
 import { MENSAGEM_NENHUM, MENSAGEM_PARECIDOS } from "@/lib/search";
 import { useBusca } from "@/lib/useBusca";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAgencias, type AgenciaDef } from "@/lib/agencias";
 import { alternarCliente, clientesDaDemanda } from "@/lib/clientesDaDemanda";
@@ -46,8 +47,8 @@ interface ClientePickerProps {
   /** false esconde as agências (ex.: dono de um roadmap). */
   comAgencias?: boolean;
   /**
-   * true mostra uma caixa em cada cliente para juntar mais de um (a lista fica aberta). Clicar no nome continua
-   * escolhendo só aquele cliente.
+   * true deixa marcar mais de um cliente: clicar no nome (ou na caixa) marca/desmarca e a lista fica aberta, com um
+   * botão "Pronto" para fechar.
    */
   variosClientes?: boolean;
 }
@@ -122,6 +123,7 @@ export function ClientePicker({
           variosClientes={variosClientes}
           escolher={escolher}
           alternar={onEscolher}
+          fechar={() => setOpen(false)}
         />
       </PopoverContent>
     </Popover>
@@ -141,6 +143,7 @@ interface ListaClientesProps {
   escolher: (valor: DonoDemanda) => void;
   /** Marca/desmarca um cliente a mais e deixa a lista aberta */
   alternar: (valor: DonoDemanda) => void;
+  fechar: () => void;
 }
 
 /** Conteúdo do popover. O texto digitado mora aqui: ao fechar o popover o conteúdo sai da tela e a busca volta vazia. */
@@ -155,6 +158,7 @@ function ListaClientes({
   variosClientes,
   escolher,
   alternar,
+  fechar,
 }: ListaClientesProps) {
   const [texto, setTexto] = useState("");
   // Clientes marcados nesta abertura: a marcação é salva a cada clique, mas a lista não espera o banco responder
@@ -219,21 +223,17 @@ function ListaClientes({
     const c = entrada.cliente;
     const marcado = marcados.includes(c.id);
     return (
-      <CommandItem key={c.id} value={`c:${c.id}`} onSelect={() => escolher({ cliente_id: c.id, pessoal: false, agencia_id: null, clientes_extras: [] })}>
+      <CommandItem
+        key={c.id}
+        value={`c:${c.id}`}
+        // Vários clientes: o nome também marca/desmarca e a lista fica aberta; senão escolhe só ele e fecha
+        onSelect={() => (variosClientes ? alternarCliente_(c.id) : escolher({ cliente_id: c.id, pessoal: false, agencia_id: null, clientes_extras: [] }))}
+      >
         {variosClientes && (
-          // Caixa: junta (ou tira) este cliente sem fechar a lista; clicar no nome escolhe só ele
-          <button
-            type="button"
+          <span
             role="checkbox"
             aria-checked={marcado}
             aria-label={marcado ? `Tirar ${c.nome}` : `Juntar ${c.nome}`}
-            title={marcado ? "Tirar este cliente" : "Juntar este cliente (mais de um)"}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              alternarCliente_(c.id);
-            }}
             className={cn(
               "h-4 w-4 shrink-0 rounded-sm border flex items-center justify-center transition-colors",
               marcado
@@ -242,7 +242,7 @@ function ListaClientes({
             )}
           >
             {marcado && <Check size={10} />}
-          </button>
+          </span>
         )}
         <span className="flex-1 truncate">{c.nome}</span>
         {!variosClientes && !pessoalAtual && clienteIdAtual === c.id && <Check size={14} />}
@@ -267,13 +267,21 @@ function ListaClientes({
             {fixos.length > 0 && <CommandGroup>{fixos.map(renderEntrada)}</CommandGroup>}
             {deAgencias.length > 0 && <CommandGroup heading="Agências">{deAgencias.map(renderEntrada)}</CommandGroup>}
             {doResultado.length > 0 && (
-              <CommandGroup heading={variosClientes ? "Clientes · marque a caixa para juntar mais de um" : "Clientes"}>
+              <CommandGroup heading={variosClientes ? "Clientes · marque quantos quiser" : "Clientes"}>
                 {doResultado.map(renderEntrada)}
               </CommandGroup>
             )}
           </>
         )}
       </CommandList>
+      {variosClientes && (
+        <div className="flex items-center justify-between gap-2 border-t p-2">
+          <span className="text-xs text-muted-foreground">
+            {marcados.length === 0 ? "Nenhum cliente" : marcados.length === 1 ? "1 cliente" : `${marcados.length} clientes`}
+          </span>
+          <Button type="button" size="sm" className="h-7" onClick={fechar}>Pronto</Button>
+        </div>
+      )}
     </Command>
   );
 }
