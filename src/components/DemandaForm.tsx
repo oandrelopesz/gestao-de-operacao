@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -11,7 +10,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ClienteSelect } from "@/components/ClienteSelect";
+import { ClientePicker } from "@/components/demandas/ClientePicker";
+import { clientesDaDemanda } from "@/lib/clientesDaDemanda";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -26,6 +26,8 @@ const demandaSchema = z.object({
   titulo: z.string().min(2, "Título é obrigatório"),
   descricao: z.string().nullable().optional(),
   cliente_id: z.string().optional().nullable().or(z.literal("")),
+  clientes_extras: z.array(z.string()).optional(),
+  pessoal: z.boolean().optional(),
   status: z.string().min(1, "Selecione a coluna"),
   prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
   prazo: z.string().nullable().optional(),
@@ -52,6 +54,8 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
       titulo: initialValues?.titulo || "",
       descricao: initialValues?.descricao || "",
       cliente_id: initialValues?.cliente_id || "",
+      clientes_extras: initialValues?.clientes_extras ?? [],
+      pessoal: initialValues?.pessoal ?? false,
       status: initialValues?.status || "fazer_hoje",
       prioridade: (initialValues?.prioridade as any) || "media",
       prazo: initialValues?.prazo || "",
@@ -61,12 +65,6 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
       frequencia_intervalo_dias: (initialValues as any)?.frequencia_intervalo_dias || null,
     },
   });
-
-  // A agência aparece em maiúscula inicial ao lado do cliente, como era na lista antiga
-  const opcoesClientes = useMemo(
-    () => clientes.map((c) => ({ id: c.id, nome: c.nome, agencia: c.agencia ? c.agencia.charAt(0).toUpperCase() + c.agencia.slice(1) : null })),
-    [clientes]
-  );
 
   return (
     <Form {...form}>
@@ -88,20 +86,39 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
         <FormField
           control={form.control}
           name="cliente_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Cliente</FormLabel>
-              <FormControl>
-                <ClienteSelect
-                  clientes={opcoesClientes}
-                  value={field.value || null}
-                  onChange={(id) => field.onChange(id ?? "")}
-                  opcaoVazia="Sem cliente (opcional)"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          render={({ field }) => {
+            const extras = form.watch("clientes_extras") ?? [];
+            const pessoal = !!form.watch("pessoal");
+            const ids = clientesDaDemanda({ cliente_id: field.value || null, clientes_extras: extras });
+            const rotulo = pessoal
+              ? "Pessoal"
+              : ids.length
+                ? ids.map((id) => clientes.find((c) => c.id === id)?.nome ?? "Cliente").join(" + ")
+                : "Sem cliente (opcional)";
+            return (
+              <FormItem>
+                <FormLabel>Cliente(s)</FormLabel>
+                <ClientePicker
+                  clientes={clientes}
+                  clienteIdAtual={field.value || null}
+                  pessoalAtual={pessoal}
+                  clientesExtrasAtuais={extras}
+                  comAgencias={false}
+                  variosClientes
+                  onEscolher={(v) => {
+                    field.onChange(v.cliente_id ?? "");
+                    form.setValue("clientes_extras", v.clientes_extras);
+                    form.setValue("pessoal", v.pessoal);
+                  }}
+                >
+                  <Button type="button" variant="outline" className="w-full justify-start font-normal">
+                    <span className="truncate">{rotulo}</span>
+                  </Button>
+                </ClientePicker>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
         />
 
         <div className="grid grid-cols-2 gap-4">
