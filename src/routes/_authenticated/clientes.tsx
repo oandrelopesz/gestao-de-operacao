@@ -404,7 +404,7 @@ function ClientesPage() {
 
       {/* Sub-tabs por agência */}
       <div className="flex items-center gap-2 flex-wrap">
-      <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v, subAgencia: undefined } })}>
+      <Tabs value={agencia} onValueChange={(v) => navigate({ search: { view, agencia: v, subAgencia: undefined } })} className="min-w-0 max-w-full">
         <TabsList>
           <TabsTrigger value="todos" className="gap-2">
             Todos
@@ -497,7 +497,7 @@ function ClientesPage() {
       )}
 
       {/* Métricas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard 
           icon={<UsersIcon size={16} />} 
           label="Clientes" 
@@ -578,7 +578,7 @@ function ClientesPage() {
         <MensagemBusca resultado={resultadoBusca} className="-mb-3" />
       )}
       {loading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[1, 2, 3, 4].map((i) => <div key={i} className="h-56 rounded-lg bg-muted/40 animate-pulse" />)}
         </div>
       ) : fetchError ? (
@@ -616,7 +616,7 @@ function ClientesPage() {
           </Button>
         </div>
       ) : view === "cards" ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((c) => (
             <ClienteCard
               key={c.id}

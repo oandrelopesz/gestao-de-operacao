@@ -286,7 +286,7 @@ export function DemandaDrawer({
               </div>
             </div>
 
-            {(demanda.cliente_id || true) && (
+            {(
               <div className="grid grid-cols-[120px,1fr] items-center gap-2">
                 <div className="flex items-center gap-2 text-zinc-400">
                   <User size={14} />

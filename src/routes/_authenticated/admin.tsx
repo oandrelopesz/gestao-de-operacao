@@ -643,7 +643,7 @@ function AdminPage() {
 
       <Tabs value={secao} onValueChange={(v) => navigate({ search: { secao: v as Secao }, replace: true })}>
         <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-          <TabsList className="w-max justify-start">
+          <TabsList className="w-max max-w-none justify-start">
             {SECOES.map((s) => (
               <TabsTrigger key={s.id} value={s.id}>{s.label}</TabsTrigger>
             ))}
@@ -789,7 +789,7 @@ function AdminPage() {
                   <CardTitle className="flex items-center gap-2"><Database size={18} /> Dados</CardTitle>
                   <CardDescription>Volume atual por tabela e exportação.</CardDescription>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex flex-wrap justify-end gap-2">
                   <Button variant="outline" size="sm" className="gap-2" onClick={loadCounts}>
                     <RefreshCw size={14} /> Atualizar
                   </Button>

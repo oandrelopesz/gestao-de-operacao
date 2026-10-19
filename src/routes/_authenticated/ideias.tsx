@@ -156,7 +156,7 @@ function IdeiasPage() {
             Ideias de implementação para este sistema, outros sistemas ou clientes. Quando chegar a hora, envie para as demandas.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
             {(["abertas", "concluidas"] as const).map((s) => (
               <button

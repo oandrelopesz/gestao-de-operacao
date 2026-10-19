@@ -761,7 +761,7 @@ function DemandasPage() {
 
   return (
     <div className="space-y-4 flex flex-col h-[calc(100vh-8rem)]">
-      <div className="flex items-center justify-between shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold tracking-tight">Demandas</h1>
           <Button 

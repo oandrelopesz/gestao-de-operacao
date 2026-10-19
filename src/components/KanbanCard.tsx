@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
-import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, UserPlus, AlertTriangle, Rocket, Map as MapIcon, Unlink, Building2, Crown } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Check, FileText, Repeat, CalendarDays, User, UserPlus, AlertTriangle, Rocket, Map as MapIcon, Unlink, Building2, Crown, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,6 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { clientesDaDemanda } from "@/lib/clientesDaDemanda";
 import { ClientePicker, type DonoDemanda } from "@/components/demandas/ClientePicker";
 import { cn } from "@/lib/utils";
 import { useAgencias } from "@/lib/agencias";
@@ -362,6 +364,40 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                 <span className="inline-flex items-center gap-1 max-w-full truncate text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600">
                   <User size={10} className="shrink-0" /> Pessoal
                 </span>
+              ) : clientesDaDemanda(demanda).length > 1 ? (
+                /* Demanda de mais de um cliente: um selo só; clicar mostra quais são */
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      title="Ver os clientes desta demanda"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 hover:bg-sky-500/20"
+                    >
+                      <Users size={10} className="shrink-0" /> Diversos clientes
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    className="w-56 p-2"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <p className="px-1 pb-1 text-xs font-semibold text-muted-foreground">
+                      {clientesDaDemanda(demanda).length} clientes
+                    </p>
+                    <ul className="space-y-0.5">
+                      {clientesDaDemanda(demanda).map((id) => (
+                        <li key={id} className="flex items-center gap-1.5 rounded px-1 py-1 text-sm">
+                          <User size={12} className="shrink-0 text-sky-600" />
+                          <span className="truncate">{clientes?.find((c) => c.id === id)?.nome ?? (id === demanda.cliente_id ? demanda.clientes?.nome : null) ?? "Cliente removido"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </PopoverContent>
+                </Popover>
               ) : demanda.clientes?.nome && (
                 <span
                   title={`Cliente: ${demanda.clientes.nome}`}
@@ -370,21 +406,6 @@ export function KanbanCardView({ demanda, onEdit, onDelete, onComplete, onMoveTo
                   <User size={10} className="shrink-0" /> <span className="truncate">{demanda.clientes.nome}</span>
                 </span>
               )}
-
-              {/* Demanda de mais de um cliente: um selo para cada cliente a mais */}
-              {!demanda.pessoal && demanda.cliente_id && (demanda.clientes_extras ?? []).map((id) => {
-                const nome = clientes?.find((c) => c.id === id)?.nome;
-                if (!nome) return null;
-                return (
-                  <span
-                    key={id}
-                    title={`Cliente: ${nome}`}
-                    className="inline-flex items-center gap-1 max-w-full truncate text-[10px] font-medium px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300"
-                  >
-                    <User size={10} className="shrink-0" /> <span className="truncate">{nome}</span>
-                  </span>
-                );
-              })}
 
               {demanda.descricao && (
                 <span
