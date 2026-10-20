@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Plus, Search, Users as UsersIcon, DollarSign, TrendingUp, Smile,
   MoreVertical, Pencil, Archive, Trash2, LayoutGrid, Table as TableIcon, Calendar, Play, Pause,
-  AlertCircle, Settings2, ArchiveRestore
+  AlertCircle, Settings2, ArchiveRestore, UserMinus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,14 +59,16 @@ import { cn } from "@/lib/utils";
 import { useBusca } from "@/lib/useBusca";
 import { MENSAGEM_NENHUM, normalizarBusca, type ResultadoBusca } from "@/lib/search";
 import { MensagemBusca } from "@/components/MensagemBusca";
+import { ClientesChurn } from "@/components/clientes/ClientesChurn";
 
-type SearchParams = { agencia?: string; view?: "cards" | "tabela"; subAgencia?: string };
+type SearchParams = { agencia?: string; view?: "cards" | "tabela"; subAgencia?: string; aba?: "churn" };
 
 export const Route = createFileRoute("/_authenticated/clientes")({
   validateSearch: (search: Record<string, unknown>): SearchParams => ({
     agencia: typeof search.agencia === "string" && search.agencia ? search.agencia : "todos",
     view: search.view === "tabela" ? "tabela" : "cards",
     subAgencia: typeof search.subAgencia === "string" ? search.subAgencia : undefined,
+    aba: search.aba === "churn" ? "churn" : undefined,
   }),
   component: ClientesPage,
 });
@@ -105,7 +107,7 @@ const verbaMensal = (c: ClienteView) => Number(c.verba_mensal_brl || 0);
 const temVerba = (c: ClienteView) => c.trafego_ativo !== false && verbaMensal(c) > 0;
 
 function ClientesPage() {
-  const { agencia, view, subAgencia } = Route.useSearch();
+  const { agencia, view, subAgencia, aba } = Route.useSearch();
   const navigate = Route.useNavigate();
   const { agencias, meta: agenciaMetaOf, label: agenciaLabelOf } = useAgencias();
 
@@ -297,6 +299,27 @@ function ClientesPage() {
   const [pausaLote, setPausaLote] = useState<{ id: string; nome: string } | null>(null);
   const [deletingName, setDeletingName] = useState<string>("");
 
+  const abas = (
+    <Tabs value={aba ?? "ativos"} onValueChange={(v) => navigate({ search: v === "churn" ? { aba: "churn" } : { agencia: "todos", view: "cards" } })}>
+      <TabsList>
+        <TabsTrigger value="ativos" className="gap-1.5"><UsersIcon size={14} />Ativos</TabsTrigger>
+        <TabsTrigger value="churn" className="gap-1.5"><UserMinus size={14} />Em churn</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+
+  if (aba === "churn") {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <h1 className="text-2xl font-bold tracking-tight">Clientes em Churn</h1>
+          {abas}
+        </div>
+        <ClientesChurn />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -304,7 +327,8 @@ function ClientesPage() {
           <h1 className="text-2xl font-bold tracking-tight">Clientes Ativos</h1>
           <p className="text-muted-foreground">Visão por agência, com verba de ads, NPS e demandas de cada cliente.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {abas}
           <Tabs value={view} onValueChange={(v) => navigate({ search: { agencia, view: v as any } })}>
             <TabsList>
               <TabsTrigger value="cards" className="gap-1.5"><LayoutGrid size={14} />Cards</TabsTrigger>
