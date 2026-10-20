@@ -9,6 +9,9 @@ export type StatusReuniao = "importando" | "pronto" | "erro";
 export type Situacao = "importando" | "renomeando" | "excluindo" | "erro" | "pronto";
 export type TipoArquivo = "transcricao" | "resumo";
 export type FormatoArquivo = "pdf" | "docx";
+/** Formatos de download da aba: o "md" não é arquivo no bucket, sai do DOCX no navegador (firefliesMd.ts). */
+export type FormatoDownload = FormatoArquivo | "md";
+export const FIREFLIES_HOME = "https://app.fireflies.ai";
 export type ChaveArquivo = `${TipoArquivo}_${FormatoArquivo}`;
 /** Caminhos dentro do bucket privado `fireflies` (ex.: "<id>/transcricao.pdf"). */
 export type ArquivosReuniao = Partial<Record<ChaveArquivo, string>>;
@@ -242,7 +245,7 @@ function nomeSeguro(s: string): string {
 }
 
 /** "Reunião de alinhamento — 25-09-2026 14-00 — Transcrição.pdf" */
-export function nomeArquivo(r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoArquivo): string {
+export function nomeArquivo(r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoDownload): string {
   const titulo = nomeSeguro(tituloExibido(r)) || "Reunião";
   const p = partesDoIso(r.data_hora);
   const quando = p ? ` — ${p.dia}-${p.mes}-${p.ano} ${p.hora}-${p.minuto}` : "";

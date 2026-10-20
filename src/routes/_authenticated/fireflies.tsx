@@ -23,13 +23,14 @@ import { useCachedState } from "@/lib/pageCache";
 import { CACHE_KEYS, loadFireflies } from "@/lib/data";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  ROTULO_SITUACAO, ROTULO_TIPO, URL_APLICAR_AGORA, arquivoDisponivel, caminhoArquivo, dataCurta, duracaoTexto, filtrar, horario,
+  FIREFLIES_HOME, ROTULO_SITUACAO, ROTULO_TIPO, URL_APLICAR_AGORA, arquivoDisponivel, caminhoArquivo, dataCurta, duracaoTexto, filtrar, horario,
   intervaloAtualizacao, linkFireflies, mensagemErroFireflies, nomeArquivo, resumoParticipantes, situacao, tituloExibido,
-  type FormatoArquivo, type ReuniaoFireflies, type Situacao, type TipoArquivo,
+  type FormatoDownload, type ReuniaoFireflies, type Situacao, type TipoArquivo,
 } from "@/lib/fireflies";
 import {
   PreviewDialog, baixarArquivoFireflies, preCarregarArquivo, salvarBlob, type AlvoPrevia,
 } from "@/components/fireflies/PreviewDialog";
+import { docxParaMarkdown } from "@/lib/firefliesMd";
 import { MensagemBusca } from "@/components/MensagemBusca";
 
 // Aba "Fireflies": reuniões gravadas pelo robô do Fireflies, importadas pelo worker da VPS
@@ -108,12 +109,19 @@ function FirefliesPage() {
   const atualizarLocal = useCallback((id: string, patch: Partial<ReuniaoFireflies>) =>
     setLista((prev) => prev && prev.map((r) => (r.id === id ? { ...r, ...patch } : r))), [setLista]);
 
-  const baixar = useCallback(async (r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoArquivo) => {
-    if (!caminhoArquivo(r, tipo, formato)) return;
+  const baixar = useCallback(async (r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoDownload) => {
+    const origem = formato === "md" ? "docx" : formato;
+    if (!caminhoArquivo(r, tipo, origem)) return;
     const chave = `${r.id}:${tipo}_${formato}`;
     setBaixando(chave);
     try {
-      salvarBlob(await baixarArquivoFireflies(r, tipo, formato), nomeArquivo(r, tipo, formato));
+      const blob = await baixarArquivoFireflies(r, tipo, origem);
+      salvarBlob(
+        formato === "md"
+          ? new Blob([docxParaMarkdown(await blob.arrayBuffer())], { type: "text/markdown;charset=utf-8" })
+          : blob,
+        nomeArquivo(r, tipo, formato),
+      );
     } catch (e) {
       toast.error(mensagemErroFireflies(e));
     } finally {
@@ -160,9 +168,16 @@ function FirefliesPage() {
             <p className="text-sm text-muted-foreground">Transcrições e resumos das suas reuniões, importados automaticamente</p>
           </div>
         </div>
-        <Button variant="outline" className="gap-2" onClick={() => carregar()} disabled={carregando} title="Buscar as reuniões de novo">
-          <RefreshCw size={16} className={cn(carregando && "animate-spin")} /> Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" className="gap-2">
+            <a href={FIREFLIES_HOME} target="_blank" rel="noopener noreferrer" title="Abrir o Fireflies completo">
+              <ExternalLink size={16} /> Abrir Fireflies
+            </a>
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={() => carregar()} disabled={carregando} title="Buscar as reuniões de novo">
+            <RefreshCw size={16} className={cn(carregando && "animate-spin")} /> Atualizar
+          </Button>
+        </div>
       </div>
 
       <div className="relative">
@@ -303,7 +318,7 @@ interface CartaoReuniaoProps {
   /** Arquivo desta reunião sendo baixado agora ("<id>:<tipo>_<formato>"), ou null */
   baixando: string | null;
   onVer: (r: ReuniaoFireflies, tipo: TipoArquivo) => void;
-  onBaixar: (r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoArquivo) => void;
+  onBaixar: (r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoDownload) => void;
   onRenomear: (r: ReuniaoFireflies) => void;
   onExcluir: (r: ReuniaoFireflies) => void;
 }
@@ -394,7 +409,7 @@ interface GrupoArquivosProps {
   tipo: TipoArquivo;
   baixando: string | null;
   onVer: (r: ReuniaoFireflies, tipo: TipoArquivo) => void;
-  onBaixar: (r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoArquivo) => void;
+  onBaixar: (r: ReuniaoFireflies, tipo: TipoArquivo, formato: FormatoDownload) => void;
 }
 
 function GrupoArquivos({ r, tipo, baixando, onVer, onBaixar }: GrupoArquivosProps) {
@@ -403,8 +418,8 @@ function GrupoArquivos({ r, tipo, baixando, onVer, onBaixar }: GrupoArquivosProp
   const rotulo = ROTULO_TIPO[tipo];
   // Ponteiro chegando no botão (mouse por cima, dedo encostando, foco pelo teclado): o arquivo já começa a vir,
   // e o clique abre/baixa na hora
-  const preCarregar = (formato: FormatoArquivo, ok: boolean) => (ok ? () => preCarregarArquivo(r, tipo, formato) : undefined);
-  const botao = (formato: FormatoArquivo, ok: boolean) => {
+  const preCarregar = (formato: FormatoDownload, ok: boolean) => (ok ? () => preCarregarArquivo(r, tipo, formato === "md" ? "docx" : formato) : undefined);
+  const botao = (formato: FormatoDownload, ok: boolean) => {
     const ativo = baixando === `${r.id}:${tipo}_${formato}`;
     return (
       <Button
@@ -445,6 +460,7 @@ function GrupoArquivos({ r, tipo, baixando, onVer, onBaixar }: GrupoArquivosProp
         </Button>
         {botao("pdf", pdf)}
         {botao("docx", docx)}
+        {botao("md", docx)}
       </div>
     </div>
   );
