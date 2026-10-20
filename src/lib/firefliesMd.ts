@@ -43,3 +43,32 @@ export function docxParaMarkdown(docx: ArrayBuffer): string {
   }
   return linhas.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }
+
+/** "14th Sep, 2026 - 2:02 PM" (Brasília), o formato do Meeting Date do .md nativo do Fireflies. */
+function meetingDate(iso: string): string {
+  const d = new Date(iso);
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })
+      .formatToParts(d).map((x) => [x.type, x.value]),
+  );
+  const dia = Number(p.day);
+  const sufixo = dia % 100 >= 11 && dia % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[dia % 10] ?? "th";
+  return `${dia}${sufixo} ${p.month}, ${p.year} - ${p.hour}:${p.minute} ${p.dayPeriod}`;
+}
+
+/**
+ * .md no mesmo formato do export nativo do Fireflies: `# Título`, `**Meeting Date:**`, `---` e, na transcrição, uma linha
+ * `**Falante** *[mm:ss]*: texto ` por fala, sem linhas em branco. O resumo mantém as seções do DOCX.
+ */
+export function exportarMd(docx: ArrayBuffer, tipo: "transcricao" | "resumo", dataHora: string | null): string {
+  const linhas = docxParaMarkdown(docx).split("\n");
+  const titulo = linhas.find((l) => l.startsWith("# ")) ?? "# Reunião";
+  // o cabeçalho do DOCX (Data, Horário, Duração, Participantes, link) termina na linha do Fireflies
+  const corpo = linhas.slice(linhas.findIndex((l) => l.startsWith("**Fireflies:**")) + 1);
+  const cab = `${titulo}\n\n${dataHora ? `**Meeting Date:** ${meetingDate(dataHora)}\n\n` : ""}---\n\n`;
+  if (tipo === "resumo") return `${cab}${corpo.join("\n").trim()}\n`;
+  const falas = corpo
+    .filter((l) => l.trim())
+    .map((l) => l.replace(/^\[([\d:]+)\] \*\*(.+?):\*\* ?/, "**$2** *[$1]*: ") + " ");
+  return `${cab}${falas.join("\n")}\n`;
+}

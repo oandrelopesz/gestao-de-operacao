@@ -30,7 +30,7 @@ import {
 import {
   PreviewDialog, baixarArquivoFireflies, preCarregarArquivo, salvarBlob, type AlvoPrevia,
 } from "@/components/fireflies/PreviewDialog";
-import { docxParaMarkdown } from "@/lib/firefliesMd";
+import { exportarMd } from "@/lib/firefliesMd";
 import { MensagemBusca } from "@/components/MensagemBusca";
 
 // Aba "Fireflies": reuniões gravadas pelo robô do Fireflies, importadas pelo worker da VPS
@@ -118,7 +118,7 @@ function FirefliesPage() {
       const blob = await baixarArquivoFireflies(r, tipo, origem);
       salvarBlob(
         formato === "md"
-          ? new Blob([docxParaMarkdown(await blob.arrayBuffer())], { type: "text/markdown;charset=utf-8" })
+          ? new Blob([exportarMd(await blob.arrayBuffer(), tipo, r.data_hora)], { type: "text/markdown;charset=utf-8" })
           : blob,
         nomeArquivo(r, tipo, formato),
       );
