@@ -22,7 +22,11 @@ try {
   console.log("clientes:", a.nome, a.agencia, "|", b.nome, b.agencia);
   const item = (n) => p.locator("[data-radix-popper-content-wrapper] [cmdk-item]", { hasText: n }).first();
   await p.locator("[data-radix-popper-content-wrapper] input").fill(a.nome); await item(a.nome).click(); await p.waitForTimeout(1000);
-  console.log("lista segue aberta:", await p.locator("[data-radix-popper-content-wrapper]").count());
+  console.log("1 clique escolhe e fecha:", (await p.locator("[data-radix-popper-content-wrapper]").count()) === 0);
+  await card.hover(); await card.getByTitle("Atribuir cliente").click(); await p.waitForTimeout(600);
+  await p.locator("[data-radix-popper-content-wrapper] button", { hasText: "Selecionar mais de um" }).click();
+  await p.waitForTimeout(500);
+  console.log("lista segue aberta no modo vários:", await p.locator("[data-radix-popper-content-wrapper]").count());
   await p.locator("[data-radix-popper-content-wrapper] input").fill(b.nome); await item(b.nome).click(); await p.waitForTimeout(1500);
   await p.screenshot({ path: process.env.TEMP + "/repro-multi-aberto.png" });
   await p.locator("[data-radix-popper-content-wrapper] button", { hasText: "Pronto" }).click(); await p.waitForTimeout(1500);

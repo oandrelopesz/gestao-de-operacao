@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { Building2, Check, User } from "lucide-react";
+import { Building2, Check, ListPlus, User } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
@@ -47,8 +47,8 @@ interface ClientePickerProps {
   /** false esconde as agências (ex.: dono de um roadmap). */
   comAgencias?: boolean;
   /**
-   * true deixa marcar mais de um cliente: clicar no nome (ou na caixa) marca/desmarca e a lista fica aberta, com um
-   * botão "Pronto" para fechar.
+   * true oferece o botão "Selecionar mais de um": por padrão clicar no nome escolhe só ele e fecha; no modo vários
+   * (ou se a demanda já tem mais de um cliente) clicar marca/desmarca e a lista fica aberta, com um botão "Pronto".
    */
   variosClientes?: boolean;
 }
@@ -167,6 +167,9 @@ function ListaClientes({
   );
   // Os marcados ao abrir vêm primeiro na lista (sem pular de lugar enquanto marca e desmarca)
   const [marcadosAoAbrir] = useState(marcados);
+  // Começa um cliente por vez; o botão libera marcar vários (já abre assim se a demanda tem mais de um)
+  const [modoVarios, setModoVarios] = useState(marcados.length > 1);
+  const varios = variosClientes && modoVarios;
   const entradas = useMemo<Entrada[]>(() => {
     const lista = variosClientes && marcadosAoAbrir.length
       ? [
@@ -226,10 +229,10 @@ function ListaClientes({
       <CommandItem
         key={c.id}
         value={`c:${c.id}`}
-        // Vários clientes: o nome também marca/desmarca e a lista fica aberta; senão escolhe só ele e fecha
-        onSelect={() => (variosClientes ? alternarCliente_(c.id) : escolher({ cliente_id: c.id, pessoal: false, agencia_id: null, clientes_extras: [] }))}
+        // Modo vários: o nome também marca/desmarca e a lista fica aberta; senão escolhe só ele e fecha
+        onSelect={() => (varios ? alternarCliente_(c.id) : escolher({ cliente_id: c.id, pessoal: false, agencia_id: null, clientes_extras: [] }))}
       >
-        {variosClientes && (
+        {varios && (
           <span
             role="checkbox"
             aria-checked={marcado}
@@ -245,7 +248,7 @@ function ListaClientes({
           </span>
         )}
         <span className="flex-1 truncate">{c.nome}</span>
-        {!variosClientes && !pessoalAtual && clienteIdAtual === c.id && <Check size={14} />}
+        {!varios && !pessoalAtual && clienteIdAtual === c.id && <Check size={14} />}
       </CommandItem>
     );
   };
@@ -267,14 +270,21 @@ function ListaClientes({
             {fixos.length > 0 && <CommandGroup>{fixos.map(renderEntrada)}</CommandGroup>}
             {deAgencias.length > 0 && <CommandGroup heading="Agências">{deAgencias.map(renderEntrada)}</CommandGroup>}
             {doResultado.length > 0 && (
-              <CommandGroup heading={variosClientes ? "Clientes · marque quantos quiser" : "Clientes"}>
+              <CommandGroup heading={varios ? "Clientes · marque quantos quiser" : "Clientes"}>
                 {doResultado.map(renderEntrada)}
               </CommandGroup>
             )}
           </>
         )}
       </CommandList>
-      {variosClientes && (
+      {variosClientes && !varios && (
+        <div className="border-t p-2">
+          <Button type="button" variant="ghost" size="sm" className="h-7 w-full justify-start gap-1.5 text-xs" onClick={() => setModoVarios(true)}>
+            <ListPlus size={13} /> Selecionar mais de um
+          </Button>
+        </div>
+      )}
+      {varios && (
         <div className="flex items-center justify-between gap-2 border-t p-2">
           <span className="text-xs text-muted-foreground">
             {marcados.length === 0 ? "Nenhum cliente" : marcados.length === 1 ? "1 cliente" : `${marcados.length} clientes`}
