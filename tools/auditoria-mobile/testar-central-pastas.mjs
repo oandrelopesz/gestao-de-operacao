@@ -27,12 +27,12 @@ try {
   p.on("console", (m) => { if (m.type() === "error" && !/GSI|403|FedCM|identity|accounts list/.test(m.text())) console.log("  console:", m.text().slice(0, 200)); });
   const url = `${SITE}/central?cliente=${cliente.id}`;
   await abrirEstavel(p, url, 4000);
-  for (let i = 0; i < 24 && !(await p.getByRole("button", { name: "Enviar pasta" }).count()); i++) {
+  for (let i = 0; i < 24 && !(await p.getByRole("button", { name: "Enviar pasta inteira" }).count()); i++) {
     await p.waitForTimeout(10000);
     await p.goto(url);
     await p.waitForTimeout(3000);
   }
-  ok(await p.getByRole("button", { name: "Enviar pasta" }).count() > 0, "botão Enviar pasta no ar");
+  ok(await p.getByRole("button", { name: "Enviar pasta inteira" }).count() > 0, "botão Enviar pasta no ar");
 
   await p.locator('input[type=file]').nth(1).setInputFiles(dir);
   await p.getByText("3 arquivos").first().waitFor({ timeout: 60000 });

@@ -199,8 +199,8 @@ export function PastaAberta({
             {zipando === pasta ? <Loader2 size={16} className="animate-spin mr-1" /> : <Archive size={16} className="mr-1" />}Baixar pasta (.zip)
           </Button>
         )}
-        <Button variant="outline" size="sm" onClick={() => entradaPasta.current?.click()}><FolderUp size={16} className="mr-1" />Enviar pasta</Button>
-        <Button size="sm" onClick={() => entrada.current?.click()}><Upload size={16} className="mr-1" />Enviar arquivos</Button>
+        <Button size="sm" onClick={() => entradaPasta.current?.click()}><FolderUp size={16} className="mr-1" />Enviar pasta inteira</Button>
+        <Button variant="outline" size="sm" onClick={() => entrada.current?.click()}><Upload size={16} className="mr-1" />Enviar arquivos soltos</Button>
         <input
           ref={entrada} type="file" multiple className="hidden"
           onChange={(e) => { void enviar(Array.from(e.target.files ?? []).map((file) => ({ file, pasta: "" }))); e.target.value = ""; }}
