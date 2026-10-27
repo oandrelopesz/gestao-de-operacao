@@ -29,3 +29,6 @@ Ferramentas fora do app (não entram no build do Lovable). Instalar uma vez: `np
   0) e se a curva desenhada corta alguma forma; ímã da bolinha, melhor lado ao soltar no meio da forma, clicar sem arrastar
   (nada), mover a origem (seta acompanha), seta desenhada com a ferramenta, alças das pontas (Esc, soltar, religar, desfazer),
   cotovelo e funil. Cria e apaga o próprio quadro.
+- Cliente pelo título nas Demandas: `node testar-cliente-no-titulo.mjs http://localhost:5178/` — adicionar rápido no Standby
+  com e sem nome de cliente (confere banco e selo no card) e formulário "Nova" (preenche ao digitar, limpa, grava, escolha
+  à mão vence). Cria demandas `[TESTE] rapido`/`[TESTE] form` e apaga todas no fim.

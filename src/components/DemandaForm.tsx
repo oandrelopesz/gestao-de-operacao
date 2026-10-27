@@ -1,5 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRef } from "react";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/form";
 import { ClientePicker } from "@/components/demandas/ClientePicker";
 import { clientesDaDemanda } from "@/lib/clientesDaDemanda";
+import { clientesNoTitulo } from "@/lib/clienteNoTitulo";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -66,6 +68,9 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
     },
   });
 
+  // Demanda sem dono: o cliente segue o título ("Subir criativos PopAgro" → Pop Agro) até o André escolher à mão
+  const clientePeloTitulo = useRef(!initialValues?.cliente_id && !initialValues?.pessoal);
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -76,7 +81,18 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
             <FormItem>
               <FormLabel>Título</FormLabel>
               <FormControl>
-                <Input placeholder="O que precisa ser feito?" {...field} value={field.value || ""} />
+                <Input
+                  placeholder="O que precisa ser feito?"
+                  {...field}
+                  value={field.value || ""}
+                  onChange={(e) => {
+                    field.onChange(e);
+                    if (!clientePeloTitulo.current) return;
+                    const ids = clientesNoTitulo(e.target.value, clientes);
+                    form.setValue("cliente_id", ids[0] ?? "");
+                    form.setValue("clientes_extras", ids.slice(1));
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -106,6 +122,7 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
                   comAgencias={false}
                   variosClientes
                   onEscolher={(v) => {
+                    clientePeloTitulo.current = false;
                     field.onChange(v.cliente_id ?? "");
                     form.setValue("clientes_extras", v.clientes_extras);
                     form.setValue("pessoal", v.pessoal);

@@ -80,6 +80,7 @@ import { ehEsquemaDesatualizado, recarregarUmaVez } from "@/lib/recuperacaoErro"
 import { EscolherDiaDialog } from "@/components/EscolherDiaDialog";
 import { SelecaoBarra } from "@/components/demandas/SelecaoBarra";
 import { clientesDaDemanda } from "@/lib/clientesDaDemanda";
+import { clientesNoTitulo } from "@/lib/clienteNoTitulo";
 import type { DonoDemanda } from "@/components/demandas/ClientePicker";
 import { montarCopiaDemanda, colunaDaCopia, proximaOrdem } from "@/lib/demandaCopia";
 import { useBusca } from "@/lib/useBusca";
@@ -405,15 +406,21 @@ function DemandasPage() {
 
       const isRecorrente = status === "recorrentes";
 
+      // O André escreve o cliente no título ("Subir criativos PopAgro"): a demanda já nasce atribuída.
+      // Nada reconhecido = sem cliente, como antes.
+      const ids = clientesNoTitulo(titulo, clientes);
+
+      // O join com clientes faz o selo do cliente aparecer no card já na atualização otimista
       const { data, error } = await supabase.from("demandas").insert([{
         titulo,
         status: status as any,
         user_id: userId,
-        cliente_id: null,
+        cliente_id: ids[0] ?? null,
+        clientes_extras: ids.slice(1),
         prioridade: "media" as const,
         ordem: maxOrder + 1,
         recorrente: isRecorrente
-      }]).select().single();
+      }]).select("*, clientes(nome, agencia)").single();
 
       if (error) throw error;
       
