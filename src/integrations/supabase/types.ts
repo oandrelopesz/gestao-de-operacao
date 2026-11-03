@@ -2129,6 +2129,7 @@ export type Database = {
         Row: {
           arquivo_nome: string
           created_at: string
+          descricoes: Json
           id: string
           nome: string
           observacoes: string | null
@@ -2141,6 +2142,7 @@ export type Database = {
         Insert: {
           arquivo_nome: string
           created_at?: string
+          descricoes?: Json
           id?: string
           nome: string
           observacoes?: string | null
@@ -2153,6 +2155,7 @@ export type Database = {
         Update: {
           arquivo_nome?: string
           created_at?: string
+          descricoes?: Json
           id?: string
           nome?: string
           observacoes?: string | null

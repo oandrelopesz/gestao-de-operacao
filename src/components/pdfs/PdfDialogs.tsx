@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { atualizarPdf, baixarConteudo, criarPasta, salvarNoComputador, mensagemErroPdf, type PdfArquivo } from "@/lib/pdfs";
 import { opcoesDePasta, formatarTamanho, nomeSemExtensao, extensaoDe, tipoDoArquivo, PASTA_CORES, type PdfPasta } from "@/lib/pdfsArvore";
 import { IconeArquivo, IconeArquivoSimples } from "@/components/pdfs/IconeArquivo";
+import { DescricoesEditor } from "@/components/pdfs/Descricoes";
+import { camposParaSalvar, descricoesDe, novaDescricao, type Descricao } from "@/lib/arquivoDescricoes";
 
 /** Como mostrar o arquivo na tela: PDF no visualizador do navegador, texto como texto, o resto só baixando. */
 type ModoVisualizacao = "pdf" | "texto" | "nenhum";
@@ -176,13 +178,13 @@ interface PdfEditDialogProps {
   pdf: PdfArquivo | null;
   pastas: PdfPasta[];
   onClose: () => void;
-  onSaved: (patch: { nome: string; pasta_id: string | null; player: string | null; observacoes: string | null }) => void;
+  onSaved: (patch: { nome: string; pasta_id: string | null; player: string | null; observacoes: string | null; descricoes: Descricao[] }) => void;
 }
 
 export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogProps) {
   const [nome, setNome] = useState("");
   const [player, setPlayer] = useState("");
-  const [observacoes, setObservacoes] = useState("");
+  const [descricoes, setDescricoes] = useState<Descricao[]>([]);
   const [pastaId, setPastaId] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -190,7 +192,8 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
     if (!pdf) return;
     setNome(pdf.nome);
     setPlayer(pdf.player || "");
-    setObservacoes(pdf.observacoes || "");
+    const atuais = descricoesDe(pdf);
+    setDescricoes(atuais.length ? atuais : [novaDescricao()]);
     setPastaId(pdf.pasta_id ?? FORA_DAS_PASTAS);
   }, [pdf]);
 
@@ -200,7 +203,7 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
     if (!pastaId) { toast.error("Escolha a pasta"); return; }
     setSaving(true);
     try {
-      const patch = { nome: nome.trim(), pasta_id: pastaId === FORA_DAS_PASTAS ? null : pastaId, player: player.trim() || null, observacoes: observacoes.trim() || null };
+      const patch = { nome: nome.trim(), pasta_id: pastaId === FORA_DAS_PASTAS ? null : pastaId, player: player.trim() || null, ...camposParaSalvar(descricoes) };
       await atualizarPdf(pdf.id, patch);
       onSaved(patch);
       toast.success("Arquivo atualizado");
@@ -214,7 +217,7 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
 
   return (
     <Dialog open={!!pdf} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-[440px]">
+      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar arquivo</DialogTitle>
           <DialogDescription>Arquivo original: {pdf?.arquivo_nome}</DialogDescription>
@@ -233,14 +236,8 @@ export function PdfEditDialog({ pdf, pastas, onClose, onSaved }: PdfEditDialogPr
             <SelectPasta id="pdf-pasta" pastas={pastas} value={pastaId} onChange={setPastaId} comRaiz />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="pdf-observacoes">Observações</Label>
-            <Textarea
-              id="pdf-observacoes"
-              rows={4}
-              placeholder="Anotações sobre o arquivo: do que se trata, onde usar, links…"
-              value={observacoes}
-              onChange={(e) => setObservacoes(e.target.value)}
-            />
+            <Label>Descrições</Label>
+            <DescricoesEditor idBase="pdf-desc" valor={descricoes} onChange={setDescricoes} linhas={4} />
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
@@ -258,7 +255,7 @@ export interface PdfParaEnviar {
   arquivo: File;
   nome: string;
   player: string;
-  observacoes: string;
+  descricoes: Descricao[];
 }
 
 interface EnviarPdfsDialogProps {
@@ -277,7 +274,7 @@ interface EnviarPdfsDialogProps {
  * Dá para criar um tema ou uma subpasta ali mesmo, sem sair do popup.
  */
 export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPastaCriada, onConfirmar }: EnviarPdfsDialogProps) {
-  const [campos, setCampos] = useState<{ nome: string; player: string; observacoes: string }[]>([]);
+  const [campos, setCampos] = useState<{ nome: string; player: string; descricoes: Descricao[] }[]>([]);
   const [pastaId, setPastaId] = useState("");
   const [criando, setCriando] = useState<{ parentId: string | null } | null>(null);
   const [novoNome, setNovoNome] = useState("");
@@ -288,7 +285,7 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
 
   useEffect(() => {
     if (!arquivos) return;
-    setCampos(arquivos.map(() => ({ nome: "", player: "", observacoes: "" })));
+    setCampos(arquivos.map(() => ({ nome: "", player: "", descricoes: [novaDescricao()] })));
     setPastaId(pastaInicial ?? "");
     setCriando(null);
     setNovoNome("");
@@ -297,7 +294,7 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
   }, [arquivos, pastaInicial]);
 
   const pastaEscolhida = pastas.find((p) => p.id === pastaId);
-  const setCampo = (idx: number, patch: Partial<{ nome: string; player: string; observacoes: string }>) =>
+  const setCampo = (idx: number, patch: Partial<{ nome: string; player: string; descricoes: Descricao[] }>) =>
     setCampos((prev) => prev.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
 
   const criarPastaAqui = async () => {
@@ -363,7 +360,7 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
         arquivo,
         nome: campos[i]?.nome ?? "",
         player: campos[i]?.player ?? "",
-        observacoes: campos[i]?.observacoes ?? "",
+        descricoes: campos[i]?.descricoes ?? [],
       })),
       destino,
     );
@@ -408,14 +405,8 @@ export function EnviarPdfsDialog({ arquivos, pastaInicial, pastas, onClose, onPa
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor={`pdf-observacoes-${i}`} className="text-xs">Descrição / observações</Label>
-                  <Textarea
-                    id={`pdf-observacoes-${i}`}
-                    rows={3}
-                    placeholder="Anotações sobre o arquivo: do que se trata, onde usar, links…"
-                    value={campos[i]?.observacoes ?? ""}
-                    onChange={(e) => setCampo(i, { observacoes: e.target.value })}
-                  />
+                  <Label className="text-xs">Descrições</Label>
+                  <DescricoesEditor idBase={`pdf-desc-${i}`} valor={campos[i]?.descricoes ?? []} onChange={(v) => setCampo(i, { descricoes: v })} />
                 </div>
               </div>
             ))}

@@ -30,6 +30,8 @@ import {
   planoMoverPasta, type PastaNo, type PdfPasta,
 } from "@/lib/pdfsArvore";
 import { PastaDialog, ExcluirPastaDialog, type PastaDialogState } from "@/components/pdfs/PastaDialogs";
+import { BotaoCopiar } from "@/components/pdfs/Descricoes";
+import { descricoesDe, previaDescricao } from "@/lib/arquivoDescricoes";
 import { PdfViewer, PdfEditDialog, EnviarPdfsDialog, type PdfParaEnviar } from "@/components/pdfs/PdfDialogs";
 import { IconeArquivo } from "@/components/pdfs/IconeArquivo";
 import { MensagemBusca } from "@/components/MensagemBusca";
@@ -199,7 +201,7 @@ function PdfsPage() {
     let ok = 0;
     for (const { item, envio } of fila) {
       try {
-        const novo = await enviarPdf(item.arquivo, pastaId, { nome: item.nome, player: item.player, observacoes: item.observacoes }, (fracao) =>
+        const novo = await enviarPdf(item.arquivo, pastaId, { nome: item.nome, player: item.player, descricoes: item.descricoes }, (fracao) =>
           atualizar(envio.id, { progresso: Math.round(fracao * 100) }),
           limiteMb,
         );
@@ -1057,6 +1059,7 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
   };
   // Descrição em gaveta: fechada mostra só uma linha; aberta mostra o texto todo
   const [descricaoAberta, setDescricaoAberta] = useState(false);
+  const descricoes = descricoesDe(pdf);
   return (
     <div
       className={cn(
@@ -1109,7 +1112,7 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
           <span className="shrink-0">{format(new Date(pdf.created_at), "dd/MM/yyyy")}</span>
         </span>
       </button>
-      {pdf.observacoes && (
+      {descricoes.length > 0 && (
         <>
           <button
             type="button"
@@ -1120,14 +1123,22 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
           >
             <ChevronRight size={12} className={cn("shrink-0 transition-transform", descricaoAberta && "rotate-90")} />
             {descricaoAberta ? (
-              <span className="font-medium">Recolher descrição</span>
+              <span className="font-medium">{descricoes.length > 1 ? "Recolher descrições" : "Recolher descrição"}</span>
             ) : (
-              <span className="truncate">{pdf.observacoes.split("\n").find((l) => l.trim()) ?? pdf.observacoes}</span>
+              <span className="truncate">{previaDescricao(descricoes)}</span>
             )}
           </button>
           {descricaoAberta && (
-            <div className="mt-1 max-h-96 overflow-y-auto whitespace-pre-line break-words rounded-md border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-              {pdf.observacoes}
+            <div className="mt-1 max-h-96 space-y-1.5 overflow-y-auto" data-testid="descricoes-card">
+              {descricoes.map((d) => (
+                <div key={d.id} className="rounded-md border bg-muted/30 px-3 py-2" data-testid="descricao-card-item">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-xs font-medium text-foreground/80">{d.titulo || "Sem nome"}</span>
+                    <BotaoCopiar texto={d.texto} rotulo={d.titulo.trim() || undefined} />
+                  </div>
+                  {d.texto && <p className="mt-1 whitespace-pre-line break-words text-xs leading-relaxed text-muted-foreground">{d.texto}</p>}
+                </div>
+              ))}
             </div>
           )}
         </>
@@ -1145,7 +1156,7 @@ function PdfLinha({ pdf, local, cor, onVer, onBaixar, onEditar, onTrocar, onExcl
             <Button variant="ghost" size="icon" className="h-8 w-8" title="Mais opções"><MoreVertical size={15} /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onEditar}><Pencil size={14} className="mr-2" /> Editar (nome, player, pasta, observações)</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onEditar}><Pencil size={14} className="mr-2" /> Editar (nome, player, pasta, descrições)</DropdownMenuItem>
             <DropdownMenuItem onSelect={onTrocar}><Replace size={14} className="mr-2" /> Trocar arquivo…</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onExcluir}>

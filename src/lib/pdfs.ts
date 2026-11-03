@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 // Aba "Arquivos" (antes só PDFs): os nomes internos (tabelas pdfs/pdf_pastas, bucket "pdfs")
 // ficaram os mesmos para não mexer nos dados; hoje guardam qualquer documento (sem imagem/vídeo).
+import { camposParaSalvar, lerDescricoes, type Descricao } from "@/lib/arquivoDescricoes";
 import { apagarNosDois, baixarComReserva, enviarR2 } from "@/lib/r2";
 import {
   contentTypeDe, extensaoDe, idsDescendentes, nomeParaDownload, nomeSemExtensao, proximaOrdem, tipoDoArquivo, type PdfPasta,
@@ -18,10 +19,18 @@ export interface PdfArquivo {
   player: string | null;
   /** Texto livre sobre o arquivo (popup de adicionar e de editar) */
   observacoes: string | null;
+  /** Várias descrições, cada uma com nome e texto (ver arquivoDescricoes.ts) */
+  descricoes: Descricao[];
   storage_path: string;
   tamanho: number;
   created_at: string;
 }
+
+/** Linha da tabela pdfs: garante que descricoes (jsonb) seja sempre uma lista válida. */
+const doBanco = (linha: unknown): PdfArquivo => {
+  const p = linha as PdfArquivo;
+  return { ...p, descricoes: lerDescricoes(p.descricoes) };
+};
 
 export interface PdfBiblioteca {
   pastas: PdfPasta[];
@@ -59,12 +68,12 @@ export async function fetchPdfBiblioteca(): Promise<PdfBiblioteca> {
     supabase.from("pdf_pastas").select("id, nome, parent_id, cor, ordem"),
     supabase
       .from("pdfs")
-      .select("id, pasta_id, nome, arquivo_nome, player, observacoes, storage_path, tamanho, created_at")
+      .select("id, pasta_id, nome, arquivo_nome, player, observacoes, descricoes, storage_path, tamanho, created_at")
       .order("created_at", { ascending: false }),
   ]);
   if (pastasRes.error) throw pastasRes.error;
   if (pdfsRes.error) throw pdfsRes.error;
-  return { pastas: (pastasRes.data || []) as PdfPasta[], pdfs: (pdfsRes.data || []) as PdfArquivo[] };
+  return { pastas: (pastasRes.data || []) as PdfPasta[], pdfs: (pdfsRes.data || []).map(doBanco) };
 }
 
 // ---------------------------------------------------------------- Pastas
@@ -142,7 +151,7 @@ async function subirObjeto(arquivo: File, caminho: string, onProgresso?: (fracao
 export async function enviarPdf(
   arquivo: File,
   pastaId: string,
-  meta: { nome?: string; player?: string; observacoes?: string },
+  meta: { nome?: string; player?: string; descricoes?: Descricao[] },
   onProgresso?: (fracao: number) => void,
   limiteMb: number = PDF_TAMANHO_MAX_PADRAO_MB,
 ): Promise<PdfArquivo> {
@@ -157,18 +166,18 @@ export async function enviarPdf(
       // Sem nome informado, fica o nome do documento original
       nome: meta.nome?.trim() || nomeSemExtensao(arquivo.name).trim() || "Sem nome",
       player: meta.player?.trim() || null,
-      observacoes: meta.observacoes?.trim() || null,
+      ...camposParaSalvar(meta.descricoes ?? []),
       arquivo_nome: arquivo.name,
       storage_path: caminho,
       tamanho: arquivo.size,
     }])
-    .select("id, pasta_id, nome, arquivo_nome, player, observacoes, storage_path, tamanho, created_at")
+    .select("id, pasta_id, nome, arquivo_nome, player, observacoes, descricoes, storage_path, tamanho, created_at")
     .single();
   if (error) {
     await apagarNosDois("arquivos", [caminho]).catch(() => {});
     throw error;
   }
-  return data as PdfArquivo;
+  return doBanco(data);
 }
 
 /**
@@ -195,7 +204,7 @@ export async function trocarArquivo(
     .from("pdfs")
     .update(patch)
     .eq("id", atual.id)
-    .select("id, pasta_id, nome, arquivo_nome, player, observacoes, storage_path, tamanho, created_at")
+    .select("id, pasta_id, nome, arquivo_nome, player, observacoes, descricoes, storage_path, tamanho, created_at")
     .single();
   if (error) {
     await apagarNosDois("arquivos", [caminho]).catch(() => {});
@@ -203,10 +212,10 @@ export async function trocarArquivo(
   }
   // O antigo sai por último: se falhar, sobra só um arquivo órfão, nunca um card vazio
   await apagarNosDois("arquivos", [atual.storage_path]).catch(() => {});
-  return data as PdfArquivo;
+  return doBanco(data);
 }
 
-export async function atualizarPdf(id: string, patch: Partial<Pick<PdfArquivo, "nome" | "pasta_id" | "player" | "observacoes">>): Promise<void> {
+export async function atualizarPdf(id: string, patch: Partial<Pick<PdfArquivo, "nome" | "pasta_id" | "player" | "observacoes" | "descricoes">>): Promise<void> {
   const { error } = await supabase
     .from("pdfs")
     .update(patch.nome !== undefined ? { ...patch, nome: patch.nome.trim() } : patch)
