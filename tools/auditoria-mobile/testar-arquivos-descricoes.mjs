@@ -157,9 +157,9 @@ try {
     await p.getByRole("option").first().click().catch(() => {});
     await dlg.getByRole("button", { name: "Guardar arquivo" }).click();
     await p.getByText("TESTE-DESC-envio", { exact: false }).first().waitFor({ timeout: 90000 });
-    const [novo] = await fetch(`${REST}?nome=like.*TESTE-DESC-envio*&select=id,descricoes,observacoes,storage_path`, { headers: H }).then((x) => x.json());
+    let novo; for (let i = 0; i < 60 && !novo; i++) { [novo] = await fetch(`${REST}?nome=like.*TESTE-DESC-envio*&select=id,descricoes,observacoes,storage_path`, { headers: H }).then((x) => x.json()); if (!novo) await p.waitForTimeout(500); }
     ok(novo && novo.descricoes.length === 2 && novo.descricoes[0].titulo === "Legenda" && novo.descricoes[1].texto === "Texto do roteiro", "envio real gravou as 2 descrições");
-    console.log("  (arquivo de teste enviado; apague pela tela: Excluir)");
+    { const env = linha("TESTE-DESC-envio"); await env.getByTitle("Ver a descrição").click(); ok(await env.getByTestId("descricao-card-item").count() === 2, "no site: o arquivo enviado mostra as 2 descrições"); await env.getByTestId("copiar-descricao").nth(1).click(); ok(await clip("Texto do roteiro"), "no site: copiar da 2ª descrição"); await env.getByTitle("Mais opções").click(); await p.getByRole("menuitem", { name: /Excluir/ }).click(); await p.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click(); await p.getByText("TESTE-DESC-envio", { exact: true }).waitFor({ state: "detached", timeout: 30000 }); ok(true, "arquivo de teste apagado pela tela (R2 e banco)"); }
   } else {
     await dlg.getByRole("button", { name: "Cancelar" }).click();
   }
