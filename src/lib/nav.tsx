@@ -30,6 +30,7 @@ import {
   Instagram,
   Sparkles,
   Tags,
+  Percent,
 } from "lucide-react";
 
 export interface NavLink {
@@ -82,6 +83,7 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
       { label: "Transcritor", icon: <AudioLines size={17} />, to: "/transcritor", palavras: ["transcrição", "áudio", "vídeo", "legenda"] },
       { label: "Swipe file", icon: <Images size={17} />, to: "/swipe", palavras: ["referências", "criativos", "anúncios salvos", "inspiração"] },
       { label: "Gerador de UTM", icon: <Tags size={17} />, to: "/utm", palavras: ["utm", "utms", "rastreamento", "tracking", "link rastreável", "parâmetros", "campanha", "origem", "ga4"] },
+      { label: "Calculadora de taxas", icon: <Percent size={17} />, to: "/taxas", palavras: ["taxa", "taxas", "pix", "meta", "imposto", "porcentagem", "percentual", "acrescimo", "desconto", "gateway", "recarga", "saldo"] },
       { label: "Fireflies", icon: <NotebookPen size={17} />, to: "/fireflies", palavras: ["reuniões gravadas", "reunião gravada", "gravações", "atas", "resumos"] },
       { label: "Arquivos", icon: <FileText size={17} />, to: "/arquivos", palavras: ["pdf", "documentos", "drive", "pdfs"] },
       { label: "Links", icon: <Link2 size={17} />, to: "/links", palavras: ["favoritos", "urls", "sites"] },

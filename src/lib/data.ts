@@ -49,6 +49,7 @@ export const CACHE_KEYS = {
   linksTemas: "links.temas",
   utms: "utm.lista",
   utmClientes: "utm.clientes",
+  taxas: "taxas.templates",
   notas: "notas.lista",
   notasTemas: "notas.temas",
   verDepois: "ver-depois",

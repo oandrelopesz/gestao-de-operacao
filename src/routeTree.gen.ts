@@ -16,6 +16,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedVerDepoisRouteImport } from './routes/_authenticated/ver-depois'
 import { Route as AuthenticatedUtmRouteImport } from './routes/_authenticated/utm'
 import { Route as AuthenticatedTranscritorRouteImport } from './routes/_authenticated/transcritor'
+import { Route as AuthenticatedTaxasRouteImport } from './routes/_authenticated/taxas'
 import { Route as AuthenticatedSwipeRouteImport } from './routes/_authenticated/swipe'
 import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
 import { Route as AuthenticatedRoadmapRouteImport } from './routes/_authenticated/roadmap'
@@ -82,6 +83,11 @@ const AuthenticatedTranscritorRoute =
     path: '/transcritor',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedTaxasRoute = AuthenticatedTaxasRouteImport.update({
+  id: '/taxas',
+  path: '/taxas',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedSwipeRoute = AuthenticatedSwipeRouteImport.update({
   id: '/swipe',
   path: '/swipe',
@@ -269,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/roadmap': typeof AuthenticatedRoadmapRoute
   '/saldo': typeof AuthenticatedSaldoRoute
   '/swipe': typeof AuthenticatedSwipeRoute
+  '/taxas': typeof AuthenticatedTaxasRoute
   '/transcritor': typeof AuthenticatedTranscritorRoute
   '/utm': typeof AuthenticatedUtmRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
@@ -306,6 +313,7 @@ export interface FileRoutesByTo {
   '/roadmap': typeof AuthenticatedRoadmapRoute
   '/saldo': typeof AuthenticatedSaldoRoute
   '/swipe': typeof AuthenticatedSwipeRoute
+  '/taxas': typeof AuthenticatedTaxasRoute
   '/transcritor': typeof AuthenticatedTranscritorRoute
   '/utm': typeof AuthenticatedUtmRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
@@ -346,6 +354,7 @@ export interface FileRoutesById {
   '/_authenticated/roadmap': typeof AuthenticatedRoadmapRoute
   '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
   '/_authenticated/swipe': typeof AuthenticatedSwipeRoute
+  '/_authenticated/taxas': typeof AuthenticatedTaxasRoute
   '/_authenticated/transcritor': typeof AuthenticatedTranscritorRoute
   '/_authenticated/utm': typeof AuthenticatedUtmRoute
   '/_authenticated/ver-depois': typeof AuthenticatedVerDepoisRoute
@@ -387,6 +396,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/saldo'
     | '/swipe'
+    | '/taxas'
     | '/transcritor'
     | '/utm'
     | '/ver-depois'
@@ -424,6 +434,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/saldo'
     | '/swipe'
+    | '/taxas'
     | '/transcritor'
     | '/utm'
     | '/ver-depois'
@@ -463,6 +474,7 @@ export interface FileRouteTypes {
     | '/_authenticated/roadmap'
     | '/_authenticated/saldo'
     | '/_authenticated/swipe'
+    | '/_authenticated/taxas'
     | '/_authenticated/transcritor'
     | '/_authenticated/utm'
     | '/_authenticated/ver-depois'
@@ -526,6 +538,13 @@ declare module '@tanstack/react-router' {
       path: '/transcritor'
       fullPath: '/transcritor'
       preLoaderRoute: typeof AuthenticatedTranscritorRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/taxas': {
+      id: '/_authenticated/taxas'
+      path: '/taxas'
+      fullPath: '/taxas'
+      preLoaderRoute: typeof AuthenticatedTaxasRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/swipe': {
@@ -770,6 +789,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedRoadmapRoute: typeof AuthenticatedRoadmapRoute
   AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
   AuthenticatedSwipeRoute: typeof AuthenticatedSwipeRoute
+  AuthenticatedTaxasRoute: typeof AuthenticatedTaxasRoute
   AuthenticatedTranscritorRoute: typeof AuthenticatedTranscritorRoute
   AuthenticatedUtmRoute: typeof AuthenticatedUtmRoute
   AuthenticatedVerDepoisRoute: typeof AuthenticatedVerDepoisRoute
@@ -807,6 +827,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedRoadmapRoute: AuthenticatedRoadmapRoute,
   AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,
   AuthenticatedSwipeRoute: AuthenticatedSwipeRoute,
+  AuthenticatedTaxasRoute: AuthenticatedTaxasRoute,
   AuthenticatedTranscritorRoute: AuthenticatedTranscritorRoute,
   AuthenticatedUtmRoute: AuthenticatedUtmRoute,
   AuthenticatedVerDepoisRoute: AuthenticatedVerDepoisRoute,
