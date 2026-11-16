@@ -53,7 +53,8 @@ try {
   const trechos = () => p.evaluate(() => { const ed = document.querySelector(".ProseMirror").editor; return ed.state.selection.ranges.map((r) => ed.state.doc.textBetween(r.$from.pos, r.$to.pos, "\n", "\n")); });
   const marcas = () => p.evaluate(() => { const o = {}; document.querySelector(".ProseMirror").editor.state.doc.descendants((n) => { if (n.isText) o[n.text] = n.marks.map((m) => m.type.name).sort().join(","); }); return o; });
   const clicar = async (texto, opcoes = {}, f) => { const c = await centro(texto, f); await p.mouse.click(c.x, c.y, opcoes); await p.waitForTimeout(150); };
-  const comShift = async (fn) => { await p.keyboard.down("Shift"); await fn(); await p.keyboard.up("Shift"); await p.waitForTimeout(150); };
+  const comTecla = (tecla) => async (fn) => { await p.keyboard.down(tecla); await fn(); await p.keyboard.up(tecla); await p.waitForTimeout(150); };
+  const comShift = comTecla("Shift"), comCtrl = comTecla("Control");
 
   // 1. Clique triplo: só a linha
   await clicar("R$27 mil", { clickCount: 3 });
@@ -101,6 +102,20 @@ try {
   await p.keyboard.press("Control+z");
   await clicar("PIX", {});
   ok((await trechos()).length === 1, "clique comum volta a um cursor só");
+
+  // 7. Ctrl + mouse faz o mesmo que Shift, inclusive a partir de um cursor sem seleção
+  await clicar("Meta Ads", { clickCount: 3 });
+  await comCtrl(() => clicar("Google Ads", { clickCount: 3 }));
+  ok(JSON.stringify(await trechos()) === JSON.stringify(["Meta Ads", "Google Ads"]), "Ctrl + clique triplo soma a linha", await trechos());
+  await comCtrl(() => clicar("R$315", { clickCount: 2 }));
+  ok((await trechos()).length === 3, "Ctrl + clique duplo soma a 3ª seleção", await trechos());
+  await clicar("PIX", {});
+  await comCtrl(() => clicar("Psicologia", { clickCount: 2 }));
+  await comCtrl(() => clicar("PIX", { clickCount: 2 }));
+  ok(JSON.stringify(await trechos()) === JSON.stringify(["Psicologia", "PIX"]), "Ctrl + clique duplo a partir do cursor soma palavras", await trechos());
+  await p.keyboard.press("Control+b");
+  m = await marcas();
+  ok(/bold/.test(m["Psicologia"] ?? "") && /bold/.test(m["PIX"] ?? ""), "Ctrl+B nas duas palavras", m);
 } finally {
   await nav.close();
   await limpar();

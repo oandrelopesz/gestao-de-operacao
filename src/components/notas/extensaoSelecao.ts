@@ -81,10 +81,17 @@ export const SelecaoNota = Extension.create({
           },
           handleDOMEvents: {
             mousedown: (view, event) => {
-              if (event.button !== 0 || !event.shiftKey || view.state.selection.empty) return false;
+              // Shift (só com algo selecionado) ou Ctrl/Cmd (também a partir do cursor) somam trechos
+              const soma = event.ctrlKey || event.metaKey;
+              if (event.button !== 0 || !(event.shiftKey || soma)) return false;
+              const vazia = view.state.selection.empty;
+              // Shift sem seleção estica como sempre; Ctrl+clique em link abre o link (handleClick)
+              if ((vazia && !soma) || (soma && event.detail <= 1 && (event.target as HTMLElement | null)?.closest("a"))) { baseEm = 0; return false; }
               const clicado = view.posAtCoords({ left: event.clientX, top: event.clientY });
               if (!clicado) return false;
               event.preventDefault();
+              // O padrão do ProseMirror para Ctrl+clique é selecionar o bloco inteiro: aqui vira só o cursor
+              if (vazia && event.detail <= 1) selecionar(view, TextSelection.create(view.state.doc, clicado.pos));
               if (event.detail <= 1 || Date.now() - baseEm > 1500) base = trechosDe(view.state.selection);
               baseEm = Date.now();
               const somar = (novo: Trecho) => { if (!view.isDestroyed) selecionar(view, criarSelecao(view.state.doc, [...base, novo])); };
