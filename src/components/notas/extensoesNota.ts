@@ -6,6 +6,7 @@ import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Placeholder } from "@tiptap/extensions";
 import type { Extensions } from "@tiptap/react";
 import { Coluna, Colunas } from "@/components/notas/extensaoColunas";
+import { SelecaoNota } from "@/components/notas/extensaoSelecao";
 
 export function extensoesNota(): Extensions {
   return [
@@ -25,6 +26,7 @@ export function extensoesNota(): Extensions {
     TaskItem.configure({ nested: true }),
     Colunas,
     Coluna,
+    SelecaoNota,
     Placeholder.configure({
       placeholder: ({ editor, node, pos }) => {
         if (node.type.name === "heading") return "Título";

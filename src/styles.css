@@ -408,6 +408,8 @@ html[data-hidden] [data-state="closed"] {
 /* O texto de ajuda não tem altura (float): numa coluna ele nunca quebra linha, senão vaza da caixa */
 .nota-editor-conteudo .nota-coluna .is-empty::before { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .nota-editor-conteudo .ProseMirror-gapcursor::after { border-top-color: var(--foreground); }
+/* Seleção de vários trechos (Shift + mouse): mesma cor da seleção nativa */
+.nota-editor-conteudo .nota-selecao { background-color: color-mix(in oklch, var(--color-primary) 25%, transparent); }
 
 /* iPhone: campo com fonte < 16px faz o Safari dar zoom ao focar (só iOS tem -webkit-touch-callout) */
 @supports (-webkit-touch-callout: none) {

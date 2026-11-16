@@ -75,6 +75,43 @@ export function textoDoDoc(doc: NoDoc | null | undefined): string {
   return blocos.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+/**
+ * Linha em volta da posição `i` do texto de um bloco (quebras de linha = "\n"): [início, fim), sem a quebra.
+ * Texto colado costuma virar um parágrafo só com as linhas separadas por quebra; o clique triplo usa isto
+ * para pegar a linha, não o parágrafo (que seria a nota inteira).
+ */
+export function limitesDaLinha(texto: string, i: number): [number, number] {
+  const inicio = i > 0 ? texto.lastIndexOf("\n", i - 1) + 1 : 0;
+  const fim = texto.indexOf("\n", i);
+  return [inicio, fim < 0 ? texto.length : fim];
+}
+
+const LETRA = /[\p{L}\p{N}_]/u;
+
+/** Palavra em volta da posição `i`: [início, fim). Fora de palavra devolve um trecho vazio. */
+export function limitesDaPalavra(texto: string, i: number): [number, number] {
+  let inicio = i;
+  let fim = i;
+  while (inicio > 0 && LETRA.test(texto[inicio - 1])) inicio--;
+  while (fim < texto.length && LETRA.test(texto[fim])) fim++;
+  return [inicio, fim];
+}
+
+/** Trechos da seleção múltipla: em ordem, os que se sobrepõem ou se encostam viram um, os vazios saem. */
+export function juntarTrechos(trechos: [number, number][]): [number, number][] {
+  const ordenados = trechos
+    .map(([a, b]): [number, number] => (a <= b ? [a, b] : [b, a]))
+    .filter(([a, b]) => a < b)
+    .sort((x, y) => x[0] - y[0]);
+  const juntos: [number, number][] = [];
+  for (const [a, b] of ordenados) {
+    const ultimo = juntos[juntos.length - 1];
+    if (ultimo && a <= ultimo[1]) ultimo[1] = Math.max(ultimo[1], b);
+    else juntos.push([a, b]);
+  }
+  return juntos;
+}
+
 /** Documento sem texto e sem imagem (nota em branco). */
 export function docVazio(doc: NoDoc | null | undefined): boolean {
   return !textoDoDoc(doc) && imagensDoDoc(doc).length === 0;
