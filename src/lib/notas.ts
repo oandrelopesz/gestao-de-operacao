@@ -39,16 +39,26 @@ export async function fetchTemasNotas(): Promise<Tema[]> {
 }
 
 export async function fetchNotas(): Promise<Nota[]> {
-  const { data, error } = await notas().select("id, titulo, conteudo, doc, tema_id, created_at, updated_at");
+  const { data, error } = await notas().select("id, titulo, conteudo, doc, tema_id, created_at, updated_at").is("cliente_id", null);
   if (error) throw error;
   return (data || []) as Nota[];
 }
 
-type Campos = { titulo: string; conteudo: string; tema_id: string | null; doc?: NoDoc | null };
+/** Notas da pasta de um cliente na Central de arquivos (mais recentes primeiro). */
+export async function fetchNotasCliente(clienteId: string): Promise<Nota[]> {
+  const { data, error } = await notas()
+    .select("id, titulo, conteudo, doc, tema_id, created_at, updated_at")
+    .eq("cliente_id", clienteId)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data || []) as Nota[];
+}
+
+type Campos = { titulo: string; conteudo: string; tema_id: string | null; doc?: NoDoc | null; cliente_id?: string | null };
 
 export async function criarNota(c: Campos): Promise<Nota> {
   const { data, error } = await notas()
-    .insert([{ titulo: c.titulo.trim(), conteudo: c.conteudo, tema_id: c.tema_id, doc: c.doc ?? null }])
+    .insert([{ titulo: c.titulo.trim(), conteudo: c.conteudo, tema_id: c.tema_id, doc: c.doc ?? null, cliente_id: c.cliente_id ?? null }])
     .select("id, titulo, conteudo, doc, tema_id, created_at, updated_at")
     .single();
   if (error) throw error;

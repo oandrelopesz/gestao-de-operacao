@@ -11,6 +11,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MensagemBusca } from "@/components/MensagemBusca";
+import { NotasCliente } from "@/components/central/NotasCliente";
 import { useBusca } from "@/lib/useBusca";
 import { cn } from "@/lib/utils";
 import {
@@ -263,6 +264,8 @@ export function PastaAberta({
           />
         ))}
       </div>
+
+      {!pasta && <NotasCliente clienteId={clienteId} />}
 
       <AlertDialog open={!!apagar} onOpenChange={(o) => !o && setApagar(null)}>
         <AlertDialogContent>
