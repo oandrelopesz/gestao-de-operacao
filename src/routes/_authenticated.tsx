@@ -189,7 +189,7 @@ function AuthenticatedLayout({ session }: { session: any }) {
 
   useEffect(() => {
     const userEmail = (session as any)?.user?.email;
-    setUserName(userEmail ? userEmail.split("@")[0] : "Admin");
+    setUserName(userEmail ? "André Lopes" : "Admin");
   }, [session]);
 
   const currentPage =
@@ -271,7 +271,7 @@ function AuthenticatedLayout({ session }: { session: any }) {
             <div className="flex items-center gap-3 px-2 py-1.5 rounded-lg">
               <Avatar className="h-8 w-8 ring-2 ring-background">
                 <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                  {userName.substring(0, 2).toUpperCase()}
+                  {userName.split(" ").map((p) => p[0]).join("").substring(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-col overflow-hidden">
