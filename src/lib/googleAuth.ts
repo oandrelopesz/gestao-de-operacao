@@ -6,6 +6,9 @@
 
 const GSI_SRC = "https://accounts.google.com/gsi/client";
 
+/** ID do cliente OAuth web (público; o mesmo do GOOGLE_CLIENT_ID das funções). Usado no login do app. */
+export const GOOGLE_CLIENT_ID = "992656410238-rv5027f2sb5a9p682u2lljej6r8c6pdd.apps.googleusercontent.com";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GoogleGsi = any;
 

@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, Link, useNavigate, useRouterState, useRouter }
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { ChevronRight, ChevronLeft, PanelLeft, Sun, Moon, Sparkles } from "lucide-react";
+import { ChevronRight, ChevronLeft, PanelLeft, Sun, Moon, Sparkles, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -19,20 +19,41 @@ import { getConfig } from "@/lib/appConfig";
 import { aplicarMenu, type MenuConfig } from "@/lib/menuConfig";
 import { NAV_GROUPS } from "@/lib/nav";
 import { toast } from "sonner";
+import { limparIdToken } from "@/lib/googleAuth";
 import { marcarTodosVistos, useAvisosFormularios } from "@/lib/formulariosEnvios";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
     return { session: null };
   },
-  component: AuthenticatedLayout,
+  component: LoginObrigatorio,
 });
+
+// Login obrigatório (só Google). A sessão do Supabase fica no navegador e se renova sozinha;
+// só some ao deslogar ou limpar os dados do site. Sem sessão, vai para /login.
+function LoginObrigatorio() {
+  const navigate = useNavigate();
+  const [sessao, setSessao] = useState<any>(undefined);
+  useEffect(() => {
+    let vivo = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!vivo) return;
+      if (data.session) setSessao(data.session);
+      else navigate({ to: "/login", replace: true });
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((evento, s) => {
+      if (evento === "SIGNED_OUT") navigate({ to: "/login", replace: true });
+      else if (s) setSessao(s);
+    });
+    return () => { vivo = false; sub.subscription.unsubscribe(); };
+  }, [navigate]);
+  if (!sessao) return <div className="min-h-screen bg-background" />;
+  return <AuthenticatedLayout session={sessao} />;
+}
 
 const ALL_LINKS = NAV_GROUPS.flatMap((g) => g.links);
 
-function AuthenticatedLayout() {
-  const context = Route.useRouteContext() as any;
-  const session = context?.session;
+function AuthenticatedLayout({ session }: { session: any }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   // Tela que está de fato montada (rota já carregada). O endereço muda no clique, antes de a rota nova
@@ -257,6 +278,18 @@ function AuthenticatedLayout() {
                 <span className="text-sm font-medium truncate capitalize">{userName}</span>
                 <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">estrategista digital</span>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="ml-auto h-8 w-8 text-muted-foreground hover:text-foreground"
+                title="Sair"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  limparIdToken();
+                }}
+              >
+                <LogOut size={16} />
+              </Button>
             </div>
           </div>
         </aside>
