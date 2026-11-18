@@ -817,12 +817,6 @@ function DemandasPage() {
                 </TabsTrigger>
             </TabsList>
             </Tabs>
-            <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-8" onClick={() => setAgendadasAberta(true)}>
-                Agendadas
-                {agendadas.length > 0 && (
-                  <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">{agendadas.length}</span>
-                )}
-            </Button>
             <Button
                 variant="outline"
                 size="sm"
@@ -831,6 +825,12 @@ function DemandasPage() {
             >
                 <CalendarClock size={14} />
                 Agendar
+            </Button>
+            <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-8" onClick={() => setAgendadasAberta(true)}>
+                Agendadas
+                {agendadas.length > 0 && (
+                  <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">{agendadas.length}</span>
+                )}
             </Button>
             <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => openNewDemanda()}>
                 <Plus size={14} />
