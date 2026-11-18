@@ -686,7 +686,7 @@ function OperacaoEditor({ form, index, plataformasDisponiveis, metodoPadrao, ver
         </p>
       ) : (
         <div className="space-y-2">
-          <div className="hidden sm:grid sm:grid-cols-[1fr_1.1fr_1.1fr_auto] gap-2 px-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+          <div className="hidden sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(7.5rem,1.1fr)_auto] gap-2 px-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
             <span>Plataforma</span>
             <span>Forma de pagamento</span>
             <span>{tipoVerba === "mensal" ? `Verba / mês (${simbolo})` : `Verba total (${simbolo})`}</span>
@@ -695,7 +695,7 @@ function OperacaoEditor({ form, index, plataformasDisponiveis, metodoPadrao, ver
           {plataformas.map((plat) => {
             const cfg = config[plat] || { verba: 0, metodo_pagamento: metodoPadrao };
             return (
-              <div key={plat} className="grid grid-cols-1 sm:grid-cols-[1fr_1.1fr_1.1fr_auto] gap-2 items-center rounded-md border bg-background p-2">
+              <div key={plat} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(7.5rem,1.1fr)_auto] gap-2 items-center rounded-md border bg-background p-2">
                 <Badge variant="secondary" className="justify-self-start">{plat}</Badge>
                 <Select
                   value={cfg.metodo_pagamento}
