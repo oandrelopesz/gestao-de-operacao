@@ -20,6 +20,7 @@ import { Route as AuthenticatedTaxasRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedSwipeRouteImport } from './routes/_authenticated/swipe'
 import { Route as AuthenticatedSaldoRouteImport } from './routes/_authenticated/saldo'
 import { Route as AuthenticatedRoadmapRouteImport } from './routes/_authenticated/roadmap'
+import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
 import { Route as AuthenticatedProspeccaoRouteImport } from './routes/_authenticated/prospeccao'
 import { Route as AuthenticatedPdfsRouteImport } from './routes/_authenticated/pdfs'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
@@ -101,6 +102,11 @@ const AuthenticatedSaldoRoute = AuthenticatedSaldoRouteImport.update({
 const AuthenticatedRoadmapRoute = AuthenticatedRoadmapRouteImport.update({
   id: '/roadmap',
   path: '/roadmap',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRadarRoute = AuthenticatedRadarRouteImport.update({
+  id: '/radar',
+  path: '/radar',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProspeccaoRoute = AuthenticatedProspeccaoRouteImport.update({
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/pdfs': typeof AuthenticatedPdfsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
+  '/radar': typeof AuthenticatedRadarRoute
   '/roadmap': typeof AuthenticatedRoadmapRoute
   '/saldo': typeof AuthenticatedSaldoRoute
   '/swipe': typeof AuthenticatedSwipeRoute
@@ -310,6 +317,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/pdfs': typeof AuthenticatedPdfsRoute
   '/prospeccao': typeof AuthenticatedProspeccaoRoute
+  '/radar': typeof AuthenticatedRadarRoute
   '/roadmap': typeof AuthenticatedRoadmapRoute
   '/saldo': typeof AuthenticatedSaldoRoute
   '/swipe': typeof AuthenticatedSwipeRoute
@@ -351,6 +359,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/pdfs': typeof AuthenticatedPdfsRoute
   '/_authenticated/prospeccao': typeof AuthenticatedProspeccaoRoute
+  '/_authenticated/radar': typeof AuthenticatedRadarRoute
   '/_authenticated/roadmap': typeof AuthenticatedRoadmapRoute
   '/_authenticated/saldo': typeof AuthenticatedSaldoRoute
   '/_authenticated/swipe': typeof AuthenticatedSwipeRoute
@@ -393,6 +402,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pdfs'
     | '/prospeccao'
+    | '/radar'
     | '/roadmap'
     | '/saldo'
     | '/swipe'
@@ -431,6 +441,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pdfs'
     | '/prospeccao'
+    | '/radar'
     | '/roadmap'
     | '/saldo'
     | '/swipe'
@@ -471,6 +482,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding'
     | '/_authenticated/pdfs'
     | '/_authenticated/prospeccao'
+    | '/_authenticated/radar'
     | '/_authenticated/roadmap'
     | '/_authenticated/saldo'
     | '/_authenticated/swipe'
@@ -566,6 +578,13 @@ declare module '@tanstack/react-router' {
       path: '/roadmap'
       fullPath: '/roadmap'
       preLoaderRoute: typeof AuthenticatedRoadmapRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/radar': {
+      id: '/_authenticated/radar'
+      path: '/radar'
+      fullPath: '/radar'
+      preLoaderRoute: typeof AuthenticatedRadarRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/prospeccao': {
@@ -786,6 +805,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPdfsRoute: typeof AuthenticatedPdfsRoute
   AuthenticatedProspeccaoRoute: typeof AuthenticatedProspeccaoRoute
+  AuthenticatedRadarRoute: typeof AuthenticatedRadarRoute
   AuthenticatedRoadmapRoute: typeof AuthenticatedRoadmapRoute
   AuthenticatedSaldoRoute: typeof AuthenticatedSaldoRoute
   AuthenticatedSwipeRoute: typeof AuthenticatedSwipeRoute
@@ -824,6 +844,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPdfsRoute: AuthenticatedPdfsRoute,
   AuthenticatedProspeccaoRoute: AuthenticatedProspeccaoRoute,
+  AuthenticatedRadarRoute: AuthenticatedRadarRoute,
   AuthenticatedRoadmapRoute: AuthenticatedRoadmapRoute,
   AuthenticatedSaldoRoute: AuthenticatedSaldoRoute,
   AuthenticatedSwipeRoute: AuthenticatedSwipeRoute,

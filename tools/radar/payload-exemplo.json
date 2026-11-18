@@ -1,0 +1,71 @@
+{
+  "schema_versao": 1,
+  "tipo": "boletim",
+  "edicao_id": "DIA-20261117",
+  "revisao": "R1",
+  "ocorrido_em": "2026-11-17T21:03:00-03:00",
+  "dia": {
+    "abertura_texto": "🔵 *Radar IA | Boletim de 17/11/2026 — versão revisada*\n…",
+    "fora": [
+      { "id": "RAD-20261117-003", "motivo": "falta documentação oficial do Google" }
+    ],
+    "cobertura_parcial": "3 achados elegíveis; não completei com material fraco."
+  },
+  "achados": [
+    {
+      "id": "RAD-20261117-004",
+      "versao": 2,
+      "titulo": "Vercel remove em 30/11 as Deployment Checks nativas de lint e typecheck",
+      "classe": "bom",
+      "tipo": "B",
+      "tipo_motivo": "descontinuação oficial com prazo, impacto e ação indicada pela própria fonte",
+      "alerta": false,
+      "temas": ["software_saas"],
+      "confianca": "alta",
+      "estagio": "ferramenta utilizável",
+      "prontidao": "precisa preparar/integrar",
+      "publicacao": "2026-11-17",
+      "primeira_descoberta": "2026-11-17T20:15:00-03:00",
+      "atualizacao": null,
+      "corpo": {
+        "tema_tipo": "SaaS/infra · descontinuação documentada em changelog oficial",
+        "explicando_facil": {
+          "o_que_e": ["Lint: um revisor automático que caça erro óbvio de código, como um corretor ortográfico."],
+          "como_te_afeta": "Se ninguém migrar, a trava que barrava código com erro some em 30/11.",
+          "exemplo": "Ilustrativo: um deploy com erro de tipo, que antes era barrado, passa a ir ao ar."
+        },
+        "o_que_entrega": ["A Vercel vai retirar as Deployment Checks nativas de lint e typecheck."],
+        "por_que_importa": ["Quem usa essas checks perde a trava em 30/11 se não migrar."],
+        "evidencia": {
+          "fonte": "changelog oficial e documentação da Vercel",
+          "limitacoes": "custo do Vercel CI não verificado"
+        },
+        "custo": ["Migração sem custo informado; Vercel CI desconhecido"],
+        "esforco": ["30–90 min por projeto; não medido"],
+        "aplicacoes": [],
+        "lancamento": null,
+        "mudanca": {
+          "o_que_muda": ["Não dá para criar checks novas desde 17/11; as existentes param em 30/11/2026."],
+          "quem_pode_ser_afetado": ["Projetos com Lint/Typecheck com provedor Vercel."],
+          "quando": ["Remoção: 30/11/2026"],
+          "o_que_muda_no_trabalho": ["A trava nativa some na data."],
+          "o_que_fazer_agora": ["Mover os comandos para o CI ou Build Command, como a Vercel indica."],
+          "resultado_esperado": ["Trava equivalente mantida antes do deploy."]
+        },
+        "proximos_passos": [
+          "Quem opera o projeto abre Build and Deployment até 28/11/2026 e procura Lint/Typecheck com provedor Vercel.",
+          "Se encontrar, move o comando para o CI já usado ou para o Build Command antes de 30/11/2026.",
+          "Como conferir: PR de teste com erro proposital de tipo deve ser barrado."
+        ]
+      },
+      "links": [
+        { "tipo": "descoberta", "url": "https://vercel.com/changelog/native-lint-and-typecheck-deployment-checks-are-being-deprecated" },
+        { "tipo": "evidencia", "url": "https://vercel.com/docs/deployment-checks" }
+      ],
+      "post_x_url": null,
+      "link_citado_x_url": null,
+      "texto_whatsapp": "🟢 BOM *RAD-20261117-004 — Vercel remove em 30/11…*\n🏷️ *Temas:* Software/SaaS\n…",
+      "enviado_em": "2026-11-17T21:04:00-03:00"
+    }
+  ]
+}
