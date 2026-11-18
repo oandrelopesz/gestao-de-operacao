@@ -29,6 +29,7 @@ export const CACHE_KEYS = {
   clientesView: "clientes-view",
   clientesChurn: "clientes-churn",
   clientesPausados: "clientes-pausados",
+  saldoFora: "saldo-fora",
   saldo: "saldo",
   acessos: "acessos",
   financeiro: "financeiro",
@@ -170,6 +171,16 @@ export async function loadSaldo() {
   if (error) throw error;
   // Plataformas desativadas no cadastro do cliente ficam fora do monitor (histórico preservado).
   // O filtro mora aqui, e não na página, porque o pré-carregamento guarda este mesmo resultado no cache.
+  return ((data || []) as any[]).filter((r) => r.ativo !== false);
+}
+
+/** Contas de saldo de clientes pausados ou em churn (fora do monitor), para as abas Pausados e Em churn do Saldo */
+export async function loadSaldoFora() {
+  const { data, error } = await supabase
+    .from("saldo_ads_fora_view" as any)
+    .select("*")
+    .order("cliente_nome");
+  if (error) throw error;
   return ((data || []) as any[]).filter((r) => r.ativo !== false);
 }
 

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import {
   AlertCircle,
@@ -67,10 +67,36 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useBusca } from "@/lib/useBusca";
 import { MensagemBusca } from "@/components/MensagemBusca";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SaldoForaDoMonitor } from "@/components/saldo/SaldoForaDoMonitor";
 
+// ?aba=pausados|churn abre as contas de quem saiu do monitor; cliente_id e highlight vêm dos avisos de saldo
 export const Route = createFileRoute("/_authenticated/saldo")({
+  validateSearch: (s: Record<string, unknown>): { aba?: "pausados" | "churn"; cliente_id?: string; highlight?: string } => ({
+    ...(s.aba === "pausados" || s.aba === "churn" ? { aba: s.aba } : {}),
+    ...(typeof s.cliente_id === "string" && s.cliente_id ? { cliente_id: s.cliente_id } : {}),
+    ...(typeof s.highlight === "string" && s.highlight ? { highlight: s.highlight } : {}),
+  }),
   component: SaldoPage,
 });
+
+/** Abas Ativos / Pausados / Em churn: o monitor de sempre fica em Ativos; as outras mostram as contas de quem saiu dele. */
+function SaldoPage() {
+  const navigate = useNavigate();
+  const { aba } = Route.useSearch();
+  return (
+    <div className="space-y-6">
+      <Tabs value={aba ?? "ativos"} onValueChange={(v) => navigate({ to: "/saldo", search: v === "ativos" ? {} : { aba: v as "pausados" | "churn" } })}>
+        <TabsList>
+          <TabsTrigger value="ativos">Ativos</TabsTrigger>
+          <TabsTrigger value="pausados" className="gap-1.5"><span className="h-2 w-2 rounded-full bg-yellow-500" aria-hidden />Pausados</TabsTrigger>
+          <TabsTrigger value="churn" className="gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500" aria-hidden />Em churn</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {aba ? <SaldoForaDoMonitor grupo={aba} /> : <SaldoAtivos />}
+    </div>
+  );
+}
 
 // Cores dos badges por plataforma (a lista em si vem do Admin, via usePlataformas)
 const PLATAFORMA_CORES: Record<string, string> = {
@@ -180,7 +206,7 @@ const formatDias = (dias?: number | null) => {
 const statusEfetivo = (row: SaldoRow) =>
   ALERTING.includes(row.status_alerta) && row.alerta_dispensado ? "dispensado" : row.status_alerta;
 
-function SaldoPage() {
+function SaldoAtivos() {
   const { agencias, label: agenciaLabelOf, meta: agenciaMetaOf } = useAgencias();
   const { nomes: plataformasDisponiveis } = usePlataformas();
   const [data, setData] = useCachedState<SaldoRow[]>(CACHE_KEYS.saldo, []);

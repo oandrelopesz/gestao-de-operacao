@@ -20,6 +20,7 @@ const c = await conectar();
 try {
   await c.query("BEGIN");
   await c.query(migration);
+  await c.query(readFileSync(join(raiz, "supabase/migrations/20261118210000_saldo_fora_do_monitor.sql"), "utf8"));
   // segunda aplicação: idempotente
   await c.query(migration);
   confere("migration aplica duas vezes sem erro", true);
@@ -38,14 +39,18 @@ try {
      VALUES ($1, (now() AT TIME ZONE 'America/Sao_Paulo')::date - 2, 1000, false)`, [conta]);
 
   const naView = async () => (await c.query("SELECT saldo_atual_estimado s FROM public.saldo_ads_view WHERE id = $1", [conta])).rows[0];
+  const naFora = async () => (await c.query("SELECT saldo_atual_estimado s FROM public.saldo_ads_fora_view WHERE id = $1", [conta])).rows[0];
   const conta1 = async () => (await c.query("SELECT pausado, saldo_congelado FROM public.saldo_ads WHERE id = $1", [conta])).rows[0];
 
   const antes = await naView();
   confere("ativo aparece no Saldo", !!antes, antes && `saldo ${antes.s}`);
+  confere("ativo não aparece na view de fora do monitor", !(await naFora()));
 
   // PAUSAR
   await c.query("UPDATE public.clientes SET status_operacional = 'pausado' WHERE id = $1", [cli]);
   confere("pausado some do Saldo (view)", !(await naView()));
+  const fora = await naFora();
+  confere("pausado aparece na view de fora, com o saldo congelado", !!fora && Number(fora.s) === Number(antes.s), fora && `saldo ${fora.s}`);
   const p = await conta1();
   confere("conta fica pausada com saldo congelado", p.pausado === true && Number(p.saldo_congelado) === Number(antes.s), `congelado ${p.saldo_congelado}`);
 
@@ -69,9 +74,11 @@ try {
   // CHURN com efeito imediato some; com contrato em vigor continua
   await c.query("UPDATE public.clientes SET status_operacional = 'churn', churn_efeito_imediato = true WHERE id = $1", [cli]);
   confere("churn imediato some do Saldo", !(await naView()));
+  confere("churn imediato aparece na view de fora", !!(await naFora()));
   await c.query("UPDATE public.clientes SET status_operacional = 'ativo' WHERE id = $1", [cli]);
   await c.query("UPDATE public.clientes SET status_operacional = 'churn', churn_efeito_imediato = false, contrato_ate = (now() AT TIME ZONE 'America/Sao_Paulo')::date + 10 WHERE id = $1", [cli]);
   confere("churn com contrato em vigor segue no Saldo", !!(await naView()));
+  confere("churn com contrato em vigor não aparece na view de fora", !(await naFora()));
   await c.query("UPDATE public.clientes SET status_operacional = 'ativo' WHERE id = $1", [cli]);
 
   // PAUSAR EM MASSA (várias linhas num UPDATE só) e voltar

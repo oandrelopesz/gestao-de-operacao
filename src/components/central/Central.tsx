@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -15,7 +16,7 @@ import { NotasCliente } from "@/components/central/NotasCliente";
 import { useBusca } from "@/lib/useBusca";
 import { cn } from "@/lib/utils";
 import {
-  apagarCentral, baixarCentral, baixarPastaZip, enviarCentral, fetchPastas, listarCentral, renomearCentral, urlMiniatura,
+  apagarCentral, baixarCentral, baixarPastaZip, enviarCentral, fetchPastasTodas, listarCentral, type GrupoPasta, renomearCentral, urlMiniatura,
 } from "@/lib/central";
 import { doArrastar, dosArquivosDaPasta, type ArquivoComPasta } from "@/lib/centralArrastar";
 import {
@@ -42,17 +43,26 @@ function useCarga<T>(fn: () => Promise<T>) {
 }
 
 /** Grade de pastas (clientes) com busca tolerante e contagem de arquivos. */
-export function Pastas({ onAbrir }: { onAbrir: (id: string) => void }) {
+export function Pastas({ onAbrir, aba, onAba }: { onAbrir: (id: string) => void; aba: GrupoPasta; onAba: (a: GrupoPasta) => void }) {
   const [busca, setBusca] = useState("");
-  const pastasQ = useCarga(fetchPastas);
+  const pastasQ = useCarga(fetchPastasTodas);
   const listaQ = useCarga(listarCentral);
-  const pastas = useMemo(() => pastasQ.dados ?? [], [pastasQ.dados]);
+  const todas = useMemo(() => pastasQ.dados ?? [], [pastasQ.dados]);
+  const pastas = useMemo(() => todas.filter((p) => p.grupo === aba), [todas, aba]);
+  const qtd = (g: GrupoPasta) => todas.filter((p) => p.grupo === g).length;
   const resultado = useBusca(pastas, busca, (p) => [p.nome]);
   const contagem = useMemo(() => contarPorCliente(listaQ.dados ?? []), [listaQ.dados]);
   const erro = pastasQ.erro || listaQ.erro;
 
   return (
     <div className="space-y-4">
+      <Tabs value={aba} onValueChange={(v) => onAba(v as GrupoPasta)}>
+        <TabsList>
+          <TabsTrigger value="ativos">Ativos ({qtd("ativos")})</TabsTrigger>
+          <TabsTrigger value="pausados" className="gap-1.5"><span className="h-2 w-2 rounded-full bg-yellow-500" aria-hidden />Pausados ({qtd("pausados")})</TabsTrigger>
+          <TabsTrigger value="churn" className="gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500" aria-hidden />Em churn ({qtd("churn")})</TabsTrigger>
+        </TabsList>
+      </Tabs>
       <div className="relative max-w-sm">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input className="pl-9" placeholder="Buscar cliente" value={busca} onChange={(e) => setBusca(e.target.value)} />
@@ -60,6 +70,9 @@ export function Pastas({ onAbrir }: { onAbrir: (id: string) => void }) {
       <MensagemBusca resultado={resultado} />
       {erro && <p className="text-sm text-destructive">{erro}</p>}
       {!pastasQ.dados && !pastasQ.erro && <Loader2 className="animate-spin text-muted-foreground" />}
+      {pastasQ.dados && pastas.length === 0 && !busca && (
+        <p className="text-sm text-muted-foreground">Nenhum cliente {aba === "pausados" ? "pausado" : aba === "churn" ? "em churn" : "ativo"}.</p>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3">
         {resultado.itens.map((p) => {
           const n = contagem[p.id] ?? 0;
@@ -89,7 +102,7 @@ const SIMULTANEOS = 4;
 export function PastaAberta({
   clienteId, pasta, onIr, onVoltar,
 }: { clienteId: string; pasta: string; onIr: (pasta: string) => void; onVoltar: () => void }) {
-  const pastasQ = useCarga(fetchPastas);
+  const pastasQ = useCarga(fetchPastasTodas);
   const listaQ = useCarga(listarCentral);
   const nomeCliente = pastasQ.dados?.find((p) => p.id === clienteId)?.nome ?? "Cliente";
   const todos = useMemo(() => listaQ.dados ?? [], [listaQ.dados]);

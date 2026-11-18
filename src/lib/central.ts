@@ -1,7 +1,7 @@
 // Dados da Central de arquivos: pastas (clientes), arquivos no R2 (módulo `central`, sem bucket antigo no Supabase).
 // Listar, apagar, copiar e miniatura usam só o R2; baixar usa a reserva do Supabase, como o resto do sistema.
 import { Zip, ZipPassThrough } from "fflate";
-import { filtroClienteDisponivel } from "@/lib/churn";
+import { churnEncerrado, filtroClienteDisponivel } from "@/lib/churn";
 import { supabase } from "@/integrations/supabase/client";
 import { apagarR2, baixarComReserva, copiarComReserva, enviarR2, listarR2, urlFixa } from "@/lib/r2";
 import { caminhoCentral, entradasDoZip, motivoRecusa, nomeOriginal, renomeado } from "@/lib/centralRegras";
@@ -11,6 +11,29 @@ export async function fetchPastas(): Promise<{ id: string; nome: string }[]> {
   const { data, error } = await supabase.from("clientes").select("id, nome").eq("arquivado", false).or(filtroClienteDisponivel()).order("nome");
   if (error) throw error;
   return data ?? [];
+}
+
+export type GrupoPasta = "ativos" | "pausados" | "churn";
+
+/**
+ * Todas as pastas da Central, com o grupo de cada cliente: ativos (inclui churn com contrato em vigor), pausados e churn
+ * que já valeu. Churn arquivado também entra, para a pasta não sumir com os arquivos dentro.
+ */
+export async function fetchPastasTodas(): Promise<{ id: string; nome: string; grupo: GrupoPasta }[]> {
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("id, nome, arquivado, status_operacional, churn_efeito_imediato, contrato_ate")
+    .order("nome");
+  if (error) throw error;
+  return (data ?? [])
+    .map((c: any) => ({
+      id: c.id as string,
+      nome: c.nome as string,
+      arquivado: !!c.arquivado,
+      grupo: (c.status_operacional === "pausado" ? "pausados" : churnEncerrado(c) ? "churn" : "ativos") as GrupoPasta,
+    }))
+    .filter((c) => !c.arquivado || c.grupo === "churn")
+    .map(({ id, nome, grupo }) => ({ id, nome, grupo }));
 }
 
 /** Caminhos de todos os arquivos da Central, relativos ao módulo (`<cliente_id>/<pastas>/<carimbo>-<nome>`). */
