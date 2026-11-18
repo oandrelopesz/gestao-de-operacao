@@ -15,7 +15,8 @@ import {
   Repeat,
   History,
   Map as MapIcon,
-  Unlink
+  Unlink,
+  CalendarClock
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import {
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { COLUNA_AGENDADAS } from "@/lib/agendadas";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
@@ -176,6 +178,8 @@ export function DemandaDrawer({
   };
 
   const currentColumn = columns.find(c => c.id === demanda.status);
+  // Agendada: a coluna é escondida (não vem em `columns`) e a data é obrigatória (CHECK no banco)
+  const agendada = demanda.status === COLUNA_AGENDADAS;
   // Card recorrente (mãe) não tem "atraso" de entrega — mesmo critério do card no quadro
   const atraso = demanda.status !== "feito" && demanda.status !== "recorrentes"
     ? diasDeAtraso(demanda.prazo, hojeBrasilia())
@@ -273,6 +277,12 @@ export function DemandaDrawer({
                     {currentColumn.title}
                   </Badge>
                 )}
+                {agendada && (
+                  <Badge variant="outline" className="text-[11px] py-0 h-5 gap-1">
+                    <CalendarClock size={11} />
+                    Agendada
+                  </Badge>
+                )}
               </div>
             </div>
 
@@ -343,7 +353,7 @@ export function DemandaDrawer({
                     />
                   </PopoverContent>
                 </Popover>
-                {demanda.prazo && (
+                {demanda.prazo && !agendada && (
                   <button
                     type="button"
                     title="Remover data"

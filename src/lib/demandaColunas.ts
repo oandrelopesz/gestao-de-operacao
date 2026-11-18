@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { COLUNA_AGENDADAS } from "@/lib/agendadas";
 
 export type RegraData = "nenhuma" | "hoje" | "amanha" | "depois_amanha" | "dias_semana";
 
@@ -47,6 +48,8 @@ export async function fetchDemandaColunas(): Promise<KanbanColumnDef[]> {
   const { data, error } = await supabase
     .from("demanda_colunas")
     .select("id, titulo, hex, ordem, sistema, regra_data, dias_semana")
+    // Agendadas é coluna de sistema escondida: as tarefas dela aparecem só no botão "Agendadas"
+    .neq("id", COLUNA_AGENDADAS)
     .order("ordem", { ascending: true });
   // Só cai no padrão se a tabela não existir; tabela vazia (colunas apagadas no Admin) = board vazio
   if (error) {

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Plus, List, Kanban as KanbanIcon, Search, MoreVertical, Pencil, Trash2, Repeat, Calendar as CalendarIcon, ChevronDown, ChevronUp, X, Check, CheckSquare } from "lucide-react";
+import { Plus, List, Kanban as KanbanIcon, Search, MoreVertical, Pencil, Trash2, Repeat, Calendar as CalendarIcon, ChevronDown, ChevronUp, X, Check, CheckSquare, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,7 +58,9 @@ import { cn } from "@/lib/utils";
 import { KanbanColumnDef, COLUMN_COLORS, slugifyColumnId, RegraData } from "@/lib/demandaColunas";
 import { RegraDataCampos } from "@/components/demandas/RegraDataCampos";
 import { msAteProximaVirada } from "@/lib/viradaDia";
-import { hojeBrasilia, siglaDoDia } from "@/lib/entrega";
+import { formatarDataCurta, hojeBrasilia, siglaDoDia } from "@/lib/entrega";
+import { AgendadasSheet } from "@/components/demandas/AgendadasSheet";
+import { COLUNA_AGENDADAS } from "@/lib/agendadas";
 import { somarDias } from "@/lib/recorrencia";
 import {
   mapaDias as montarMapaDias,
@@ -100,6 +102,7 @@ function DemandasPage() {
   const { label: agenciaLabelOf } = useAgencias();
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [agendadasAberta, setAgendadasAberta] = useState(false);
   const [loading, setLoading] = useState(false);
   const [clientes, setClientes] = useCachedState<{ id: string; nome: string; agencia: string }[]>(CACHE_KEYS.clientesLite, []);
   const [demandas, setDemandas] = useCachedState<any[]>(CACHE_KEYS.demandas, []);
@@ -269,6 +272,11 @@ function DemandasPage() {
     setIsModalOpen(true);
   };
 
+  const openAgendar = () => {
+    setEditingDemanda({ status: COLUNA_AGENDADAS });
+    setIsModalOpen(true);
+  };
+
   const handleCreateOrUpdateDemanda = async (values: DemandaFormValues) => {
     setLoading(true);
     try {
@@ -311,7 +319,9 @@ function DemandasPage() {
           ordem: maxOrder + 1
         }]);
         if (error) throw error;
-        toast.success("Demanda criada!");
+        toast.success(sanitizedValues.status === COLUNA_AGENDADAS && sanitizedValues.prazo
+          ? `Agendada para ${formatarDataCurta(sanitizedValues.prazo)}`
+          : "Demanda criada!");
       }
 
       setIsModalOpen(false);
@@ -526,9 +536,16 @@ function DemandasPage() {
 
   const nomeDoCliente = useMemo(() => new Map(clientes.map((c) => [c.id, c.nome] as const)), [clientes]);
 
+  // Agendadas esperam fora do quadro e da lista (botão "Agendadas"); o banco as desce 2 dias antes da data
+  const doQuadro = useMemo(() => demandas.filter((d) => d.status !== COLUNA_AGENDADAS), [demandas]);
+  const agendadas = useMemo(
+    () => demandas.filter((d) => d.status === COLUNA_AGENDADAS).sort((a, b) => String(a.prazo).localeCompare(String(b.prazo))),
+    [demandas],
+  );
+
   // Busca tolerante (sem acento, com erro de digitação): só filtra, os cards seguem a ordem das colunas
   const resultadoBusca = useBusca(
-    demandas,
+    doQuadro,
     searchQuery,
     // A agência (da demanda ou do cliente) também entra: buscar "Effect" acha as demandas da Effect
     (d) => {
@@ -800,6 +817,21 @@ function DemandasPage() {
                 </TabsTrigger>
             </TabsList>
             </Tabs>
+            <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-8" onClick={() => setAgendadasAberta(true)}>
+                Agendadas
+                {agendadas.length > 0 && (
+                  <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">{agendadas.length}</span>
+                )}
+            </Button>
+            <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs h-8 border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
+                onClick={openAgendar}
+            >
+                <CalendarClock size={14} />
+                Agendar
+            </Button>
             <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => openNewDemanda()}>
                 <Plus size={14} />
                 Nova
@@ -1178,9 +1210,15 @@ function DemandasPage() {
       }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{editingDemanda?.id ? "Editar Demanda" : "Nova Demanda"}</DialogTitle>
+            <DialogTitle>
+              {editingDemanda?.status === COLUNA_AGENDADAS
+                ? editingDemanda?.id ? "Editar tarefa agendada" : "Agendar tarefa"
+                : editingDemanda?.id ? "Editar Demanda" : "Nova Demanda"}
+            </DialogTitle>
             <DialogDescription>
-              Preencha os detalhes da tarefa abaixo.
+              {editingDemanda?.status === COLUNA_AGENDADAS
+                ? "Ela fica em Agendadas e desce para Fazer depois de amanhã 2 dias antes da data."
+                : "Preencha os detalhes da tarefa abaixo."}
             </DialogDescription>
           </DialogHeader>
           <DemandaForm
@@ -1189,9 +1227,21 @@ function DemandasPage() {
             onSubmit={handleCreateOrUpdateDemanda} 
             loading={loading}
             initialValues={editingDemanda}
+            agendar={editingDemanda?.status === COLUNA_AGENDADAS}
           />
         </DialogContent>
       </Dialog>
+
+      <AgendadasSheet
+        aberto={agendadasAberta}
+        onOpenChange={setAgendadasAberta}
+        agendadas={agendadas}
+        onAgendar={() => { setAgendadasAberta(false); openAgendar(); }}
+        onAbrir={(d) => { setAgendadasAberta(false); handleOpenDrawer(d); }}
+        onEditar={(d) => { setAgendadasAberta(false); setEditingDemanda(d); setIsModalOpen(true); }}
+        onConcluir={(d) => moverParaFeito(d.id)}
+        onExcluir={(d) => { setDeletingId(d.id); setDeletingName(d.titulo); }}
+      />
 
       <AlertDialog open={!!deletingId} onOpenChange={(o) => { if (!o) setDeletingId(null); }}>
         <AlertDialogContent>

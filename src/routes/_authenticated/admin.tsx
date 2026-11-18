@@ -22,6 +22,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { COLUNA_AGENDADAS } from "@/lib/agendadas";
 import { useAgencias, AGENCIA_COLORS, slugifyAgenciaId, type AgenciaDef } from "@/lib/agencias";
 import { useDemandaColunas, COLUMN_COLORS, slugifyColumnId, type KanbanColumnDef, type RegraData } from "@/lib/demandaColunas";
 import { RegraDataCampos } from "@/components/demandas/RegraDataCampos";
@@ -600,7 +601,8 @@ function AdminPage() {
       } else {
         // Colunas só podem sair depois das demandas (FK demandas.status -> demanda_colunas)
         await wipeAllDemandas();
-        const { error } = await supabase.from("demanda_colunas").delete().not("id", "is", null);
+        // Agendadas fica: é a coluna de sistema (escondida) das tarefas agendadas
+        const { error } = await supabase.from("demanda_colunas").delete().not("id", "is", null).neq("id", COLUNA_AGENDADAS);
         if (error) throw error;
         toast.success("Colunas e demandas do Kanban foram apagadas");
         await reloadColunas();

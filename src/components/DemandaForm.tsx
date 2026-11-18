@@ -14,6 +14,7 @@ import {
 import { ClientePicker } from "@/components/demandas/ClientePicker";
 import { clientesDaDemanda } from "@/lib/clientesDaDemanda";
 import { clientesNoTitulo } from "@/lib/clienteNoTitulo";
+import { hojeBrasilia } from "@/lib/entrega";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -47,9 +48,11 @@ interface DemandaFormProps {
   columns: { id: string; title: string }[];
   onSubmit: (values: DemandaFormValues) => void;
   loading?: boolean;
+  /** Tarefa agendada: sem coluna nem recorrência, com data obrigatória (o banco a desce 2 dias antes) */
+  agendar?: boolean;
 }
 
-export function DemandaForm({ clientes, columns, onSubmit, loading, initialValues }: DemandaFormProps & { initialValues?: Partial<DemandaFormValues> }) {
+export function DemandaForm({ clientes, columns, onSubmit, loading, initialValues, agendar }: DemandaFormProps & { initialValues?: Partial<DemandaFormValues> }) {
   const form = useForm<DemandaFormValues>({
     resolver: zodResolver(demandaSchema),
     defaultValues: {
@@ -138,7 +141,8 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
           }}
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className={agendar ? "grid gap-4" : "grid grid-cols-2 gap-4"}>
+          {!agendar && (
           <FormField
             control={form.control}
             name="status"
@@ -161,6 +165,7 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
               </FormItem>
             )}
           />
+          )}
           <FormField
             control={form.control}
             name="prioridade"
@@ -186,6 +191,7 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
           />
         </div>
 
+        {!agendar && (
         <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
           <FormField
             control={form.control}
@@ -258,15 +264,22 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
             </div>
           )}
         </div>
+        )}
 
         <FormField
           control={form.control}
           name="prazo"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Prazo (Opcional)</FormLabel>
+              <FormLabel>{agendar ? "Data agendada" : "Prazo (Opcional)"}</FormLabel>
               <FormControl>
-                <Input type="date" {...field} value={field.value || ""} />
+                <Input
+                  type="date"
+                  {...field}
+                  value={field.value || ""}
+                  required={agendar}
+                  min={agendar ? hojeBrasilia() : undefined}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -288,7 +301,7 @@ export function DemandaForm({ clientes, columns, onSubmit, loading, initialValue
         />
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Salvando..." : "Criar Demanda"}
+          {loading ? "Salvando..." : agendar ? "Agendar" : "Criar Demanda"}
         </Button>
       </form>
     </Form>
