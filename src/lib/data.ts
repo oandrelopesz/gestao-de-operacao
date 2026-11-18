@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { parseOperacoesResumo } from "@/lib/clientes";
 import { formatMoeda } from "@/lib/moedas";
-import { churnEncerrado } from "@/lib/churn";
+import { churnEncerrado, filtroClienteDisponivel } from "@/lib/churn";
 import { categoriaDoScore } from "@/lib/nps";
 import { fetchDemandaColunas } from "@/lib/demandaColunas";
 import { fetchCursoCategorias } from "@/lib/cursoCategorias";
@@ -28,6 +28,7 @@ export const CACHE_KEYS = {
   colunas: "demanda-colunas",
   clientesView: "clientes-view",
   clientesChurn: "clientes-churn",
+  clientesPausados: "clientes-pausados",
   saldo: "saldo",
   acessos: "acessos",
   financeiro: "financeiro",
@@ -77,7 +78,7 @@ export async function loadDemandas() {
 }
 
 export async function loadClientesLite() {
-  const { data, error } = await supabase.from("clientes").select("id, nome, agencia").order("nome");
+  const { data, error } = await supabase.from("clientes").select("id, nome, agencia").eq("arquivado", false).or(filtroClienteDisponivel()).order("nome");
   if (error) throw error;
   return (data || []) as { id: string; nome: string; agencia: string }[];
 }
@@ -102,7 +103,8 @@ async function buscarClientesView(arquivado: boolean) {
   if (saldosError) console.warn("Erro ao buscar saldos para enriquecimento:", saldosError);
 
   // Churn que já valeu mora na aba Clientes em Churn; com contrato em vigor o cliente segue aqui até a data
-  const lista = ((data as any[]) || []).filter((cli) => !churnEncerrado(cli));
+  // Pausados moram na sub-aba Pausados
+  const lista = ((data as any[]) || []).filter((cli) => !churnEncerrado(cli) && cli.status_operacional !== "pausado");
   return lista.map((cli) => {
     const cliSaldos = (saldos || []).filter((s) => s.cliente_id === cli.id && s.ativo !== false);
     const operacoes = parseOperacoesResumo(cli.operacoes);
@@ -146,6 +148,18 @@ export async function loadClientesChurn() {
     .order("churn_em", { ascending: false, nullsFirst: false });
   if (error) throw error;
   return ((data as any[]) || []).filter((cli) => churnEncerrado(cli));
+}
+
+/** Clientes pausados (não arquivados), para a sub-aba Pausados de Clientes */
+export async function loadClientesPausados() {
+  const { data, error } = await supabase
+    .from("clientes_view" as any)
+    .select("*")
+    .eq("status_operacional", "pausado")
+    .eq("arquivado", false)
+    .order("nome");
+  if (error) throw error;
+  return (data as any[]) || [];
 }
 
 export async function loadSaldo() {
@@ -248,6 +262,7 @@ export const NPS_CLIENTES_QUERY = {
       .from("clientes")
       .select("id, nome, agencia, status_operacional, em_onboarding, nicho")
       .eq("arquivado", false)
+      .or(filtroClienteDisponivel())
       .order("nome");
     if (error) throw error;
     return data || [];

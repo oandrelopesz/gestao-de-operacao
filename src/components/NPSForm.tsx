@@ -14,6 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { filtroClienteDisponivel } from "@/lib/churn";
 import { NPS_METRICS, getScoreCategory, getMetricColor, calcularScoreNPS, type NPSNotas } from "@/lib/nps";
 import { useAgencias } from "@/lib/agencias";
 import { getUserId } from "@/lib/clientesService";
@@ -63,6 +64,7 @@ export function NPSForm({ onSuccess, onClose, initialData, defaultClienteId }: N
         .from("clientes")
         .select("id, nome, agencia")
         .eq("arquivado", false)
+        .or(filtroClienteDisponivel())
         .order("nome");
       return data || [];
     },

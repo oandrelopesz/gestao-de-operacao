@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { filtroClienteDisponivel } from "@/lib/churn";
 import type { ClientFormValues } from "@/components/ClientForm";
 import { loadClienteFormValues, saveCliente } from "@/lib/clientesService";
 import { aplicarVerbaPrincipal } from "@/lib/verbaPrincipal";
@@ -157,6 +158,7 @@ export async function fetchClientesEmOnboarding(): Promise<ClienteResumo[]> {
     .select("id, nome, agencia, em_onboarding, trafego_ativo, onboarding_desde")
     .eq("em_onboarding", true)
     .eq("arquivado", false)
+    .or(filtroClienteDisponivel())
     .order("nome", { ascending: true });
   if (error) throw error;
   return (data || []) as ClienteResumo[];

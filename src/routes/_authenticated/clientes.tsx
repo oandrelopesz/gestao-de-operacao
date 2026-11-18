@@ -60,15 +60,16 @@ import { useBusca } from "@/lib/useBusca";
 import { MENSAGEM_NENHUM, normalizarBusca, type ResultadoBusca } from "@/lib/search";
 import { MensagemBusca } from "@/components/MensagemBusca";
 import { ClientesChurn } from "@/components/clientes/ClientesChurn";
+import { ClientesPausados } from "@/components/clientes/ClientesPausados";
 
-type SearchParams = { agencia?: string; view?: "cards" | "tabela"; subAgencia?: string; aba?: "churn" };
+type SearchParams = { agencia?: string; view?: "cards" | "tabela"; subAgencia?: string; aba?: "churn" | "pausados" };
 
 export const Route = createFileRoute("/_authenticated/clientes")({
   validateSearch: (search: Record<string, unknown>): SearchParams => ({
     agencia: typeof search.agencia === "string" && search.agencia ? search.agencia : "todos",
     view: search.view === "tabela" ? "tabela" : "cards",
     subAgencia: typeof search.subAgencia === "string" ? search.subAgencia : undefined,
-    aba: search.aba === "churn" ? "churn" : undefined,
+    aba: search.aba === "churn" || search.aba === "pausados" ? search.aba : undefined,
   }),
   component: ClientesPage,
 });
@@ -117,7 +118,6 @@ function ClientesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [operacionalFilter, setOperacionalFilter] = useState<string>("all_active");
-  const [showPausados, setShowPausados] = useState(true);
   const [showArquivados, setShowArquivados] = useState(false);
   /** Valor atual do controle para quem roda depois (o "Desfazer" do aviso guarda uma versão antiga da tela) */
   const showArquivadosRef = useRef(showArquivados);
@@ -196,8 +196,8 @@ function ClientesPage() {
       .filter((c) => agencia === "todos" ? true : c.agencia === agencia)
       .filter((c) => !subAgencia || c.agencia === subAgencia)
       .filter((c) => statusFilter === "all" || c.nps_status === statusFilter)
-      .filter((c) => c.arquivado || showPausados || c.status_operacional === "ativo");
-  }, [clientes, arquivados, showArquivados, agencia, subAgencia, statusFilter, showPausados]);
+      .filter((c) => c.status_operacional !== "pausado");
+  }, [clientes, arquivados, showArquivados, agencia, subAgencia, statusFilter]);
 
   // "Ver detalhes" do aviso de fim de contrato escreve "Nome A|Nome B": a busca por texto não faz "ou",
   // então cada nome entre "|" é um cliente exato e o resultado é só esses, na ordem da tela.
@@ -222,7 +222,6 @@ function ClientesPage() {
     
     const total = list.length;
     const ativos = ativosList.length;
-    const pausados = list.filter((c) => c.status_operacional === "pausado").length;
     const churn = list.filter((c) => c.status_operacional === "churn").length;
     
     const verbaTotal = ativosList.reduce((acc, c) => {
@@ -237,7 +236,7 @@ function ClientesPage() {
     const em_risco = ativosList.filter((c) => c.nps_status === "em_risco").length;
     const critico = ativosList.filter((c) => c.nps_status === "critico").length;
     
-    return { total, ativos, pausados, churn, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
+    return { total, ativos, churn, verbaTotal, verbaMedia, ancora, saudavel, em_risco, critico };
   }, [clientes, agencia]);
 
   const agenciaMeta = agencia === "todos"
@@ -300,13 +299,26 @@ function ClientesPage() {
   const [deletingName, setDeletingName] = useState<string>("");
 
   const abas = (
-    <Tabs value={aba ?? "ativos"} onValueChange={(v) => navigate({ search: v === "churn" ? { aba: "churn" } : { agencia: "todos", view: "cards" } })}>
+    <Tabs value={aba ?? "ativos"} onValueChange={(v) => navigate({ search: v === "churn" || v === "pausados" ? { aba: v } : { agencia: "todos", view: "cards" } })}>
       <TabsList>
         <TabsTrigger value="ativos" className="gap-1.5"><UsersIcon size={14} />Ativos</TabsTrigger>
-        <TabsTrigger value="churn" className="gap-1.5"><UserMinus size={14} />Em churn</TabsTrigger>
+        <TabsTrigger value="pausados" className="gap-1.5"><span className="h-2 w-2 rounded-full bg-yellow-500" aria-hidden />Pausados</TabsTrigger>
+        <TabsTrigger value="churn" className="gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500" aria-hidden />Em churn</TabsTrigger>
       </TabsList>
     </Tabs>
   );
+
+  if (aba === "pausados") {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <h1 className="text-2xl font-bold tracking-tight">Clientes Pausados</h1>
+          {abas}
+        </div>
+        <ClientesPausados />
+      </div>
+    );
+  }
 
   if (aba === "churn") {
     return (
@@ -526,7 +538,7 @@ function ClientesPage() {
           icon={<UsersIcon size={16} />} 
           label="Clientes" 
           value={String(metrics.total)} 
-          hint={`${metrics.ativos} ativos / ${metrics.pausados} pausados / ${metrics.churn} churn`} 
+          hint={`${metrics.ativos} ativos / ${metrics.churn} em churn (contrato em vigor)`} 
         />
         <MetricCard 
           icon={<DollarSign size={16} />} 
@@ -586,10 +598,6 @@ function ClientesPage() {
             <SelectItem value="sem_avaliacao">Sem avaliação</SelectItem>
           </SelectContent>
         </Select>
-        <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs">
-          <span className="font-medium">Mostrar pausados</span>
-          <Checkbox checked={showPausados} onCheckedChange={(v) => setShowPausados(!!v)} />
-        </div>
         <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md border text-xs">
           <span className="font-medium">Mostrar arquivados</span>
           <Checkbox aria-label="Mostrar arquivados" checked={showArquivados} onCheckedChange={(v) => setShowArquivados(!!v)} />

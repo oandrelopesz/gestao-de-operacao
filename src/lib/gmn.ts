@@ -1,6 +1,7 @@
 // Aba Google Meu Negócio: perfis, posts e chamadas à edge function `gmn`.
 // O types.ts gerado ainda não conhece as tabelas novas: por isso `as any` nos `.from(...)`.
 import { supabase } from "@/integrations/supabase/client";
+import { filtroClienteDisponivel } from "@/lib/churn";
 import { cabecalhosDeAcesso } from "@/lib/googleDrive";
 import { blobParaBase64, normalizarFoto, normalizarLogo } from "@/lib/gmnImagem";
 import {
@@ -132,7 +133,7 @@ export async function fetchPerfis(): Promise<PerfilGmn[]> {
 }
 
 export async function fetchClientesOpcoes(): Promise<ClienteOpcao[]> {
-  const { data, error } = await supabase.from("clientes").select("id, nome, arquivado").order("nome");
+  const { data, error } = await supabase.from("clientes").select("id, nome, arquivado").or(filtroClienteDisponivel()).order("nome");
   if (error) throw error;
   return (data || []).filter((c: any) => !c.arquivado).map((c: any) => ({ id: c.id, nome: c.nome }));
 }

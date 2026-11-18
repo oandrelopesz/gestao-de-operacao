@@ -65,3 +65,17 @@ test("churn só sai dos ativos quando valeu: imediato, sem data ou contrato venc
   assert.equal(e({ contrato_ate: "2026-11-30" }), false);
   assert.equal(churnEncerrado({ status_operacional: "ativo", churn_efeito_imediato: true }, hoje), false);
 });
+
+import { filtroClienteDisponivel } from "./churn.ts";
+
+test("filtro de cliente disponível: ativo ou churn com contrato em vigor, nunca pausado", () => {
+  const f = filtroClienteDisponivel("2026-11-18");
+  assert.equal(
+    f,
+    "status_operacional.eq.ativo,and(status_operacional.eq.churn,churn_efeito_imediato.eq.false,contrato_ate.gte.2026-11-18)",
+  );
+  assert.ok(!f.includes("pausado"));
+  // coerente com churnEncerrado: contrato até hoje ainda vale, ontem já saiu
+  assert.equal(churnEncerrado({ status_operacional: "churn", contrato_ate: "2026-11-18" }, "2026-11-18"), false);
+  assert.equal(churnEncerrado({ status_operacional: "churn", contrato_ate: "2026-11-17" }, "2026-11-18"), true);
+});

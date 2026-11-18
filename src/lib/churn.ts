@@ -50,3 +50,10 @@ export function churnEncerrado(c: ClienteChurnContrato, hoje = hojeBrasilia()): 
   if (c.status_operacional !== "churn") return false;
   return !!c.churn_efeito_imediato || !c.contrato_ate || c.contrato_ate < hoje;
 }
+
+/**
+ * Filtro PostgREST (`.or(...)`) dos clientes que ainda se atende: ativos, ou em churn com contrato em vigor.
+ * Pausados, churn que já valeu e (por cascata) removidos ficam fora de todo seletor de cliente. Espelha `churnEncerrado`.
+ */
+export const filtroClienteDisponivel = (hoje = hojeBrasilia()) =>
+  `status_operacional.eq.ativo,and(status_operacional.eq.churn,churn_efeito_imediato.eq.false,contrato_ate.gte.${hoje})`;

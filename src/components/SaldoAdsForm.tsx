@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { filtroClienteDisponivel } from "@/lib/churn";
 import { maskBRLInput, parseBRLInput, formatBRL } from "@/lib/clientes";
 import { useAgencias } from "@/lib/agencias";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +79,7 @@ export function SaldoAdsForm({ initialValues, onSubmit, loading }: SaldoAdsFormP
 
   useEffect(() => {
     const fetchClientes = async () => {
-      const { data } = await supabase.from("clientes").select("id, nome, agencia, verba_ads, tipo_verba, verba_total_contratada, data_inicio, data_limite_verba").order("nome");
+      const { data } = await supabase.from("clientes").select("id, nome, agencia, verba_ads, tipo_verba, verba_total_contratada, data_inicio, data_limite_verba").eq("arquivado", false).or(filtroClienteDisponivel()).order("nome");
       if (data) setClientes(data as any);
     };
     fetchClientes();

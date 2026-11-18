@@ -1,13 +1,14 @@
 // Dados da Central de arquivos: pastas (clientes), arquivos no R2 (módulo `central`, sem bucket antigo no Supabase).
 // Listar, apagar, copiar e miniatura usam só o R2; baixar usa a reserva do Supabase, como o resto do sistema.
 import { Zip, ZipPassThrough } from "fflate";
+import { filtroClienteDisponivel } from "@/lib/churn";
 import { supabase } from "@/integrations/supabase/client";
 import { apagarR2, baixarComReserva, copiarComReserva, enviarR2, listarR2, urlFixa } from "@/lib/r2";
 import { caminhoCentral, entradasDoZip, motivoRecusa, nomeOriginal, renomeado } from "@/lib/centralRegras";
 
 /** Pastas = clientes do cadastro que não estão arquivados, em ordem alfabética. */
 export async function fetchPastas(): Promise<{ id: string; nome: string }[]> {
-  const { data, error } = await supabase.from("clientes").select("id, nome").eq("arquivado", false).order("nome");
+  const { data, error } = await supabase.from("clientes").select("id, nome").eq("arquivado", false).or(filtroClienteDisponivel()).order("nome");
   if (error) throw error;
   return data ?? [];
 }
