@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { acessoLiberado } from "../_comum/acesso.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +9,10 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  if (!(await acessoLiberado(req))) {
+    return new Response(JSON.stringify({ erro: "Não autorizado." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } })
   }
 
   // Desabilitado por solicitação do usuário: as tarefas recorrentes devem ficar apenas na coluna "Recorrentes"
