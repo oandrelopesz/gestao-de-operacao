@@ -32,3 +32,7 @@ Ferramentas fora do app (não entram no build do Lovable). Instalar uma vez: `np
 - Cliente pelo título nas Demandas: `node testar-cliente-no-titulo.mjs http://localhost:5178/` — adicionar rápido no Standby
   com e sem nome de cliente (confere banco e selo no card) e formulário "Nova" (preenche ao digitar, limpa, grava, escolha
   à mão vence). Cria demandas `[TESTE] rapido`/`[TESTE] form` e apaga todas no fim.
+
+## Login nos testes (desde 17/11/2026)
+O banco só responde a quem está logado. Rode os testes com `npm run teste -- <script>.mjs [args]` (dentro de `tools/auditoria-mobile`):
+`sessao-teste.mjs` gera uma sessão real de contato@andrelopes.digital (service_role lida de `%USERPROFILE%\.gestao\seguranca.env`) e a injeta no navegador do Playwright e no `fetch` do Node. Sem isso, os scripts caem na tela de login e o REST com a chave pública dá 401.
