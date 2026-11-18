@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/radar/CardAchado.tsx"
+        ],
+        "createdAt": "2026-11-18T03:59:21.638Z",
+        "reason": "spec do André docs/radar-ia/prompt-aba-radar-ia.md L541 pede borda esquerda na cor da classe do achado"
+      }
+    ]
+  }
+}
