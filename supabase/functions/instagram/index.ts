@@ -7,15 +7,16 @@
 //   POST { acao: "local", ref }   -> { lugar, sem_conferir? }  confere a página colada (id ou nome de usuário)
 //   POST { acao: "permissoes" }   -> { valido, permissoes, paginas } permissões do META_TOKEN e tarefas em cada página
 //   POST { acao: "comentar", id }  -> { ok }                    tenta de novo o primeiro comentário de um post publicado
-// verify_jwt = false (supabase/config.toml); sem chave de acesso, por decisão do André até o projeto de segurança.
+// verify_jwt = false (supabase/config.toml); POST exige a sessão do André ou x-cron-key (_comum/acesso.ts).
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
+import { acessoLiberado } from "../_comum/acesso.ts";
 import { GRAPH, contasDasPaginas, listarTudo } from "./meta.ts";
 import { comentar, excluir, local, locais, passo, permissoes } from "./passo.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-key",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
@@ -41,7 +42,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   const token = Deno.env.get("META_TOKEN") ?? "";
   if (req.method === "GET") return json({ ok: true, servico: "instagram", token: !!token });
-  if (!token) return json({ erro: "Falta o segredo META_TOKEN no Lovable." }, 500);
+  if (!(await acessoLiberado(req))) return json({ erro: "Acesso não autorizado." }, 401);
+  if (!token) return json({ erro: "Falta o segredo META_TOKEN." }, 500);
   let corpo: any;
   try {
     corpo = await req.json();

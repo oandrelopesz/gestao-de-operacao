@@ -2,10 +2,10 @@
 // Transição de 30 dias (até 30/10/2026): envio só para o R2; leitura no R2 com reserva no bucket antigo do
 // Supabase; apagar nos dois lados. Swipe file, Transcritor e Fireflies não usam este módulo.
 import { supabase } from "@/integrations/supabase/client";
+import { cabecalhosDaSessao } from "@/lib/acessoSessao";
 import { MODULOS_R2, chaveR2, urlFixaR2, urlImagemNota, type ModuloR2 } from "@/lib/r2Chaves";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const CHAVE_PUBLICA = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const FUNCAO = `${SUPABASE_URL}/functions/v1/r2`;
 
 /** O arquivo não está no R2 (a leitura e a cópia caem no Supabase). */
@@ -14,7 +14,7 @@ class NaoEstaNoR2 extends Error {}
 async function chamar<T>(corpo: Record<string, unknown>): Promise<T> {
   const r = await fetch(FUNCAO, {
     method: "POST",
-    headers: { apikey: CHAVE_PUBLICA, Authorization: `Bearer ${CHAVE_PUBLICA}`, "Content-Type": "application/json" },
+    headers: await cabecalhosDaSessao(),
     body: JSON.stringify(corpo),
   });
   const d = await r.json().catch(() => ({}));

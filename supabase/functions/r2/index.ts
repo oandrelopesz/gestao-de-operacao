@@ -8,14 +8,15 @@
 //   POST { acao: "listar", prefixo }      -> { chaves }
 //   POST { acao: "migrar", modulo, direcao, limite } -> { copiados, erros, existentes, faltam, total, invalidos }  (x-swipe-key)
 //   POST { acao: "conferir", modulo }     -> { iguais, soNoSupabase, soNoR2, tamanhoDiferente }         (x-swipe-key)
-// POST exige o cabeçalho apikey com a chave pública do projeto: o mesmo nível de acesso que o Storage tinha.
+// POST exige a sessão do André (Authorization: Bearer <jwt do login Google>) ou x-cron-key (_comum/acesso.ts); a chave pública sozinha não libera.
 // deno-lint-ignore-file no-explicit-any
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
+import { acessoLiberado } from "../_comum/acesso.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-swipe-key",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-swipe-key, x-cron-key",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
@@ -75,19 +76,6 @@ function exigirModulo(modulo: unknown): string {
 }
 
 // ------------------------------------------------------------------ acesso
-
-/** Chave pública do projeto (a mesma que o app usa): a do ambiente ou um JWT anon deste projeto. */
-function chavePublicaValida(apikey: string): boolean {
-  if (!apikey) return false;
-  if (env("SUPABASE_ANON_KEY") && apikey === env("SUPABASE_ANON_KEY")) return true;
-  try {
-    const ref = new URL(env("SUPABASE_URL")).hostname.split(".")[0];
-    const carga = JSON.parse(atob(apikey.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return carga.role === "anon" && carga.ref === ref;
-  } catch {
-    return false;
-  }
-}
 
 function iguais(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -311,7 +299,7 @@ Deno.serve(async (req) => {
       });
     }
     if (req.method !== "POST") return json({ error: "Método não suportado" }, 405);
-    if (!chavePublicaValida(req.headers.get("apikey") || "")) return json({ error: "Acesso não autorizado." }, 401);
+    if (!(await acessoLiberado(req))) return json({ error: "Acesso não autorizado." }, 401);
 
     const body = (await req.json().catch(() => null)) ?? {};
     switch (body.acao) {
