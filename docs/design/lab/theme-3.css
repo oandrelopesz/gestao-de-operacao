@@ -1,0 +1,26 @@
+@import url(palette.css);
+/* 3 · Monocromo futurista: Vercel/Raycast. Contraste máximo, quinas retas, grade fina, azul só no foco. */
+:root{--font:"Geist","Inter",system-ui,sans-serif;--font-display:"Geist",system-ui,sans-serif;--fs:13px;--h1:18px;--h1-w:600;--h1-ls:-.03em;
+--r-sm:2px;--r-md:4px;--r-lg:6px;--r-xl:8px;--r-pill:4px;--side-w:224px;--col-w:276px;--gap:0;--col-pad:0;--card-pad:12px;--card-gap:0;--stroke:1.5;--t-w:500}
+html[data-mode=dark]{--bg:oklch(.1 .012 258);--bg-side:oklch(.1 .012 258);--surface:oklch(.1 .012 258);--surface-2:oklch(.16 .014 258);--lane:transparent;--line:oklch(1 0 0/.1);--line-2:oklch(1 0 0/.22);--card-line:oklch(1 0 0/.1);--surface-pop:oklch(.13 .014 258)}
+html[data-mode=light]{--bg:oklch(.995 0 0);--bg-side:oklch(.985 .002 250);--surface:oklch(1 0 0);--lane:transparent;--line:oklch(.9 .006 250);--line-2:oklch(.7 .01 250);--fg:oklch(.14 .01 255)}
+.board{gap:0;padding:0 0 0 22px}
+.col{border-left:1px solid var(--line);border-radius:0;padding:0;gap:0}
+.col-h{padding:12px;border-bottom:1px solid var(--line)}
+.cards{gap:0}
+.card{border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent;padding:14px 12px}
+.card:hover{transform:none;background:var(--hover);border-color:var(--line)}
+html[data-mode=dark] .card:hover{box-shadow:inset 2px 0 0 var(--pri)}
+html[data-mode=light] .card:hover{box-shadow:inset 2px 0 0 var(--fg)}
+.btn{box-shadow:none}
+.btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn.primary:hover{filter:none;background:var(--fg-2)}
+.nav a.on{background:transparent;box-shadow:inset 2px 0 0 var(--fg)}
+.nav a.on .ic{color:var(--fg)}
+.pill{background:var(--surface-2);color:var(--fg)}
+.chip.on{background:var(--fg);color:var(--bg)}
+.logo{background:var(--fg);border-radius:2px;clip-path:polygon(50% 8%,92% 88%,8% 88%);box-shadow:none}
+.top{border-bottom:1px solid var(--line)}
+.date,.nav .n,.col-h .ct,.props dt{font-family:"Geist Mono",ui-monospace,monospace;font-size:11px}
+html[data-mode=dark] .field:focus-within,html[data-mode=dark] .inp:focus{box-shadow:0 0 0 3px oklch(.72 .15 235/.2)}
+.seg button.on{background:var(--fg);color:var(--bg);box-shadow:none}

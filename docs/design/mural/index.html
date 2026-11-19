@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mural de referências</title>
+<style>
+  :root { --papel: #f3f1ec; --tinta: #1b1a17; --apagado: #6b675f; --linha: #d9d5cc; --sim: #1f7a4d; --nao: #b3361f; color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--papel); color: var(--tinta); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; padding: 0 clamp(16px, 4vw, 56px) 120px; }
+  header { padding-block: 48px 8px; max-width: 72ch; }
+  h1 { font-size: 34px; line-height: 1.1; margin: 0 0 12px; letter-spacing: -0.02em; font-weight: 650; }
+  header p { margin: 0 0 8px; color: var(--apagado); }
+  section { margin-top: 56px; border-top: 1px solid var(--linha); padding-top: 20px; }
+  h2 { font-size: 22px; margin: 0; letter-spacing: -0.01em; font-weight: 650; }
+  section > p { margin: 4px 0 20px; color: var(--apagado); max-width: 70ch; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 28px 20px; }
+  figure { margin: 0; }
+  .foto { position: relative; display: block; width: 100%; padding: 0; border: 0; background: #e6e2da; cursor: zoom-in; border-radius: 6px; overflow: hidden; }
+  .foto img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; transition: transform .5s cubic-bezier(.16,1,.3,1); }
+  .foto:hover img { transform: scale(1.025); }
+  .num { position: absolute; top: 10px; left: 10px; min-width: 34px; padding: 2px 8px; border-radius: 4px; background: var(--tinta); color: #fff; font: 600 15px/1.5 "Segoe UI", system-ui, sans-serif; font-variant-numeric: tabular-nums; text-align: center; }
+  figure.sim .foto { outline: 3px solid var(--sim); outline-offset: 3px; }
+  figure.nao .foto img { opacity: .35; filter: grayscale(1); }
+  figcaption { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  figcaption a { color: var(--apagado); font-size: 13px; margin-right: auto; }
+  .voto { font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--linha); background: #fff; color: var(--tinta); cursor: pointer; }
+  .voto:hover { border-color: var(--tinta); }
+  .voto[aria-pressed="true"].s { background: var(--sim); border-color: var(--sim); color: #fff; }
+  .voto[aria-pressed="true"].n { background: var(--nao); border-color: var(--nao); color: #fff; }
+  :focus-visible { outline: 2px solid #2f5bd3; outline-offset: 2px; }
+  .barra { position: fixed; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 14px clamp(16px, 4vw, 56px) calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--tinta); color: #fff; font-size: 14px; }
+  .barra b { font-weight: 600; }
+  .barra span { flex: 1 1 320px; }
+  .barra button { font: inherit; padding: 8px 18px; border: 0; border-radius: 999px; background: #fff; color: var(--tinta); cursor: pointer; }
+  dialog { padding: 0; border: 0; background: transparent; max-width: 94vw; max-height: 92vh; }
+  dialog::backdrop { background: rgb(20 19 17 / .88); }
+  dialog img { display: block; max-width: 94vw; max-height: 92vh; border-radius: 6px; }
+  @media (prefers-reduced-motion: reduce) { .foto img { transition: none; } }
+</style>
+
+<header>
+  <h1>Mural de referências</h1>
+  <p>45 telas em 9 estilos bem diferentes. Marque <b>Gostei</b> no que te atrai e <b>Não</b> no que te dá vontade de fechar. Não precisa marcar tudo.</p>
+  <p>Clique na imagem para ver grande. As marcações ficam salvas neste navegador. No fim, use o botão Copiar da barra de baixo e cole a lista no chat.</p>
+  <p>São conceitos de designers publicados no Dribbble, não sistemas prontos. Servem para descobrir o gosto, não para copiar.</p>
+</header>
+<main id="mural"></main>
+<div class="barra" role="status"><span id="resumo">Nada marcado ainda.</span><button id="copiar" type="button">Copiar</button></div>
+<dialog id="zoom"></dialog>
+
+<script>
+const ESTILOS = [
+  { t: 'Suíço e tipográfico', d: 'Grade rígida, tipografia grande e pesada, preto e branco com um único acento de cor.', ids: [0, 2, 4, 11, 172, 179] },
+  { t: 'Industrial e hardware', d: 'Botões e mostradores que parecem objetos físicos, cinza e alumínio, laranja só para sinal. Escola Dieter Rams e Teenage Engineering.', ids: [51, 54, 271, 270, 190] },
+  { t: 'Painel técnico claro', d: 'Cinza quente e verde-oliva, leitura de instrumento, números grandes e finos, muito ar.', ids: [254, 255, 21, 115] },
+  { t: 'Tátil e com relevo', d: 'Superfícies com volume, materiais, sombras de verdade. Parece que dá para tocar.', ids: [24, 36, 44, 34, 156, 234] },
+  { t: 'Terminal e dados densos', d: 'Fonte mono, tabelas apertadas, muita informação por centímetro. Cara de ferramenta profissional.', ids: [82, 168, 216, 224, 269, 108] },
+  { t: 'Cockpit futurista escuro', d: 'Painel de instrumentos, linhas finas que brilham, mapas e radares. Ficção científica sóbria.', ids: [48, 160, 244, 6, 163, 272] },
+  { t: 'Escuro de luxo', d: 'Preto profundo, um único acento metálico ou neon, tipografia elegante, pouca coisa na tela.', ids: [67, 104, 277, 96, 296] },
+  { t: 'Editorial colorido', d: 'Blocos de cor chapada, números enormes, cara de revista. Ousado.', ids: [141, 176, 174, 169] },
+  { t: 'Vidro e espaço', d: 'Camadas translúcidas sobre um ambiente, como o sistema dos óculos da Apple.', ids: [125, 127, 159] },
+];
+const CHAVE = 'mural-votos';
+let votos = {};
+try { votos = JSON.parse(localStorage.getItem(CHAVE)) || {}; } catch {}
+const salvar = () => { try { localStorage.setItem(CHAVE, JSON.stringify(votos)); } catch {} };
+
+fetch('candidatos.json').then(r => r.json()).then(dados => {
+  let n = 0;
+  mural.innerHTML = ESTILOS.map((e, ei) => `
+    <section aria-labelledby="e${ei}">
+      <h2 id="e${ei}">${e.t}</h2><p>${e.d}</p>
+      <div class="grade">${e.ids.map(id => { n++; const c = dados[id]; return `
+        <figure data-n="${n}" data-estilo="${e.t}">
+          <button class="foto" type="button" aria-label="Ampliar tela ${n}"><img loading="lazy" referrerpolicy="no-referrer" src="${c.src}" alt="${(c.title || e.t).replace(/"/g, '')}"><span class="num">${n}</span></button>
+          <figcaption><a href="${c.link}" target="_blank" rel="noopener">ver original</a>
+            <button class="voto s" type="button" aria-pressed="false">Gostei</button>
+            <button class="voto n" type="button" aria-pressed="false">Não</button></figcaption>
+        </figure>`; }).join('')}</div>
+    </section>`).join('');
+  pintar();
+});
+
+mural.addEventListener('click', ev => {
+  const fig = ev.target.closest('figure'); if (!fig) return;
+  if (ev.target.closest('.foto')) { const o = fig.querySelector('img'); zoom.replaceChildren(Object.assign(new Image(), { src: o.src, alt: o.alt, referrerPolicy: 'no-referrer' })); zoom.showModal(); return; }
+  const b = ev.target.closest('.voto'); if (!b) return;
+  const v = b.classList.contains('s') ? 'sim' : 'nao';
+  votos[fig.dataset.n] = votos[fig.dataset.n] === v ? undefined : v;
+  salvar(); pintar();
+});
+zoom.addEventListener('click', () => zoom.close());
+
+function pintar() {
+  const sim = [], nao = [];
+  for (const fig of mural.querySelectorAll('figure')) {
+    const v = votos[fig.dataset.n];
+    fig.className = v || '';
+    fig.querySelector('.s').setAttribute('aria-pressed', v === 'sim');
+    fig.querySelector('.n').setAttribute('aria-pressed', v === 'nao');
+    if (v === 'sim') sim.push(fig.dataset.n); else if (v === 'nao') nao.push(fig.dataset.n);
+  }
+  resumo.innerHTML = sim.length || nao.length ? `<b>Gostei:</b> ${sim.join(', ') || 'nenhuma'} &nbsp;·&nbsp; <b>Não:</b> ${nao.join(', ') || 'nenhuma'}` : 'Nada marcado ainda.';
+}
+copiar.addEventListener('click', async () => {
+  const t = resumo.textContent.replace(/\s+/g, ' ').trim();
+  try { await navigator.clipboard.writeText(t); copiar.textContent = 'Copiado'; } catch { copiar.textContent = 'Selecione o texto e copie'; }
+  setTimeout(() => (copiar.textContent = 'Copiar'), 1800);
+});
+</script>
+</html>

@@ -166,6 +166,570 @@
   --glow-2: oklch(0.6 0.2 290 / 0.14);
 }
 
+/* Aparência "Painel e vidro": camadas de vidro, raios grandes, Geologica fina.
+   Ajuste fino de cor por aparência acontece na Fase 2 (casca), com as 4 combinações abertas. */
+html[data-aparencia="painel"] {
+  --font-sans: "Geologica", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Geologica", ui-sans-serif, system-ui, sans-serif;
+  --radius: 1rem;
+  --vidro: rgb(255 255 255 / 0.46);
+  --vidro-linha: rgb(255 255 255 / 0.75);
+  --vidro-filtro: blur(28px) saturate(1.5);
+  --regua: 1px;
+  --regua-cor: var(--border);
+}
+html[data-aparencia="painel"].dark {
+  --vidro: rgb(20 27 40 / 0.5);
+  --vidro-linha: rgb(255 255 255 / 0.09);
+}
+
+/* Aparência "Editorial": revista suíça, fios grossos, quase sem raio, Schibsted Grotesk */
+html[data-aparencia="editorial"] {
+  --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --radius: 0.125rem;
+  --vidro: var(--card);
+  --vidro-linha: var(--border);
+  --vidro-filtro: none;
+  --regua: 3px;
+  --regua-cor: var(--foreground);
+}
+
+/* Casca do Painel: céu fixo no fundo e peças de vidro por cima (cores do mockup aprovado) */
+html[data-aparencia="painel"] {
+  --background: #e8edf3;
+  /* ponytail: cartões quase opacos em vez de backdrop-filter em cada um (centenas na Demandas pesariam a rolagem);
+     a linha do horizonte não atravessa os cartões que ficam direto sobre o céu */
+  --card: rgb(255 255 255 / 0.9);
+  --popover: rgb(248 250 253 / 0.94);
+  --sky: linear-gradient(180deg, #dfe6ee 0%, #eef2f6 46%, #f6f4f0 64%, #e3e9f0 100%);
+  --vidro-sombra: 0 1px 0 rgb(255 255 255 / 0.9) inset, 0 24px 48px -20px rgb(22 34 56 / 0.28);
+}
+html[data-aparencia="painel"].dark {
+  --background: #04060a;
+  --card: rgb(28 35 48 / 0.92);
+  --popover: rgb(18 24 35 / 0.92);
+  --sky: linear-gradient(180deg, #03050a 0%, #060a12 50%, #0a1220 72%, #070b13 100%);
+  --vidro-sombra: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 24px 48px -16px rgb(0 0 0 / 0.55);
+}
+html[data-aparencia="painel"] body {
+  background: var(--sky);
+  background-attachment: fixed;
+}
+html[data-aparencia="painel"] .casca {
+  background: transparent;
+}
+html[data-aparencia="painel"] main > header {
+  background: var(--vidro);
+  -webkit-backdrop-filter: var(--vidro-filtro);
+  backdrop-filter: var(--vidro-filtro);
+  border-color: var(--vidro-linha);
+}
+.camada-vidro {
+  background: var(--vidro);
+  border: 1px solid var(--vidro-linha);
+  -webkit-backdrop-filter: var(--vidro-filtro);
+  backdrop-filter: var(--vidro-filtro);
+  box-shadow: var(--vidro-sombra);
+}
+.camada-voo {
+  animation: camada-abre 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* só o deslize lateral: a centralização vertical vem da propriedade `translate` do -translate-y-1/2 (Tailwind 4),
+   que soma com `transform`; repetir translateY(-50%) aqui fazia o card nascer em cima e descer no fim */
+@keyframes camada-abre {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Casca do Editorial: fios grossos de revista, sem sombra, sem vidro */
+html[data-aparencia="editorial"] .editorial-mast {
+  border-bottom: var(--regua) solid var(--regua-cor);
+}
+html[data-aparencia="editorial"] .editorial-abas {
+  border-bottom: 1px solid var(--border);
+}
+html[data-aparencia="editorial"] main > header {
+  background: var(--background);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+/*
+ * Tinta, linhas e atraso por aparência (mockup aprovado em docs/design/lab2).
+ * Atenção: html[data-aparencia] vence .dark na especificidade, então todo token
+ * definido no bloco claro precisa ser repetido no bloco escuro da mesma aparência.
+ */
+html[data-aparencia="painel"] {
+  --foreground: #101722;
+  --card-foreground: #101722;
+  --popover-foreground: #101722;
+  --muted: rgb(255 255 255 / 0.5);
+  --secondary: rgb(255 255 255 / 0.5);
+  --muted-foreground: #4a5566;
+  --border: rgb(16 23 34 / 0.1);
+  --input: rgb(16 23 34 / 0.16);
+  --linha-forte: rgb(16 23 34 / 0.2);
+  --atraso: oklch(0.55 0.17 45);
+  --planeta: linear-gradient(180deg, #d5dee8 0%, #eaeff4 5%, #f1f4f7 12%);
+  --planeta-borda: rgb(255 255 255 / 0.95);
+  --nevoa: rgb(255 246 232 / 0.9);
+}
+html[data-aparencia="painel"].dark {
+  --foreground: #e9eef5;
+  --card-foreground: #e9eef5;
+  --popover-foreground: #e9eef5;
+  --muted: rgb(255 255 255 / 0.06);
+  --secondary: rgb(255 255 255 / 0.08);
+  --muted-foreground: #a3aebd;
+  --border: rgb(255 255 255 / 0.08);
+  --input: rgb(255 255 255 / 0.12);
+  --linha-forte: rgb(255 255 255 / 0.16);
+  --atraso: oklch(0.8 0.14 60);
+  --planeta: #070b12;
+  --planeta-borda: rgb(190 220 255 / 0.55);
+  --nevoa: rgb(70 120 190 / 0.22);
+}
+html[data-aparencia="editorial"] {
+  --muted-foreground: oklch(0.42 0.03 255);
+  --border: oklch(0.86 0.012 245);
+  --linha-forte: oklch(0.74 0.015 250);
+  --atraso: oklch(0.55 0.19 38);
+}
+html[data-aparencia="editorial"].dark {
+  --muted-foreground: oklch(0.76 0.02 250);
+  --border: oklch(1 0 0 / 10%);
+  --linha-forte: oklch(1 0 0 / 22%);
+  --atraso: oklch(0.78 0.15 50);
+}
+
+/* Fundo: Painel troca a grade e o brilho pela borda do planeta no horizonte; Editorial é papel liso */
+html[data-aparencia="painel"] body::before {
+  inset: auto;
+  left: 50%;
+  top: 74vh;
+  width: 260vw;
+  height: 260vw;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: var(--planeta);
+  box-shadow: 0 -1px 0 var(--planeta-borda), 0 -40px 120px -30px var(--nevoa);
+}
+html[data-aparencia="editorial"] body::before,
+html[data-aparencia="painel"] .glow-line::after,
+html[data-aparencia="editorial"] .glow-line::after {
+  display: none;
+}
+
+/* Cartões (Card) e botão principal: só a imagem de fundo e a sombra mudam. A cor de fundo (estados como
+   atrasada, selecionada, concluída) continua vindo das classes, igual à Clássica. */
+html[data-aparencia="painel"] .surface,
+html[data-aparencia="painel"] .surface:hover {
+  background-image: linear-gradient(var(--color-card), var(--color-card)), linear-gradient(var(--vidro-linha), var(--vidro-linha));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+}
+html[data-aparencia="editorial"] .surface,
+html[data-aparencia="editorial"] .surface:hover {
+  background-image: linear-gradient(var(--color-card), var(--color-card)), linear-gradient(var(--linha-forte), var(--linha-forte));
+  box-shadow: none;
+}
+html[data-aparencia="painel"] .btn-glow,
+html[data-aparencia="editorial"] .btn-glow,
+html[data-aparencia="painel"] .btn-glow:hover,
+html[data-aparencia="editorial"] .btn-glow:hover {
+  background-image: linear-gradient(var(--color-primary), var(--color-primary));
+  box-shadow: none;
+}
+
+/* Texto em gradiente da marca (Clássica) vira cor sólida nas aparências novas */
+html[data-aparencia="painel"] .text-brand,
+html[data-aparencia="editorial"] .text-brand {
+  background-image: none;
+  color: var(--primary);
+}
+
+/* Camadas (janelas, confirmações, gavetas, avisos), só no computador: no celular a janela é tela cheia e fica
+   como na Clássica. Geometria igual; mudam fundo, fio, raio e sombra (camadas.css do mockup). */
+html[data-aparencia="painel"] {
+  --camada: rgb(248 250 253 / 0.8);
+  --camada-fio: rgb(255 255 255 / 0.9);
+  --camada-sombra: 0 1px 0 rgb(255 255 255 / 0.9) inset, 0 40px 80px -24px rgb(22 34 56 / 0.35);
+  --veu: rgb(214 222 232 / 0.5);
+}
+html[data-aparencia="painel"].dark {
+  --camada: rgb(18 24 35 / 0.78);
+  --camada-fio: rgb(255 255 255 / 0.1);
+  --camada-sombra: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 40px 80px -20px rgb(0 0 0 / 0.7);
+  --veu: rgb(2 4 8 / 0.55);
+}
+html[data-aparencia="editorial"] {
+  --camada: oklch(0.985 0.005 240);
+  --camada-fio: var(--foreground);
+  --camada-sombra: 0 30px 60px -30px oklch(0.19 0.03 255 / 0.45);
+  --veu: oklch(0.19 0.03 255 / 0.35);
+}
+html[data-aparencia="editorial"].dark {
+  --camada: oklch(0.16 0.02 255);
+  --camada-fio: var(--foreground);
+  --camada-sombra: 0 30px 60px -30px rgb(0 0 0 / 0.8);
+  --veu: rgb(0 0 0 / 0.55);
+}
+@media (min-width: 640px) {
+  html[data-aparencia="painel"] .camada-janela,
+  html[data-aparencia="painel"] .camada-gaveta,
+  html[data-aparencia="editorial"] .camada-janela,
+  html[data-aparencia="editorial"] .camada-gaveta {
+    background-color: var(--camada);
+    border-color: var(--camada-fio);
+    box-shadow: var(--camada-sombra);
+  }
+  html[data-aparencia="painel"] .camada-janela,
+  html[data-aparencia="painel"] .camada-gaveta {
+    -webkit-backdrop-filter: blur(28px) saturate(1.5);
+    backdrop-filter: blur(28px) saturate(1.5);
+  }
+  /* slide-in-from-left-1/2 e top-[48%] vêm do shadcn do Tailwind 3; no 4 o translate-x/y é a propriedade `translate`,
+     que soma com o `transform` da animação, e a janela entrava deslizando do canto. Nas aparências novas, só zoom e fade. */
+  html[data-aparencia="painel"] .camada-janela,
+  html[data-aparencia="editorial"] .camada-janela {
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+    --tw-exit-translate-x: 0;
+    --tw-exit-translate-y: 0;
+  }
+  html[data-aparencia="painel"] .camada-janela {
+    border-radius: 22px;
+  }
+  html[data-aparencia="editorial"] .camada-janela {
+    border-radius: 0;
+  }
+  html[data-aparencia="painel"] .veu,
+  html[data-aparencia="editorial"] .veu {
+    background-color: var(--veu);
+  }
+  html[data-aparencia="painel"] .veu {
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+  }
+  html[data-aparencia="editorial"] .veu {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  html[data-aparencia="painel"] .toaster .toast {
+    background-color: var(--camada);
+    border-color: var(--camada-fio);
+    -webkit-backdrop-filter: blur(28px) saturate(1.5);
+    backdrop-filter: blur(28px) saturate(1.5);
+  }
+  html[data-aparencia="editorial"] .toaster .toast {
+    border-color: var(--foreground);
+    border-radius: 0;
+  }
+}
+
+/* Título de toda aba (o h1 dentro do main): Painel grande e fino; Editorial pesado, como capa de revista.
+   A Demandas (titulo-pagina) ganha o tamanho de capa do mockup. */
+html[data-aparencia="painel"] main h1:not(.ProseMirror *) {
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 250;
+  letter-spacing: -0.035em;
+}
+html[data-aparencia="editorial"] main h1:not(.ProseMirror *) {
+  font-size: clamp(36px, 4.4vw, 64px);
+  line-height: 0.9;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  /* entrelinha curta: folga para a perna de "p", "g" e "j" não encostar no subtítulo */
+  padding-bottom: 0.1em;
+}
+html[data-aparencia="editorial"] main h1.titulo-pagina {
+  font-size: clamp(56px, 8vw, 112px);
+  line-height: 0.82;
+  letter-spacing: -0.055em;
+}
+@media (max-width: 1023px) {
+  html[data-aparencia="painel"] main h1:not(.ProseMirror *) {
+    font-size: 28px;
+  }
+  html[data-aparencia="editorial"] main h1:not(.ProseMirror *),
+  html[data-aparencia="editorial"] main h1.titulo-pagina {
+    font-size: 34px;
+    line-height: 0.95;
+  }
+}
+
+/* Demandas, Painel: anel do dia e números ao lado da previsão, colunas como janelas de vidro */
+.cab-painel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 16px;
+}
+.resumo-hud {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px 14px 16px;
+  border-radius: 22px;
+}
+.resumo-anel {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  flex: none;
+}
+.resumo-anel svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.resumo-anel circle {
+  fill: none;
+  stroke-width: 3;
+}
+.resumo-anel .trk {
+  stroke: var(--linha-forte);
+}
+.resumo-anel .tk {
+  stroke: var(--linha-forte);
+  stroke-width: 6;
+  stroke-dasharray: 1 13.94;
+}
+.resumo-anel .val {
+  stroke: var(--primary);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.resumo-anel b {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 250;
+  letter-spacing: -0.03em;
+}
+.resumo-anel small {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted-foreground);
+}
+.resumo-num {
+  display: grid;
+  gap: 2px;
+  padding-left: 24px;
+  border-left: 1px solid var(--linha-forte);
+}
+.resumo-num b {
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 200;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.resumo-num small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.resumo-num.resumo-atr b,
+.resumo-deck .resumo-atr {
+  color: var(--atraso);
+}
+@media (max-width: 900px) {
+  .resumo-hud {
+    flex-wrap: wrap;
+  }
+}
+/* celular: faixa baixa numa linha só; a página tem altura fixa, então cada pixel aqui sai do quadro */
+@media (max-width: 639px) {
+  .resumo-hud {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: 6px 12px 6px 6px;
+    border-radius: 16px;
+  }
+  .resumo-anel {
+    width: 46px;
+    height: 46px;
+  }
+  .resumo-anel b {
+    font-size: 13px;
+  }
+  .resumo-anel small {
+    display: none;
+  }
+  .resumo-num {
+    padding-left: 10px;
+  }
+  .resumo-num b {
+    font-size: 20px;
+  }
+  .resumo-num small {
+    font-size: 10.5px;
+  }
+  .resumo-deck {
+    font-size: 15px;
+  }
+}
+html[data-aparencia="painel"] .cab-painel > .previsao-recorrencias {
+  flex: 1 1 520px;
+  min-width: 0;
+  border-radius: 22px;
+}
+html[data-aparencia="painel"] .previsao-recorrencias,
+html[data-aparencia="painel"] .coluna-kanban {
+  background: var(--vidro);
+  border-color: var(--vidro-linha);
+  -webkit-backdrop-filter: var(--vidro-filtro);
+  backdrop-filter: var(--vidro-filtro);
+  box-shadow: var(--vidro-sombra);
+}
+html[data-aparencia="painel"] .previsao-dia {
+  border-style: solid;
+  border-color: var(--border);
+  background: var(--muted);
+}
+html[data-aparencia="painel"] .coluna-kanban {
+  border-radius: 22px;
+}
+html[data-aparencia="painel"] .coluna-kanban[data-sobre] {
+  border-color: var(--primary);
+}
+html[data-aparencia="painel"] .coluna-topo {
+  display: none;
+}
+html[data-aparencia="painel"] .coluna-cab {
+  padding-top: 14px;
+}
+html[data-aparencia="painel"] .coluna-cab > div:first-child {
+  flex: 1;
+  align-items: baseline;
+}
+html[data-aparencia="painel"] .coluna-cab h3 {
+  /* o h3 tem a cor da coluna no style; aqui ela mistura com a tinta para dar contraste no vidro */
+  color: color-mix(in oklch, var(--cc) 66%, var(--foreground)) !important;
+  font-weight: 550;
+  letter-spacing: 0.08em;
+}
+html[data-aparencia="painel"] .coluna-n {
+  margin-left: auto;
+  padding: 0;
+  background: none;
+  color: var(--foreground);
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 200;
+  letter-spacing: -0.03em;
+}
+
+/* Demandas, Editorial: frase-resumo, previsão como agenda impressa, colunas com bloco de cor chapada e número enorme */
+.resumo-deck {
+  margin: 4px 0 0;
+  max-width: 52ch;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+.resumo-deck b {
+  color: var(--foreground);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+html[data-aparencia="editorial"] .previsao-recorrencias {
+  padding: 12px 0 14px;
+  border: 0;
+  border-top: 1px solid var(--linha-forte);
+  border-bottom: 1px solid var(--linha-forte);
+  border-radius: 0;
+  background: none;
+}
+html[data-aparencia="editorial"] .previsao-dia {
+  border: 0;
+  border-left: 1px solid var(--linha-forte);
+  border-radius: 0;
+  background: none;
+}
+html[data-aparencia="editorial"] .previsao-dia:first-child {
+  border-left: 0;
+}
+html[data-aparencia="editorial"] .quadro-demandas {
+  gap: 0;
+  border-top: var(--regua) solid var(--regua-cor);
+}
+html[data-aparencia="editorial"] .coluna-kanban {
+  border: 0;
+  border-right: 1px solid var(--linha-forte);
+  border-radius: 0;
+  background: transparent;
+}
+html[data-aparencia="editorial"] .coluna-kanban[data-sobre] {
+  background: var(--muted);
+}
+html[data-aparencia="editorial"] .coluna-topo {
+  display: none;
+}
+html[data-aparencia="editorial"] .coluna-cab {
+  /* tinta clara ou escura escolhida pelo brilho da cor da coluna */
+  --bi: oklch(from var(--cc) calc(clamp(0, (0.615 - l) * 999, 1) * 0.8 + 0.17) 0.02 255);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  /* com overflow hidden o cabeçalho encolheria em coluna baixa (celular) e cortaria o número */
+  flex: none;
+  margin-bottom: 0;
+  padding: 14px 12px 0 16px;
+  overflow: hidden;
+  background: var(--cc);
+  color: var(--bi);
+}
+html[data-aparencia="editorial"] .coluna-cab > div:first-child {
+  display: contents;
+}
+html[data-aparencia="editorial"] .coluna-cab > button {
+  grid-column: 2;
+  grid-row: 1;
+  color: inherit;
+}
+html[data-aparencia="editorial"] .coluna-cab h3 {
+  grid-column: 1;
+  grid-row: 1;
+  color: inherit !important;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  text-transform: none;
+}
+html[data-aparencia="editorial"] .coluna-n {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: end;
+  margin: 10px 2px -8px 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: 104px;
+  line-height: 0.74;
+  font-weight: 900;
+  letter-spacing: -0.07em;
+  font-variant-numeric: tabular-nums;
+}
+/* celular: número menor, senão o bloco de cor ocupa metade de uma coluna já baixa */
+@media (max-width: 639px) {
+  html[data-aparencia="editorial"] .coluna-n {
+    margin: 4px 2px -2px 0;
+    font-size: 56px;
+  }
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

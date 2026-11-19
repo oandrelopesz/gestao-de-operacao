@@ -1,0 +1,21 @@
+@import url(palette.css);
+/* 4 · Serifa e dado em mono: Twenty/Resend. Títulos com serifa, números e datas em mono, caderno técnico. */
+:root{--font:"Geist","Inter",system-ui,sans-serif;--font-display:"Instrument Serif",Georgia,serif;--fs:13.5px;--h1:34px;--h1-w:400;--h1-ls:-.02em;--h2-w:400;
+--r-sm:3px;--r-md:6px;--r-lg:10px;--r-xl:12px;--r-pill:999px;--side-w:240px;--col-w:288px;--gap:16px;--col-pad:0;--card-pad:12px 13px;--card-gap:10px;--stroke:1.4;--t-w:500}
+html[data-mode=light]{--bg:oklch(.978 .008 85);--bg-side:oklch(.978 .008 85);--surface:oklch(.995 .004 85);--surface-2:oklch(.955 .01 85);--lane:transparent;--line:oklch(.9 .012 85);--line-2:oklch(.8 .015 85);--hover-solid:oklch(.97 .008 85);--surface-pop:oklch(.995 .004 85)}
+html[data-mode=dark]{--bg:oklch(.13 .014 255);--lane:transparent}
+h1{line-height:1}
+.drawer header h2,.sheet h2{font-size:24px;line-height:1.1}
+.col-h{padding:0 0 8px;border-bottom:1px solid var(--line-2);font-family:var(--font-display);font-size:19px;font-weight:400;letter-spacing:-.01em}
+.col-h .ct,.date,.nav .n,.tl li span,.props dt{font-family:"Geist Mono",ui-monospace,monospace;font-size:11px;letter-spacing:-.01em}
+.nav .grp{font-family:"Geist Mono",ui-monospace,monospace;font-weight:400;font-size:11px;letter-spacing:.06em}
+.card{box-shadow:none}
+.card:hover{transform:none;box-shadow:3px 3px 0 var(--line-2);border-color:var(--fg-3)}
+.btn{box-shadow:none}
+.btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+html[data-mode=dark] .btn.primary{background:var(--pri);color:var(--pri-fg);border-color:var(--pri)}
+.tag{border-radius:3px;background:transparent;border:1px solid var(--line-2)}
+.pill{border-radius:3px;font-family:"Geist Mono",monospace}
+.chip{border-radius:3px;font-family:"Geist Mono",monospace;font-size:11px}
+.logo{border-radius:50%;background:var(--pri)}
+.brand{font-family:var(--font-display);font-size:19px;font-weight:400}

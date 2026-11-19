@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="pt-BR" data-dir="__ID__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demandas · Direção __ID__ · __NOME__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?__FONTES__&display=swap">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="theme-__ID__.css">
+<script>
+  (function () {
+    var d = document.documentElement, m = null;
+    try { m = localStorage.getItem('lab-mode'); } catch (e) {}
+    if (!m) m = '__MODO__';
+    d.setAttribute('data-mode', m);
+  })();
+</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
+    <symbol id="i-calplus" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><path d="M21 13V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8"/><path d="M3 10h18"/><path d="M16 19h6"/><path d="M19 16v6"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="i-crown" viewBox="0 0 24 24"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-cols" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <aside class="side" aria-label="Menu principal">
+    <div class="brand"><span class="logo" aria-hidden="true"></span><b>Gestão de Operação</b></div>
+    <button class="side-search" data-open="cmdk" type="button">
+      <svg class="ic"><use href="#i-search"/></svg><span>Buscar ou ir para…</span><kbd>Ctrl K</kbd>
+    </button>
+    <nav class="nav">
+      <div class="grp">Hoje</div>
+      <a href="#"><svg class="ic"><use href="#i-home"/></svg>Início</a>
+      <a href="#" class="on" aria-current="page"><svg class="ic"><use href="#i-check"/></svg>Demandas<span class="n">14</span></a>
+      <a href="#"><svg class="ic"><use href="#i-cal"/></svg>Agenda</a>
+      <div class="grp">Clientes</div>
+      <a href="#"><svg class="ic"><use href="#i-users"/></svg>Clientes</a>
+      <a href="#"><svg class="ic"><use href="#i-wallet"/></svg>Saldo</a>
+      <a href="#"><svg class="ic"><use href="#i-msg"/></svg>NPS de Clientes</a>
+      <a href="#"><svg class="ic"><use href="#i-folder"/></svg>Central de arquivos</a>
+      <a href="#"><svg class="ic"><use href="#i-sliders"/></svg>Calculadora de taxas</a>
+      <div class="grp">Marketing e canais</div>
+      <a href="#"><svg class="ic"><use href="#i-zap"/></svg>Instagram</a>
+      <a href="#"><svg class="ic"><use href="#i-file"/></svg>Conteúdo</a>
+      <div class="grp">Comercial e dinheiro</div>
+      <a href="#"><svg class="ic"><use href="#i-trend"/></svg>CRM</a>
+      <a href="#"><svg class="ic"><use href="#i-wallet"/></svg>Financeiro</a>
+    </nav>
+    <div class="me">
+      <span class="av lg">A</span>
+      <div><b>André Lopes</b><small>contato@andrelopes.digital</small></div>
+      <button class="icon-btn" id="mode" type="button" aria-label="Alternar tema claro e escuro"><svg class="ic"><use href="#i-moon"/></svg></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="top">
+      <div class="ttl">
+        <h1>Demandas</h1>
+        <button class="icon-btn info" type="button" aria-label="Sobre esta tela" title="Arraste os cartões entre as colunas. Datas movem sozinhas na virada do dia."><svg class="ic"><use href="#i-info"/></svg></button>
+      </div>
+      <div class="tools">
+        <label class="field search"><svg class="ic"><use href="#i-search"/></svg><input id="q" type="search" placeholder="Buscar demanda" autocomplete="off"></label>
+        <div class="seg" role="group" aria-label="Visão">
+          <button type="button" class="on" data-view="board"><svg class="ic"><use href="#i-cols"/></svg>Quadro</button>
+          <button type="button" data-view="list"><svg class="ic"><use href="#i-list"/></svg>Lista</button>
+        </div>
+        <button class="btn" type="button" data-open="agendar"><svg class="ic"><use href="#i-calplus"/></svg>Agendar</button>
+        <button class="btn" type="button" data-open="agendadas"><svg class="ic"><use href="#i-clock"/></svg>Agendadas<span class="pill">3</span></button>
+        <button class="btn primary" type="button" data-open="nova"><svg class="ic"><use href="#i-plus"/></svg>Nova</button>
+      </div>
+    </header>
+    <div class="filters" id="filters"></div>
+    <section class="board" id="board" aria-label="Quadro de demandas"></section>
+    <section class="list" id="list" hidden aria-label="Lista de demandas"></section>
+  </main>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dr-title" hidden></aside>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="m-title" hidden>
+  <form class="sheet" id="form" autocomplete="off">
+    <header><h2 id="m-title">Nova demanda</h2><button type="button" class="icon-btn" data-close aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button></header>
+    <p class="hint" id="m-hint">Preencha o essencial. O resto pode ser editado depois.</p>
+    <label class="lbl">Título<input class="inp" name="t" placeholder="Ex.: Subir criativos da campanha de dezembro" required></label>
+    <div class="row2">
+      <label class="lbl">Cliente
+        <span class="sel"><span class="av sm">C</span><select class="inp" name="c"><option>Clínica Aurora</option><option>Studio Lume</option><option>Brasa &amp; Cia</option><option>Nova Odonto</option><option>Atlas Imóveis</option></select></span>
+      </label>
+      <label class="lbl" id="f-col">Coluna
+        <select class="inp" name="col"><option>Fazer hoje</option><option>Fazer amanhã</option><option>Fazer depois de amanhã</option></select>
+      </label>
+      <label class="lbl" id="f-date" hidden>Data de entrega
+        <input class="inp" type="date" name="d" value="2027-01-25">
+      </label>
+    </div>
+    <div class="lbl">Prioridade
+      <div class="seg full" role="group" aria-label="Prioridade">
+        <button type="button">Normal</button><button type="button" class="on">Alta</button><button type="button"><svg class="ic"><use href="#i-crown"/></svg>Coroa</button>
+      </div>
+    </div>
+    <label class="lbl">Descrição<textarea class="inp" name="n" rows="3" placeholder="Contexto, links e o que precisa ficar pronto"></textarea></label>
+    <footer>
+      <span class="sw" id="rec"><button type="button" class="tgl" role="switch" aria-checked="false" aria-label="Recorrente"></button>Recorrente</span>
+      <span class="sp"></span>
+      <button type="button" class="btn" data-close>Cancelar</button>
+      <button type="submit" class="btn primary" id="m-ok">Criar demanda</button>
+    </footer>
+  </form>
+</div>
+
+<div class="cmdk" id="cmdk" role="dialog" aria-modal="true" aria-label="Busca rápida" hidden>
+  <div class="cmd">
+    <label class="cmd-in"><svg class="ic"><use href="#i-search"/></svg><input id="cmd-q" placeholder="O que você quer fazer?" autocomplete="off"></label>
+    <ul id="cmd-list"></ul>
+    <footer><span><kbd>↑</kbd><kbd>↓</kbd> navegar</span><span><kbd>Enter</kbd> abrir</span><span><kbd>Esc</kbd> fechar</span></footer>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<nav class="dirs" aria-label="Direções de design">
+  <span>Direção</span>
+  __LINKS__
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>

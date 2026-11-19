@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
+import { APARENCIA_INIT_SCRIPT } from "@/lib/aparencia";
 
 export type Theme = "light" | "dark";
 
 const STORAGE_KEY = "theme";
 
 // Roda antes do React para evitar "flash" de tema claro ao abrir em modo escuro
-export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("${STORAGE_KEY}");if(!t){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}if(t==="dark"){document.documentElement.classList.add("dark")}}catch(e){}})();`;
+export const THEME_INIT_SCRIPT =
+  `(function(){try{var t=localStorage.getItem("${STORAGE_KEY}");if(!t){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}if(t==="dark"){document.documentElement.classList.add("dark")}}catch(e){}})();` +
+  APARENCIA_INIT_SCRIPT;
 
 export function applyTheme(theme: Theme) {
   if (typeof document === "undefined") return;

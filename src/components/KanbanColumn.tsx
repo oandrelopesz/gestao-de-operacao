@@ -179,21 +179,25 @@ export function KanbanColumn({
   );
 
   return (
-    <div className={cn(
-      "flex flex-col w-[280px] shrink-0 rounded-xl p-0 h-full transition-colors border border-border/60",
+    // coluna-*: ganchos das aparências Painel/Editorial no styles.css (na Clássica não pintam nada); --cc = cor da coluna
+    <div
+      data-sobre={!secoes && isOver ? "" : undefined}
+      style={{ "--cc": hex } as React.CSSProperties}
+      className={cn(
+      "coluna-kanban flex flex-col w-[280px] shrink-0 rounded-xl p-0 h-full transition-colors border border-border/60",
       "bg-muted/40",
       !secoes && isOver && "bg-accent/50 border-primary/30"
     )}>
       {/* Top indicator line */}
-      <div 
-        className="h-[3px] w-full rounded-t-xl mb-0" 
+      <div
+        className="coluna-topo h-[3px] w-full rounded-t-xl mb-0"
         style={{ backgroundColor: hex }}
       />
-      
-      <div className="flex items-center justify-between px-3 pt-3 mb-2">
+
+      <div className="coluna-cab flex items-center justify-between px-3 pt-3 mb-2">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-xs tracking-tight uppercase" style={{ color: hex }}>{title}</h3>
-          <span className="text-[10px] text-muted-foreground font-medium px-1.5 py-0.5 rounded-full bg-zinc-200/50 dark:bg-zinc-800/50">
+          <span className="coluna-n text-[10px] text-muted-foreground font-medium px-1.5 py-0.5 rounded-full bg-zinc-200/50 dark:bg-zinc-800/50">
             {demandas.length}
           </span>
         </div>

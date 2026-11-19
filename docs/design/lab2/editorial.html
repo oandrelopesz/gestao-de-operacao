@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demandas · Editorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..900&display=swap">
+<link rel="stylesheet" href="camadas.css">
+<script>(function () { var m = 'light'; try { m = localStorage.getItem('lab2-mode') || m; } catch (e) {} document.documentElement.dataset.mode = m; })();</script>
+<style>
+/* Aparência Editorial: a página como uma revista de grade suíça. Fios pretos grossos, um bloco de cor chapada
+   no topo de cada coluna (a cor que a coluna já tem no sistema) com o número enorme. Sem sombra, sem cantos redondos.
+   A aba é a mesma de hoje, peça por peça; só a pele muda. */
+:root {
+  --font: "Schibsted Grotesk", system-ui, sans-serif;
+  --bg: oklch(0.972 0.008 240);
+  --ink: oklch(0.19 0.03 255); --ink-2: oklch(0.42 0.03 255); --ink-3: oklch(0.5 0.03 255);
+  --line: oklch(0.86 0.012 245); --line-2: oklch(0.74 0.015 250);
+  --surface: oklch(1 0 0); --surface-2: oklch(0.945 0.01 245);
+  --accent: oklch(0.55 0.2 262); --accent-ink: #fff;
+  --late-ink: oklch(0.55 0.19 38);
+  --rule: 3px solid var(--ink);
+  --r-lg: 0; --r-md: 0; --r-sm: 0; --r-xs: 0; --bw: 2px;
+  --card: var(--surface); --card-line: var(--line-2); --card-shadow: none;
+  --col-bg: transparent; --col-line: transparent;
+  --layer: oklch(0.985 0.005 240); --layer-line: var(--ink); --layer-filter: none;
+  --shadow-layer: 0 30px 60px -30px oklch(0.19 0.03 255 / .45);
+  --scrim: oklch(0.19 0.03 255 / .35);
+}
+[data-mode="dark"] {
+  --bg: oklch(0.125 0.018 255);
+  --ink: oklch(0.95 0.008 250); --ink-2: oklch(0.76 0.02 250); --ink-3: oklch(0.66 0.02 250);
+  --line: oklch(1 0 0 / 10%); --line-2: oklch(1 0 0 / 22%);
+  --surface: oklch(0.17 0.02 255); --surface-2: oklch(0.21 0.02 255);
+  --accent: oklch(0.72 0.15 235); --accent-ink: oklch(0.11 0.03 255);
+  --late-ink: oklch(0.78 0.15 50);
+  --layer: oklch(0.16 0.02 255);
+  --shadow-layer: 0 30px 60px -30px rgb(0 0 0 / .8);
+  --scrim: rgb(0 0 0 / .55);
+}
+/* a Schibsted tem vírgula e ponto tabulares: números tabulares só onde há números */
+body { font-variant-numeric: normal; }
+.blk b, .cnt, .ch-c, .deck b, .cal-d b, .sb-t b { font-variant-numeric: tabular-nums; }
+.page { display: grid; gap: 18px; max-width: 1480px; margin: 0 auto; padding: 0 32px 40px; }
+
+/* cabeçalho de revista: nome, grupos do menu como seções, data e utilitários */
+.mast { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 24px; padding: 18px 0 14px; border-bottom: var(--rule); }
+.word { font-size: 17px; font-weight: 850; letter-spacing: -.03em; white-space: nowrap; }
+.secs { display: flex; gap: 22px; overflow-x: auto; }
+.secs button { padding: 4px 0; border: 0; background: none; color: var(--ink-2); font-size: 14px; font-weight: 550; white-space: nowrap; }
+.secs button:hover { color: var(--ink); }
+.secs button.on { color: var(--ink); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+.util { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.util .btn { height: 32px; padding: 0 10px; border-width: 1.5px; font-weight: 600; }
+.tabs { display: flex; gap: 2px; margin-top: -18px; padding: 10px 0; border-bottom: 1px solid var(--line-2); overflow-x: auto; }
+.tabs a { padding: 6px 12px; color: var(--ink-2); font-size: 14px; text-decoration: none; white-space: nowrap; }
+.tabs a:hover { color: var(--ink); }
+.tabs a.on { background: var(--ink); color: var(--bg); font-weight: 650; }
+
+/* cabeçalho da aba na ordem de hoje: título e calendário à esquerda, ações à direita */
+.hd { align-items: flex-end; padding-top: 18px; }
+.hd-l { align-items: flex-end; gap: 14px; }
+h1 { margin: 0; font-size: clamp(56px, 8vw, 112px); line-height: .82; font-weight: 900; letter-spacing: -.055em; }
+.deck { flex-basis: 100%; margin: 4px 0 0; max-width: 52ch; font-size: 17px; line-height: 1.4; color: var(--ink-2); }
+.deck b { color: var(--ink); font-weight: 750; }
+.deck .late { color: var(--late-ink); }
+.cal-tg { height: 32px; border: 0; border-bottom: 2px solid var(--ink) !important; padding: 0 2px; color: var(--ink); font-weight: 650; }
+.cal-tg:hover { background: none !important; color: var(--accent); }
+
+.btn { border-color: var(--ink); background: transparent; color: var(--ink); font-weight: 700; }
+.btn:hover { background: var(--ink); color: var(--bg); }
+.btn .ic { stroke-width: 2; }
+.btn.ghost { border-color: transparent; }
+.btn.ghost:hover { background: var(--surface-2); color: var(--ink); }
+#h-acoes .btn.ghost { border-color: var(--ink); }
+#h-acoes .btn.ghost:hover { background: var(--ink); color: var(--bg); }
+.btn.agendar { border-color: var(--accent); color: var(--accent); }
+.btn.agendar:hover { background: var(--accent); color: var(--accent-ink); }
+.btn.primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+.btn.sel-b.on { border-color: var(--ink); }
+.btn.ok-f:hover, .btn.danger-f:hover { color: #fff; }
+.seg { padding: 0; gap: 0; border: 2px solid var(--ink); background: transparent; }
+.seg button { height: 36px; font-weight: 650; }
+.seg button.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+.seg.sm { border-width: 1.5px; }
+.seg.sm button { height: 24px; }
+.cnt { background: none; color: inherit; font-size: 13px; font-weight: 900; }
+.search { width: 260px; height: 40px; padding: 0 2px; border: 0; border-bottom: 2px solid var(--ink); background: transparent; }
+.search input { font-size: 15px; }
+.icon-btn:hover { background: var(--ink); color: var(--bg); }
+.inp { border-width: 1.5px; }
+kbd { border-radius: 0; }
+
+/* previsão como uma faixa de agenda impressa */
+.cal { padding: 12px 0 14px; border: 0; border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); background: none; }
+.cal h2 { color: var(--ink); font-weight: 800; letter-spacing: .1em; }
+.cal-d { border: 0; border-left: 1px solid var(--line-2); background: none; padding: 2px 10px; }
+.cal-d:first-child { border-left: 0; padding-left: 0; }
+.cal-d.hoje { background: none; }
+.cal-d.hoje b { color: var(--accent); }
+.cal-d b { font-size: 22px; font-weight: 900; letter-spacing: -.03em; }
+.cal-i { border-color: var(--line-2); background: var(--surface); }
+
+/* colunas: bloco de cor chapada com o nome e o número enorme, colunas separadas só por fios */
+.board { gap: 0; align-items: stretch; border-top: var(--rule); }
+.col { border-right: 1px solid var(--line-2); max-height: max(480px, calc(100dvh - 60px)); }
+/* desktop: o quadro termina na borda da tela, então a barra de rolagem lateral fica visível sem descer a página */
+@media (min-width: 900px) { .page:has(.board.fit) { padding-bottom: 0; } .board.fit { height: var(--bh); padding-bottom: 0; overflow-y: hidden; } .board.fit .col { max-height: none; height: 100%; } }
+.col.over { background: var(--surface-2); }
+/* a tinta do bloco escolhe sozinha entre clara e escura pelo brilho da cor da coluna */
+.ch, .blk { --bi: oklch(from var(--cc) calc(clamp(0, (0.615 - l) * 999, 1) * .8 + .17) .02 255); background: var(--cc); color: var(--bi); }
+.ch { align-items: flex-start; padding: 14px 12px 0 16px; }
+.ch-n { color: inherit; font-size: 19px; font-weight: 800; line-height: 1.1; letter-spacing: -.015em; text-transform: none; }
+.ch-c { display: none; }
+.ch-m { color: inherit; margin: -4px -2px 0 auto; }
+.ch-m:hover { background: color-mix(in oklch, var(--bi) 16%, transparent); color: inherit; }
+.blk { display: flex; justify-content: flex-end; height: 84px; padding: 0 14px; overflow: hidden; }
+.blk b { align-self: flex-end; font-size: 104px; line-height: .74; font-weight: 900; letter-spacing: -.07em; margin-bottom: -6px; }
+.cards { padding: 10px 10px 4px; }
+.card { border-width: 1px; }
+.card h3 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+.card.done { background: transparent; }
+.ags span { font-weight: 800; }
+.sec > header { padding: 6px 0; border-bottom: 2px solid var(--ink); margin-bottom: 8px; }
+.sec > header span { color: var(--ink); font-weight: 850; }
+.qa-b { font-weight: 600; }
+.col-new { align-self: flex-start; margin-left: 16px; border-radius: 0; border: 2px dashed var(--line-2); }
+.list { border: 0; border-top: var(--rule); background: none; }
+.lr { padding-inline: 0; }
+.lr-t b { font-weight: 700; }
+.lr .dot { border-radius: 0; }
+.sheet, .drawer, .cmd, .pop, .selbar { border-width: 2px; }
+.drawer h2, .sheet h2 { font-size: 24px; font-weight: 850; letter-spacing: -.03em; }
+.dr-t { font-weight: 850; letter-spacing: -.025em; }
+.toast { border-radius: 0; }
+
+/* entrada: os blocos de cor descem como tinta e os números sobem por dentro deles */
+.boot .ch, .boot .blk { animation: tinta .7s cubic-bezier(.7, 0, .2, 1) backwards; }
+.boot .blk b { animation: sobeN .8s cubic-bezier(.16, 1, .3, 1) backwards .3s; }
+.boot .col:nth-child(2) :is(.ch, .blk) { animation-delay: 80ms; } .boot .col:nth-child(3) :is(.ch, .blk) { animation-delay: 160ms; }
+.boot .col:nth-child(4) :is(.ch, .blk) { animation-delay: 240ms; } .boot .col:nth-child(5) :is(.ch, .blk) { animation-delay: 320ms; }
+.boot .col:nth-child(6) :is(.ch, .blk) { animation-delay: 400ms; } .boot .col:nth-child(n+7) :is(.ch, .blk) { animation-delay: 480ms; }
+.boot .card { animation: aparece .5s ease-out backwards .55s; }
+@keyframes tinta { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes sobeN { from { transform: translateY(70%); } }
+
+@media (max-width: 900px) {
+  .page { padding: 0 16px 40px; }
+  .mast { grid-template-columns: 1fr auto; }
+  .secs { grid-column: 1 / -1; order: 3; }
+  .search { width: 100%; }
+  .blk { height: 64px; }
+  .blk b { font-size: 80px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="mast">
+    <div class="word">Gestão de Operação</div>
+    <nav class="secs" id="secs" aria-label="Seções"></nav>
+    <div class="util">
+      <span>Quinta, 19 nov</span>
+      <button class="btn" type="button" data-open="cmdk"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>Ctrl K</button>
+      <button class="btn ghost" type="button" data-act="aparencia" title="Trocar de aparência" aria-label="Aparência"><svg class="ic" aria-hidden="true"><use href="#i-palette"/></svg>Aparência</button>
+      <button class="btn ghost" type="button" data-act="tema" title="Tema claro ou escuro" aria-label="Alternar tema claro e escuro"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg>Tema</button>
+    </div>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="Abas da seção"></nav>
+
+  <header class="hd">
+    <div class="hd-l"><h1>Demandas</h1><span id="h-cal"></span></div>
+    <div class="hd-r" id="h-acoes"></div>
+    <p class="deck"><b data-abertas>0</b> abertas, <b class="late"><span data-atrasadas>0</span> <span id="l-atr">atrasadas</span></b> e <b data-agendadas>0</b> agendadas esperando a data chegar.</p>
+  </header>
+  <section class="cal" id="cal" aria-label="Previsão de Recorrências"></section>
+  <div class="barra" id="barra"></div>
+  <section class="board" id="board" aria-label="Quadro de demandas"></section>
+  <section class="list" id="list" aria-label="Lista de demandas" hidden></section>
+</div>
+
+<script>
+window.DIR = {
+  /* o bloco de cor continua o cabeçalho da coluna e carrega o número grande */
+  colExtra: function (c, xs) { return '<div class="blk" aria-hidden="true"><b>' + xs.length + '</b></div>'; },
+  after: function (h) {
+    var b = document.getElementById('board');
+    if (b.hidden) return;
+    b.classList.add('fit');
+    b.style.setProperty('--bh', Math.max(380, innerHeight - (b.getBoundingClientRect().top + scrollY)) + 'px');
+    if (!window._fit) { window._fit = 1; addEventListener('resize', function () { h.fit && h.fit(); }); addEventListener('load', function () { setTimeout(function () { h.fit && h.fit(); }, 700); }); setTimeout(function () { h.fit && h.fit(); }, 1500); }
+    h.fit = function () { b.style.setProperty('--bh', Math.max(380, innerHeight - (b.getBoundingClientRect().top + scrollY)) + 'px'); };
+    document.getElementById('l-atr').textContent = h.atrasadas() === 1 ? 'atrasada' : 'atrasadas'; },
+  boot: function (h) {
+    var secs = document.getElementById('secs'), tabs = document.getElementById('tabs');
+    function nav(gi) {
+      secs.innerHTML = h.GRUPOS.map(function (g, i) { return '<button type="button" data-g="' + i + '" aria-pressed="' + (i === gi) + '"' + (i === gi ? ' class="on"' : '') + '>' + g[0] + '</button>'; }).join('');
+      tabs.innerHTML = h.GRUPOS[gi][2].map(function (t) { return '<a href="#"' + (t === 'Demandas' ? ' class="on" aria-current="page"' : '') + '>' + t + '</a>'; }).join('');
+    }
+    nav(0);
+    secs.addEventListener('click', function (e) { var b = e.target.closest('[data-g]'); if (b) nav(+b.dataset.g); });
+    tabs.addEventListener('click', function (e) { var a = e.target.closest('a'); if (!a) return; e.preventDefault(); if (!a.classList.contains('on')) h.toast('Neste mockup só a aba Demandas existe'); });
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.body.classList.add('boot');
+    setTimeout(function () { document.body.classList.remove('boot'); }, 1600);
+  }
+};
+</script>
+<script src="app.js"></script>
+</body>
+</html>

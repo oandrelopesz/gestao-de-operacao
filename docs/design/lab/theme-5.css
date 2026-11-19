@@ -1,0 +1,23 @@
+@import url(palette.css);
+/* 5 · Suave e amigável: Plane/Folk/Notion. Raios grandes, raias coloridas discretas, avatares e tags com cor. */
+:root{--font:"DM Sans","Inter",system-ui,sans-serif;--font-display:"DM Sans",system-ui,sans-serif;--fs:14px;--h1:21px;--h1-w:700;--h1-ls:-.02em;--h2-w:700;
+--r-sm:8px;--r-md:12px;--r-lg:18px;--r-xl:22px;--r-pill:999px;--side-w:250px;--col-w:296px;--gap:14px;--col-pad:10px;--card-pad:13px 14px;--card-gap:10px;--stroke:1.7;--t-w:600}
+html[data-mode=light]{--bg:oklch(.965 .012 250);--bg-side:oklch(.985 .006 250);--lane:oklch(.94 .02 250/.8);--card-line:transparent;--shadow-card:0 1px 3px oklch(.3 .05 255/.08),0 0 0 1px oklch(.3 .05 255/.03)}
+html[data-mode=dark]{--bg:oklch(.14 .02 258);--bg-side:oklch(.12 .02 258);--lane:oklch(.185 .026 258);--card-line:oklch(1 0 0/.04);--surface:oklch(.22 .024 258);--surface-2:oklch(.27 .026 258)}
+.col:nth-child(1) .dot{--c:oklch(.7 .16 40)}.col:nth-child(2) .dot{--c:oklch(.72 .15 85)}.col:nth-child(3) .dot{--c:oklch(.7 .14 235)}.col:nth-child(4) .dot{--c:oklch(.7 .14 160)}
+.col-h{font-size:14px}
+.col-h .dot{width:10px;height:10px;border-radius:4px}
+.card{transition:transform .35s cubic-bezier(.34,1.4,.64,1),box-shadow .25s var(--ease)}
+.card:hover{transform:translateY(-3px);box-shadow:0 10px 24px -10px oklch(.3 .1 262/.35)}
+.btn{height:34px}
+.btn.primary{box-shadow:0 4px 12px -3px oklch(.55 .2 262/.5)}
+.field,.seg{height:34px}
+.seg button{height:28px;border-radius:9px}
+.nav a{height:35px;border-radius:12px}
+.nav a.on{background:var(--pri);color:var(--pri-fg)}
+.nav a.on .ic,.nav a.on .n{color:var(--pri-fg)}
+.tag{background:var(--pri-soft);color:var(--pri-text)}
+.chip{height:30px;padding:0 13px}
+.logo{border-radius:8px}
+.av{border-radius:30%}
+.top{border-bottom:0}

@@ -11,6 +11,15 @@
         ],
         "createdAt": "2026-11-18T03:59:21.638Z",
         "reason": "spec do André docs/radar-ia/prompt-aba-radar-ia.md L541 pede borda esquerda na cor da classe do achado"
+      },
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "src/styles.css"
+        ],
+        "createdAt": "2026-11-19T13:00:03.602Z",
+        "reason": "Andre pediu manter o visual original como aparencia Classica (19/11); text-brand e da Classica e vira cor solida em Painel/Editorial"
       }
     ]
   }

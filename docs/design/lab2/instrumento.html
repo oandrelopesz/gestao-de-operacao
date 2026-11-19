@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demandas · Instrumento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Doto:wght@600..900&display=swap">
+<link rel="stylesheet" href="camadas.css">
+<script>(function () { var m = 'light'; try { m = localStorage.getItem('lab2-mode') || m; } catch (e) {} document.documentElement.dataset.mode = m; })();</script>
+<style>
+/* Direção A, Instrumento: o sistema como um aparelho. Chapa de alumínio, teclas com curso, visor de LCD,
+   LEDs como estado. Escola Braun e Teenage Engineering. O azul da marca é a luz do aparelho. */
+:root {
+  --font: "Archivo", system-ui, sans-serif;
+  --lcd-font: "Doto", ui-monospace, monospace;
+  --bg: #e5e6e2;
+  --strip: #d6d8d3;
+  --tray: #d9dbd6;
+  --ink: #1c1f22; --ink-2: #4f545a; --ink-3: #5d6268;
+  --line: #c7c9c4; --line-2: #b2b5af;
+  --surface: #f7f7f5; --surface-2: #ecedea;
+  --accent: oklch(0.55 0.2 262); --accent-ink: #fff;
+  --lcd-bg: #0b1013; --lcd-ink: oklch(0.85 0.12 222); --lcd-off: oklch(0.85 0.12 222 / .12);
+  --late: oklch(0.7 0.19 50); --late-ink: oklch(0.52 0.17 45);
+  --soon: oklch(0.82 0.15 92); --ok: oklch(0.62 0.13 155);
+  --crown: oklch(0.55 0.2 262);
+  --r-lg: 16px; --r-md: 9px; --r-sm: 7px;
+  --layer: #eeefeb; --layer-line: #fbfbf9; --layer-filter: none;
+  --shadow-layer: 0 1px 0 #fff inset, 0 2px 4px rgb(28 31 34 / .12), 0 32px 64px -24px rgb(28 31 34 / .5);
+  --scrim: rgb(28 31 34 / .3);
+  --key: linear-gradient(#fbfbf9, #e9eae6);
+  --key-edge: #b4b7b1;
+  --key-shadow: 0 1px 0 #fff inset, 0 2px 0 var(--key-edge), 0 3px 7px rgb(0 0 0 / .14);
+  --key-down: 0 1px 0 rgb(255 255 255 / .6) inset, 0 0 0 var(--key-edge), 0 1px 2px rgb(0 0 0 / .18);
+  --tile-shadow: 0 1px 0 #fff inset, 0 1px 1px rgb(0 0 0 / .07), 0 3px 8px -2px rgb(0 0 0 / .15);
+  --tray-shadow: inset 0 2px 4px rgb(0 0 0 / .1), inset 0 -1px 0 rgb(255 255 255 / .75);
+  --lens: inset 0 1px 1px rgb(255 255 255 / .55), inset 0 -1px 1px rgb(0 0 0 / .3);
+}
+[data-mode="dark"] {
+  --bg: #17191b; --strip: #111214; --tray: #111315;
+  --ink: #e8eaec; --ink-2: #a3a8ad; --ink-3: #7b8086;
+  --line: #2b2e32; --line-2: #3b3f44;
+  --surface: #25282c; --surface-2: #1d2023;
+  --accent: oklch(0.6 0.19 258);
+  --late-ink: oklch(0.76 0.16 55);
+  --crown: oklch(0.76 0.13 240);
+  --layer: #1d2023; --layer-line: #30343a;
+  --shadow-layer: 0 1px 0 rgb(255 255 255 / .05) inset, 0 32px 64px -24px rgb(0 0 0 / .8);
+  --scrim: rgb(0 0 0 / .55);
+  --key: linear-gradient(#303337, #26292d);
+  --key-edge: #0a0b0c;
+  --key-shadow: 0 1px 0 rgb(255 255 255 / .07) inset, 0 2px 0 var(--key-edge), 0 4px 8px rgb(0 0 0 / .5);
+  --key-down: 0 1px 0 rgb(255 255 255 / .04) inset, 0 0 0 var(--key-edge), 0 1px 2px rgb(0 0 0 / .5);
+  --tile-shadow: 0 1px 0 rgb(255 255 255 / .06) inset, 0 2px 0 #0c0d0f, 0 4px 10px -2px rgb(0 0 0 / .5);
+  --tray-shadow: inset 0 2px 6px rgb(0 0 0 / .6), inset 0 -1px 0 rgb(255 255 255 / .04);
+}
+body { background: var(--bg) repeating-linear-gradient(90deg, rgb(255 255 255 / .022) 0 1px, transparent 1px 3px); }
+
+/* faixa do aparelho: grupos como teclas, abas como etiquetas com LED */
+.strip { display: flex; align-items: center; gap: 22px; padding: 12px 24px; background: var(--strip); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 750; font-stretch: 115%; letter-spacing: -.01em; white-space: nowrap; }
+.grille { width: 24px; height: 24px; flex: none; border-radius: 50%; background: radial-gradient(circle, var(--ink-3) 1.1px, transparent 1.5px) 0 0 / 5px 5px; box-shadow: inset 0 0 0 1px var(--line-2); }
+.modes { display: flex; gap: 8px; min-width: 0; overflow-x: auto; padding: 2px 2px 5px; margin-bottom: -3px; }
+.util { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.fns { display: flex; gap: 4px; padding: 0 24px; background: var(--strip); border-bottom: 1px solid var(--line); overflow-x: auto; }
+.fns a { display: flex; align-items: center; gap: 8px; padding: 9px 10px 10px; font-size: 13px; color: var(--ink-2); text-decoration: none; white-space: nowrap; }
+.fns a::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--line-2); box-shadow: inset 0 1px 1px rgb(0 0 0 / .25); }
+.fns a:hover { color: var(--ink); }
+.fns a.on { color: var(--ink); font-weight: 650; }
+.fns a.on::before { background: var(--accent); box-shadow: var(--lens); }
+
+/* teclas */
+.key, .btn, .chip { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 0; border-radius: var(--r-md); background: var(--key); box-shadow: var(--key-shadow); color: var(--ink); font-size: 13px; font-weight: 620; font-stretch: 104%; white-space: nowrap; transition: transform .07s, box-shadow .07s; }
+.key:active, .btn:active, .chip:active, .key.on, .chip.on { transform: translateY(2px); box-shadow: var(--key-down); }
+.key .ic, .btn .ic { width: 15px; height: 15px; color: var(--ink-2); }
+.key.mode { height: 30px; padding: 0 11px; font-size: 12px; font-stretch: 92%; }
+.key.sq { width: 34px; padding: 0; justify-content: center; }
+.btn.primary { background: linear-gradient(oklch(0.6 0.2 262), oklch(0.52 0.2 262)); color: #fff; box-shadow: 0 1px 0 rgb(255 255 255 / .28) inset, 0 2px 0 oklch(0.38 0.17 262), 0 4px 10px rgb(0 0 0 / .18); }
+.btn.primary .ic { color: #fff; }
+.btn.primary:active { box-shadow: 0 1px 0 rgb(255 255 255 / .2) inset, 0 0 0 oklch(0.38 0.17 262), 0 1px 3px rgb(0 0 0 / .2); }
+.btn.danger, .btn.danger .ic { color: var(--late-ink); }
+.led { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--line-2); box-shadow: inset 0 1px 1px rgb(0 0 0 / .3); }
+.led.on, .led.hoje { background: var(--accent); box-shadow: var(--lens); }
+.led.late { background: var(--late); box-shadow: var(--lens); }
+.led.soon { background: var(--soon); box-shadow: var(--lens); }
+.led.done { background: var(--ok); box-shadow: var(--lens); }
+.cnt { min-width: 22px; padding: 3px 5px; border-radius: 4px; background: var(--lcd-bg); color: var(--lcd-ink); font: 800 12px/1 var(--lcd-font); text-align: center; }
+
+/* visor */
+.lcd { display: flex; gap: 20px; padding: 8px 14px 7px; border-radius: 10px; background: var(--lcd-bg); box-shadow: inset 0 2px 7px rgb(0 0 0 / .7), 0 1px 0 rgb(255 255 255 / .55); }
+[data-mode="dark"] .lcd { box-shadow: inset 0 2px 7px rgb(0 0 0 / .9), 0 1px 0 rgb(255 255 255 / .05); }
+.rd { display: grid; justify-items: start; gap: 3px; }
+.lcd b { position: relative; isolation: isolate; font: 800 26px/1 var(--lcd-font); color: var(--lcd-ink); }
+.lcd b::before { content: "88"; position: absolute; inset: 0; z-index: -1; color: var(--lcd-off); text-shadow: none; }
+.rd small { font-size: 11px; font-weight: 600; color: oklch(0.85 0.12 222 / .72); }
+.lcd.mini { padding: 4px 7px 3px; border-radius: 6px; }
+.lcd.mini b { font-size: 16px; }
+
+/* painel */
+.head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; padding: 22px 24px 16px; }
+.ttl { display: flex; align-items: center; gap: 8px; }
+.ttl .lcd { margin-left: 16px; }
+h1 { margin: 0; font-size: 30px; line-height: 1; font-weight: 820; font-stretch: 125%; letter-spacing: -.025em; }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.slot { display: flex; align-items: center; gap: 8px; width: 240px; height: 36px; padding: 0 12px; border-radius: var(--r-md); background: var(--tray); box-shadow: var(--tray-shadow); color: var(--ink-3); }
+.slot input { flex: 1; min-width: 0; border: 0; background: transparent; outline: 0; color: var(--ink); }
+.slot input::placeholder { color: var(--ink-3); }
+.slot:focus-within { box-shadow: var(--tray-shadow), 0 0 0 2px var(--accent); }
+.seg { border: 0; background: var(--tray); box-shadow: var(--tray-shadow); }
+.seg button.on { background: var(--key); box-shadow: 0 1px 0 rgb(255 255 255 / .7) inset, 0 1px 3px rgb(0 0 0 / .22); }
+[data-mode="dark"] .seg button.on { box-shadow: 0 1px 0 rgb(255 255 255 / .06) inset, 0 1px 3px rgb(0 0 0 / .6); }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 24px 18px; }
+.chip { height: 28px; padding: 0 11px; font-size: 12.5px; }
+
+/* canais */
+.board { display: grid; grid-template-columns: repeat(4, minmax(250px, 1fr)); align-items: start; gap: 14px; padding: 0 24px 100px; overflow-x: auto; }
+.col { min-height: 260px; padding: 10px; border-radius: 14px; background: var(--tray); box-shadow: var(--tray-shadow); }
+.col.over { box-shadow: var(--tray-shadow), 0 0 0 2px var(--accent); }
+.ch { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 12px; }
+.ch-n { font-size: 13px; font-weight: 720; font-stretch: 112%; }
+.cards { display: grid; gap: 8px; }
+.card { display: grid; gap: 8px; padding: 11px 12px 10px; border-radius: 10px; background: var(--surface); box-shadow: var(--tile-shadow); cursor: grab; }
+.card:active { cursor: grabbing; }
+.card.drag { opacity: .4; }
+.card h3 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.35; text-wrap: pretty; }
+.t-top { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); }
+.t-top .when { margin-right: auto; font-weight: 520; }
+.t-top .ic { width: 13px; height: 13px; }
+.card.late .when { color: var(--late-ink); font-weight: 650; }
+.t-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.card.done { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.card.done h3 { color: var(--ink-3); text-decoration: line-through; text-decoration-color: var(--line-2); }
+.ok-btn { border: 0; background: var(--key); box-shadow: 0 1px 0 rgb(255 255 255 / .8) inset, 0 1.5px 0 var(--key-edge), 0 2px 4px rgb(0 0 0 / .15); color: var(--line-2); }
+.ok-btn:hover { color: var(--ok); }
+.ok-btn:active { transform: translateY(1px); box-shadow: var(--key-down); }
+.card.done .ok-btn { background: var(--ok); box-shadow: var(--lens); }
+.date.late { color: var(--late-ink); font-weight: 650; }
+.date.soon { color: var(--ink); }
+.list { padding: 0 24px 100px; }
+
+/* o momento do aparelho ligando: visor embaralha e os blocos assentam na bandeja */
+.boot .card { animation: assenta .55s cubic-bezier(.16, 1, .3, 1) backwards; animation-delay: calc(var(--i) * 28ms + 380ms); }
+.boot .brand .led { animation: liga .5s steps(2, jump-none) 2; }
+@keyframes assenta { from { opacity: 0; transform: translateY(8px); } }
+@keyframes liga { 50% { opacity: .2; } }
+
+@media (max-width: 900px) {
+  .strip { flex-wrap: wrap; }
+  .modes { order: 3; width: 100%; }
+  .ttl { flex-wrap: wrap; }
+  .ttl .lcd { margin-left: 0; }
+  .slot { width: 100%; }
+}
+</style>
+</head>
+<body>
+<header class="strip">
+  <div class="brand"><span class="grille" aria-hidden="true"></span>Gestão de Operação<span class="led on" aria-hidden="true"></span></div>
+  <nav class="modes" id="modes" aria-label="Grupos do menu"></nav>
+  <div class="util">
+    <button class="key" type="button" data-open="cmdk"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>Buscar<kbd>Ctrl K</kbd></button>
+    <button class="key sq" type="button" id="mode" aria-label="Alternar tema claro e escuro"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg></button>
+  </div>
+</header>
+<nav class="fns" id="fns" aria-label="Abas do grupo"></nav>
+
+<main>
+  <div class="head">
+    <div class="ttl">
+      <h1>Demandas</h1>
+      <button class="icon-btn" type="button" title="Tudo o que precisa ser feito, separado por dia. Arraste entre as colunas." aria-label="Sobre esta aba"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></button>
+      <div class="lcd" role="group" aria-label="Resumo">
+        <div class="rd"><b data-abertas data-pad>10</b><small>abertas</small></div>
+        <div class="rd"><b data-atrasadas data-pad>01</b><small>atrasadas</small></div>
+        <div class="rd"><b data-agendadas data-pad>03</b><small>agendadas</small></div>
+      </div>
+    </div>
+    <div class="tools">
+      <label class="slot"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><input id="q" placeholder="Buscar demanda ou cliente" aria-label="Buscar demandas"></label>
+      <div class="seg" role="group" aria-label="Visualização">
+        <button type="button" data-view="board" class="on"><svg class="ic" aria-hidden="true"><use href="#i-cols"/></svg>Quadro</button>
+        <button type="button" data-view="list"><svg class="ic" aria-hidden="true"><use href="#i-list"/></svg>Lista</button>
+      </div>
+      <button class="btn" type="button" data-open="agendar"><svg class="ic" aria-hidden="true"><use href="#i-calplus"/></svg>Agendar</button>
+      <button class="btn" type="button" data-open="agendadas"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>Agendadas<span class="cnt" data-agendadas>3</span></button>
+      <button class="btn primary" type="button" data-open="nova"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Nova</button>
+    </div>
+  </div>
+  <div class="filters" id="filters" role="group" aria-label="Filtros"></div>
+  <section class="board" id="board" aria-label="Quadro de demandas"></section>
+  <section class="list" id="list" aria-label="Lista de demandas" hidden></section>
+</main>
+
+<script>
+window.DIR = {
+  card: function (x, i, h) {
+    var led = h.estado(x) || (x.col === 0 ? 'hoje' : '');
+    return '<div class="t-top"><span class="led ' + led + '"></span><span class="when">' + x.d + '</span>' +
+      (x.rec ? '<span title="Toda semana">' + h.ic('repeat') + '</span>' : '') +
+      (x.coroa ? '<span class="crown" title="Coroa">' + h.ic('crown') + '</span>' : '') + '</div>' +
+      '<h3>' + x.t + '</h3><div class="t-foot">' + h.client(x.c) + h.ok(x) + '</div>';
+  },
+  colHead: function (name, xs, ci, h) {
+    return '<header class="ch"><span class="ch-n">' + name + '</span><span class="lcd mini"><b>' + h.pad(xs.length) + '</b></span></header>';
+  },
+  chip: function (f, on) { return '<span class="led' + (on ? ' on' : '') + '"></span>' + f; },
+  boot: function (h) {
+    var modes = document.getElementById('modes'), fns = document.getElementById('fns');
+    function nav(gi) {
+      modes.innerHTML = h.GRUPOS.map(function (g, i) {
+        var on = i === gi;
+        return '<button type="button" class="key mode' + (on ? ' on' : '') + '" data-g="' + i + '" aria-pressed="' + on + '"><span class="led' + (on ? ' on' : '') + '"></span>' + g[0] + '</button>';
+      }).join('');
+      fns.innerHTML = h.GRUPOS[gi][2].map(function (t) {
+        return '<a href="#"' + (t === 'Demandas' ? ' class="on" aria-current="page"' : '') + '>' + t + '</a>';
+      }).join('');
+    }
+    nav(0);
+    modes.addEventListener('click', function (e) { var b = e.target.closest('[data-g]'); if (b) nav(+b.dataset.g); });
+    fns.addEventListener('click', function (e) { var a = e.target.closest('a'); if (!a) return; e.preventDefault(); if (!a.classList.contains('on')) h.toast('Neste mockup só a aba Demandas existe'); });
+
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.body.classList.add('boot');
+    var bs = [].slice.call(document.querySelectorAll('.lcd b')), fim = bs.map(function (b) { return b.textContent; }), n = 0;
+    var t = setInterval(function () {
+      n++;
+      bs.forEach(function (b, k) { b.textContent = n > 8 + k ? fim[k] : h.pad(Math.floor(Math.random() * 100)); });
+      if (n > 8 + bs.length) clearInterval(t);
+    }, 48);
+    setTimeout(function () { document.body.classList.remove('boot'); }, 1500);
+  }
+};
+</script>
+<script src="app.js"></script>
+</body>
+</html>

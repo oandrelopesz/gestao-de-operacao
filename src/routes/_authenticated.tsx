@@ -1,18 +1,22 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState, useRouter } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { ChevronRight, ChevronLeft, PanelLeft, Sun, Moon, Sparkles, LogOut } from "lucide-react";
+import { ChevronRight, ChevronLeft, PanelLeft, Sparkles, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/NotificationBell";
+import { SeletorAparencia } from "@/components/SeletorAparencia";
 import { cn } from "@/lib/utils";
 import { AgenciasProvider } from "@/lib/agencias";
 import { MobileNav } from "@/components/MobileNav";
 import { NavLateral } from "@/components/NavLateral";
+import { NavDoca } from "@/components/NavDoca";
+import { NavSecoes } from "@/components/NavSecoes";
+import { PaletaAbas } from "@/components/PaletaAbas";
+import { useAparencia } from "@/lib/aparencia";
 import { AtualizarAoVoltar } from "@/components/AtualizarAoVoltar";
 import { PlataformasProvider } from "@/lib/plataformas";
-import { useTheme } from "@/lib/theme";
 import { warmAllCaches } from "@/lib/data";
 import { depoisDoLoad, emLotes, esperarOcioso, pausa } from "@/lib/aquecimento";
 import { getConfig } from "@/lib/appConfig";
@@ -53,6 +57,19 @@ function LoginObrigatorio() {
 
 const ALL_LINKS = NAV_GROUPS.flatMap((g) => g.links);
 
+// true no computador (lg+): o Editorial move sino e seletor para o topo e esconde o cabeçalho antigo
+function useDesktop() {
+  return useSyncExternalStore(
+    (avisar) => {
+      const m = window.matchMedia("(min-width: 1024px)");
+      m.addEventListener("change", avisar);
+      return () => m.removeEventListener("change", avisar);
+    },
+    () => window.matchMedia("(min-width: 1024px)").matches,
+    () => false,
+  );
+}
+
 function AuthenticatedLayout({ session }: { session: any }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -68,7 +85,6 @@ function AuthenticatedLayout({ session }: { session: any }) {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("sidebar-collapsed") === "1";
   });
-  const { theme, toggle: toggleTheme } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -96,11 +112,23 @@ function AuthenticatedLayout({ session }: { session: any }) {
   const { naoVistos: avisosNaoVistos } = useAvisosFormularios();
   const contadoresMenu = useMemo(() => ({ "/dados-internos": avisosNaoVistos.length }), [avisosNaoVistos]);
   const fecharMenuCelular = useCallback(() => setIsSidebarOpen(false), []);
-  // Ctrl+K com o menu escondido: no computador reabre o menu recolhido; no celular abre a gaveta
-  const abrirMenu = useCallback(() => {
-    if (window.matchMedia("(min-width: 1024px)").matches) setIsDesktopCollapsed(false);
-    else setIsSidebarOpen(true);
+  // Painel e Editorial trocam o menu lateral do computador por doca/seções; a Clássica não muda
+  const { aparencia } = useAparencia();
+  const casca = aparencia !== "classica";
+  const desktop = useDesktop();
+  const topoEditorial = aparencia === "editorial" && desktop;
+  const [paletaAberta, setPaletaAberta] = useState(false);
+  const sair = useCallback(async () => {
+    await supabase.auth.signOut();
+    limparIdToken();
   }, []);
+  // Ctrl+K com o menu escondido: no computador reabre o menu recolhido (ou abre a busca, nas aparências novas); no celular abre a gaveta
+  const abrirMenu = useCallback(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      if (casca) setPaletaAberta(true);
+      else setIsDesktopCollapsed(false);
+    } else setIsSidebarOpen(true);
+  }, [casca]);
 
   // Aquecimento para a troca de aba ser instantânea: o cache de dados de cada aba e o código de todas as
   // rotas. A tela aberta tem prioridade total — só começa depois que ela carregou (load + 1,5 s + navegador
@@ -205,7 +233,9 @@ function AuthenticatedLayout({ session }: { session: any }) {
   return (
     <AgenciasProvider>
     <PlataformasProvider>
-      <div className="flex min-h-screen bg-background text-foreground">
+      <div className="casca flex min-h-screen bg-background text-foreground">
+        {aparencia === "painel" && <NavDoca grupos={grupos} contadores={contadoresMenu} onAbrirPaleta={() => setPaletaAberta(true)} onSair={sair} />}
+        {casca && <PaletaAbas grupos={grupos} aberta={paletaAberta} onMudar={setPaletaAberta} />}
         {/* Barra de alerta de saldo */}
         {topAlert && (
           <div
@@ -237,7 +267,8 @@ function AuthenticatedLayout({ session }: { session: any }) {
             "dark fixed inset-y-0 left-0 z-50 w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300",
             "max-lg:pt-[env(safe-area-inset-top)] max-lg:pb-[env(safe-area-inset-bottom)]",
             isSidebarOpen ? "translate-x-0" : "-translate-x-full",
-            isDesktopCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"
+            isDesktopCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0",
+            casca && "lg:hidden"
           )}
         >
           <div className="h-16 px-5 flex items-center justify-between">
@@ -295,8 +326,22 @@ function AuthenticatedLayout({ session }: { session: any }) {
         </aside>
 
         {/* Conteúdo */}
-        <main className={cn("flex-1 flex flex-col min-w-0 transition-[padding] duration-300", isDesktopCollapsed ? "lg:pl-0" : "lg:pl-64")}>
-          <header className="h-14 max-lg:h-[calc(3.5rem+env(safe-area-inset-top))] max-lg:pt-[env(safe-area-inset-top)] border-b border-border/60 flex items-center justify-between px-4 lg:px-8 sticky top-0 glass glow-line z-30">
+        <main className={cn("flex-1 flex flex-col min-w-0 transition-[padding] duration-300", casca ? (aparencia === "painel" ? "lg:pl-24" : "lg:pl-0") : isDesktopCollapsed ? "lg:pl-0" : "lg:pl-64")}>
+          {topoEditorial && (
+            <NavSecoes
+              grupos={grupos}
+              contadores={contadoresMenu}
+              onAbrirPaleta={() => setPaletaAberta(true)}
+              onSair={sair}
+              acoes={
+                <>
+                  <SeletorAparencia />
+                  <NotificationBell />
+                </>
+              }
+            />
+          )}
+          {!topoEditorial && <header className="h-14 max-lg:h-[calc(3.5rem+env(safe-area-inset-top))] max-lg:pt-[env(safe-area-inset-top)] border-b border-border/60 flex items-center justify-between px-4 lg:px-8 sticky top-0 glass glow-line z-30">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setIsSidebarOpen(true)}>
                 <ChevronRight size={16} />
@@ -322,18 +367,10 @@ function AuthenticatedLayout({ session }: { session: any }) {
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                onClick={toggleTheme}
-                title={theme === "dark" ? "Modo claro" : "Modo escuro"}
-              >
-                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-              </Button>
+              <SeletorAparencia />
               <NotificationBell />
             </div>
-          </header>
+          </header>}
           <div key={`${telaMontada}#${recarga}`} className="p-4 lg:p-8 max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))] page-enter">
             <Outlet />
           </div>

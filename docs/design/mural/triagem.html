@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><title>triagem</title>
+<style>body{margin:0;background:#ddd;font:12px system-ui}main{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:4px}
+figure{margin:0;position:relative;background:#fff}img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+b{position:absolute;top:0;left:0;background:#000;color:#fff;padding:1px 5px;font-size:15px}figcaption{padding:2px 4px;white-space:nowrap;overflow:hidden}</style>
+<main id="m"></main>
+<script>fetch('candidatos.json').then(r=>r.json()).then(d=>{const p=new URLSearchParams(location.search);const a=+(p.get('a')||0),n=+(p.get('n')||36);m.style.gridTemplateColumns=`repeat(${p.get('c')||6},1fr)`;
+const ids=p.get('ids')?p.get('ids').split(',').map(Number):d.slice(a,a+n).map((_,i)=>a+i);
+m.innerHTML=ids.map(i=>`<figure><img src="${d[i].src}" referrerpolicy="no-referrer"><b>${i}</b><figcaption>${d[i].q}</figcaption></figure>`).join('')})</script>

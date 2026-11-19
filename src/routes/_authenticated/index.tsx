@@ -61,6 +61,7 @@ import { msAteProximaVirada } from "@/lib/viradaDia";
 import { formatarDataCurta, hojeBrasilia, siglaDoDia } from "@/lib/entrega";
 import { AgendadasSheet } from "@/components/demandas/AgendadasSheet";
 import { COLUNA_AGENDADAS } from "@/lib/agendadas";
+import { CabecaPainel, ResumoEditorial } from "@/components/demandas/ResumoDia";
 import { somarDias } from "@/lib/recorrencia";
 import {
   mapaDias as montarMapaDias,
@@ -791,7 +792,7 @@ function DemandasPage() {
     <div className="space-y-4 flex flex-col h-[calc(100vh-8rem)]">
       <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold tracking-tight">Demandas</h1>
+          <h1 className="titulo-pagina text-xl font-bold tracking-tight">Demandas</h1>
           <Button 
             variant="ghost" 
             size="sm" 
@@ -837,10 +838,12 @@ function DemandasPage() {
                 Nova
             </Button>
         </div>
+        <ResumoEditorial doQuadro={doQuadro} agendadas={agendadas.length} />
       </div>
 
+      <CabecaPainel doQuadro={doQuadro} agendadas={agendadas.length}>
       {showCalendar && (
-        <div className="bg-zinc-50/50 dark:bg-zinc-900/50 rounded-lg p-3 border animate-in slide-in-from-top duration-300">
+        <div className="previsao-recorrencias bg-zinc-50/50 dark:bg-zinc-900/50 rounded-lg p-3 border animate-in slide-in-from-top duration-300">
            {/* Calendário será implementado em componente separado ou inline */}
            <div className="flex items-center justify-between mb-3">
              <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Previsão de Recorrências</div>
@@ -871,7 +874,7 @@ function DemandasPage() {
                   <div 
                     key={i} 
                     className={cn(
-                      "flex-1 min-w-[100px] max-w-[150px] p-2 rounded-md border border-dashed flex flex-col gap-1.5",
+                      "previsao-dia flex-1 min-w-[100px] max-w-[150px] p-2 rounded-md border border-dashed flex flex-col gap-1.5",
                       isToday ? "bg-primary/5 border-primary/20" : "bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800"
                     )}
                   >
@@ -897,6 +900,7 @@ function DemandasPage() {
            </div>
         </div>
       )}
+      </CabecaPainel>
 
       <div className="flex flex-wrap items-center gap-2 shrink-0">
         <div className="relative w-full max-w-[200px]">
@@ -939,7 +943,7 @@ function DemandasPage() {
               onDragEnd={onDragEnd}
               onDragCancel={onDragCancel}
             >
-              <div className="flex gap-4 h-full min-w-max pb-4">
+              <div className="quadro-demandas flex gap-4 h-full min-w-max pb-4">
                 {columns.map((col) => {
                   const cards = filteredDemandas.filter((d) => d.status === col.id).sort(byOrdem);
                   const secoes = col.dias.length

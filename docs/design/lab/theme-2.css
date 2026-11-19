@@ -1,0 +1,16 @@
+@import url(palette.css);
+/* 2 · Claro editorial: Attio/Notion. Respiro, papel branco, sombra suave, tipografia nítida. */
+:root{--font:"Geist","Inter",system-ui,sans-serif;--font-display:"Geist",system-ui,sans-serif;--fs:13.5px;--h1:22px;--h1-w:600;--h1-ls:-.025em;
+--r-sm:6px;--r-md:9px;--r-lg:14px;--r-xl:18px;--r-pill:999px;--side-w:248px;--col-w:292px;--gap:14px;--col-pad:10px;--card-pad:13px 14px;--card-gap:10px;--stroke:1.5}
+html[data-mode=light]{--bg:oklch(.975 .006 250);--bg-side:oklch(.975 .006 250);--lane:oklch(.95 .008 250/.65);--card-line:oklch(.92 .01 250);--shadow-card:0 1px 2px oklch(.2 .03 255/.05),0 0 0 1px oklch(.2 .03 255/.02)}
+html[data-mode=dark]{--bg:oklch(.14 .014 255);--lane:oklch(.165 .016 255);--card-line:oklch(1 0 0/.06)}
+.top{border-bottom:0;padding-top:20px;padding-bottom:14px}
+.side{border-right:0}
+.nav a.on{background:var(--surface);box-shadow:var(--shadow-1),0 0 0 1px var(--line)}
+html[data-mode=dark] .nav a.on{background:var(--surface-2)}
+.nav a{height:33px}
+.card{transition:transform .28s var(--ease),box-shadow .28s var(--ease)}
+.card:hover{transform:translateY(-2px);box-shadow:0 8px 22px -8px oklch(.2 .04 255/.22)}
+.col-h{padding-bottom:6px}
+.btn.primary{box-shadow:0 1px 2px oklch(.3 .15 262/.4),inset 0 1px 0 oklch(1 0 0/.2)}
+.tag{background:transparent;border:1px solid var(--line);padding-right:8px}

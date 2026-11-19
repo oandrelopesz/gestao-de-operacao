@@ -1,0 +1,16 @@
+@import url(palette.css);
+/* 1 · Grafite de precisão: Linear/Vercel. Denso, hairlines, raio curto, escuro primeiro. */
+:root{--font:"Inter",system-ui,sans-serif;--font-display:"Inter",system-ui,sans-serif;--fs:13px;--h1:17px;--h1-w:600;--h1-ls:-.012em;
+--r-sm:4px;--r-md:6px;--r-lg:8px;--r-xl:10px;--r-pill:999px;--side-w:232px;--col-w:272px;--gap:8px;--card-pad:9px 11px;--card-gap:6px;--stroke:1.6;--t-w:500}
+html[data-mode=dark]{--bg:oklch(.14 .016 258);--bg-side:oklch(.12 .016 258);--surface:oklch(.18 .018 258);--lane:transparent;--card-line:oklch(1 0 0/.07)}
+html[data-mode=light]{--lane:transparent;--bg:oklch(.985 .004 245);--bg-side:oklch(.97 .006 245)}
+.col{border-right:1px solid var(--line);border-radius:0;padding:0 8px 0 0}
+.card{box-shadow:none}
+.card:hover{box-shadow:none;transform:none;border-color:var(--line-2);background:var(--hover-solid)}
+.btn{box-shadow:none;height:28px;padding:0 10px}
+.btn.primary{box-shadow:inset 0 1px 0 oklch(1 0 0/.18)}
+.field,.seg{height:28px}.seg button{height:22px}
+.nav a{height:28px}
+.nav .grp{text-transform:none;letter-spacing:0;font-size:11.5px;font-weight:500}
+.logo{border-radius:5px}
+html[data-mode=dark] .nav a.on{box-shadow:inset 0 0 0 1px var(--line)}

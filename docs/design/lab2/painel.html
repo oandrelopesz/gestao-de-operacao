@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demandas · Painel e vidro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geologica:wght@200..700&display=swap">
+<link rel="stylesheet" href="camadas.css">
+<script>(function () { var m = 'dark'; try { m = localStorage.getItem('lab2-mode') || m; } catch (e) {} document.documentElement.dataset.mode = m; })();</script>
+<style>
+/* Aparência Painel e vidro: cabine sóbria. O fundo é um ambiente (a borda de um planeta ao amanhecer) e
+   o trabalho flutua em camadas de vidro sobre ele. Números grandes e finos, linhas de 1px, nada de brilho colorido.
+   A aba é a mesma de hoje, peça por peça; só a pele muda. */
+:root {
+  --font: "Geologica", system-ui, sans-serif;
+  --bg: #e8edf3;
+  --ink: #101722; --ink-2: #4a5566; --ink-3: #5b6676;
+  --line: rgb(16 23 34 / .1); --line-2: rgb(16 23 34 / .2);
+  --surface: rgb(255 255 255 / .78); --surface-2: rgb(255 255 255 / .5);
+  --accent: oklch(0.55 0.2 262); --accent-ink: #fff;
+  --late-ink: oklch(0.55 0.17 45);
+  --glass: rgb(255 255 255 / .46); --glass-line: rgb(255 255 255 / .75); --glass-hi: rgb(255 255 255 / .9);
+  --r-lg: 22px; --r-md: 14px; --r-sm: 10px; --r-btn: 999px; --r-seg: 999px; --r-inp: 999px;
+  --card: rgb(255 255 255 / .74); --card-line: rgb(255 255 255 / .9); --card-shadow: 0 1px 2px rgb(0 0 0 / .06);
+  --col-bg: var(--glass); --col-line: var(--glass-line);
+  --layer: rgb(248 250 253 / .8); --layer-line: rgb(255 255 255 / .9); --layer-filter: blur(28px) saturate(1.5);
+  --shadow-layer: 0 1px 0 rgb(255 255 255 / .9) inset, 0 40px 80px -24px rgb(22 34 56 / .35);
+  --shadow-glass: 0 1px 0 var(--glass-hi) inset, 0 24px 48px -20px rgb(22 34 56 / .28);
+  --scrim: rgb(214 222 232 / .5);
+  --sky: linear-gradient(180deg, #dfe6ee 0%, #eef2f6 46%, #f6f4f0 64%, #e3e9f0 100%);
+  --planet: linear-gradient(180deg, #d5dee8 0%, #eaeff4 5%, #f1f4f7 12%); --rim: rgb(255 255 255 / .95); --haze: rgb(255 246 232 / .9);
+}
+[data-mode="dark"] {
+  --bg: #04060a;
+  --ink: #e9eef5; --ink-2: #a3aebd; --ink-3: #8994a4;
+  --line: rgb(255 255 255 / .08); --line-2: rgb(255 255 255 / .16);
+  --surface: rgb(30 37 50 / .72); --surface-2: rgb(255 255 255 / .06);
+  --accent: oklch(0.72 0.15 235); --accent-ink: oklch(0.11 0.03 255);
+  --late-ink: oklch(0.8 0.14 60);
+  --glass: rgb(20 27 40 / .5); --glass-line: rgb(255 255 255 / .09); --glass-hi: rgb(255 255 255 / .07);
+  --card: rgb(34 42 57 / .66); --card-line: rgb(255 255 255 / .07); --card-shadow: none;
+  --layer: rgb(18 24 35 / .78); --layer-line: rgb(255 255 255 / .1);
+  --shadow-layer: 0 1px 0 rgb(255 255 255 / .06) inset, 0 40px 80px -20px rgb(0 0 0 / .7);
+  --shadow-glass: 0 1px 0 var(--glass-hi) inset, 0 24px 48px -16px rgb(0 0 0 / .55);
+  --scrim: rgb(2 4 8 / .55);
+  --sky: linear-gradient(180deg, #03050a 0%, #060a12 50%, #0a1220 72%, #070b13 100%);
+  --planet: #070b12; --rim: rgb(190 220 255 / .55); --haze: rgb(70 120 190 / .22);
+}
+body { background: var(--sky); background-attachment: fixed; }
+
+/* o ambiente: céu, borda do planeta e uma névoa fina no horizonte */
+.env { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.env::before { content: ""; position: absolute; left: 50%; top: 74vh; width: 260vw; height: 260vw; border-radius: 50%; transform: translateX(-50%); background: var(--planet); box-shadow: 0 -1px 0 var(--rim), 0 -40px 120px -30px var(--haze); }
+.env::after { content: ""; position: absolute; inset: 0; background-image: radial-gradient(circle, var(--line-2) .6px, transparent 1px); background-size: 120px 120px; opacity: .5; mask-image: linear-gradient(180deg, #000 0%, transparent 70%); }
+[data-mode="light"] .env::after { opacity: 0; }
+.glass, .col, .cal, .list { -webkit-backdrop-filter: blur(26px) saturate(1.5); backdrop-filter: blur(26px) saturate(1.5); box-shadow: var(--shadow-glass); }
+.glass { background: var(--glass); border: 1px solid var(--glass-line); }
+
+/* trilho de navegação: uma peça flutuante, grupo por ícone, e as abas abrem ao lado */
+.rail { position: fixed; left: 16px; top: 50%; z-index: 20; display: grid; gap: 4px; padding: 8px; border-radius: 999px; transform: translateY(-50%); }
+.rail .logo { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 6px; border-radius: 50%; background: var(--ink); color: var(--bg); font-weight: 600; font-size: 15px; letter-spacing: -.02em; }
+.rail button { position: relative; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink-2); }
+.rail button:hover { background: var(--surface-2); color: var(--ink); }
+.rail button.on { background: var(--ink); color: var(--bg); }
+.rail button .ic { width: 19px; height: 19px; stroke-width: 1.6; }
+.rail .sep { height: 1px; margin: 6px 8px; background: var(--line-2); }
+.rail button[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: calc(100% + 12px); top: 50%; padding: 6px 10px; border-radius: 8px; background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 500; white-space: nowrap; transform: translateY(-50%); pointer-events: none; }
+.fly { position: fixed; left: 88px; top: 50%; z-index: 21; width: 230px; padding: 10px; border-radius: var(--r-lg); transform: translateY(-50%); animation: abre .3s cubic-bezier(.16, 1, .3, 1); background: var(--layer); }
+.rail:has(+ .fly:not([hidden])) button[data-tip]:hover::after { display: none; }
+.fly h2 { margin: 6px 10px 8px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.fly a { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: var(--r-sm); color: var(--ink); text-decoration: none; font-size: 14px; }
+.fly a:hover { background: var(--surface-2); }
+.fly a.on { background: var(--ink); color: var(--bg); }
+@keyframes abre { from { opacity: 0; transform: translate(-8px, -50%) scale(.98); } }
+
+/* palco, na ordem de hoje: cabeçalho, previsão de recorrências, busca e seleção, quadro */
+main { display: grid; gap: 16px; min-height: 100vh; padding: 24px 28px 40px 100px; }
+.hd h1 { margin: 0 6px 0 0; font-size: 40px; line-height: 1; font-weight: 250; letter-spacing: -.035em; }
+#h-acoes { padding: 6px; border-radius: 999px; }
+.btn { font-weight: 450; }
+.btn.primary, .btn.ok-f, .btn.danger-f { font-weight: 550; }
+.btn.agendar { border-color: color-mix(in oklch, var(--accent) 45%, transparent); }
+.seg { border: 0; }
+.seg button { border-radius: 999px; height: 32px; }
+.seg button.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+.btn.sel-b { border-color: var(--line-2); background: var(--surface-2); }
+.cnt { background: var(--ink); color: var(--bg); font-weight: 500; }
+.search { width: min(270px, 100%); height: 38px; border-color: transparent; background: var(--surface-2); }
+
+/* leitura de cabine ao lado da previsão: anel do dia e três números grandes e finos */
+.cab { display: flex; flex-wrap: wrap; align-items: stretch; gap: 16px; }
+.hud { display: flex; align-items: center; gap: 24px; padding: 14px 24px 14px 16px; border-radius: var(--r-lg); }
+.gauge { position: relative; width: 116px; height: 116px; flex: none; }
+.gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.gauge circle { fill: none; stroke-width: 3; }
+.gauge .trk { stroke: var(--line-2); }
+.gauge .val { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1.2s cubic-bezier(.16, 1, .3, 1); }
+.gauge .tk { stroke: var(--line-2); stroke-width: 6; stroke-dasharray: 1 13.94; }
+.gauge b { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; font-size: 26px; line-height: 1; font-weight: 250; letter-spacing: -.03em; }
+.gauge b small { display: block; margin-top: 5px; font-size: 11px; font-weight: 400; color: var(--ink-2); letter-spacing: 0; }
+.read { display: grid; gap: 2px; padding-left: 24px; border-left: 1px solid var(--line-2); }
+.read b { font-size: 44px; line-height: 1; font-weight: 200; letter-spacing: -.04em; }
+.read small { font-size: 12px; color: var(--ink-2); }
+.read.late b { color: var(--late-ink); }
+.cal { flex: 1 1 520px; min-width: 0; padding: 14px 16px; border-radius: var(--r-lg); border-color: var(--glass-line); background: var(--glass); }
+.cal h2 { font-weight: 500; letter-spacing: .08em; }
+.cal-d { border-style: solid; border-color: var(--line); background: var(--surface-2); }
+.cal-d b { font-size: 18px; font-weight: 250; }
+.cal-i { border-color: transparent; background: var(--card); }
+
+/* janelas de vidro por coluna, cartões em placas mais opacas */
+.board { gap: 14px; }
+.col { padding: 6px 4px 0; }
+.ch { align-items: baseline; padding: 10px 12px 2px; }
+.ch-n { font-weight: 550; letter-spacing: .08em; }
+.ch-c { order: 2; margin-left: auto; padding: 0; background: none; color: var(--ink); font-size: 28px; line-height: 1; font-weight: 200; letter-spacing: -.03em; }
+.ch-m { order: 3; margin: 0 -6px 0 2px; align-self: center; }
+.load { height: 2px; margin: 8px 12px 12px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.load i { display: block; height: 100%; width: var(--w); background: var(--cc); transform-origin: left; }
+.boot .load i { animation: carrega 1s cubic-bezier(.16, 1, .3, 1) backwards .3s; }
+@keyframes carrega { from { transform: scaleX(0); } }
+.card { padding: 12px 14px; }
+.ags { margin: -12px -14px 0; }
+.card h3 { font-weight: 450; letter-spacing: -.005em; }
+.card.done { background: transparent; border-color: var(--line); box-shadow: none; }
+.sec > header span { font-weight: 550; }
+.col-new { border-radius: var(--r-lg); background: var(--glass); border-color: var(--glass-line); -webkit-backdrop-filter: blur(26px); backdrop-filter: blur(26px); }
+.list { border-color: var(--glass-line); }
+.lr:hover { background: var(--surface-2); }
+
+/* entrada: o anel enche, os números contam e as janelas sobem do horizonte */
+.boot .col { animation: emerge .8s cubic-bezier(.16, 1, .3, 1) backwards; }
+.boot .col:nth-child(2) { animation-delay: 70ms; } .boot .col:nth-child(3) { animation-delay: 140ms; } .boot .col:nth-child(4) { animation-delay: 210ms; }
+.boot .col:nth-child(5) { animation-delay: 280ms; } .boot .col:nth-child(6) { animation-delay: 350ms; } .boot .col:nth-child(n+7) { animation-delay: 420ms; }
+@keyframes emerge { from { opacity: 0; transform: translateY(24px); } }
+
+@media (max-width: 900px) {
+  main { padding: 20px 16px 110px; }
+  .rail { top: auto; bottom: 16px; left: 50%; display: flex; transform: translateX(-50%); }
+  .rail .logo, .rail .sep { display: none; }
+  .fly { left: 50%; top: auto; bottom: 80px; transform: translateX(-50%); }
+  .hud { flex-wrap: wrap; }
+  .selecionando .selbar { bottom: 84px; }
+}
+</style>
+</head>
+<body>
+<div class="env" aria-hidden="true"></div>
+<nav class="rail glass" id="rail" aria-label="Menu"></nav>
+<div class="fly glass" id="fly" hidden></div>
+
+<main>
+  <header class="hd">
+    <div class="hd-l"><h1>Demandas</h1><span id="h-cal"></span></div>
+    <div class="hd-r glass" id="h-acoes"></div>
+  </header>
+  <div class="cab">
+    <div class="hud glass" role="group" aria-label="Resumo do dia">
+      <div class="gauge"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="tk" cx="50" cy="50" r="44"/><circle class="trk" cx="50" cy="50" r="38"/><circle class="val" cx="50" cy="50" r="38"/></svg><b><span id="g-pct">0%</span><small>do dia</small></b></div>
+      <div class="read"><b data-abertas data-count>0</b><small>abertas</small></div>
+      <div class="read late"><b data-atrasadas data-count>0</b><small id="l-atr">atrasadas</small></div>
+      <div class="read"><b data-agendadas data-count>0</b><small>agendadas</small></div>
+    </div>
+    <section class="cal" id="cal" aria-label="Previsão de Recorrências"></section>
+  </div>
+  <div class="barra" id="barra"></div>
+  <section class="board" id="board" aria-label="Quadro de demandas"></section>
+  <section class="list" id="list" aria-label="Lista de demandas" hidden></section>
+</main>
+
+<script>
+window.DIR = {
+  /* barra fina de carga sob o nome, proporcional à coluna mais cheia */
+  colExtra: function (c, xs, h) {
+    var max = Math.max.apply(null, h.cols().map(function (k) { return h.doCol(k.id).length; })) || 1;
+    return '<div class="load" aria-hidden="true"><i style="--w:' + Math.round(xs.length / max * 100) + '%"></i></div>';
+  },
+  after: function (h) {
+    var pct = h.pct(), c = 2 * Math.PI * 38, v = document.querySelector('.gauge .val');
+    v.style.strokeDasharray = c;
+    if (!document.body.classList.contains('boot')) v.style.strokeDashoffset = c * (1 - pct / 100);
+    v.dataset.alvo = c * (1 - pct / 100);
+    var el = document.getElementById('g-pct'), de = parseInt(el.textContent, 10) || 0, t0 = performance.now();
+    el._t = t0;
+    if (de === pct || matchMedia('(prefers-reduced-motion: reduce)').matches) el.textContent = pct + '%';
+    else (function passo(t) { if (el._t !== t0) return; var k = Math.min(1, (t - t0) / 900); el.textContent = Math.round(de + (pct - de) * (1 - Math.pow(1 - k, 3))) + '%'; if (k < 1) requestAnimationFrame(passo); })(t0);
+    document.getElementById('l-atr').textContent = h.atrasadas() === 1 ? 'atrasada' : 'atrasadas';
+  },
+  boot: function (h) {
+    var rail = document.getElementById('rail'), fly = document.getElementById('fly'), aberto = -1;
+    var escuro = document.documentElement.dataset.mode === 'dark';
+    rail.innerHTML = '<span class="logo" aria-hidden="true">GO</span>' + h.GRUPOS.map(function (g, i) {
+      return (i === 5 ? '<span class="sep"></span>' : '') + '<button type="button" data-g="' + i + '" data-tip="' + g[0] + '" aria-label="' + g[0] + '"' + (i === 0 ? ' class="on"' : '') + '>' + h.ic(g[1]) + '</button>';
+    }).join('') + '<span class="sep"></span>' +
+      '<button type="button" data-open="cmdk" data-tip="Buscar  Ctrl K" aria-label="Busca rápida">' + h.ic('search') + '</button>' +
+      '<button type="button" data-act="aparencia" data-tip="Aparência" aria-label="Aparência">' + h.ic('palette') + '</button>' +
+      '<button type="button" data-act="tema" data-tip="Tema claro ou escuro" aria-label="Alternar tema claro e escuro">' + h.ic(escuro ? 'sun' : 'moon') + '</button>';
+    function fechar() { fly.hidden = true; aberto = -1; }
+    rail.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-g]'); if (!b) return;
+      var gi = +b.dataset.g; if (aberto === gi) return fechar();
+      aberto = gi;
+      fly.innerHTML = '<h2>' + h.GRUPOS[gi][0] + '</h2>' + h.GRUPOS[gi][2].map(function (t) { return '<a href="#"' + (t === 'Demandas' ? ' class="on" aria-current="page"' : '') + '>' + t + '</a>'; }).join('');
+      fly.hidden = false;
+    });
+    fly.addEventListener('click', function (e) { var a = e.target.closest('a'); if (!a) return; e.preventDefault(); if (!a.classList.contains('on')) h.toast('Neste mockup só a aba Demandas existe'); });
+    document.addEventListener('click', function (e) { if (!fly.hidden && !e.target.closest('#fly,#rail')) fechar(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fechar(); });
+
+    var v = document.querySelector('.gauge .val');
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { v.style.strokeDashoffset = v.dataset.alvo; return; }
+    document.body.classList.add('boot');
+    v.style.transition = 'none'; v.style.strokeDashoffset = v.style.strokeDasharray;
+    requestAnimationFrame(function () { requestAnimationFrame(function () { v.style.transition = ''; v.style.strokeDashoffset = v.dataset.alvo; }); });
+    document.querySelectorAll('[data-count]').forEach(function (b) {
+      var fim = +b.textContent, t0 = performance.now();
+      (function passo(t) { var k = Math.min(1, (t - t0) / 900); b.textContent = Math.round(fim * (1 - Math.pow(1 - k, 4))); if (k < 1) requestAnimationFrame(passo); })(t0);
+    });
+    setTimeout(function () { document.body.classList.remove('boot'); }, 1400);
+  }
+};
+</script>
+<script src="app.js"></script>
+</body>
+</html>
