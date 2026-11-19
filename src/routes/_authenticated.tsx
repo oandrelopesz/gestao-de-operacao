@@ -20,8 +20,8 @@ import { PlataformasProvider } from "@/lib/plataformas";
 import { warmAllCaches } from "@/lib/data";
 import { depoisDoLoad, emLotes, esperarOcioso, pausa } from "@/lib/aquecimento";
 import { getConfig } from "@/lib/appConfig";
-import { aplicarMenu, type MenuConfig } from "@/lib/menuConfig";
-import { NAV_GROUPS } from "@/lib/nav";
+import { aplicarMenu, reagrupar, type MenuConfig } from "@/lib/menuConfig";
+import { LINK_HOJE, NAV_GROUPS } from "@/lib/nav";
 import { toast } from "sonner";
 import { limparIdToken } from "@/lib/googleAuth";
 import { marcarTodosVistos, useAvisosFormularios } from "@/lib/formulariosEnvios";
@@ -55,7 +55,7 @@ function LoginObrigatorio() {
   return <AuthenticatedLayout session={sessao} />;
 }
 
-const ALL_LINKS = NAV_GROUPS.flatMap((g) => g.links);
+const ALL_LINKS = [...NAV_GROUPS.flatMap((g) => g.links), LINK_HOJE];
 
 // true no computador (lg+): o Editorial move sino e seletor para o topo e esconde o cabeçalho antigo
 function useDesktop() {
@@ -115,6 +115,8 @@ function AuthenticatedLayout({ session }: { session: any }) {
   // Painel e Editorial trocam o menu lateral do computador por doca/seções; a Clássica não muda
   const { aparencia } = useAparencia();
   const casca = aparencia !== "classica";
+  // Painel e Editorial usam os grupos novos (Hoje, Clientes, Marketing...); ocultas e ordem do Admin continuam valendo
+  const gruposMenu = useMemo(() => (casca ? reagrupar(grupos, [LINK_HOJE]) : grupos), [casca, grupos]);
   const desktop = useDesktop();
   const topoEditorial = aparencia === "editorial" && desktop;
   const [paletaAberta, setPaletaAberta] = useState(false);
@@ -220,9 +222,11 @@ function AuthenticatedLayout({ session }: { session: any }) {
     setUserName(userEmail ? "André Lopes" : "Admin");
   }, [session]);
 
+  // a ficha do cliente (/cliente/<id>) aparece no breadcrumb como Clientes
+  const rotaMenu = pathname.startsWith("/cliente/") ? "/clientes" : pathname;
   const currentPage =
-    ALL_LINKS.find((l) => l.to === pathname) ??
-    ALL_LINKS.find((l) => l.to !== "/" && pathname.startsWith(l.to));
+    ALL_LINKS.find((l) => l.to === rotaMenu) ??
+    ALL_LINKS.find((l) => l.to !== "/" && rotaMenu.startsWith(l.to));
 
   const getAlertColor = (status: string) => {
     if (status === "zerado") return "bg-red-700";
@@ -234,8 +238,8 @@ function AuthenticatedLayout({ session }: { session: any }) {
     <AgenciasProvider>
     <PlataformasProvider>
       <div className="casca flex min-h-screen bg-background text-foreground">
-        {aparencia === "painel" && <NavDoca grupos={grupos} contadores={contadoresMenu} onAbrirPaleta={() => setPaletaAberta(true)} onSair={sair} />}
-        {casca && <PaletaAbas grupos={grupos} aberta={paletaAberta} onMudar={setPaletaAberta} />}
+        {aparencia === "painel" && <NavDoca grupos={gruposMenu} contadores={contadoresMenu} onAbrirPaleta={() => setPaletaAberta(true)} onSair={sair} />}
+        {casca && <PaletaAbas grupos={gruposMenu} aberta={paletaAberta} onMudar={setPaletaAberta} />}
         {/* Barra de alerta de saldo */}
         {topAlert && (
           <div
@@ -296,7 +300,7 @@ function AuthenticatedLayout({ session }: { session: any }) {
             </Button>
           </div>
 
-          <NavLateral grupos={grupos} onNavegar={fecharMenuCelular} onAbrirMenu={abrirMenu} contadores={contadoresMenu} onLimparContador={() => { marcarTodosVistos().catch(() => toast.error("Não consegui limpar as notificações")); }} />
+          <NavLateral grupos={gruposMenu} onNavegar={fecharMenuCelular} onAbrirMenu={abrirMenu} contadores={contadoresMenu} onLimparContador={() => { marcarTodosVistos().catch(() => toast.error("Não consegui limpar as notificações")); }} />
 
           <div className="p-3 border-t border-sidebar-border">
             <div className="flex items-center gap-3 px-2 py-1.5 rounded-lg">
@@ -329,7 +333,7 @@ function AuthenticatedLayout({ session }: { session: any }) {
         <main className={cn("flex-1 flex flex-col min-w-0 transition-[padding] duration-300", casca ? (aparencia === "painel" ? "lg:pl-24" : "lg:pl-0") : isDesktopCollapsed ? "lg:pl-0" : "lg:pl-64")}>
           {topoEditorial && (
             <NavSecoes
-              grupos={grupos}
+              grupos={gruposMenu}
               contadores={contadoresMenu}
               onAbrirPaleta={() => setPaletaAberta(true)}
               onSair={sair}

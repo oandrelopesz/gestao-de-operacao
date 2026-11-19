@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { aplicarMenu, moverNoGrupo, alternarOculta, normalizarMenu, MENU_FIXOS } from "./menuConfig.ts";
+import { aplicarMenu, moverNoGrupo, alternarOculta, normalizarMenu, MENU_FIXOS, reagrupar, GRUPOS_NOVOS } from "./menuConfig.ts";
 
 test("endereço antigo (/pdfs → /arquivos) mantém ordem e oculta", () => {
   const g = [{ title: "Ferramentas", links: [{ to: "/links" }, { to: "/notas" }, { to: "/arquivos" }] }];
@@ -48,4 +48,29 @@ test("aba Prospecção virou CRM: ordem e oculta salvas com /prospeccao continua
   const cfg = normalizarMenu({ ocultas: ["/prospeccao"], ordem: { Operação: ["/clientes", "/prospeccao"] } });
   assert.deepEqual(cfg?.ocultas, ["/crm"]);
   assert.deepEqual(cfg?.ordem["Operação"], ["/clientes", "/crm"]);
+});
+
+test("reagrupar: grupos novos, oculta respeitada, extra entra e aba fora do mapa cai em Sistema", () => {
+  const classicos = [
+    { title: "Operação", links: [{ to: "/" }, { to: "/saldo" }] },
+    { title: "Comercial", links: [{ to: "/clientes" }, { to: "/crm" }] },
+    { title: "Sistema", links: [{ to: "/admin" }, { to: "/aba-nova" }] },
+  ];
+  const r = reagrupar(classicos, [{ to: "/hoje" }]);
+  assert.deepEqual(r.map((g) => g.title), ["Hoje", "Clientes", "Comercial e dinheiro", "Sistema"]);
+  assert.deepEqual(r[0].links.map((l) => l.to), ["/hoje", "/"]);
+  assert.deepEqual(r[1].links.map((l) => l.to), ["/clientes", "/saldo"]);
+  assert.deepEqual(r[3].links.map((l) => l.to), ["/admin", "/aba-nova"]);
+  // nenhuma rota repetida entre os grupos novos
+  const tos = GRUPOS_NOVOS.flatMap((g) => g.tos);
+  assert.equal(new Set(tos).size, tos.length);
+});
+
+test("toda aba do NAV_GROUPS tem lugar no menu novo", async () => {
+  const { readFileSync } = await import("node:fs");
+  const texto = readFileSync(new URL("./nav.tsx", import.meta.url), "utf8");
+  const rotas = [...texto.matchAll(/\bto: "(\/[^"]*)"/g)].map((m) => m[1]);
+  const novos = new Set(GRUPOS_NOVOS.flatMap((g) => g.tos));
+  assert.ok(rotas.length > 20);
+  assert.deepEqual(rotas.filter((r) => !novos.has(r)), []);
 });

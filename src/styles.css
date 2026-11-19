@@ -435,6 +435,7 @@ html[data-aparencia="painel"] main h1:not(.ProseMirror *) {
   line-height: 1;
   font-weight: 250;
   letter-spacing: -0.035em;
+  padding-bottom: 0.1em;
 }
 html[data-aparencia="editorial"] main h1:not(.ProseMirror *) {
   font-size: clamp(36px, 4.4vw, 64px);
@@ -448,6 +449,8 @@ html[data-aparencia="editorial"] main h1.titulo-pagina {
   font-size: clamp(56px, 8vw, 112px);
   line-height: 0.82;
   letter-spacing: -0.055em;
+  /* entrelinha ainda mais curta: a perna do "j" de "Hoje" pede mais folga */
+  padding-bottom: 0.2em;
 }
 @media (max-width: 1023px) {
   html[data-aparencia="painel"] main h1:not(.ProseMirror *) {
@@ -728,6 +731,34 @@ html[data-aparencia="editorial"] .coluna-n {
     margin: 4px 2px -2px 0;
     font-size: 56px;
   }
+}
+
+/* Painel Hoje e ficha do cliente (Fase 5): número do bloco no tom de cada aparência */
+.hoje-atr {
+  color: var(--atraso, var(--destructive));
+}
+.hoje-num {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 600;
+}
+html[data-aparencia="painel"] .hoje-num {
+  font-size: 40px;
+  font-weight: 200;
+  letter-spacing: -0.04em;
+}
+html[data-aparencia="editorial"] .hoje-bloco {
+  border: 0;
+  border-top: var(--regua) solid var(--regua-cor);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html[data-aparencia="editorial"] .hoje-num {
+  font-size: 64px;
+  line-height: 0.8;
+  font-weight: 900;
+  letter-spacing: -0.06em;
 }
 
 @layer base {

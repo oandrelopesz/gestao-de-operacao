@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Plus, Search, Users as UsersIcon, DollarSign, TrendingUp, Smile,
   MoreVertical, Pencil, Archive, Trash2, LayoutGrid, Table as TableIcon, Calendar, Play, Pause,
-  AlertCircle, Settings2, ArchiveRestore, UserMinus
+  AlertCircle, Settings2, ArchiveRestore, UserMinus, UserRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +61,20 @@ import { MENSAGEM_NENHUM, normalizarBusca, type ResultadoBusca } from "@/lib/sea
 import { MensagemBusca } from "@/components/MensagemBusca";
 import { ClientesChurn } from "@/components/clientes/ClientesChurn";
 import { ClientesPausados } from "@/components/clientes/ClientesPausados";
+import { useAparencia } from "@/lib/aparencia";
+
+/** "Abrir ficha" no menu do cliente: a ficha é do front novo, então só aparece fora da aparência Clássica */
+function ItemFicha({ id }: { id: string }) {
+  const { aparencia } = useAparencia();
+  if (aparencia === "classica") return null;
+  return (
+    <DropdownMenuItem asChild>
+      <Link to="/cliente/$id" params={{ id }}>
+        <UserRound size={14} className="mr-2" /> Abrir ficha
+      </Link>
+    </DropdownMenuItem>
+  );
+}
 
 type SearchParams = { agencia?: string; view?: "cards" | "tabela"; subAgencia?: string; aba?: "churn" | "pausados" };
 
@@ -726,6 +740,7 @@ function ClientesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-[200px]">
+                          <ItemFicha id={c.id} />
                           {c.arquivado ? (
                             <DropdownMenuItem onClick={() => handleRestore(c.id)}>
                               <ArchiveRestore size={14} className="mr-2" /> Restaurar
@@ -862,6 +877,7 @@ function ClienteCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[200px]">
+            <ItemFicha id={cliente.id} />
             {cliente.arquivado ? (
               <DropdownMenuItem onClick={onRestore}>
                 <ArchiveRestore size={14} className="mr-2" /> Restaurar

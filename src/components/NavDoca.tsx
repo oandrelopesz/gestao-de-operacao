@@ -1,19 +1,22 @@
 // Aparência "Painel e vidro", computador: trilho flutuante com um ícone por grupo; clicar abre as abas do grupo ao lado.
 import { useEffect, useRef, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Bookmark, LayoutDashboard, LogOut, Search, Settings, Sparkles, Target, Workflow, type LucideIcon } from "lucide-react";
+import { Brain, LogOut, Megaphone, Search, Settings, Sparkles, Sun, Users, Wallet, type LucideIcon } from "lucide-react";
 import type { NavLink } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 const ICONE_GRUPO: Record<string, LucideIcon> = {
-  Operação: LayoutDashboard,
-  Comercial: Target,
-  Pessoal: Bookmark,
-  Ferramentas: Workflow,
+  Hoje: Sun,
+  Clientes: Users,
+  "Marketing e canais": Megaphone,
+  "Comercial e dinheiro": Wallet,
+  "Meu cérebro": Brain,
   Sistema: Settings,
 };
 
 export function estaNaAba(pathname: string, to: string): boolean {
+  // A ficha do cliente (/cliente/$id) pertence à aba Clientes.
+  if (pathname.startsWith("/cliente/")) pathname = "/clientes";
   return to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`);
 }
 

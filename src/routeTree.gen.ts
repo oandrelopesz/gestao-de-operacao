@@ -30,6 +30,7 @@ import { Route as AuthenticatedLivrosRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedLinksRouteImport } from './routes/_authenticated/links'
 import { Route as AuthenticatedInstagramRouteImport } from './routes/_authenticated/instagram'
 import { Route as AuthenticatedIdeiasRouteImport } from './routes/_authenticated/ideias'
+import { Route as AuthenticatedHojeRouteImport } from './routes/_authenticated/hoje'
 import { Route as AuthenticatedHabilidadesRouteImport } from './routes/_authenticated/habilidades'
 import { Route as AuthenticatedGmnRouteImport } from './routes/_authenticated/gmn'
 import { Route as AuthenticatedFirefliesRouteImport } from './routes/_authenticated/fireflies'
@@ -48,6 +49,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAcessosRouteImport } from './routes/_authenticated/acessos'
 import { Route as AuthenticatedFluxogramasIndexRouteImport } from './routes/_authenticated/fluxogramas.index'
 import { Route as AuthenticatedFluxogramasIdRouteImport } from './routes/_authenticated/fluxogramas.$id'
+import { Route as AuthenticatedClienteIdRouteImport } from './routes/_authenticated/cliente.$id'
 
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
   id: '/privacidade',
@@ -154,6 +156,11 @@ const AuthenticatedIdeiasRoute = AuthenticatedIdeiasRouteImport.update({
   path: '/ideias',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedHojeRoute = AuthenticatedHojeRouteImport.update({
+  id: '/hoje',
+  path: '/hoje',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedHabilidadesRoute =
   AuthenticatedHabilidadesRouteImport.update({
     id: '/habilidades',
@@ -248,6 +255,11 @@ const AuthenticatedFluxogramasIdRoute =
     path: '/fluxogramas/$id',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedClienteIdRoute = AuthenticatedClienteIdRouteImport.update({
+  id: '/cliente/$id',
+  path: '/cliente/$id',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -269,6 +281,7 @@ export interface FileRoutesByFullPath {
   '/fireflies': typeof AuthenticatedFirefliesRoute
   '/gmn': typeof AuthenticatedGmnRoute
   '/habilidades': typeof AuthenticatedHabilidadesRoute
+  '/hoje': typeof AuthenticatedHojeRoute
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/instagram': typeof AuthenticatedInstagramRoute
   '/links': typeof AuthenticatedLinksRoute
@@ -286,6 +299,7 @@ export interface FileRoutesByFullPath {
   '/transcritor': typeof AuthenticatedTranscritorRoute
   '/utm': typeof AuthenticatedUtmRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
+  '/cliente/$id': typeof AuthenticatedClienteIdRoute
   '/fluxogramas/$id': typeof AuthenticatedFluxogramasIdRoute
   '/fluxogramas/': typeof AuthenticatedFluxogramasIndexRoute
 }
@@ -308,6 +322,7 @@ export interface FileRoutesByTo {
   '/fireflies': typeof AuthenticatedFirefliesRoute
   '/gmn': typeof AuthenticatedGmnRoute
   '/habilidades': typeof AuthenticatedHabilidadesRoute
+  '/hoje': typeof AuthenticatedHojeRoute
   '/ideias': typeof AuthenticatedIdeiasRoute
   '/instagram': typeof AuthenticatedInstagramRoute
   '/links': typeof AuthenticatedLinksRoute
@@ -326,6 +341,7 @@ export interface FileRoutesByTo {
   '/utm': typeof AuthenticatedUtmRoute
   '/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/': typeof AuthenticatedIndexRoute
+  '/cliente/$id': typeof AuthenticatedClienteIdRoute
   '/fluxogramas/$id': typeof AuthenticatedFluxogramasIdRoute
   '/fluxogramas': typeof AuthenticatedFluxogramasIndexRoute
 }
@@ -350,6 +366,7 @@ export interface FileRoutesById {
   '/_authenticated/fireflies': typeof AuthenticatedFirefliesRoute
   '/_authenticated/gmn': typeof AuthenticatedGmnRoute
   '/_authenticated/habilidades': typeof AuthenticatedHabilidadesRoute
+  '/_authenticated/hoje': typeof AuthenticatedHojeRoute
   '/_authenticated/ideias': typeof AuthenticatedIdeiasRoute
   '/_authenticated/instagram': typeof AuthenticatedInstagramRoute
   '/_authenticated/links': typeof AuthenticatedLinksRoute
@@ -368,6 +385,7 @@ export interface FileRoutesById {
   '/_authenticated/utm': typeof AuthenticatedUtmRoute
   '/_authenticated/ver-depois': typeof AuthenticatedVerDepoisRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/cliente/$id': typeof AuthenticatedClienteIdRoute
   '/_authenticated/fluxogramas/$id': typeof AuthenticatedFluxogramasIdRoute
   '/_authenticated/fluxogramas/': typeof AuthenticatedFluxogramasIndexRoute
 }
@@ -393,6 +411,7 @@ export interface FileRouteTypes {
     | '/fireflies'
     | '/gmn'
     | '/habilidades'
+    | '/hoje'
     | '/ideias'
     | '/instagram'
     | '/links'
@@ -410,6 +429,7 @@ export interface FileRouteTypes {
     | '/transcritor'
     | '/utm'
     | '/ver-depois'
+    | '/cliente/$id'
     | '/fluxogramas/$id'
     | '/fluxogramas/'
   fileRoutesByTo: FileRoutesByTo
@@ -432,6 +452,7 @@ export interface FileRouteTypes {
     | '/fireflies'
     | '/gmn'
     | '/habilidades'
+    | '/hoje'
     | '/ideias'
     | '/instagram'
     | '/links'
@@ -450,6 +471,7 @@ export interface FileRouteTypes {
     | '/utm'
     | '/ver-depois'
     | '/'
+    | '/cliente/$id'
     | '/fluxogramas/$id'
     | '/fluxogramas'
   id:
@@ -473,6 +495,7 @@ export interface FileRouteTypes {
     | '/_authenticated/fireflies'
     | '/_authenticated/gmn'
     | '/_authenticated/habilidades'
+    | '/_authenticated/hoje'
     | '/_authenticated/ideias'
     | '/_authenticated/instagram'
     | '/_authenticated/links'
@@ -491,6 +514,7 @@ export interface FileRouteTypes {
     | '/_authenticated/utm'
     | '/_authenticated/ver-depois'
     | '/_authenticated/'
+    | '/_authenticated/cliente/$id'
     | '/_authenticated/fluxogramas/$id'
     | '/_authenticated/fluxogramas/'
   fileRoutesById: FileRoutesById
@@ -650,6 +674,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIdeiasRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/hoje': {
+      id: '/_authenticated/hoje'
+      path: '/hoje'
+      fullPath: '/hoje'
+      preLoaderRoute: typeof AuthenticatedHojeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/habilidades': {
       id: '/_authenticated/habilidades'
       path: '/habilidades'
@@ -776,6 +807,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFluxogramasIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/cliente/$id': {
+      id: '/_authenticated/cliente/$id'
+      path: '/cliente/$id'
+      fullPath: '/cliente/$id'
+      preLoaderRoute: typeof AuthenticatedClienteIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -796,6 +834,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedFirefliesRoute: typeof AuthenticatedFirefliesRoute
   AuthenticatedGmnRoute: typeof AuthenticatedGmnRoute
   AuthenticatedHabilidadesRoute: typeof AuthenticatedHabilidadesRoute
+  AuthenticatedHojeRoute: typeof AuthenticatedHojeRoute
   AuthenticatedIdeiasRoute: typeof AuthenticatedIdeiasRoute
   AuthenticatedInstagramRoute: typeof AuthenticatedInstagramRoute
   AuthenticatedLinksRoute: typeof AuthenticatedLinksRoute
@@ -814,6 +853,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedUtmRoute: typeof AuthenticatedUtmRoute
   AuthenticatedVerDepoisRoute: typeof AuthenticatedVerDepoisRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedClienteIdRoute: typeof AuthenticatedClienteIdRoute
   AuthenticatedFluxogramasIdRoute: typeof AuthenticatedFluxogramasIdRoute
   AuthenticatedFluxogramasIndexRoute: typeof AuthenticatedFluxogramasIndexRoute
 }
@@ -835,6 +875,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedFirefliesRoute: AuthenticatedFirefliesRoute,
   AuthenticatedGmnRoute: AuthenticatedGmnRoute,
   AuthenticatedHabilidadesRoute: AuthenticatedHabilidadesRoute,
+  AuthenticatedHojeRoute: AuthenticatedHojeRoute,
   AuthenticatedIdeiasRoute: AuthenticatedIdeiasRoute,
   AuthenticatedInstagramRoute: AuthenticatedInstagramRoute,
   AuthenticatedLinksRoute: AuthenticatedLinksRoute,
@@ -853,6 +894,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedUtmRoute: AuthenticatedUtmRoute,
   AuthenticatedVerDepoisRoute: AuthenticatedVerDepoisRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedClienteIdRoute: AuthenticatedClienteIdRoute,
   AuthenticatedFluxogramasIdRoute: AuthenticatedFluxogramasIdRoute,
   AuthenticatedFluxogramasIndexRoute: AuthenticatedFluxogramasIndexRoute,
 }

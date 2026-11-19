@@ -33,6 +33,29 @@ export function aplicarMenu<L extends { to: string }>(
     .filter((g) => g.links.length > 0);
 }
 
+/** Menu das aparências Painel e Editorial (a Clássica segue com os grupos do NAV_GROUPS). */
+export const GRUPOS_NOVOS: { title: string; tos: string[] }[] = [
+  { title: "Hoje", tos: ["/hoje", "/", "/agenda", "/dashboard"] },
+  { title: "Clientes", tos: ["/clientes", "/onboarding", "/roadmap", "/saldo", "/nps", "/dados-internos", "/acessos", "/central", "/fireflies"] },
+  { title: "Marketing e canais", tos: ["/instagram", "/conteudo", "/gmn", "/swipe", "/utm", "/transcritor"] },
+  { title: "Comercial e dinheiro", tos: ["/crm", "/financeiro", "/taxas"] },
+  { title: "Meu cérebro", tos: ["/notas", "/ideias", "/links", "/arquivos", "/fluxogramas", "/cursos", "/livros", "/habilidades", "/radar", "/ver-depois"] },
+  { title: "Sistema", tos: ["/admin"] },
+];
+
+/** Redistribui os grupos já filtrados/ordenados pelo Admin nos grupos novos. Aba que não estiver
+ *  no GRUPOS_NOVOS (aba criada depois) cai no último grupo, para nunca sumir do menu. */
+export function reagrupar<L extends { to: string }>(grupos: { title: string; links: L[] }[], extras: L[] = []): { title: string; links: L[] }[] {
+  const todos = [...extras, ...grupos.flatMap((g) => g.links)];
+  const porTo = new Map(todos.map((l) => [l.to, l]));
+  const usados = new Set(GRUPOS_NOVOS.flatMap((g) => g.tos));
+  const sobras = todos.filter((l) => !usados.has(l.to));
+  return GRUPOS_NOVOS.map((g, i) => ({
+    title: g.title,
+    links: [...g.tos.flatMap((to) => porTo.get(to) ?? []), ...(i === GRUPOS_NOVOS.length - 1 ? sobras : [])],
+  })).filter((g) => g.links.length > 0);
+}
+
 export function moverNoGrupo(cfg: MenuConfig, grupo: string, tos: string[], to: string, delta: -1 | 1): MenuConfig {
   const lista = [...tos];
   const i = lista.indexOf(to);

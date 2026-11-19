@@ -32,6 +32,7 @@ import {
   Sparkles,
   Tags,
   Percent,
+  Sun,
 } from "lucide-react";
 
 export interface NavLink {
@@ -102,3 +103,6 @@ export const NAV_GROUPS: { title: string; links: NavLink[] }[] = [
     ],
   },
 ];
+
+/** Painel "Hoje": só existe no menu das aparências Painel e Editorial (fica fora do NAV_GROUPS da Clássica). */
+export const LINK_HOJE: NavLink = { label: "Hoje", icon: <Sun size={17} />, to: "/hoje", palavras: ["resumo", "dia", "painel", "início", "visão geral"] };
